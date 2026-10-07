@@ -85,6 +85,26 @@ function renderProjects() {
     <div class="meta">Mode: ${state.settings.localMode ? "Local-first" : "Remote"}</div>`;
 }
 
+async function createTask() {
+  const title = $("#task-title").value.trim();
+  if (!title) return;
+  const button = $("#create-task");
+  button.disabled = true;
+  try {
+    await fetchJson("/api/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title, assignedAgent: "codex" }),
+    });
+    $("#task-title").value = "";
+    await loadState();
+  } catch (error) {
+    alert(error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function renderTasks() {
   $("#tasks-list").innerHTML = state.tasks.map((task) => `
     <article class="list-item">
@@ -178,6 +198,9 @@ await checkHealth();\nsetInterval(async () => { try { await loadState(); await c
 const tokenInput = document.querySelector("#control-token");
 const saveTokenButton = document.querySelector("#save-control-token");
 if (tokenInput) tokenInput.value = CONTROL_TOKEN;
+const createTaskButton = document.querySelector("#create-task");
+if (createTaskButton) createTaskButton.addEventListener("click", () => createTask().catch((e) => alert(e.message)));
+
 if (saveTokenButton) saveTokenButton.addEventListener("click", () => {
   const value = tokenInput.value.trim();
   if (!value) return;
