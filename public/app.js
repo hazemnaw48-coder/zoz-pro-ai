@@ -172,3 +172,13 @@ document.querySelectorAll("[data-nav]").forEach((button) => {
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 await loadState();
 await checkHealth();
+
+const tokenInput = document.querySelector("#control-token");
+const saveTokenButton = document.querySelector("#save-control-token");
+if (tokenInput) tokenInput.value = CONTROL_TOKEN;
+if (saveTokenButton) saveTokenButton.addEventListener("click", () => {
+  const value = tokenInput.value.trim();
+  if (!value) return;
+  localStorage.setItem("zoz_control_token", value);
+  location.reload();
+});
