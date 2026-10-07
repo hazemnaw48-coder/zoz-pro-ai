@@ -4,6 +4,8 @@ import os from "node:os";
 
 const execFileAsync = promisify(execFile);
 const CONTROL_URL = (process.env.ZOZ_PRO_CONTROL_URL ?? "http://127.0.0.1:3000").replace(/\/$/, "");
+const CONTROL_TOKEN = process.env.ZOZ_CONTROL_TOKEN ?? "";
+if (!CONTROL_TOKEN) throw new Error("ZOZ_CONTROL_TOKEN is required.");
 const POLL_MS = Number(process.env.ZOZ_PRO_POLL_MS ?? 5000);
 const REPO_DIR = process.env.ZOZ_PRO_REPO_DIR ?? process.cwd();
 const MAX_OUTPUT = 12000;
@@ -11,7 +13,7 @@ const MAX_OUTPUT = 12000;
 async function post(path, body) {
   const response = await fetch(`${CONTROL_URL}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", authorization: `Bearer ${CONTROL_TOKEN}` },
     body: JSON.stringify(body),
   });
   const data = await response.json();
@@ -25,7 +27,7 @@ async function heartbeat(extra = {}) {
 }
 
 async function claimNext() {
-  const response = await fetch(`${CONTROL_URL}/api/control/commands`, { cache: "no-store" });
+  const response = await fetch(`${CONTROL_URL}/api/control/commands`, { cache: "no-store", headers: { authorization: `Bearer ${CONTROL_TOKEN}` } });
   if (!response.ok) throw new Error(`queue HTTP ${response.status}`);
   const { commands = [] } = await response.json();
   return commands.find((command) => command.status === "queued" && !command.requiresApproval);
