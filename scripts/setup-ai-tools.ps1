@@ -14,11 +14,15 @@ if (-not (Has-Command "git")) {
   Write-Host ("Git: " + (git --version))
 }
 
-# 2) Node.js (needed by the documented Claude Code npm installation)
+# 2) Node.js / npm
 if (-not (Has-Command "node")) {
-  Write-Host "Node.js not found. Install Node.js 18+ before installing Claude Code."
+  Write-Host "Node.js not found. Install Node.js 20+ before installing the CLI tools."
 } else {
   Write-Host ("Node.js: " + (node --version))
+}
+
+if (-not (Has-Command "npm")) {
+  Write-Host "npm not found. Install Node.js 20+ and rerun this script."
 }
 
 # 3) Codex CLI
@@ -41,19 +45,27 @@ if (-not (Has-Command "claude")) {
   Write-Host ("Claude Code: " + (claude --version))
 }
 
-# 5) Google Antigravity CLI
-if (-not (Has-Command "agy")) {
-  Write-Host "Installing Google Antigravity CLI..."
-  irm https://antigravity.google/cli/install.ps1 | iex
+# 5) Gemini CLI (Google Gemini)
+# NOTE: Gemini CLI is separate from Google Antigravity.
+if (-not (Has-Command "gemini")) {
+  if (Has-Command "npm") {
+    Write-Host "Installing Gemini CLI..."
+    npm install -g @google/gemini-cli
+  } else {
+    Write-Host "npm not found; Gemini CLI was not installed."
+  }
 } else {
-  Write-Host ("Antigravity: " + (agy --version))
+  Write-Host ("Gemini CLI: " + (gemini --version))
 }
 
 Write-Host ""
 Write-Host "Verification commands:"
 Write-Host "  git --version"
+Write-Host "  node --version"
+Write-Host "  npm --version"
 Write-Host "  codex --version"
 Write-Host "  claude --version"
-Write-Host "  agy --version"
+Write-Host "  gemini --version"
 Write-Host ""
 Write-Host "Authentication is separate. Do not add API keys to this repository."
+Write-Host "Antigravity is intentionally excluded from this baseline."
