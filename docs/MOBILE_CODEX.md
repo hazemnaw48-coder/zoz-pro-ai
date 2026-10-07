@@ -30,3 +30,25 @@ The executor polls the queue, claims one normal command at a time, runs Codex in
 ## Offline computer
 
 The phone can queue commands while the computer is offline. They remain pending until the executor reconnects. The computer must be powered on and the executor running for local Codex execution.
+
+## Windows auto-start
+
+Configure the token and control URL once:
+
+```powershell
+.\scripts\configure-codex-executor.ps1 -Token "<YOUR_OWNER_TOKEN>" -ControlUrl "https://YOUR-ZOZ-PRO-HOST"
+```
+
+Then install the per-user logon task:
+
+```powershell
+.\scripts\install-codex-executor-task.ps1
+```
+
+Remove it with:
+
+```powershell
+.\scripts\remove-codex-executor-task.ps1
+```
+
+The real token is never committed to the repository.
