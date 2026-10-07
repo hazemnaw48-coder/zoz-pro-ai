@@ -36,6 +36,15 @@ test("mobile control queue persists normal commands and blocks risky commands pe
     const state = await (await fetch(`http://127.0.0.1:${port}/api/state`)).json();
     assert.equal(state.controlCommands.length, 2);
     assert.equal(state.controlCommands[0].instruction, "Deploy the application.");
+    assert.equal(state.approvals[0].commandId, riskyCommand.id);
+    const approve = await fetch(`http://127.0.0.1:${port}/api/approvals/${encodeURIComponent(riskyCommand.approvalId)}/approve`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ decidedBy: "Owner" }),
+    });
+    assert.equal(approve.status, 200);
+    const afterApproval = await (await fetch(`http://127.0.0.1:${port}/api/state`)).json();
+    assert.equal(afterApproval.controlCommands[0].status, "queued");
   } finally {
     await new Promise((resolve) => server.close(resolve));
     delete process.env.ZOZ_DATA_DIR;
