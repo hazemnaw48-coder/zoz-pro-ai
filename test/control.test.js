@@ -14,7 +14,6 @@ test("mobile control queue persists normal commands and blocks risky commands pe
 
   try {
     const normal = await fetch(`http://127.0.0.1:${port}/api/control/commands`, {
-      headers: { authorization: "Bearer test-control-token" },
       method: "POST",
       headers: { "content-type": "application/json", authorization: "Bearer test-control-token" },
       body: JSON.stringify({ instruction: "Review ZP-001 and report findings." }),
@@ -24,9 +23,8 @@ test("mobile control queue persists normal commands and blocks risky commands pe
     assert.equal(normalCommand.status, "queued");
 
     const risky = await fetch(`http://127.0.0.1:${port}/api/control/commands`, {
-      headers: { authorization: "Bearer test-control-token" },
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", authorization: "Bearer test-control-token" },
       body: JSON.stringify({
         instruction: "Deploy the application.",
         actionType: "production_affecting",
