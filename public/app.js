@@ -33,7 +33,12 @@ function renderControl() {
     : '<div class="panel muted-text">No commands yet.</div>';
 }
 
-async function cancelCommand(id) {\n  await fetchJson(`/api/control/commands/${encodeURIComponent(id)}/cancel`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ actor: "Owner" }) });\n  await loadState();\n}\n\nasync function sendCommand() {
+async function cancelCommand(id) {
+  await fetchJson(`/api/control/commands/${encodeURIComponent(id)}/cancel`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ actor: "Owner" }) });
+  await loadState();
+}
+
+async function sendCommand() {
   const instruction = $("#control-instruction").value.trim();
   const actionType = $("#control-risk").value || null;
   if (!instruction) return;
@@ -163,7 +168,11 @@ function renderSettings() {
     <div class="meta">Deployment status: ${escapeHtml(state.project.deploymentStatus)}</div>`;
 }
 
-function bindControlActions() {\n  document.querySelectorAll("[data-cancel]").forEach((b) => b.addEventListener("click", () => cancelCommand(b.dataset.cancel).catch((e) => alert(e.message))));\n}\n\nasync function loadState() {
+function bindControlActions() {
+  document.querySelectorAll("[data-cancel]").forEach((b) => b.addEventListener("click", () => cancelCommand(b.dataset.cancel).catch((e) => alert(e.message))));
+}
+
+async function loadState() {
   state = await fetchJson("/api/state");
   renderDashboard(); renderProjects(); renderTasks(); renderControl(); renderApprovals(); renderActivity(); renderAgents(); renderSettings(); bindControlActions();
 }
@@ -193,7 +202,8 @@ document.querySelectorAll("[data-nav]").forEach((button) => {
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 await loadState();
-await checkHealth();\nsetInterval(async () => { try { await loadState(); await checkHealth(); } catch {} }, 5000);
+await checkHealth();
+setInterval(async () => { try { await loadState(); await checkHealth(); } catch {} }, 5000);
 
 const tokenInput = document.querySelector("#control-token");
 const saveTokenButton = document.querySelector("#save-control-token");
