@@ -74,7 +74,7 @@ export function assertTaskTransition(from, to) {
 
 export function createInitialState() {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     project: {
       id: "ZOZ-PRO",
       name: "ZOZ Pro",
@@ -107,6 +107,14 @@ export function createInitialState() {
     ],
     approvals: [],
     controlCommands: [],
+    executor: {
+      agent: "Codex",
+      status: "offline",
+      lastSeen: null,
+      hostname: null,
+      currentCommandId: null,
+      lastError: null,
+    },
     activity: [
       {
         id: "act-001",
