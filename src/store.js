@@ -2,12 +2,16 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createInitialState, validateState } from "./domain.js";
 
-export const DEFAULT_STATE_FILE = path.resolve(
-  process.env.ZOZ_DATA_DIR ?? path.join(process.cwd(), "data"),
-  "zoz-pro-state.json",
-);
+export function getDefaultStateFile() {
+  return path.resolve(
+    process.env.ZOZ_DATA_DIR ?? path.join(process.cwd(), "data"),
+    "zoz-pro-state.json",
+  );
+}
 
-export function createStateStore(filePath = DEFAULT_STATE_FILE) {
+export const DEFAULT_STATE_FILE = getDefaultStateFile();
+
+export function createStateStore(filePath = getDefaultStateFile()) {
   return {
     async load() {
       try {
