@@ -108,7 +108,11 @@ export function createInitialState() {
     approvals: [],
     controlCommands: [],
     executor: {
+      id: "codex",
       agent: "Codex",
+      mode: "local_cli",
+      protocol: "zoz-control-v1",
+      capabilities: ["coding", "tests", "git"],
       status: "offline",
       lastSeen: null,
       hostname: null,
