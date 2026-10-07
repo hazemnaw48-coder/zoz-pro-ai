@@ -1,9 +1,12 @@
 let state = null;
+const CONTROL_TOKEN = localStorage.getItem("zoz_control_token") ?? "";
 
 const $ = (selector) => document.querySelector(selector);
 
-async function fetchJson(url, options) {
-  const response = await fetch(url, options);
+async function fetchJson(url, options = {}) {
+  const headers = new Headers(options.headers ?? {});
+  if (CONTROL_TOKEN) headers.set("Authorization", `Bearer ${CONTROL_TOKEN}`);
+  const response = await fetch(url, { ...options, headers });
   const body = await response.json();
   if (!response.ok) throw new Error(body.error ?? "Request failed");
   return body;
