@@ -40,7 +40,7 @@ test("mobile control queue persists normal commands and blocks risky commands pe
     assert.equal(state.approvals[0].commandId, riskyCommand.id);
     const approve = await fetch(`http://127.0.0.1:${port}/api/approvals/${encodeURIComponent(riskyCommand.approvalId)}/approve`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", authorization: "Bearer test-control-token" },
       body: JSON.stringify({ decidedBy: "Owner" }),
     });
     assert.equal(approve.status, 200);
