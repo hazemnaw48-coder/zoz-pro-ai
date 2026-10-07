@@ -3,7 +3,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  APPROVAL_STATUSES,
   assertTaskTransition,
   createInitialState,
   requiresApproval,
@@ -90,7 +89,7 @@ async function handleApi(req, res, url) {
     return sendJson(res, 201, task);
   }
 
-  const transitionMatch = url.pathname.match(/^\\/api\\/tasks\\/([^/]+)\\/transition$/);
+  const transitionMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/transition$/);
   if (req.method === "POST" && transitionMatch) {
     const taskId = decodeURIComponent(transitionMatch[1]);
     const body = await readJson(req);
@@ -161,7 +160,7 @@ async function handleApi(req, res, url) {
     return sendJson(res, 201, approval);
   }
 
-  const approvalMatch = url.pathname.match(/^\\/api\\/approvals\\/([^/]+)\\/(approve|reject)$/);
+  const approvalMatch = url.pathname.match(/^\/api\/approvals\/([^/]+)\/(approve|reject)$/);
   if (req.method === "POST" && approvalMatch) {
     const approvalId = decodeURIComponent(approvalMatch[1]);
     const decision = approvalMatch[2];
