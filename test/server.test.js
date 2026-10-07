@@ -31,7 +31,7 @@ test("server exposes state and enforces approval gate", async () => {
   } finally {
     await new Promise((resolve) => server.close(resolve));
     delete process.env.ZOZ_DATA_DIR;
-  delete process.env.ZOZ_CONTROL_TOKEN;
+    delete process.env.ZOZ_CONTROL_TOKEN;
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
@@ -39,6 +39,7 @@ test("server exposes state and enforces approval gate", async () => {
 test("server persists explicit approval decisions", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "zoz-pro-server-"));
   process.env.ZOZ_DATA_DIR = dir;
+  process.env.ZOZ_CONTROL_TOKEN = "test-control-token";
 
   const { server } = await import("../src/server.js");
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -47,7 +48,7 @@ test("server persists explicit approval decisions", async () => {
   try {
     const create = await fetch(`http://127.0.0.1:${port}/api/approvals`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", authorization: "Bearer test-control-token" },
       body: JSON.stringify({
         taskId: "ZP-001",
         actionType: "financial",
@@ -74,6 +75,7 @@ test("server persists explicit approval decisions", async () => {
   } finally {
     await new Promise((resolve) => server.close(resolve));
     delete process.env.ZOZ_DATA_DIR;
+    delete process.env.ZOZ_CONTROL_TOKEN;
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
