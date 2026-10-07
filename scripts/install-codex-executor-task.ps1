@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 param([string]$TaskName = "ZOZ Pro Codex Executor")
-$repoDir = (Get-Location).Path
+$repoDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $scriptPath = Join-Path $repoDir "scripts\start-codex-executor.ps1"
 if (-not (Test-Path $scriptPath)) { throw "ZOZ Pro executor launcher not found: $scriptPath" }
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw "Node.js was not found in PATH." }
