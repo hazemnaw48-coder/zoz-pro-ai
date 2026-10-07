@@ -1,0 +1,17 @@
+{
+  "name": "zoz-pro",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test",
+    "build": "node --check src/domain.js && node --check src/store.js && node --check src/control.js && node --check src/server.js && node --check scripts/codex-executor.mjs && node --check public/app.js",
+    "executor": "node scripts/codex-executor.mjs",
+    "test:control": "node --test test/control.test.js",
+    "test:server": "node --test test/server.test.js"
+  }
+}
