@@ -113,6 +113,27 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { commands: state.controlCommands ?? [] });
   }
 
+  if (req.method === "GET" && url.pathname === "/api/executor/status") {
+    return sendJson(res, 200, state.executor ?? {
+      agent: "Codex", status: "offline", lastSeen: null, hostname: null,
+      currentCommandId: null, lastError: null,
+    });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/executor/heartbeat") {
+    const body = await readJson(req);
+    state.executor = {
+      agent: "Codex",
+      status: "online",
+      lastSeen: new Date().toISOString(),
+      hostname: typeof body.hostname === "string" ? body.hostname : null,
+      currentCommandId: body.currentCommandId ?? null,
+      lastError: body.lastError ?? null,
+    };
+    await store.save(state);
+    return sendJson(res, 200, state.executor);
+  }
+
   if (req.method === "POST" && url.pathname === "/api/control/commands") {
     try {
       const command = createControlCommand(state, await readJson(req));
