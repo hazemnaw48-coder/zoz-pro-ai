@@ -7,6 +7,10 @@ import {
   createInitialState,
   requiresApproval,
 } from "./domain.js";
+import {
+  assertControlCommandTransition,
+  normalizeControlCommandInput,
+} from "./control.js";
 import { createStateStore } from "./store.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -19,11 +23,10 @@ const CONTENT_TYPES = {
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
 };
 
-function getStore() {
-  return createStateStore();
-}
+function getStore() { return createStateStore(); }
 
 function sendJson(res, status, payload) {
   res.writeHead(status, {
@@ -48,16 +51,107 @@ function appendActivity(state, activity) {
   });
 }
 
+function createControlCommand(state, body) {
+  const input = normalizeControlCommandInput(body);
+  if (input.requiresApproval) {
+    return {
+      id: `CMD-${Date.now()}`,
+      ...input,
+      status: "awaiting_approval",
+      requestedBy: body.requestedBy ?? "Owner",
+      createdAt: new Date().toISOString(),
+      claimedAt: null,
+      completedAt: null,
+      result: null,
+      error: null,
+    };
+  }
+  return {
+    id: `CMD-${Date.now()}`,
+    ...input,
+    status: "queued",
+    requestedBy: body.requestedBy ?? "Owner",
+    createdAt: new Date().toISOString(),
+    claimedAt: null,
+    completedAt: null,
+    result: null,
+    error: null,
+  };
+}
+
 async function handleApi(req, res, url) {
   const store = getStore();
   const state = await store.load();
 
   if (req.method === "GET" && url.pathname === "/api/health") {
-    return sendJson(res, 200, { status: "ok", project: state.project.repository });
+    return sendJson(res, 200, {
+      status: "ok",
+      project: state.project.repository,
+      controlPlane: "ready",
+      queuedCommands: state.controlCommands?.filter((c) => c.status === "queued").length ?? 0,
+    });
   }
 
   if (req.method === "GET" && url.pathname === "/api/state") {
     return sendJson(res, 200, state);
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/control/commands") {
+    return sendJson(res, 200, { commands: state.controlCommands ?? [] });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/control/commands") {
+    try {
+      const command = createControlCommand(state, await readJson(req));
+      state.controlCommands ??= [];
+      state.controlCommands.unshift(command);
+      appendActivity(state, {
+        type: "control_command_created",
+        actor: command.requestedBy,
+        message: `${command.id} queued for Codex: ${command.instruction}`,
+      });
+      await store.save(state);
+      return sendJson(res, 201, command);
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  const commandMatch = url.pathname.match(/^\/api\/control\/commands\/([^/]+)\/(claim|complete|fail|cancel)$/);
+  if (req.method === "POST" && commandMatch) {
+    const commandId = decodeURIComponent(commandMatch[1]);
+    const action = commandMatch[2];
+    const command = (state.controlCommands ?? []).find((item) => item.id === commandId);
+    if (!command) return sendJson(res, 404, { error: "command not found" });
+
+    const target = {
+      claim: "claimed",
+      complete: "completed",
+      fail: "failed",
+      cancel: "cancelled",
+    }[action];
+
+    try {
+      assertControlCommandTransition(command.status, target);
+    } catch (error) {
+      return sendJson(res, 409, { error: error.message });
+    }
+
+    const body = await readJson(req);
+    command.status = target;
+    if (target === "claimed") command.claimedAt = new Date().toISOString();
+    if (target === "completed") {
+      command.completedAt = new Date().toISOString();
+      command.result = typeof body.result === "string" ? body.result : "Completed";
+    }
+    if (target === "failed") command.error = typeof body.error === "string" ? body.error : "Failed";
+    appendActivity(state, {
+      type: `control_command_${target}`,
+      actor: body.actor ?? "Codex",
+      message: `${command.id}: ${target}`,
+    });
+    await store.save(state);
+    return sendJson(res, 200, command);
   }
 
   if (req.method === "POST" && url.pathname === "/api/tasks") {
@@ -65,8 +159,10 @@ async function handleApi(req, res, url) {
     if (!body.title || typeof body.title !== "string") {
       return sendJson(res, 400, { error: "title is required" });
     }
-
     const id = body.id ?? `ZP-${String(state.tasks.length + 1).padStart(3, "0")}`;
+    if (state.tasks.some((item) => item.id === id)) {
+      return sendJson(res, 409, { error: "task id already exists" });
+    }
     const task = {
       id,
       title: body.title.trim(),
@@ -77,7 +173,6 @@ async function handleApi(req, res, url) {
       requiredChecks: Array.isArray(body.requiredChecks) ? body.requiredChecks : ["build", "tests"],
       result: null,
     };
-
     state.tasks.unshift(task);
     appendActivity(state, {
       type: "task_created",
@@ -99,10 +194,7 @@ async function handleApi(req, res, url) {
     const actionType = body.actionType ?? null;
     if (actionType && requiresApproval(actionType)) {
       const approval = state.approvals.find(
-        (item) =>
-          item.taskId === taskId &&
-          item.actionType === actionType &&
-          item.status === "approved",
+        (item) => item.taskId === taskId && item.actionType === actionType && item.status === "approved",
       );
       if (!approval) {
         return sendJson(res, 409, {
@@ -117,7 +209,6 @@ async function handleApi(req, res, url) {
     } catch (error) {
       return sendJson(res, 409, { error: error.message });
     }
-
     task.status = body.status;
     if (typeof body.result === "string") task.result = body.result;
     appendActivity(state, {
@@ -126,7 +217,6 @@ async function handleApi(req, res, url) {
       taskId,
       message: `${taskId}: ${body.status}`,
     });
-
     await store.save(state);
     return sendJson(res, 200, task);
   }
@@ -134,11 +224,11 @@ async function handleApi(req, res, url) {
   if (req.method === "POST" && url.pathname === "/api/approvals") {
     const body = await readJson(req);
     if (!body.taskId || !body.actionType || !requiresApproval(body.actionType)) {
-      return sendJson(res, 400, {
-        error: "taskId and a supported risk actionType are required",
-      });
+      return sendJson(res, 400, { error: "taskId and a supported risk actionType are required" });
     }
-
+    if (!state.tasks.some((item) => item.id === body.taskId)) {
+      return sendJson(res, 404, { error: "task not found" });
+    }
     const approval = {
       id: `APR-${Date.now()}`,
       taskId: body.taskId,
@@ -167,9 +257,7 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const approval = state.approvals.find((item) => item.id === approvalId);
     if (!approval) return sendJson(res, 404, { error: "approval not found" });
-    if (approval.status !== "pending") {
-      return sendJson(res, 409, { error: "approval already decided" });
-    }
+    if (approval.status !== "pending") return sendJson(res, 409, { error: "approval already decided" });
 
     approval.status = decision === "approve" ? "approved" : "rejected";
     approval.decidedBy = body.decidedBy ?? "Owner";
@@ -180,6 +268,15 @@ async function handleApi(req, res, url) {
       taskId: approval.taskId,
       message: `${approval.actionType} approval ${approval.status}.`,
     });
+
+    if (approval.status === "approved") {
+      for (const command of state.controlCommands ?? []) {
+        if (command.status === "awaiting_approval" && command.actionType === approval.actionType) {
+          command.status = "queued";
+        }
+      }
+    }
+
     await store.save(state);
     return sendJson(res, 200, approval);
   }
@@ -193,7 +290,6 @@ async function serveStatic(req, res, url) {
   if (!filePath.startsWith(publicDir + path.sep)) {
     return sendJson(res, 400, { error: "invalid path" });
   }
-
   try {
     const body = await fs.readFile(filePath);
     const type = CONTENT_TYPES[path.extname(filePath)] ?? "application/octet-stream";
@@ -208,11 +304,8 @@ async function serveStatic(req, res, url) {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
-    if (url.pathname.startsWith("/api/")) {
-      await handleApi(req, res, url);
-    } else {
-      await serveStatic(req, res, url);
-    }
+    if (url.pathname.startsWith("/api/")) await handleApi(req, res, url);
+    else await serveStatic(req, res, url);
   } catch (error) {
     console.error(error);
     sendJson(res, 500, { error: "internal_server_error" });
