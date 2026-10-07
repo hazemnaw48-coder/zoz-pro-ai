@@ -12,6 +12,7 @@ import {
   normalizeControlCommandInput,
 } from "./control.js";
 import { createStateStore } from "./store.js";
+import { isAuthorized, sendUnauthorized } from "./auth.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -104,6 +105,8 @@ async function handleApi(req, res, url) {
       queuedCommands: state.controlCommands?.filter((c) => c.status === "queued").length ?? 0,
     });
   }
+
+  if (!isAuthorized(req)) return sendUnauthorized(res);
 
   if (req.method === "GET" && url.pathname === "/api/state") {
     return sendJson(res, 200, state);
