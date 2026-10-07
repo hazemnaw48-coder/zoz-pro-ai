@@ -106,6 +106,7 @@ export function createInitialState() {
       },
     ],
     approvals: [],
+    controlCommands: [],
     activity: [
       {
         id: "act-001",
