@@ -9,7 +9,7 @@ ZP-001 — Foundation: application skeleton and durable project state
 task/ZP-001-foundation
 
 ## Last Verified Commit
-85d65ada4389e0c6649a97e6bca8544acfc9b46e — code present on branch; independent full-repository verification is still pending.
+4696871603c9242db0aca1326ce7dfc9ba0250bc — state-store path resolution fix verified by GitHub Actions.
 
 ## Files Changed
 - .gitignore
@@ -27,27 +27,32 @@ task/ZP-001-foundation
 - .github/workflows/ci.yml
 
 ## Tests Passed
-- Local syntax/test validation was run against a reconstructed verification fixture: 6/6 tests passed and build syntax checks passed.
-- This is not yet accepted as final repository verification because the execution environment could not clone GitHub.
+- GitHub Actions workflow: ZOZ Pro CI
+- Workflow run: 37698967259
+- Event: push
+- Head SHA: 4696871603c9242db0aca1326ce7dfc9ba0250bc
+- `npm test`: success
+- `npm run build`: success
+- CI checkout of the exact repository branch: success
+- Previous persistence test failure was resolved by resolving the default state-file path at store creation time.
 
 ## Tests Failed
-- No application test failure recorded.
-- Repository checkout verification blocked by environment DNS/network access.
+- None recorded on the verified commit.
 
 ## Blocked Reason
-Independent execution of the exact GitHub branch is pending. GitHub reports the existing Vercel check as pending; no production deployment was initiated by this task.
+None for ZP-001 technical verification.
 
 ## Next Allowed Action
-Run npm test and npm run build from the exact task/ZP-001-foundation checkout. Then update this state with the exact verified result and commit SHA. Only after that, perform reviewer verification. Do not merge or deploy.
+Reviewer verification of ZP-001, then owner decision on merge to main. Do not start ZP-002 and do not deploy until review and explicit owner approval.
 
 ## Last Agent
 Codex — primary implementer
 
 ## Last Review
-Not yet reviewed.
+Pending independent reviewer pass.
 
 ## Deployment Status
-not_deployed — deployment is intentionally disabled until owner approval.
+not_deployed — deployment remains disabled until owner approval.
 
 ## Boundaries
 - Repository: hazemnaw48-coder/zoz-pro-ai
