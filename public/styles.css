@@ -159,7 +159,7 @@ h3 { font-size: 1rem; }
   color: #fff;
 }
 
-.approval-actions {
+.control-row { display:flex; gap:8px; margin-top:10px; } textarea, select { width:100%; border:1px solid #d1d5db; border-radius:10px; padding:10px; font:inherit; } .control-row select { flex:1; } .control-row button { border:0; border-radius:10px; padding:10px 14px; background:#111827; color:#fff; } .control-row button:disabled { opacity:.5; }\n\n.approval-actions {
   display: flex;
   gap: 8px;
   margin-top: 10px;
