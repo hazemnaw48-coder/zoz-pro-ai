@@ -53,30 +53,43 @@ function appendActivity(state, activity) {
 
 function createControlCommand(state, body) {
   const input = normalizeControlCommandInput(body);
-  if (input.requiresApproval) {
-    return {
-      id: `CMD-${Date.now()}`,
-      ...input,
-      status: "awaiting_approval",
-      requestedBy: body.requestedBy ?? "Owner",
-      createdAt: new Date().toISOString(),
-      claimedAt: null,
-      completedAt: null,
-      result: null,
-      error: null,
-    };
-  }
-  return {
-    id: `CMD-${Date.now()}`,
+  const id = `CMD-${Date.now()}`;
+  const command = {
+    id,
     ...input,
-    status: "queued",
+    status: input.requiresApproval ? "awaiting_approval" : "queued",
     requestedBy: body.requestedBy ?? "Owner",
     createdAt: new Date().toISOString(),
     claimedAt: null,
     completedAt: null,
     result: null,
     error: null,
+    approvalId: null,
   };
+
+  if (input.requiresApproval) {
+    const approval = {
+      id: `APR-${Date.now()}-${id}`,
+      taskId: body.taskId ?? state.project.currentTask,
+      commandId: id,
+      actionType: input.actionType,
+      status: "pending",
+      requestedBy: command.requestedBy,
+      decidedBy: null,
+      decidedAt: null,
+      reason: body.reason ?? "Mobile command requires explicit owner approval.",
+    };
+    command.approvalId = approval.id;
+    state.approvals.unshift(approval);
+    appendActivity(state, {
+      type: "approval_requested",
+      actor: approval.requestedBy,
+      taskId: approval.taskId,
+      message: `Approval requested for mobile command ${id}.`,
+    });
+  }
+
+  return command;
 }
 
 async function handleApi(req, res, url) {
@@ -270,11 +283,10 @@ async function handleApi(req, res, url) {
     });
 
     if (approval.status === "approved") {
-      for (const command of state.controlCommands ?? []) {
-        if (command.status === "awaiting_approval" && command.actionType === approval.actionType) {
-          command.status = "queued";
-        }
-      }
+      const command = (state.controlCommands ?? []).find(
+        (item) => item.approvalId === approval.id && item.status === "awaiting_approval",
+      );
+      if (command) command.status = "queued";
     }
 
     await store.save(state);
