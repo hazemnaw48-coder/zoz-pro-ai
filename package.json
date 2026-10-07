@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test",
-    "build": "node --check src/domain.js && node --check src/store.js && node --check src/server.js && node --check public/app.js"
+    "build": "node --check src/domain.js && node --check src/store.js && node --check src/server.js && node --check public/app.js",
+    "executor": "node scripts/codex-executor.mjs"
   }
 }
