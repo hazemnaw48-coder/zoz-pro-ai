@@ -43,3 +43,24 @@ test("approval risk catalog is persisted in settings", () => {
     "account_affecting",
   ]);
 });
+
+import { assertControlCommandTransition, normalizeControlCommandInput } from "../src/control.js";
+
+test("mobile control commands are normalized and risk-gated", () => {
+  assert.deepEqual(normalizeControlCommandInput({
+    instruction: "Run the ZP-001 verification",
+  }), {
+    instruction: "Run the ZP-001 verification",
+    actionType: null,
+    requiresApproval: false,
+  });
+  assert.equal(normalizeControlCommandInput({
+    instruction: "Deploy",
+    actionType: "production_affecting",
+  }).requiresApproval, true);
+});
+
+test("control command lifecycle cannot skip Codex claim", () => {
+  assert.equal(assertControlCommandTransition("queued", "claimed"), undefined);
+  assert.throws(() => assertControlCommandTransition("queued", "completed"), /Invalid control command transition/);
+});
