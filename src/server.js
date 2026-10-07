@@ -175,6 +175,9 @@ async function handleApi(req, res, url) {
     }
 
     const body = await readJson(req);
+    if (action === "claim" && command.requiresApproval) {
+      return sendJson(res, 409, { error: "approval_required", message: "This command must be approved before it can be claimed." });
+    }
     command.status = target;
     if (target === "claimed") command.claimedAt = new Date().toISOString();
     if (target === "completed") {
@@ -182,6 +185,7 @@ async function handleApi(req, res, url) {
       command.result = typeof body.result === "string" ? body.result : "Completed";
     }
     if (target === "failed") command.error = typeof body.error === "string" ? body.error : "Failed";
+    if (target === "cancelled") command.cancelledAt = new Date().toISOString();
     appendActivity(state, {
       type: `control_command_${target}`,
       actor: body.actor ?? "Codex",
