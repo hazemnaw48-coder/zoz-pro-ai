@@ -62,7 +62,7 @@ test("server persists explicit approval decisions", async () => {
       `http://127.0.0.1:${port}/api/approvals/${encodeURIComponent(approval.id)}/approve`,
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", authorization: "Bearer test-control-token" },
         body: JSON.stringify({ decidedBy: "Owner" }),
       },
     );
