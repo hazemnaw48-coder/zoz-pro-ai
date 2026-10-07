@@ -13,7 +13,6 @@ import { createStateStore } from "./store.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const publicDir = path.resolve(__dirname, "../public");
-const store = createStateStore();
 const PORT = Number(process.env.PORT ?? 3000);
 
 const CONTENT_TYPES = {
@@ -22,6 +21,10 @@ const CONTENT_TYPES = {
   ".css": "text/css; charset=utf-8",
   ".json": "application/json; charset=utf-8",
 };
+
+function getStore() {
+  return createStateStore();
+}
 
 function sendJson(res, status, payload) {
   res.writeHead(status, {
@@ -47,6 +50,7 @@ function appendActivity(state, activity) {
 }
 
 async function handleApi(req, res, url) {
+  const store = getStore();
   const state = await store.load();
 
   if (req.method === "GET" && url.pathname === "/api/health") {
@@ -86,7 +90,7 @@ async function handleApi(req, res, url) {
     return sendJson(res, 201, task);
   }
 
-  const transitionMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/transition$/);
+  const transitionMatch = url.pathname.match(/^\\/api\\/tasks\\/([^/]+)\\/transition$/);
   if (req.method === "POST" && transitionMatch) {
     const taskId = decodeURIComponent(transitionMatch[1]);
     const body = await readJson(req);
@@ -157,7 +161,7 @@ async function handleApi(req, res, url) {
     return sendJson(res, 201, approval);
   }
 
-  const approvalMatch = url.pathname.match(/^\/api\/approvals\/([^/]+)\/(approve|reject)$/);
+  const approvalMatch = url.pathname.match(/^\\/api\\/approvals\\/([^/]+)\\/(approve|reject)$/);
   if (req.method === "POST" && approvalMatch) {
     const approvalId = decodeURIComponent(approvalMatch[1]);
     const decision = approvalMatch[2];
