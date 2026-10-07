@@ -9,20 +9,21 @@ import { createStateStore } from "../src/store.js";
 test("server exposes state and enforces approval gate", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "zoz-pro-server-"));
   process.env.ZOZ_DATA_DIR = dir;
+  process.env.ZOZ_CONTROL_TOKEN = "test-control-token";
 
   const { server } = await import("../src/server.js");
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const port = server.address().port;
 
   try {
-    const stateResponse = await fetch(`http://127.0.0.1:${port}/api/state`);
+    const stateResponse = await fetch(`http://127.0.0.1:${port}/api/state`, { headers: { authorization: "Bearer test-control-token" } });
     assert.equal(stateResponse.status, 200);
     const state = await stateResponse.json();
     assert.equal(state.project.repository, "hazemnaw48-coder/zoz-pro-ai");
 
     const transition = await fetch(`http://127.0.0.1:${port}/api/tasks/ZP-001/transition`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", authorization: "Bearer test-control-token" },
       body: JSON.stringify({ status: "verification", actionType: "external_send" }),
     });
     assert.equal(transition.status, 409);
@@ -30,6 +31,7 @@ test("server exposes state and enforces approval gate", async () => {
   } finally {
     await new Promise((resolve) => server.close(resolve));
     delete process.env.ZOZ_DATA_DIR;
+  delete process.env.ZOZ_CONTROL_TOKEN;
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
