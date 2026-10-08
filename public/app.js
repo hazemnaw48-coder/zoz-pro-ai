@@ -60,6 +60,26 @@ async function sendCommand() {
 }
 
 
+
+function renderContacts() {
+  const contacts = state.contacts ?? [];
+  $("#contacts-list").innerHTML = contacts.length ? contacts.map((c) => `
+    <article class="list-item"><div class="section-heading"><div><div class="list-title">${escapeHtml(c.name)}</div><div class="meta">${escapeHtml(c.company || "No company")} · ${escapeHtml(c.role || "Contact")}</div></div><span class="score-pill">${escapeHtml(c.status)}</span></div>
+    <div class="meta">Next: ${escapeHtml(c.nextAction || "Follow up")}</div>
+    <div class="opp-actions">${["lead","qualified","active","customer","inactive","lost"].map(s => `<button data-contact-status="${escapeHtml(c.id)}" data-status="${s}" ${c.status===s?"disabled":""}>${s}</button>`).join("")}</div></article>`).join("") : '<div class="panel muted-text">No contacts yet.</div>';
+  document.querySelectorAll("[data-contact-status]").forEach((b) => b.addEventListener("click", async () => {
+    await fetchJson(`/api/contacts/${encodeURIComponent(b.dataset.contactStatus)}/status`, {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({status:b.dataset.status})});
+    await loadState();
+  }));
+}
+async function createContact() {
+  const name=$("#contact-name").value.trim(); if(!name) return;
+  await fetchJson("/api/contacts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
+    name,company:$("#contact-company").value.trim(),role:$("#contact-role").value.trim(),nextAction:$("#contact-next").value.trim()
+  })});
+  ["contact-name","contact-company","contact-role","contact-next"].forEach(id=>$("#"+id).value=""); await loadState();
+}
+
 function renderOpportunities() {
   const opportunities = state.opportunities ?? [];
   $("#opportunities-list").innerHTML = opportunities.length ? opportunities.map((o) => `
@@ -208,7 +228,7 @@ function bindControlActions() {
 
 async function loadState() {
   state = await fetchJson("/api/state");
-  renderDashboard(); renderProjects(); renderTasks(); renderControl(); renderApprovals(); renderActivity(); renderAgents(); renderSettings(); renderOpportunities(); renderIntelligence(); bindControlActions();
+  renderDashboard(); renderProjects(); renderTasks(); renderControl(); renderApprovals(); renderActivity(); renderAgents(); renderSettings(); renderOpportunities(); renderIntelligence(); renderContacts(); bindControlActions();
 }
 
 async function checkHealth() {
@@ -242,6 +262,8 @@ setInterval(async () => { try { await loadState(); await checkHealth(); } catch 
 const tokenInput = document.querySelector("#control-token");
 const saveTokenButton = document.querySelector("#save-control-token");
 if (tokenInput) tokenInput.value = CONTROL_TOKEN;
+const createContactButton = document.querySelector("#create-contact");
+if (createContactButton) createContactButton.addEventListener("click", () => createContact().catch((e) => alert(e.message)));
 const createOpportunityButton = document.querySelector("#create-opportunity");
 if (createOpportunityButton) createOpportunityButton.addEventListener("click", () => createOpportunity().catch((e) => alert(e.message)));
 const createIntelligenceButton = document.querySelector("#create-intelligence");
