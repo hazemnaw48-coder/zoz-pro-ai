@@ -79,3 +79,39 @@ test("server persists explicit approval decisions", async () => {
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
+
+
+test("server creates and persists scored opportunities and intelligence", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "zoz-pro-opportunities-"));
+  process.env.ZOZ_DATA_DIR = dir;
+  process.env.ZOZ_CONTROL_TOKEN = "test-control-token";
+  const { server } = await import("../src/server.js");
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = server.address().port;
+  const headers = { "content-type": "application/json", authorization: "Bearer test-control-token" };
+  try {
+    const opportunityResponse = await fetch(`http://127.0.0.1:${port}/api/opportunities`, {
+      method: "POST", headers,
+      body: JSON.stringify({ title:"Test opportunity", source:"test", fit:25, value:20, urgency:15, confidence:10 }),
+    });
+    assert.equal(opportunityResponse.status, 201);
+    const opportunity = await opportunityResponse.json();
+    assert.equal(opportunity.score, 70);
+
+    const intelligenceResponse = await fetch(`http://127.0.0.1:${port}/api/intelligence`, {
+      method: "POST", headers,
+      body: JSON.stringify({ type:"market", signal:"Test signal", confidence:80, relevance:60 }),
+    });
+    assert.equal(intelligenceResponse.status, 201);
+    assert.equal((await intelligenceResponse.json()).score, 70);
+
+    const persisted = await createStateStore(path.join(dir, "zoz-pro-state.json")).load();
+    assert.equal(persisted.opportunities[0].score, 70);
+    assert.equal(persisted.intelligence[0].score, 70);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    delete process.env.ZOZ_DATA_DIR;
+    delete process.env.ZOZ_CONTROL_TOKEN;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
