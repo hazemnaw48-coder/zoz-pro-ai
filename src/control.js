@@ -52,8 +52,8 @@ export function canExecuteControlCommand(command, task) {
   if (command.requiresApproval) return { ok: false, reason: "approval_required" };
   if (!task) return { ok: false, reason: "task not found" };
   if (task.assignedAgent !== "codex") return { ok: false, reason: "task is not assigned to Codex" };
-  if (["completed", "failed", "blocked"].includes(task.status)) {
-    return { ok: false, reason: `task is ${task.status}` };
+  if (!["planned", "assigned"].includes(task.status)) {
+    return { ok: false, reason: `task is ${task.status}; claim requires planned or assigned` };
   }
   return { ok: true };
 }
