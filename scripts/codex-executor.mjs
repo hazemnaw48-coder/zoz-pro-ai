@@ -73,8 +73,9 @@ async function processOne(command) {
         return response.json();
       }).then((state) => state.tasks.find((item) => item.id === command.taskId));
       if (!task) throw new Error(`task not found: ${command.taskId}`);
-      if (task.status === "planned") await transitionTask(command.taskId, "assigned");
-      await transitionTask(command.taskId, "executing");
+      if (task.status !== "executing") {
+        throw new Error(`task ${task.id} is not executing after command claim; current status is ${task.status}`);
+      }
     }
     const result = await runCodex(command);
     const commit = await execFileAsync("git", ["rev-parse","HEAD"], { cwd: REPO_DIR, windowsHide: true });

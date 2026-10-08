@@ -18,6 +18,7 @@ import { normalizeContactInput, CONTACT_STATUSES } from "./crm.js";
 import { normalizeOutreachInput, OUTREACH_STATUSES } from "./outreach.js";
 import { isAuthorized, sendUnauthorized } from "./auth.js";
 import { assertTaskCanReceiveCommand, normalizeTaskVerificationInput } from "./workflow.js";
+import { assignTask, evaluateExecutionGate } from "./orchestrator.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,6 +63,9 @@ function createControlCommand(state, body) {
   const taskId = body.taskId ?? state.project.currentTask;
   const task = state.tasks.find((item) => item.id === taskId);
   assertTaskCanReceiveCommand(task);
+  if (task.status !== "assigned") {
+    throw new Error(`Task ${task.id} must be explicitly assigned before a command can be created; current status is ${task.status}`);
+  }
   const id = `CMD-${Date.now()}`;
   const command = {
     id,
@@ -291,11 +295,26 @@ async function handleApi(req, res, url) {
     }[action];
 
     const task = state.tasks.find((item) => item.id === command.taskId);
+    const approvalStatus = command.approvalId
+      ? state.approvals.find((item) => item.id === command.approvalId)?.status ?? null
+      : null;
+
     if (action === "claim") {
-      const executable = canExecuteControlCommand(command, task);
-      if (!executable.ok) {
-        return sendJson(res, 409, { error: executable.reason });
+      const gate = evaluateExecutionGate({
+        task,
+        actionType: command.actionType,
+        approvalStatus,
+      });
+      if (!gate.allowed) {
+        return sendJson(res, 409, { error: gate.reason, approvalRequired: gate.approvalRequired ?? false });
       }
+    }
+
+    if (action === "complete" && task && task.status !== "verification") {
+      return sendJson(res, 409, {
+        error: "task_not_ready_for_command_completion",
+        message: "The task must reach verification before the command can be marked completed.",
+      });
     }
 
     try {
@@ -305,20 +324,35 @@ async function handleApi(req, res, url) {
     }
 
     const body = await readJson(req);
-    if (action === "claim" && command.requiresApproval) {
-      return sendJson(res, 409, { error: "approval_required", message: "This command must be approved before it can be claimed." });
-    }
     command.status = target;
-    if (target === "claimed") command.claimedAt = new Date().toISOString();
+    if (target === "claimed") {
+      command.claimedAt = new Date().toISOString();
+      assertTaskTransition(task.status, "executing");
+      task.status = "executing";
+      appendActivity(state, {
+        type: "task_executing",
+        actor: body.actor ?? "Codex Executor",
+        taskId: task.id,
+        message: `${task.id} entered executing after command ${command.id} was claimed.`,
+      });
+    }
     if (target === "completed") {
       command.completedAt = new Date().toISOString();
       command.result = typeof body.result === "string" ? body.result : "Completed";
     }
-    if (target === "failed") command.error = typeof body.error === "string" ? body.error : "Failed";
+    if (target === "failed") {
+      command.error = typeof body.error === "string" ? body.error : "Failed";
+      if (task && ["assigned", "executing", "verification"].includes(task.status)) {
+        assertTaskTransition(task.status, "failed");
+        task.status = "failed";
+        task.result = command.error;
+      }
+    }
     if (target === "cancelled") command.cancelledAt = new Date().toISOString();
     appendActivity(state, {
       type: `control_command_${target}`,
       actor: body.actor ?? "Codex",
+      taskId: command.taskId,
       message: `${command.id}: ${target}`,
     });
     await store.save(state);
@@ -355,6 +389,27 @@ async function handleApi(req, res, url) {
     return sendJson(res, 201, task);
   }
 
+  const assignMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/assign$/);
+  if (req.method === "POST" && assignMatch) {
+    const taskId = decodeURIComponent(assignMatch[1]);
+    const task = state.tasks.find((item) => item.id === taskId);
+    if (!task) return sendJson(res, 404, { error: "task not found" });
+    try {
+      const body = await readJson(req);
+      const assigned = assignTask(task, { taskId, agent: body.agent, actor: body.actor });
+      Object.assign(task, assigned);
+      appendActivity(state, {
+        type: "task_assigned",
+        actor: task.assignedBy,
+        taskId,
+        message: `${taskId} assigned to ${task.assignedAgent}.`,
+      });
+      await store.save(state);
+      return sendJson(res, 200, task);
+    } catch (error) {
+      return sendJson(res, 409, { error: error.message });
+    }
+  }
   const verifyMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/verify$/);
   if (req.method === "POST" && verifyMatch) {
     const taskId = decodeURIComponent(verifyMatch[1]);
