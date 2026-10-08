@@ -14,6 +14,7 @@ import {
 import { createStateStore } from "./store.js";
 import { normalizeOpportunityInput, normalizeIntelligenceInput, OPPORTUNITY_STATUSES } from "./opportunities.js";
 import { normalizeContactInput, CONTACT_STATUSES } from "./crm.js";
+import { normalizeOutreachInput, OUTREACH_STATUSES } from "./outreach.js";
 import { isAuthorized, sendUnauthorized } from "./auth.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -112,6 +113,42 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/state") {
     return sendJson(res, 200, state);
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/outreach") {
+    return sendJson(res, 200, { outreach: state.outreach ?? [] });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/outreach") {
+    try {
+      const item = normalizeOutreachInput(await readJson(req));
+      if (!(state.contacts ?? []).some((contact) => contact.id === item.contactId)) {
+        return sendJson(res, 400, { error:"contact not found" });
+      }
+      if (item.opportunityId && !(state.opportunities ?? []).some((opportunity) => opportunity.id === item.opportunityId)) {
+        return sendJson(res, 400, { error:"opportunity not found" });
+      }
+      state.outreach ??= [];
+      state.outreach.unshift(item);
+      appendActivity(state, { type:"outreach_created", actor:"Owner", message:`Created outreach ${item.id} for ${item.contactId}; status remains ${item.status} until explicitly sent.` });
+      await store.save(state);
+      return sendJson(res, 201, item);
+    } catch (error) { return sendJson(res, 400, { error:error.message }); }
+  }
+
+  const outreachMatch = url.pathname.match(/^\/api\/outreach\/([^/]+)\/status$/);
+  if (req.method === "POST" && outreachMatch) {
+    const id = decodeURIComponent(outreachMatch[1]);
+    const item = (state.outreach ?? []).find((entry) => entry.id === id);
+    if (!item) return sendJson(res, 404, { error:"outreach not found" });
+    const body = await readJson(req);
+    if (!OUTREACH_STATUSES.includes(body.status)) return sendJson(res, 400, { error:"invalid outreach status" });
+    item.status = body.status;
+    item.updatedAt = new Date().toISOString();
+    if (body.status === "sent") item.lastAttemptAt = new Date().toISOString();
+    appendActivity(state, { type:"outreach_status_changed", actor:"Owner", message:`${id}: ${body.status}` });
+    await store.save(state);
+    return sendJson(res, 200, item);
   }
 
   if (req.method === "GET" && url.pathname === "/api/contacts") {
