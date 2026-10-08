@@ -6,6 +6,7 @@ import {
   assertTaskTransition,
   createInitialState,
   requiresApproval,
+  WORK_AREA_IDS,
 } from "./domain.js";
 import {
   assertControlCommandTransition,
@@ -204,9 +205,14 @@ async function handleApi(req, res, url) {
     if (state.tasks.some((item) => item.id === id)) {
       return sendJson(res, 409, { error: "task id already exists" });
     }
+    const workAreaId = body.workAreaId ?? "operations";
+    if (!WORK_AREA_IDS.includes(workAreaId)) {
+      return sendJson(res, 400, { error: "unsupported workAreaId" });
+    }
     const task = {
       id,
       title: body.title.trim(),
+      workAreaId,
       owner: body.owner ?? "CEO/Manager",
       assignedAgent: body.assignedAgent ?? "codex",
       branch: body.branch ?? `task/${id.toLowerCase()}-task`,
