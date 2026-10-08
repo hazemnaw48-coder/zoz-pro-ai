@@ -20,6 +20,23 @@ test("server exposes state and enforces approval gate", async () => {
     assert.equal(stateResponse.status, 200);
     const state = await stateResponse.json();
     assert.equal(state.project.repository, "hazemnaw48-coder/zoz-pro-ai");
+    assert.ok(Array.isArray(state.workAreas));
+    assert.equal(state.workAreas.some((area) => area.id === "product"), true);
+
+    const createTask = await fetch(`http://127.0.0.1:${port}/api/tasks`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer test-control-token" },
+      body: JSON.stringify({ title: "Work area routing test", workAreaId: "sales" }),
+    });
+    assert.equal(createTask.status, 201);
+    assert.equal((await createTask.json()).workAreaId, "sales");
+
+    const badArea = await fetch(`http://127.0.0.1:${port}/api/tasks`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer test-control-token" },
+      body: JSON.stringify({ title: "Invalid area test", workAreaId: "not-real" }),
+    });
+    assert.equal(badArea.status, 400);
 
     const transition = await fetch(`http://127.0.0.1:${port}/api/tasks/ZP-001/transition`, {
       method: "POST",
