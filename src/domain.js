@@ -20,6 +20,19 @@ export const RISK_TYPES = [
   "account_affecting",
 ];
 
+export const WORK_AREAS = [
+  { id: "executive", name: "Executive Control", description: "CEO decisions, priorities, approvals, policy, and company-wide control." },
+  { id: "intelligence", name: "Opportunities & Intelligence", description: "Opportunity discovery, research, qualification, scoring, and market intelligence." },
+  { id: "sales", name: "Sales & CRM", description: "Leads, contacts, opportunities, follow-up, pipeline, and customer progression." },
+  { id: "marketing", name: "Marketing & Growth", description: "Content, SEO, campaigns, growth experiments, and performance tracking." },
+  { id: "operations", name: "Operations & Delivery", description: "Projects, delivery workflows, process execution, and operational follow-through." },
+  { id: "finance", name: "Finance & Governance", description: "Financial planning, cost tracking, controls, and owner-approved financial actions." },
+  { id: "communications", name: "Communications", description: "Approved external communication workflows, records, and follow-up coordination." },
+  { id: "product", name: "Product & Engineering", description: "Product development, coding, tests, releases, and technical reliability." },
+];
+
+export const WORK_AREA_IDS = WORK_AREAS.map((area) => area.id);
+
 export const AGENT_ROLES = [
   {
     id: "codex",
@@ -82,6 +95,7 @@ export function createInitialState() {
       repository: "hazemnaw48-coder/zoz-pro-ai",
       integrationBranch: "main",
       currentTask: "ZP-001",
+      currentWorkArea: "product",
       currentBranch: "task/ZP-001-foundation",
       lastVerifiedCommit: "pending",
       filesChanged: [],
@@ -98,6 +112,7 @@ export function createInitialState() {
         id: "ZP-001",
         title: "Foundation: application skeleton and durable project state",
         owner: "CEO/Manager",
+        workAreaId: "product",
         assignedAgent: "codex",
         branch: "task/ZP-001-foundation",
         status: "verification",
