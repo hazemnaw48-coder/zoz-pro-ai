@@ -13,6 +13,7 @@ import {
 } from "./control.js";
 import { createStateStore } from "./store.js";
 import { normalizeOpportunityInput, normalizeIntelligenceInput, OPPORTUNITY_STATUSES } from "./opportunities.js";
+import { normalizeContactInput, CONTACT_STATUSES } from "./crm.js";
 import { isAuthorized, sendUnauthorized } from "./auth.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -111,6 +112,38 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/state") {
     return sendJson(res, 200, state);
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/contacts") {
+    return sendJson(res, 200, { contacts: state.contacts ?? [] });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/contacts") {
+    try {
+      const contact = normalizeContactInput(await readJson(req));
+      if (contact.linkedOpportunityId && !(state.opportunities ?? []).some((item) => item.id === contact.linkedOpportunityId)) {
+        return sendJson(res, 400, { error:"linked opportunity not found" });
+      }
+      state.contacts ??= [];
+      state.contacts.unshift(contact);
+      appendActivity(state, { type:"contact_created", actor:"Owner", message:`Created contact ${contact.id}: ${contact.name}` });
+      await store.save(state);
+      return sendJson(res, 201, contact);
+    } catch (error) { return sendJson(res, 400, { error:error.message }); }
+  }
+
+  const contactMatch = url.pathname.match(/^\/api\/contacts\/([^/]+)\/status$/);
+  if (req.method === "POST" && contactMatch) {
+    const id = decodeURIComponent(contactMatch[1]);
+    const contact = (state.contacts ?? []).find((item) => item.id === id);
+    if (!contact) return sendJson(res, 404, { error:"contact not found" });
+    const body = await readJson(req);
+    if (!CONTACT_STATUSES.includes(body.status)) return sendJson(res, 400, { error:"invalid contact status" });
+    contact.status = body.status;
+    contact.updatedAt = new Date().toISOString();
+    appendActivity(state, { type:"contact_status_changed", actor:"Owner", message:`${id}: ${body.status}` });
+    await store.save(state);
+    return sendJson(res, 200, contact);
   }
 
   if (req.method === "GET" && url.pathname === "/api/opportunities") {
