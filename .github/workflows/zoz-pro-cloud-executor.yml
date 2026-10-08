@@ -1,0 +1,208 @@
+name: ZOZ Pro Cloud Executor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: write
+  copilot-requests: write
+
+concurrency:
+  group: zoz-pro-cloud-executor
+  cancel-in-progress: false
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CONTROL_URL: ${{ vars.ZOZ_PRO_CONTROL_URL }}
+      CONTROL_TOKEN: ${{ secrets.ZOZ_CONTROL_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Check for queued command
+        id: queue
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${CONTROL_URL}" || { echo "::error::Missing repository variable ZOZ_PRO_CONTROL_URL"; exit 1; }
+          test -n "${CONTROL_TOKEN}" || { echo "::error::Missing repository secret ZOZ_CONTROL_TOKEN"; exit 1; }
+
+          curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer ${CONTROL_TOKEN}" \
+            "${CONTROL_URL%/}/api/health" > health.json
+
+          curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer ${CONTROL_TOKEN}" \
+            "${CONTROL_URL%/}/api/state" > state.json
+
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const state = JSON.parse(fs.readFileSync("state.json", "utf8"));
+          const command = (state.controlCommands || []).find(
+            (item) => item.status === "queued" && !item.requiresApproval
+          );
+          if (command) fs.writeFileSync("command.json", JSON.stringify(command));
+          NODE
+
+          if [ -f command.json ]; then
+            echo "has_command=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_command=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Execute queued command with Copilot CLI
+        if: steps.queue.outputs.has_command == 'true'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          command_id="$(node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          console.log(JSON.parse(fs.readFileSync("command.json", "utf8")).id);
+          NODE
+          )"
+
+          task_id="$(node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          console.log(JSON.parse(fs.readFileSync("command.json", "utf8")).taskId || "");
+          NODE
+          )"
+
+          instruction="$(node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          console.log(JSON.parse(fs.readFileSync("command.json", "utf8")).instruction);
+          NODE
+          )"
+
+          task_branch="$(TASK_ID="${task_id}" node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const state = JSON.parse(fs.readFileSync("state.json", "utf8"));
+          const task = (state.tasks || []).find((item) => item.id === process.env.TASK_ID);
+          console.log(task?.branch || "");
+          NODE
+          )"
+
+          test -n "${task_id}" || { echo "::error::Queued command has no taskId"; exit 1; }
+          test -n "${task_branch}" || { echo "::error::Task branch missing"; exit 1; }
+
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${CONTROL_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"actor":"ZOZ Pro Cloud Executor"}' \
+            "${CONTROL_URL%/}/api/control/commands/${command_id}/claim"
+
+          current_status="$(TASK_ID="${task_id}" node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const state = JSON.parse(fs.readFileSync("state.json", "utf8"));
+          console.log((state.tasks || []).find((item) => item.id === process.env.TASK_ID)?.status || "");
+          NODE
+          )"
+
+          if [ "${current_status}" = "planned" ]; then
+            curl --fail-with-body --silent --show-error \
+              -X POST \
+              -H "Authorization: Bearer ${CONTROL_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{"actor":"ZOZ Pro Cloud Executor","status":"assigned"}' \
+              "${CONTROL_URL%/}/api/tasks/${task_id}/transition"
+          fi
+
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${CONTROL_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"actor":"ZOZ Pro Cloud Executor","status":"executing"}' \
+            "${CONTROL_URL%/}/api/tasks/${task_id}/transition"
+
+          git fetch origin "+refs/heads/*:refs/remotes/origin/*"
+          if git show-ref --verify --quiet "refs/remotes/origin/${task_branch}"; then
+            git checkout -B "${task_branch}" "origin/${task_branch}"
+          else
+            git checkout -B "${task_branch}" origin/main
+          fi
+
+          cat > /tmp/zoz-prompt.txt <<EOF
+          You are the cloud implementation agent for ZOZ Pro.
+
+          Owner task:
+          ${instruction}
+
+          Repository boundary:
+          - Only hazemnaw48-coder/zoz-pro-ai.
+          - Work only on task branch ${task_branch}.
+          - Do not access or modify the legacy ZOZ AI repository.
+          - Do not merge to main.
+          - Do not deploy production.
+          - Do not modify credentials or secrets.
+          - Do not perform financial, external-send, destructive, irreversible, account, or production-affecting actions.
+          - Never bypass an approval gate.
+          - Inspect existing code before changes.
+          - Run relevant tests and build checks.
+          - Make only the changes needed for this task.
+          EOF
+
+          npm install --global @github/copilot
+
+          copilot -p "$(cat /tmp/zoz-prompt.txt)" \
+            --allow-tool='shell(git:*)' \
+            --allow-tool='shell(npm:*)' \
+            --allow-tool=write \
+            --allow-tool=edit \
+            --no-ask-user
+
+          git status --short
+
+          if git diff --quiet && git diff --cached --quiet; then
+            commit_sha="$(git rev-parse HEAD)"
+          else
+            git add -A
+            git config user.name "ZOZ Pro Cloud Executor"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "ZOZ Pro cloud task ${task_id}"
+            git push --set-upstream origin "${task_branch}"
+            commit_sha="$(git rev-parse HEAD)"
+          fi
+
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${CONTROL_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(COMMIT_SHA="${commit_sha}" node --input-type=module --eval '
+            const b = {
+              actor: "ZOZ Pro Cloud Executor",
+              status: "verification",
+              result: "Cloud implementation finished; awaiting verification. commit=" + process.env.COMMIT_SHA
+            };
+            process.stdout.write(JSON.stringify(b));
+            ' COMMIT_SHA="${commit_sha}")" \
+            "${CONTROL_URL%/}/api/tasks/${task_id}/transition"
+
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${CONTROL_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(COMMIT_SHA="${commit_sha}" node --input-type=module --eval '
+            const b = {
+              actor: "ZOZ Pro Cloud Executor",
+              result: "Cloud Copilot completed. commit=" + process.env.COMMIT_SHA
+            };
+            process.stdout.write(JSON.stringify(b));
+            ' COMMIT_SHA="${commit_sha}")" \
+            "${CONTROL_URL%/}/api/control/commands/${command_id}/complete"
