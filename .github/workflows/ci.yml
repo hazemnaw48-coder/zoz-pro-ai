@@ -14,3 +14,14 @@ jobs:
           node-version: 20
       - run: npm test
       - run: npm run build
+      - name: Verify Windows launcher scripts
+        shell: pwsh
+        run: |
+          $install = Get-Content scripts/install-codex-executor-task.ps1 -Raw
+          $start = Get-Content scripts/start-codex-executor.ps1 -Raw
+          $tailnet = Get-Content scripts/start-zoz-pro-tailnet.ps1 -Raw
+          [scriptblock]::Create($install) | Out-Null
+          [scriptblock]::Create($start) | Out-Null
+          [scriptblock]::Create($tailnet) | Out-Null
+          if ($install -notmatch 'param\(') { throw 'Installer parameter declaration missing' }
+          if ($tailnet -notmatch 'tailscale serve --bg 3000') { throw 'Tailnet launcher missing Tailscale Serve command' }

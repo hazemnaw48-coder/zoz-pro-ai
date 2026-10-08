@@ -74,7 +74,7 @@ export function assertTaskTransition(from, to) {
 
 export function createInitialState() {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     project: {
       id: "ZOZ-PRO",
       name: "ZOZ Pro",
@@ -105,6 +105,10 @@ export function createInitialState() {
         result: "Foundation implemented; awaiting verification.",
       },
     ],
+    opportunities: [],
+    intelligence: [],
+    contacts: [],
+    outreach: [],
     approvals: [],
     controlCommands: [],
     executor: {

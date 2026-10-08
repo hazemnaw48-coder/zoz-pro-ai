@@ -79,3 +79,109 @@ test("server persists explicit approval decisions", async () => {
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
+
+
+test("server creates and persists scored opportunities and intelligence", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "zoz-pro-opportunities-"));
+  process.env.ZOZ_DATA_DIR = dir;
+  process.env.ZOZ_CONTROL_TOKEN = "test-control-token";
+  const { server } = await import("../src/server.js");
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = server.address().port;
+  const headers = { "content-type": "application/json", authorization: "Bearer test-control-token" };
+  try {
+    const opportunityResponse = await fetch(`http://127.0.0.1:${port}/api/opportunities`, {
+      method: "POST", headers,
+      body: JSON.stringify({ title:"Test opportunity", source:"test", fit:25, value:20, urgency:15, confidence:10 }),
+    });
+    assert.equal(opportunityResponse.status, 201);
+    const opportunity = await opportunityResponse.json();
+    assert.equal(opportunity.score, 70);
+
+    const intelligenceResponse = await fetch(`http://127.0.0.1:${port}/api/intelligence`, {
+      method: "POST", headers,
+      body: JSON.stringify({ type:"market", signal:"Test signal", confidence:80, relevance:60 }),
+    });
+    assert.equal(intelligenceResponse.status, 201);
+    assert.equal((await intelligenceResponse.json()).score, 70);
+
+    const persisted = await createStateStore(path.join(dir, "zoz-pro-state.json")).load();
+    assert.equal(persisted.opportunities[0].score, 70);
+    assert.equal(persisted.intelligence[0].score, 70);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    delete process.env.ZOZ_DATA_DIR;
+    delete process.env.ZOZ_CONTROL_TOKEN;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+
+test("server creates and persists CRM contacts", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "zoz-pro-crm-"));
+  process.env.ZOZ_DATA_DIR = dir;
+  process.env.ZOZ_CONTROL_TOKEN = "test-control-token";
+  const { server } = await import("../src/server.js");
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = server.address().port;
+  const headers = { "content-type": "application/json", authorization: "Bearer test-control-token" };
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/contacts`, {
+      method:"POST", headers,
+      body:JSON.stringify({ name:"CRM Test", company:"Acme", status:"qualified", nextAction:"Follow up" }),
+    });
+    assert.equal(response.status, 201);
+    const contact = await response.json();
+    assert.equal(contact.status, "qualified");
+
+    const persisted = await createStateStore(path.join(dir, "zoz-pro-state.json")).load();
+    assert.equal(persisted.contacts[0].name, "CRM Test");
+    assert.equal(persisted.contacts[0].status, "qualified");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    delete process.env.ZOZ_DATA_DIR;
+    delete process.env.ZOZ_CONTROL_TOKEN;
+    await fs.rm(dir, { recursive:true, force:true });
+  }
+});
+
+
+test("server creates and persists outreach only for existing contacts", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "zoz-pro-outreach-"));
+  process.env.ZOZ_DATA_DIR = dir;
+  process.env.ZOZ_CONTROL_TOKEN = "test-control-token";
+  const { server } = await import("../src/server.js");
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = server.address().port;
+  const headers = { "content-type":"application/json", authorization:"Bearer test-control-token" };
+  try {
+    const contactResponse = await fetch(`http://127.0.0.1:${port}/api/contacts`, {
+      method:"POST", headers, body:JSON.stringify({ name:"Outreach Test" }),
+    });
+    assert.equal(contactResponse.status, 201);
+    const contact = await contactResponse.json();
+
+    const response = await fetch(`http://127.0.0.1:${port}/api/outreach`, {
+      method:"POST", headers,
+      body:JSON.stringify({ contactId:contact.id, channel:"whatsapp", message:"Test follow-up", followUpNumber:1 }),
+    });
+    assert.equal(response.status, 201);
+    const item = await response.json();
+    assert.equal(item.status, "draft");
+
+    const sent = await fetch(`http://127.0.0.1:${port}/api/outreach/${encodeURIComponent(item.id)}/status`, {
+      method:"POST", headers, body:JSON.stringify({ status:"sent" }),
+    });
+    assert.equal(sent.status, 200);
+    assert.equal((await sent.json()).status, "sent");
+
+    const persisted = await createStateStore(path.join(dir, "zoz-pro-state.json")).load();
+    assert.equal(persisted.outreach[0].contactId, contact.id);
+    assert.equal(persisted.outreach[0].status, "sent");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    delete process.env.ZOZ_DATA_DIR;
+    delete process.env.ZOZ_CONTROL_TOKEN;
+    await fs.rm(dir, { recursive:true, force:true });
+  }
+});

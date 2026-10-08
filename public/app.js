@@ -59,6 +59,60 @@ async function sendCommand() {
   }
 }
 
+
+
+function renderContacts() {
+  const contacts = state.contacts ?? [];
+  $("#contacts-list").innerHTML = contacts.length ? contacts.map((c) => `
+    <article class="list-item"><div class="section-heading"><div><div class="list-title">${escapeHtml(c.name)}</div><div class="meta">${escapeHtml(c.company || "No company")} · ${escapeHtml(c.role || "Contact")}</div></div><span class="score-pill">${escapeHtml(c.status)}</span></div>
+    <div class="meta">Next: ${escapeHtml(c.nextAction || "Follow up")}</div>
+    <div class="opp-actions">${["lead","qualified","active","customer","inactive","lost"].map(s => `<button data-contact-status="${escapeHtml(c.id)}" data-status="${s}" ${c.status===s?"disabled":""}>${s}</button>`).join("")}</div></article>`).join("") : '<div class="panel muted-text">No contacts yet.</div>';
+  document.querySelectorAll("[data-contact-status]").forEach((b) => b.addEventListener("click", async () => {
+    await fetchJson(`/api/contacts/${encodeURIComponent(b.dataset.contactStatus)}/status`, {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({status:b.dataset.status})});
+    await loadState();
+  }));
+}
+async function createContact() {
+  const name=$("#contact-name").value.trim(); if(!name) return;
+  await fetchJson("/api/contacts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
+    name,company:$("#contact-company").value.trim(),role:$("#contact-role").value.trim(),nextAction:$("#contact-next").value.trim()
+  })});
+  ["contact-name","contact-company","contact-role","contact-next"].forEach(id=>$("#"+id).value=""); await loadState();
+}
+
+function renderOpportunities() {
+  const opportunities = state.opportunities ?? [];
+  $("#opportunities-list").innerHTML = opportunities.length ? opportunities.map((o) => `
+    <article class="list-item"><div class="section-heading"><div><div class="list-title">${escapeHtml(o.title)}</div><div class="meta">${escapeHtml(o.source || "Manual")} · ${escapeHtml(o.category || "General")}</div></div><span class="score-pill">${escapeHtml(o.score)}/100</span></div>
+    <div class="meta">Fit ${o.fit} · Value ${o.value} · Urgency ${o.urgency} · Confidence ${o.confidence}</div>
+    <div class="meta">Next: ${escapeHtml(o.nextAction || "Qualify")}</div>
+    <div class="opp-actions">${["new","qualified","watching","won","lost"].map(s => `<button data-opp-status="${escapeHtml(o.id)}" data-status="${s}" ${o.status===s?"disabled":""}>${s}</button>`).join("")}</div></article>`).join("") : '<div class="panel muted-text">No opportunities yet.</div>';
+  document.querySelectorAll("[data-opp-status]").forEach((b) => b.addEventListener("click", async () => {
+    await fetchJson(`/api/opportunities/${encodeURIComponent(b.dataset.oppStatus)}/status`, {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({status:b.dataset.status})});
+    await loadState();
+  }));
+}
+function renderIntelligence() {
+  const items = state.intelligence ?? [];
+  $("#intelligence-list").innerHTML = items.length ? items.map((s) => `
+    <article class="list-item"><div class="list-title">${escapeHtml(s.type)} · score ${escapeHtml(s.score)}/100</div><div class="meta">${escapeHtml(s.signal)}</div><div class="meta">Source: ${escapeHtml(s.source || "Manual")} · Confidence: ${s.confidence} · Relevance: ${s.relevance}</div></article>`).join("") : '<div class="panel muted-text">No intelligence signals yet.</div>';
+}
+async function createOpportunity() {
+  const title=$("#opp-title").value.trim(); if(!title) return;
+  await fetchJson("/api/opportunities",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
+    title,source:$("#opp-source").value.trim(),nextAction:$("#opp-next").value.trim(),
+    fit:Number($("#opp-fit").value),value:Number($("#opp-value").value),urgency:Number($("#opp-urgency").value),confidence:Number($("#opp-confidence").value)
+  })});
+  ["opp-title","opp-source","opp-next"].forEach(id=>$("#"+id).value=""); await loadState();
+}
+async function createIntelligence() {
+  const signal=$("#intel-signal").value.trim(); if(!signal) return;
+  await fetchJson("/api/intelligence",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
+    signal,source:$("#intel-source").value.trim(),type:"market",confidence:Number($("#intel-confidence").value),relevance:Number($("#intel-relevance").value)
+  })});
+  ["intel-signal","intel-source"].forEach(id=>$("#"+id).value=""); await loadState();
+}
+
 function renderDashboard() {
   const project = state.project;
   $("#project-status").innerHTML = [
@@ -174,7 +228,7 @@ function bindControlActions() {
 
 async function loadState() {
   state = await fetchJson("/api/state");
-  renderDashboard(); renderProjects(); renderTasks(); renderControl(); renderApprovals(); renderActivity(); renderAgents(); renderSettings(); bindControlActions();
+  renderDashboard(); renderProjects(); renderTasks(); renderControl(); renderApprovals(); renderActivity(); renderAgents(); renderSettings(); renderOpportunities(); renderIntelligence(); renderContacts(); bindControlActions();
 }
 
 async function checkHealth() {
@@ -208,6 +262,12 @@ setInterval(async () => { try { await loadState(); await checkHealth(); } catch 
 const tokenInput = document.querySelector("#control-token");
 const saveTokenButton = document.querySelector("#save-control-token");
 if (tokenInput) tokenInput.value = CONTROL_TOKEN;
+const createContactButton = document.querySelector("#create-contact");
+if (createContactButton) createContactButton.addEventListener("click", () => createContact().catch((e) => alert(e.message)));
+const createOpportunityButton = document.querySelector("#create-opportunity");
+if (createOpportunityButton) createOpportunityButton.addEventListener("click", () => createOpportunity().catch((e) => alert(e.message)));
+const createIntelligenceButton = document.querySelector("#create-intelligence");
+if (createIntelligenceButton) createIntelligenceButton.addEventListener("click", () => createIntelligence().catch((e) => alert(e.message)));
 const createTaskButton = document.querySelector("#create-task");
 if (createTaskButton) createTaskButton.addEventListener("click", () => createTask().catch((e) => alert(e.message)));
 

@@ -12,6 +12,9 @@ import {
   normalizeControlCommandInput,
 } from "./control.js";
 import { createStateStore } from "./store.js";
+import { normalizeOpportunityInput, normalizeIntelligenceInput, OPPORTUNITY_STATUSES } from "./opportunities.js";
+import { normalizeContactInput, CONTACT_STATUSES } from "./crm.js";
+import { normalizeOutreachInput, OUTREACH_STATUSES } from "./outreach.js";
 import { isAuthorized, sendUnauthorized } from "./auth.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -110,6 +113,118 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/state") {
     return sendJson(res, 200, state);
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/outreach") {
+    return sendJson(res, 200, { outreach: state.outreach ?? [] });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/outreach") {
+    try {
+      const item = normalizeOutreachInput(await readJson(req));
+      if (!(state.contacts ?? []).some((contact) => contact.id === item.contactId)) {
+        return sendJson(res, 400, { error:"contact not found" });
+      }
+      if (item.opportunityId && !(state.opportunities ?? []).some((opportunity) => opportunity.id === item.opportunityId)) {
+        return sendJson(res, 400, { error:"opportunity not found" });
+      }
+      state.outreach ??= [];
+      state.outreach.unshift(item);
+      appendActivity(state, { type:"outreach_created", actor:"Owner", message:`Created outreach ${item.id} for ${item.contactId}; status remains ${item.status} until explicitly sent.` });
+      await store.save(state);
+      return sendJson(res, 201, item);
+    } catch (error) { return sendJson(res, 400, { error:error.message }); }
+  }
+
+  const outreachMatch = url.pathname.match(/^\/api\/outreach\/([^/]+)\/status$/);
+  if (req.method === "POST" && outreachMatch) {
+    const id = decodeURIComponent(outreachMatch[1]);
+    const item = (state.outreach ?? []).find((entry) => entry.id === id);
+    if (!item) return sendJson(res, 404, { error:"outreach not found" });
+    const body = await readJson(req);
+    if (!OUTREACH_STATUSES.includes(body.status)) return sendJson(res, 400, { error:"invalid outreach status" });
+    item.status = body.status;
+    item.updatedAt = new Date().toISOString();
+    if (body.status === "sent") item.lastAttemptAt = new Date().toISOString();
+    appendActivity(state, { type:"outreach_status_changed", actor:"Owner", message:`${id}: ${body.status}` });
+    await store.save(state);
+    return sendJson(res, 200, item);
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/contacts") {
+    return sendJson(res, 200, { contacts: state.contacts ?? [] });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/contacts") {
+    try {
+      const contact = normalizeContactInput(await readJson(req));
+      if (contact.linkedOpportunityId && !(state.opportunities ?? []).some((item) => item.id === contact.linkedOpportunityId)) {
+        return sendJson(res, 400, { error:"linked opportunity not found" });
+      }
+      state.contacts ??= [];
+      state.contacts.unshift(contact);
+      appendActivity(state, { type:"contact_created", actor:"Owner", message:`Created contact ${contact.id}: ${contact.name}` });
+      await store.save(state);
+      return sendJson(res, 201, contact);
+    } catch (error) { return sendJson(res, 400, { error:error.message }); }
+  }
+
+  const contactMatch = url.pathname.match(/^\/api\/contacts\/([^/]+)\/status$/);
+  if (req.method === "POST" && contactMatch) {
+    const id = decodeURIComponent(contactMatch[1]);
+    const contact = (state.contacts ?? []).find((item) => item.id === id);
+    if (!contact) return sendJson(res, 404, { error:"contact not found" });
+    const body = await readJson(req);
+    if (!CONTACT_STATUSES.includes(body.status)) return sendJson(res, 400, { error:"invalid contact status" });
+    contact.status = body.status;
+    contact.updatedAt = new Date().toISOString();
+    appendActivity(state, { type:"contact_status_changed", actor:"Owner", message:`${id}: ${body.status}` });
+    await store.save(state);
+    return sendJson(res, 200, contact);
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/opportunities") {
+    return sendJson(res, 200, { opportunities: [...(state.opportunities ?? [])].sort((a,b) => b.score - a.score) });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/opportunities") {
+    try {
+      const opportunity = normalizeOpportunityInput(await readJson(req));
+      state.opportunities ??= [];
+      state.opportunities.unshift(opportunity);
+      appendActivity(state, { type:"opportunity_created", actor:"Owner", message:`Created ${opportunity.id}: ${opportunity.title} (score ${opportunity.score})` });
+      await store.save(state);
+      return sendJson(res, 201, opportunity);
+    } catch (error) { return sendJson(res, 400, { error:error.message }); }
+  }
+
+  const opportunityMatch = url.pathname.match(/^\/api\/opportunities\/([^/]+)\/status$/);
+  if (req.method === "POST" && opportunityMatch) {
+    const id = decodeURIComponent(opportunityMatch[1]);
+    const opportunity = (state.opportunities ?? []).find((item) => item.id === id);
+    if (!opportunity) return sendJson(res, 404, { error:"opportunity not found" });
+    const body = await readJson(req);
+    if (!OPPORTUNITY_STATUSES.includes(body.status)) return sendJson(res, 400, { error:"invalid opportunity status" });
+    opportunity.status = body.status;
+    opportunity.updatedAt = new Date().toISOString();
+    appendActivity(state, { type:"opportunity_status_changed", actor:"Owner", message:`${id}: ${body.status}` });
+    await store.save(state);
+    return sendJson(res, 200, opportunity);
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/intelligence") {
+    return sendJson(res, 200, { intelligence: state.intelligence ?? [] });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/intelligence") {
+    try {
+      const signal = normalizeIntelligenceInput(await readJson(req));
+      state.intelligence ??= [];
+      state.intelligence.unshift(signal);
+      appendActivity(state, { type:"intelligence_added", actor:"Owner", message:`Added ${signal.type} intelligence signal.` });
+      await store.save(state);
+      return sendJson(res, 201, signal);
+    } catch (error) { return sendJson(res, 400, { error:error.message }); }
   }
 
   if (req.method === "GET" && url.pathname === "/api/control/commands") {
