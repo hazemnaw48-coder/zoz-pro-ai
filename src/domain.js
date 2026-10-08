@@ -144,6 +144,7 @@ export function createInitialState() {
         message: "ZP-001 started on task/ZP-001-foundation.",
       },
     ],
+    workAreas: WORK_AREAS,
     agents: AGENT_ROLES,
     settings: {
       localMode: true,
