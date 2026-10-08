@@ -185,3 +185,91 @@ test("server creates and persists outreach only for existing contacts", async ()
     await fs.rm(dir, { recursive:true, force:true });
   }
 });
+
+
+test("ZP-006 verification requires every declared check and completes only from verification", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "zoz-pro-zp006-verify-"));
+  process.env.ZOZ_DATA_DIR = dir;
+  process.env.ZOZ_CONTROL_TOKEN = "test-control-token";
+  const { server } = await import("../src/server.js");
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = server.address().port;
+  const headers = { "content-type": "application/json", authorization: "Bearer test-control-token" };
+
+  try {
+    const create = await fetch(`http://127.0.0.1:${port}/api/tasks`, {
+      method: "POST", headers,
+      body: JSON.stringify({
+        id: "ZP-006-V1",
+        title: "Verification test",
+        requiredChecks: ["build", "tests", "audit"],
+      }),
+    });
+    assert.equal(create.status, 201);
+
+    const assigned = await fetch(`http://127.0.0.1:${port}/api/tasks/ZP-006-V1/transition`, {
+      method: "POST", headers, body: JSON.stringify({ status: "assigned", actor: "CEO/Manager" }),
+    });
+    assert.equal(assigned.status, 200);
+
+    const executing = await fetch(`http://127.0.0.1:${port}/api/tasks/ZP-006-V1/transition`, {
+      method: "POST", headers, body: JSON.stringify({ status: "executing", actor: "Codex" }),
+    });
+    assert.equal(executing.status, 200);
+
+    const verification = await fetch(`http://127.0.0.1:${port}/api/tasks/ZP-006-V1/transition`, {
+      method: "POST", headers, body: JSON.stringify({ status: "verification", actor: "Codex" }),
+    });
+    assert.equal(verification.status, 200);
+
+    const incomplete = await fetch(`http://127.0.0.1:${port}/api/tasks/ZP-006-V1/verify`, {
+      method: "POST", headers,
+      body: JSON.stringify({
+        passed: true,
+        checks: { build: true, tests: true, audit: false },
+        evidence: "audit check failed",
+        commitSha: "abc123",
+      }),
+    });
+    assert.equal(incomplete.status, 409);
+    assert.equal((await incomplete.json()).error, "verification_failed");
+
+    const stateAfterFailure = await (await fetch(`http://127.0.0.1:${port}/api/state`, { headers })).json();
+    assert.equal(stateAfterFailure.tasks.find((item) => item.id === "ZP-006-V1").status, "failed");
+
+    const create2 = await fetch(`http://127.0.0.1:${port}/api/tasks`, {
+      method: "POST", headers,
+      body: JSON.stringify({ id: "ZP-006-V2", title: "Successful verification", requiredChecks: ["build", "tests"] }),
+    });
+    assert.equal(create2.status, 201);
+    for (const status of ["assigned", "executing", "verification"]) {
+      const response = await fetch(`http://127.0.0.1:${port}/api/tasks/ZP-006-V2/transition`, {
+        method: "POST", headers, body: JSON.stringify({ status, actor: "Codex" }),
+      });
+      assert.equal(response.status, 200);
+    }
+
+    const complete = await fetch(`http://127.0.0.1:${port}/api/tasks/ZP-006-V2/verify`, {
+      method: "POST", headers,
+      body: JSON.stringify({
+        passed: true,
+        checks: { build: true, tests: true },
+        evidence: "All required checks passed.",
+        commitSha: "def456",
+      }),
+    });
+    assert.equal(complete.status, 200);
+    const result = await complete.json();
+    assert.equal(result.task.status, "completed");
+    assert.equal(result.verification.commitSha, "def456");
+
+    const state = await (await fetch(`http://127.0.0.1:${port}/api/state`, { headers })).json();
+    assert.equal(state.project.lastVerifiedCommit, "def456");
+    assert.equal(state.activity[0].type, "task_verified");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    delete process.env.ZOZ_DATA_DIR;
+    delete process.env.ZOZ_CONTROL_TOKEN;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
