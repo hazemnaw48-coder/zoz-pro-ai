@@ -41,17 +41,22 @@ jobs:
           test -n "${CONTROL_URL}" || { echo "::error::Missing repository variable ZOZ_PRO_CONTROL_URL"; exit 1; }
           test -n "${CONTROL_TOKEN}" || { echo "::error::Missing repository secret ZOZ_CONTROL_TOKEN"; exit 1; }
 
-          curl --fail-with-body --silent --show-error             -H "Authorization: Bearer ${CONTROL_TOKEN}"             "${CONTROL_URL%/}/api/health" > health.json
+          curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer ${CONTROL_TOKEN}" \
+            "${CONTROL_URL%/}/api/health" > health.json
 
-          curl --fail-with-body --silent --show-error             -H "Authorization: Bearer ${CONTROL_TOKEN}"             "${CONTROL_URL%/}/api/state" > state.json
+          curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer ${CONTROL_TOKEN}" \
+            "${CONTROL_URL%/}/api/state" > state.json
 
-          node --input-type=module -e '
-            const fs=require("node:fs");
-            const state=JSON.parse(fs.readFileSync("state.json","utf8"));
-            const command=(state.controlCommands||[]).find(c=>c.status==="queued"&&!c.requiresApproval);
-            if(!command){ process.exit(0); }
-            fs.writeFileSync("command.json",JSON.stringify(command));
-          '
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const state = JSON.parse(fs.readFileSync("state.json", "utf8"));
+          const command = (state.controlCommands || []).find(
+            (item) => item.status === "queued" && !item.requiresApproval
+          );
+          if (command) fs.writeFileSync("command.json", JSON.stringify(command));
+          NODE
 
           if [ -f command.json ]; then
             echo "has_command=true" >> "$GITHUB_OUTPUT"
@@ -67,66 +72,100 @@ jobs:
         run: |
           set -euo pipefail
 
-          command_id="$(node --input-type=module -e 'console.log(JSON.parse(require("fs").readFileSync("command.json")).id)')"
-          task_id="$(node --input-type=module -e 'console.log(JSON.parse(require("fs").readFileSync("command.json")).taskId)')"
-          instruction="$(node --input-type=module -e 'console.log(JSON.parse(require("fs").readFileSync("command.json")).instruction)')"
+          command_id="$(node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          console.log(JSON.parse(fs.readFileSync("command.json", "utf8")).id);
+          NODE
+          )"
 
-          task_branch="$(node --input-type=module -e '
-            const fs=require("node:fs");
-            const state=JSON.parse(fs.readFileSync("state.json","utf8"));
-            const task=(state.tasks||[]).find(t=>t.id===process.env.TASK_ID);
-            console.log(task?.branch||"");
-          ')",
+          task_id="$(node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          console.log(JSON.parse(fs.readFileSync("command.json", "utf8")).taskId || "");
+          NODE
+          )"
 
-          export TASK_ID="${task_id}"
-          task_branch="$(TASK_ID="${task_id}" node --input-type=module -e '
-            const fs=require("node:fs");
-            const state=JSON.parse(fs.readFileSync("state.json","utf8"));
-            const task=(state.tasks||[]).find(t=>t.id===process.env.TASK_ID);
-            console.log(task?.branch||"");
-          ')"
+          instruction="$(node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          console.log(JSON.parse(fs.readFileSync("command.json", "utf8")).instruction);
+          NODE
+          )"
 
+          task_branch="$(TASK_ID="${task_id}" node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const state = JSON.parse(fs.readFileSync("state.json", "utf8"));
+          const task = (state.tasks || []).find((item) => item.id === process.env.TASK_ID);
+          console.log(task?.branch || "");
+          NODE
+          )"
+
+          test -n "${task_id}" || { echo "::error::Queued command has no taskId"; exit 1; }
           test -n "${task_branch}" || { echo "::error::Task branch missing"; exit 1; }
 
-          curl --fail-with-body --silent --show-error             -X POST             -H "Authorization: Bearer ${CONTROL_TOKEN}"             -H "Content-Type: application/json"             -d '{"actor":"ZOZ Pro Cloud Executor"}'             "${CONTROL_URL%/}/api/control/commands/${command_id}/claim"
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${CONTROL_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"actor":"ZOZ Pro Cloud Executor"}' \
+            "${CONTROL_URL%/}/api/control/commands/${command_id}/claim"
 
-          current_status="$(TASK_ID="${task_id}" node --input-type=module -e '
-            const fs=require("node:fs");
-            const state=JSON.parse(fs.readFileSync("state.json","utf8"));
-            console.log((state.tasks||[]).find(t=>t.id===process.env.TASK_ID)?.status||"");
-          ')"
+          current_status="$(TASK_ID="${task_id}" node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const state = JSON.parse(fs.readFileSync("state.json", "utf8"));
+          console.log((state.tasks || []).find((item) => item.id === process.env.TASK_ID)?.status || "");
+          NODE
+          )"
 
           if [ "${current_status}" = "planned" ]; then
-            curl --fail-with-body --silent --show-error               -X POST               -H "Authorization: Bearer ${CONTROL_TOKEN}"               -H "Content-Type: application/json"               -d '{"actor":"ZOZ Pro Cloud Executor","status":"assigned"}'               "${CONTROL_URL%/}/api/tasks/${task_id}/transition"
+            curl --fail-with-body --silent --show-error \
+              -X POST \
+              -H "Authorization: Bearer ${CONTROL_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{"actor":"ZOZ Pro Cloud Executor","status":"assigned"}' \
+              "${CONTROL_URL%/}/api/tasks/${task_id}/transition"
           fi
 
-          curl --fail-with-body --silent --show-error             -X POST             -H "Authorization: Bearer ${CONTROL_TOKEN}"             -H "Content-Type: application/json"             -d '{"actor":"ZOZ Pro Cloud Executor","status":"executing"}'             "${CONTROL_URL%/}/api/tasks/${task_id}/transition"
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${CONTROL_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"actor":"ZOZ Pro Cloud Executor","status":"executing"}' \
+            "${CONTROL_URL%/}/api/tasks/${task_id}/transition"
 
           git fetch origin "+refs/heads/*:refs/remotes/origin/*"
-          git checkout -B "${task_branch}" "origin/main"
+          if git show-ref --verify --quiet "refs/remotes/origin/${task_branch}"; then
+            git checkout -B "${task_branch}" "origin/${task_branch}"
+          else
+            git checkout -B "${task_branch}" origin/main
+          fi
 
           cat > /tmp/zoz-prompt.txt <<EOF
-You are the cloud implementation agent for ZOZ Pro.
+          You are the cloud implementation agent for ZOZ Pro.
 
-Owner task:
-${instruction}
+          Owner task:
+          ${instruction}
 
-Repository boundary:
-- Only hazemnaw48-coder/zoz-pro-ai.
-- Work only on task branch ${task_branch}.
-- Do not access or modify the legacy repository.
-- Do not merge to main.
-- Do not deploy production.
-- Do not modify credentials or secrets.
-- Do not perform financial, external-send, destructive, irreversible, account, or production-affecting actions.
-- Never bypass an approval gate.
-- Inspect existing code before changes.
-- Run relevant tests and build checks.
-- Make only the changes needed for this task.
-EOF
+          Repository boundary:
+          - Only hazemnaw48-coder/zoz-pro-ai.
+          - Work only on task branch ${task_branch}.
+          - Do not access or modify the legacy ZOZ AI repository.
+          - Do not merge to main.
+          - Do not deploy production.
+          - Do not modify credentials or secrets.
+          - Do not perform financial, external-send, destructive, irreversible, account, or production-affecting actions.
+          - Never bypass an approval gate.
+          - Inspect existing code before changes.
+          - Run relevant tests and build checks.
+          - Make only the changes needed for this task.
+          EOF
 
           npm install --global @github/copilot
-          copilot -p "$(cat /tmp/zoz-prompt.txt)"             --allow-tool='shell(git:*)'             --allow-tool='shell(npm:*)'             --allow-tool=write             --allow-tool=edit             --no-ask-user
+
+          copilot -p "$(cat /tmp/zoz-prompt.txt)" \
+            --allow-tool='shell(git:*)' \
+            --allow-tool='shell(npm:*)' \
+            --allow-tool=write \
+            --allow-tool=edit \
+            --no-ask-user
 
           git status --short
 
@@ -141,6 +180,29 @@ EOF
             commit_sha="$(git rev-parse HEAD)"
           fi
 
-          curl --fail-with-body --silent --show-error             -X POST             -H "Authorization: Bearer ${CONTROL_TOKEN}"             -H "Content-Type: application/json"             -d "{"actor":"ZOZ Pro Cloud Executor","status":"verification","result":"Cloud implementation finished; awaiting verification. commit=${commit_sha}"}"             "${CONTROL_URL%/}/api/tasks/${task_id}/transition"
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${CONTROL_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(node --input-type=module --eval '
+            const b = {
+              actor: "ZOZ Pro Cloud Executor",
+              status: "verification",
+              result: "Cloud implementation finished; awaiting verification. commit=" + process.env.COMMIT_SHA
+            };
+            process.stdout.write(JSON.stringify(b));
+            ' COMMIT_SHA="${commit_sha}")" \
+            "${CONTROL_URL%/}/api/tasks/${task_id}/transition"
 
-          curl --fail-with-body --silent --show-error             -X POST             -H "Authorization: Bearer ${CONTROL_TOKEN}"             -H "Content-Type: application/json"             -d "{"actor":"ZOZ Pro Cloud Executor","result":"Cloud Copilot completed. commit=${commit_sha}"}"             "${CONTROL_URL%/}/api/control/commands/${command_id}/complete"
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${CONTROL_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(node --input-type=module --eval '
+            const b = {
+              actor: "ZOZ Pro Cloud Executor",
+              result: "Cloud Copilot completed. commit=" + process.env.COMMIT_SHA
+            };
+            process.stdout.write(JSON.stringify(b));
+            ' COMMIT_SHA="${commit_sha}")" \
+            "${CONTROL_URL%/}/api/control/commands/${command_id}/complete"
