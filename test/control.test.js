@@ -13,6 +13,13 @@ test("mobile control queue persists normal commands and blocks risky commands pe
   const port = server.address().port;
 
   try {
+    const assignment = await fetch(`http://127.0.0.1:${port}/api/tasks/ZP-006/assign`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer test-control-token" },
+      body: JSON.stringify({ agent: "codex", actor: "CEO/Manager" }),
+    });
+    assert.equal(assignment.status, 200);
+
     const normal = await fetch(`http://127.0.0.1:${port}/api/control/commands`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: "Bearer test-control-token" },
@@ -71,6 +78,13 @@ test("commands bind to a real Codex task and rejected approvals cancel execution
     });
     assert.equal(taskResponse.status, 201);
 
+    const assignment = await fetch(`http://127.0.0.1:${port}/api/tasks/ZP-006-T1/assign`, {
+      method: "POST", headers,
+      body: JSON.stringify({ agent: "codex", actor: "CEO/Manager" }),
+    });
+    assert.equal(assignment.status, 200);
+    assert.equal((await assignment.json()).status, "assigned");
+
     const commandResponse = await fetch(`http://127.0.0.1:${port}/api/control/commands`, {
       method: "POST", headers,
       body: JSON.stringify({ taskId: "ZP-006-T1", instruction: "Run safe tests." }),
@@ -84,6 +98,8 @@ test("commands bind to a real Codex task and rejected approvals cancel execution
       method: "POST", headers, body: JSON.stringify({ actor: "Codex Executor" }),
     });
     assert.equal(claim.status, 200);
+    const postClaimState = await (await fetch(`http://127.0.0.1:${port}/api/state`, { headers })).json();
+    assert.equal(postClaimState.tasks.find((item) => item.id === "ZP-006-T1").status, "executing");
 
     const risky = await fetch(`http://127.0.0.1:${port}/api/control/commands`, {
       method: "POST", headers,
