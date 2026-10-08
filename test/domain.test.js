@@ -27,7 +27,8 @@ test("initial state is bounded to the ZOZ Pro repository and main integration br
   const state = createInitialState();
   assert.equal(state.project.repository, "hazemnaw48-coder/zoz-pro-ai");
   assert.equal(state.project.integrationBranch, "main");
-  assert.equal(state.project.currentBranch, "task/ZP-001-foundation");
+  assert.equal(state.project.currentTask, "ZP-006");
+  assert.equal(state.project.currentBranch, "feature/ZP-006-ceo-task-command-audit");
   assert.equal(validateState(state), true);
 });
 

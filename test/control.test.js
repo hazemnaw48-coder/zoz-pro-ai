@@ -53,3 +53,59 @@ test("mobile control queue persists normal commands and blocks risky commands pe
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
+
+
+test("commands bind to a real Codex task and rejected approvals cancel execution", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "zoz-pro-zp006-control-"));
+  process.env.ZOZ_DATA_DIR = dir;
+  process.env.ZOZ_CONTROL_TOKEN = "test-control-token";
+  const { server } = await import("../src/server.js");
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = server.address().port;
+  const headers = { "content-type": "application/json", authorization: "Bearer test-control-token" };
+
+  try {
+    const taskResponse = await fetch(`http://127.0.0.1:${port}/api/tasks`, {
+      method: "POST", headers,
+      body: JSON.stringify({ id: "ZP-006-T1", title: "Workflow test", assignedAgent: "codex" }),
+    });
+    assert.equal(taskResponse.status, 201);
+
+    const commandResponse = await fetch(`http://127.0.0.1:${port}/api/control/commands`, {
+      method: "POST", headers,
+      body: JSON.stringify({ taskId: "ZP-006-T1", instruction: "Run safe tests." }),
+    });
+    assert.equal(commandResponse.status, 201);
+    const command = await commandResponse.json();
+    assert.equal(command.taskId, "ZP-006-T1");
+    assert.equal(command.status, "queued");
+
+    const claim = await fetch(`http://127.0.0.1:${port}/api/control/commands/${command.id}/claim`, {
+      method: "POST", headers, body: JSON.stringify({ actor: "Codex Executor" }),
+    });
+    assert.equal(claim.status, 200);
+
+    const risky = await fetch(`http://127.0.0.1:${port}/api/control/commands`, {
+      method: "POST", headers,
+      body: JSON.stringify({ taskId: "ZP-006-T1", instruction: "Delete production data.", actionType: "destructive" }),
+    });
+    assert.equal(risky.status, 201);
+    const riskyCommand = await risky.json();
+    assert.equal(riskyCommand.status, "awaiting_approval");
+
+    const reject = await fetch(`http://127.0.0.1:${port}/api/approvals/${encodeURIComponent(riskyCommand.approvalId)}/reject`, {
+      method: "POST", headers, body: JSON.stringify({ decidedBy: "Owner" }),
+    });
+    assert.equal(reject.status, 200);
+
+    const state = await (await fetch(`http://127.0.0.1:${port}/api/state`, { headers })).json();
+    const cancelled = state.controlCommands.find((item) => item.id === riskyCommand.id);
+    assert.equal(cancelled.status, "cancelled");
+    assert.equal(cancelled.error, "Owner rejected approval.");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    delete process.env.ZOZ_DATA_DIR;
+    delete process.env.ZOZ_CONTROL_TOKEN;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
