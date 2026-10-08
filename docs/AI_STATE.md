@@ -3,60 +3,44 @@
 This file is the durable handoff record for engineering sessions. Resume from this file and Git history; do not recreate completed work.
 
 ## Current Task
-ZP-001 — Foundation: application skeleton and durable project state
+ZP-002 — Runtime control, work areas, and Technical Manager
 
 ## Current Branch
-task/ZP-001-foundation
+task/ZP-002-runtime-control
 
 ## Last Verified Commit
-4696871603c9242db0aca1326ce7dfc9ba0250bc — state-store path resolution fix verified by GitHub Actions.
+9de52bfecff65096ec20b0d38f81576c15c97c09 — Technical Manager regression tests added; awaiting GitHub Actions verification.
 
-## Files Changed
-- .gitignore
-- package.json
-- src/domain.js
-- src/store.js
-- src/server.js
-- public/index.html
-- public/styles.css
-- public/app.js
-- test/domain.test.js
-- test/store.test.js
-- test/server.test.js
-- docs/AI_STATE.md
-- .github/workflows/ci.yml
+## Work Completed
+- ZP-001 foundation retained; main remains untouched.
+- Node.js 24 toolchain aligned for current Vercel runtime requirements.
+- Eight company work areas added and routed into task creation/state/UI.
+- Mobile Control Plane queues owner instructions for local Codex execution.
+- Risk actions are held behind explicit owner approval.
+- Local Windows launchers added for server + Codex executor.
+- Technical Manager diagnostics and UI added.
+- Technical Manager regression tests added.
 
-## Tests Passed
-- GitHub Actions workflow: ZOZ Pro CI
-- Workflow run: 37698967259
-- Event: push
-- Head SHA: 4696871603c9242db0aca1326ce7dfc9ba0250bc
-- `npm test`: success
-- `npm run build`: success
-- CI checkout of the exact repository branch: success
-- Previous persistence test failure was resolved by resolving the default state-file path at store creation time.
+## Tests
+- Earlier ZP-002 CI runs passed for work-area routing, work-area UI, Technical Manager, and manager UI.
+- Commit 523c1a5a5650ee8453fbef05f53f94f2bb322f13 had Vercel status success.
+- Current head 9de52bfecff65096ec20b0d38f81576c15c97c09 still requires fresh GitHub Actions verification.
+- No local-machine runtime execution has been claimed; the Windows launcher must be run on the owner's computer.
+- ZIP snapshot 9e74bf664fe84c90016e6bab0472d7441f9b9be2 is an older Stage 1 backup and is not the current GitHub history.
 
-## Tests Failed
-- None recorded on the verified commit.
+## Blocked / Not Done
+- No production deployment or merge to main.
+- No public exposure of the local control plane.
+- No Paperclip integration; no direct Paperclip tool is currently connected.
+- Deep business modules (Opportunities, CRM/Leads, Follow-ups, Reports) are not yet implemented beyond work-area routing.
 
-## Blocked Reason
-None for ZP-001 technical verification.
-
-## Next Allowed Action
-Reviewer verification of ZP-001, then owner decision on merge to main. Do not start ZP-002 and do not deploy until review and explicit owner approval.
-
-## Last Agent
-Codex — primary implementer
-
-## Last Review
-Pending independent reviewer pass.
-
-## Deployment Status
-not_deployed — deployment remains disabled until owner approval.
-
-## Boundaries
+## Safety
 - Repository: hazemnaw48-coder/zoz-pro-ai
-- Integration branch: main
 - Legacy repository excluded: zozaimanager2026-design/zoz-ai-control
-- One coding agent per task.
-- main remains untouched by ZP-001 application work.
+- One coding agent writes per task.
+- autoDeploy=false.
+- Risk actions require explicit owner approval.
+- Do not deploy or merge without explicit owner approval.
+
+## Next Action
+Verify commit 9de52bf... with GitHub Actions. If green, continue ZP-002 by hardening the local mobile-to-Codex runtime and then implement the first real business module, starting with Opportunities & Intelligence. Do not merge/deploy without owner approval.
