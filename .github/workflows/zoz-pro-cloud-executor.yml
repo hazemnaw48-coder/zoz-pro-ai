@@ -184,7 +184,7 @@ jobs:
             -X POST \
             -H "Authorization: Bearer ${CONTROL_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d "$(node --input-type=module --eval '
+            -d "$(COMMIT_SHA="${commit_sha}" node --input-type=module --eval '
             const b = {
               actor: "ZOZ Pro Cloud Executor",
               status: "verification",
@@ -198,7 +198,7 @@ jobs:
             -X POST \
             -H "Authorization: Bearer ${CONTROL_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d "$(node --input-type=module --eval '
+            -d "$(COMMIT_SHA="${commit_sha}" node --input-type=module --eval '
             const b = {
               actor: "ZOZ Pro Cloud Executor",
               result: "Cloud Copilot completed. commit=" + process.env.COMMIT_SHA
