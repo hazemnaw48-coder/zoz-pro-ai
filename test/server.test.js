@@ -115,3 +115,32 @@ test("server creates and persists scored opportunities and intelligence", async 
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
+
+
+test("server creates and persists CRM contacts", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "zoz-pro-crm-"));
+  process.env.ZOZ_DATA_DIR = dir;
+  process.env.ZOZ_CONTROL_TOKEN = "test-control-token";
+  const { server } = await import("../src/server.js");
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = server.address().port;
+  const headers = { "content-type": "application/json", authorization: "Bearer test-control-token" };
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/contacts`, {
+      method:"POST", headers,
+      body:JSON.stringify({ name:"CRM Test", company:"Acme", status:"qualified", nextAction:"Follow up" }),
+    });
+    assert.equal(response.status, 201);
+    const contact = await response.json();
+    assert.equal(contact.status, "qualified");
+
+    const persisted = await createStateStore(path.join(dir, "zoz-pro-state.json")).load();
+    assert.equal(persisted.contacts[0].name, "CRM Test");
+    assert.equal(persisted.contacts[0].status, "qualified");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    delete process.env.ZOZ_DATA_DIR;
+    delete process.env.ZOZ_CONTROL_TOKEN;
+    await fs.rm(dir, { recursive:true, force:true });
+  }
+});
