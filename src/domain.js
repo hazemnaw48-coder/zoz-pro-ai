@@ -107,6 +107,7 @@ export function createInitialState() {
     ],
     opportunities: [],
     intelligence: [],
+    contacts: [],
     approvals: [],
     controlCommands: [],
     executor: {
