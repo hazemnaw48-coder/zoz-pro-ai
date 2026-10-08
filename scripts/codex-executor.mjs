@@ -55,17 +55,39 @@ async function runCodex(command) {
   return { output: (result.stdout ?? "").slice(-MAX_OUTPUT), diagnostics: (result.stderr ?? "").slice(-MAX_OUTPUT) };
 }
 
+async function transitionTask(taskId, status, body = {}) {
+  return post(`/api/tasks/${encodeURIComponent(taskId)}/transition`, {
+    actor: "Codex Executor",
+    status,
+    ...body,
+  });
+}
+
 async function processOne(command) {
   await post(`/api/control/commands/${encodeURIComponent(command.id)}/claim`, { actor: "Codex Executor" });
   await heartbeat({ currentCommandId: command.id });
   try {
+    if (command.taskId) {
+      await transitionTask(command.taskId, "executing");
+    }
     const result = await runCodex(command);
     const commit = await execFileAsync("git", ["rev-parse","HEAD"], { cwd: REPO_DIR, windowsHide: true });
+    const commitSha = commit.stdout.trim();
+    if (command.taskId) {
+      await transitionTask(command.taskId, "verification", {
+        result: `Implementation finished; awaiting verification. commit=${commitSha}`,
+      });
+    }
     await post(`/api/control/commands/${encodeURIComponent(command.id)}/complete`, {
-      actor:"Codex", result:`Codex completed. commit=${commit.stdout.trim()}\n${result.output}`
+      actor:"Codex", result:`Codex completed. commit=${commitSha}\n${result.output}`
     });
     await heartbeat({ currentCommandId:null, lastError:null });
   } catch (error) {
+    if (command.taskId) {
+      await transitionTask(command.taskId, "failed", {
+        result: `Executor failure: ${error.message}`,
+      }).catch(() => {});
+    }
     await post(`/api/control/commands/${encodeURIComponent(command.id)}/fail`, {
       actor:"Codex", error:`Codex executor failed: ${error.message}`
     }).catch(()=>{});
