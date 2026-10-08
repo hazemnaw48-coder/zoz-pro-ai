@@ -8,14 +8,23 @@ Repository: `hazemnaw48-coder/zoz-pro-ai`
 Legacy repository excluded: `zozaimanager2026-design/zoz-ai-control`
 
 ## Current Engineering Stage
-ZP-005 — One-command local runtime and phone-to-Codex bridge preparation
+ZP-006 — hardened CEO → Task → Command → Codex → Verification → Audit workflow
 
 ## Current Branch
 `feature/ZP-005-one-command-local-runtime`
 
 ## Latest Commit
-`20958823a822c56a15a750535bcc966325f2df44`
-Message: `feat: add one-command ZOZ Pro local runtime launcher`
+Branch work is in progress on `feature/ZP-006-ceo-task-command-audit`.
+
+## ZP-006 Changes
+- Every control command is bound to an existing Codex task.
+- Codex cannot claim a command for a completed/failed/blocked task.
+- Risky command approval remains an explicit owner gate.
+- Rejected approvals now cancel the waiting command and write an audit event.
+- Codex Executor advances the bound task through assignment and execution, then leaves it in verification.
+- Task completion now requires an explicit verification request with every required check passing.
+- Verification records evidence, verifier, commit SHA, project verification state, and audit activity.
+- No deploy or merge is performed by the executor.
 
 ## Completed Product Foundations
 - Application skeleton and durable local state store
@@ -56,7 +65,7 @@ No deployment to production is authorized.
 - Never access or modify the legacy ZOZ AI repository.
 
 ## Next Engineering Step
-ZP-006 — harden the CEO -> Task -> Command -> Codex -> Result/Failure -> Audit workflow and make the mobile control plane the single operational entry point.
+Run repository CI for ZP-006, review the branch, then open a draft PR for owner review. Do not merge or deploy until explicit owner approval.
 
 ## Computer-Only Action
 Only the actual Windows runtime activation requires the user's computer:
