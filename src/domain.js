@@ -82,7 +82,7 @@ export function createInitialState() {
       repository: "hazemnaw48-coder/zoz-pro-ai",
       integrationBranch: "main",
       currentTask: "ZP-006",
-      currentBranch: "task/zp-006-ceo-task-command-audit",
+      currentBranch: "feature/ZP-006-ceo-task-command-audit",
       lastVerifiedCommit: "de24795b263a790accb1f1f8d288c6c1370e37fb",
       filesChanged: [],
       testsPassed: [],
