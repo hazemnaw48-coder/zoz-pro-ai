@@ -478,11 +478,28 @@ async function handleApi(req, res, url) {
       message: `${approval.actionType} approval ${approval.status}.`,
     });
 
-    if (approval.status === "approved") {
-      const command = (state.controlCommands ?? []).find(
-        (item) => item.approvalId === approval.id && item.status === "awaiting_approval",
-      );
-      if (command) command.status = "queued";
+    const command = (state.controlCommands ?? []).find(
+      (item) => item.approvalId === approval.id && item.status === "awaiting_approval",
+    );
+    if (command && approval.status === "approved") {
+      command.status = "queued";
+      appendActivity(state, {
+        type: "control_command_released",
+        actor: approval.decidedBy,
+        taskId: command.taskId,
+        message: `${command.id} released to Codex after explicit owner approval.`,
+      });
+    }
+    if (command && approval.status === "rejected") {
+      command.status = "cancelled";
+      command.cancelledAt = new Date().toISOString();
+      command.error = "Owner rejected approval.";
+      appendActivity(state, {
+        type: "control_command_cancelled",
+        actor: approval.decidedBy,
+        taskId: command.taskId,
+        message: `${command.id} cancelled because owner rejected approval.`,
+      });
     }
 
     await store.save(state);
