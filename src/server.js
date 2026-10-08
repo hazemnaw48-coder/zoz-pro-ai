@@ -14,6 +14,7 @@ import {
 } from "./control.js";
 import { createStateStore } from "./store.js";
 import { isAuthorized, sendUnauthorized } from "./auth.js";
+import { summarizeSystem } from "./manager.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -111,6 +112,10 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/state") {
     return sendJson(res, 200, state);
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/manager") {
+    return sendJson(res, 200, summarizeSystem(state));
   }
 
   if (req.method === "GET" && url.pathname === "/api/control/commands") {
