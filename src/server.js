@@ -128,7 +128,7 @@ async function handleApi(req, res, url) {
     } catch (error) { return sendJson(res, 400, { error:error.message }); }
   }
 
-  const opportunityMatch = url.pathname.match(/^\\/api\\/opportunities\\/([^/]+)\\/status$/);
+  const opportunityMatch = url.pathname.match(/^\/api\/opportunities\/([^/]+)\/status$/);
   if (req.method === "POST" && opportunityMatch) {
     const id = decodeURIComponent(opportunityMatch[1]);
     const opportunity = (state.opportunities ?? []).find((item) => item.id === id);
