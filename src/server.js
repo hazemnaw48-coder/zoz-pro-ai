@@ -10,12 +10,14 @@ import {
 import {
   assertControlCommandTransition,
   normalizeControlCommandInput,
+  canExecuteControlCommand,
 } from "./control.js";
 import { createStateStore } from "./store.js";
 import { normalizeOpportunityInput, normalizeIntelligenceInput, OPPORTUNITY_STATUSES } from "./opportunities.js";
 import { normalizeContactInput, CONTACT_STATUSES } from "./crm.js";
 import { normalizeOutreachInput, OUTREACH_STATUSES } from "./outreach.js";
 import { isAuthorized, sendUnauthorized } from "./auth.js";
+import { assertTaskCanReceiveCommand, normalizeTaskVerificationInput } from "./workflow.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -57,10 +59,14 @@ function appendActivity(state, activity) {
 
 function createControlCommand(state, body) {
   const input = normalizeControlCommandInput(body);
+  const taskId = body.taskId ?? state.project.currentTask;
+  const task = state.tasks.find((item) => item.id === taskId);
+  assertTaskCanReceiveCommand(task);
   const id = `CMD-${Date.now()}`;
   const command = {
     id,
     ...input,
+    taskId,
     status: input.requiresApproval ? "awaiting_approval" : "queued",
     requestedBy: body.requestedBy ?? "Owner",
     createdAt: new Date().toISOString(),
@@ -74,7 +80,7 @@ function createControlCommand(state, body) {
   if (input.requiresApproval) {
     const approval = {
       id: `APR-${Date.now()}-${id}`,
-      taskId: body.taskId ?? state.project.currentTask,
+      taskId,
       commandId: id,
       actionType: input.actionType,
       status: "pending",
@@ -260,6 +266,7 @@ async function handleApi(req, res, url) {
       appendActivity(state, {
         type: "control_command_created",
         actor: command.requestedBy,
+        taskId: command.taskId,
         message: `${command.id} queued for Codex: ${command.instruction}`,
       });
       await store.save(state);
@@ -282,6 +289,14 @@ async function handleApi(req, res, url) {
       fail: "failed",
       cancel: "cancelled",
     }[action];
+
+    const task = state.tasks.find((item) => item.id === command.taskId);
+    if (action === "claim") {
+      const executable = canExecuteControlCommand(command, task);
+      if (!executable.ok) {
+        return sendJson(res, 409, { error: executable.reason });
+      }
+    }
 
     try {
       assertControlCommandTransition(command.status, target);
@@ -338,6 +353,44 @@ async function handleApi(req, res, url) {
     });
     await store.save(state);
     return sendJson(res, 201, task);
+  }
+
+  const verifyMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/verify$/);
+  if (req.method === "POST" && verifyMatch) {
+    const taskId = decodeURIComponent(verifyMatch[1]);
+    const task = state.tasks.find((item) => item.id === taskId);
+    if (!task) return sendJson(res, 404, { error: "task not found" });
+    const body = await readJson(req);
+    const verification = normalizeTaskVerificationInput(task, body);
+    if (!verification.passed) {
+      task.status = "failed";
+      task.result = `Verification failed: ${verification.failedChecks.join(", ") || verification.missingChecks.join(", ")}`;
+      state.project.testsFailed = [...new Set([...(state.project.testsFailed ?? []), ...verification.failedChecks, ...verification.missingChecks])];
+      appendActivity(state, {
+        type: "task_verification_failed",
+        actor: verification.verifiedBy,
+        taskId,
+        message: task.result,
+      });
+      await store.save(state);
+      return sendJson(res, 409, { error: "verification_failed", verification, task });
+    }
+    if (task.status !== "verification") {
+      return sendJson(res, 409, { error: `task must be in verification status, currently ${task.status}` });
+    }
+    task.status = "completed";
+    task.result = verification.evidence || `Verified commit ${verification.commitSha || "unknown"}`;
+    state.project.lastVerifiedCommit = verification.commitSha || state.project.lastVerifiedCommit;
+    state.project.testsPassed = [...new Set([...(state.project.testsPassed ?? []), ...task.requiredChecks])];
+    state.project.nextAllowedAction = "Create the next task only after reviewing the completed ZP-006 audit trail.";
+    appendActivity(state, {
+      type: "task_verified",
+      actor: verification.verifiedBy,
+      taskId,
+      message: `Task verified and completed. commit=${verification.commitSha || "unknown"}`,
+    });
+    await store.save(state);
+    return sendJson(res, 200, { task, verification });
   }
 
   const transitionMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/transition$/);
