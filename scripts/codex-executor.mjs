@@ -68,6 +68,12 @@ async function processOne(command) {
   await heartbeat({ currentCommandId: command.id });
   try {
     if (command.taskId) {
+      const task = await fetch(`${CONTROL_URL}/api/state`, { headers: { authorization: `Bearer ${CONTROL_TOKEN}` } }).then(async (response) => {
+        if (!response.ok) throw new Error(`state HTTP ${response.status}`);
+        return response.json();
+      }).then((state) => state.tasks.find((item) => item.id === command.taskId));
+      if (!task) throw new Error(`task not found: ${command.taskId}`);
+      if (task.status === "planned") await transitionTask(command.taskId, "assigned");
       await transitionTask(command.taskId, "executing");
     }
     const result = await runCodex(command);
