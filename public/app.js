@@ -59,6 +59,20 @@ async function sendCommand() {
   }
 }
 
+function renderWorkAreas() {
+  const areas = state.workAreas ?? [];
+  const tasks = state.tasks ?? [];
+  $("#work-areas-list").innerHTML = areas.map((area) => {
+    const areaTasks = tasks.filter((task) => task.workAreaId === area.id);
+    const active = areaTasks.filter((task) => !["completed", "failed"].includes(task.status)).length;
+    return "<article class=\"work-card\"><div class=\"section-heading\"><div><div class=\"list-title\">" + escapeHtml(area.name) + "</div><div class=\"meta\">" + escapeHtml(area.description) + "</div></div><span class=\"badge\">" + areaTasks.length + " tasks</span></div><div class=\"work-stats\"><span>Active: " + active + "</span><span>Total: " + areaTasks.length + "</span></div></article>";
+  }).join("");
+  const select = $("#task-work-area");
+  if (select) {
+    select.innerHTML = areas.map((area) => "<option value=\"" + escapeHtml(area.id) + "\">" + escapeHtml(area.name) + "</option>").join("");
+    if (state.project.currentWorkArea) select.value = state.project.currentWorkArea;
+  }
+}
 function renderDashboard() {
   const project = state.project;
   $("#project-status").innerHTML = [
@@ -75,7 +89,7 @@ function renderDashboard() {
   $("#current-task-status").textContent = task?.status ?? "unknown";
   $("#current-task").innerHTML = task
     ? `<div class="list-title">${escapeHtml(task.id)} — ${escapeHtml(task.title)}</div>
-       <div class="meta">Agent: ${escapeHtml(task.assignedAgent)} · Branch: ${escapeHtml(task.branch)}</div>
+       <div class="meta">Work area: ${escapeHtml((state.workAreas?.find((area) => area.id === task.workAreaId)?.name) ?? task.workAreaId ?? "Unassigned")}</div><div class="meta">Agent: ${escapeHtml(task.assignedAgent)} · Branch: ${escapeHtml(task.branch)}</div>
        <div class="meta">Required checks: ${escapeHtml(task.requiredChecks.join(", "))}</div>`
     : "<div class='muted-text'>No current task.</div>";
   $("#next-action").textContent = project.nextAllowedAction;
@@ -99,7 +113,7 @@ async function createTask() {
     await fetchJson("/api/tasks", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title, assignedAgent: "codex" }),
+      body: JSON.stringify({ title, workAreaId: $("#task-work-area").value || "operations", assignedAgent: "codex" }),
     });
     $("#task-title").value = "";
     await loadState();
@@ -174,7 +188,7 @@ function bindControlActions() {
 
 async function loadState() {
   state = await fetchJson("/api/state");
-  renderDashboard(); renderProjects(); renderTasks(); renderControl(); renderApprovals(); renderActivity(); renderAgents(); renderSettings(); bindControlActions();
+  renderDashboard(); renderWorkAreas(); renderProjects(); renderTasks(); renderControl(); renderApprovals(); renderActivity(); renderAgents(); renderSettings(); bindControlActions();
 }
 
 async function checkHealth() {
