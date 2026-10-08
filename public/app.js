@@ -73,6 +73,24 @@ function renderWorkAreas() {
     if (state.project.currentWorkArea) select.value = state.project.currentWorkArea;
   }
 }
+function renderManager(manager) {
+  const badge = $("#manager-status");
+  badge.textContent = manager.status;
+  $("#manager-summary").innerHTML = [
+    card("Tasks", manager.counts.tasks),
+    card("Active", manager.counts.activeTasks),
+    card("Approvals", manager.counts.pendingApprovals),
+    card("Queued Commands", manager.counts.queuedCommands),
+    card("Codex", manager.executor.status),
+    card("Deployment", manager.deployment),
+  ].join("");
+  $("#manager-alerts").innerHTML = manager.alerts.length
+    ? manager.alerts.map((alert) => '<div class="panel"><div class="list-title">Manager Alert</div><div class="meta">' + escapeHtml(alert) + '</div></div>').join("")
+    : '<div class="panel muted-text">No manager alerts.</div>';
+  $("#manager-areas").innerHTML = manager.workAreas.map((area) =>
+    '<article class="work-card"><div class="list-title">' + escapeHtml(area.name) + '</div><div class="meta">Active: ' + area.activeTasks + ' · Completed: ' + area.completedTasks + ' · Failed: ' + area.failedTasks + '</div></article>'
+  ).join("");
+}
 function renderDashboard() {
   const project = state.project;
   $("#project-status").innerHTML = [
@@ -188,7 +206,8 @@ function bindControlActions() {
 
 async function loadState() {
   state = await fetchJson("/api/state");
-  renderDashboard(); renderWorkAreas(); renderProjects(); renderTasks(); renderControl(); renderApprovals(); renderActivity(); renderAgents(); renderSettings(); bindControlActions();
+  renderDashboard();
+  try { renderManager(await fetchJson("/api/manager")); } catch {} renderWorkAreas(); renderProjects(); renderTasks(); renderControl(); renderApprovals(); renderActivity(); renderAgents(); renderSettings(); bindControlActions();
 }
 
 async function checkHealth() {
