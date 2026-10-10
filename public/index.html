@@ -17,10 +17,16 @@
 <section class="view" data-view="approvals"><div class="section-heading"><h2>Approvals</h2></div><div id="approvals-list" class="stack"></div></section>
 <section class="view" data-view="activity"><div class="section-heading"><h2>Activity Log</h2></div><div id="activity-list" class="stack"></div></section>
 <section class="view" data-view="agents"><div class="section-heading"><h2>Agents</h2></div><div id="agents-list" class="stack"></div></section>
+<section class="view" data-view="content-factory">
+  <div class="section-heading"><div><div class="eyebrow">Media operations</div><h2>Content Factory</h2><div class="meta">حالة التكاملات والتحكم الآمن من ZOZ Pro</div></div><button id="refresh-content-factory" type="button">تحديث الحالة</button></div>
+  <div class="panel"><div class="panel-header"><h3 id="factory-overall">جارٍ فحص الحالة…</h3><span id="factory-phase" class="badge">Checking</span></div><p id="factory-checked-at" class="meta">لم يتم الفحص بعد.</p><p id="factory-safety" class="meta"></p></div>
+  <div id="factory-connectors" class="stack"></div>
+  <div class="panel"><h3>الإجراء التالي</h3><p id="factory-next-steps" class="meta"></p><div class="control-row"><button id="open-codex-control" type="button">فتح تحكم Codex</button><button id="open-approvals" type="button">فتح الموافقات</button></div><p class="meta">هذه الشاشة تعرض حالة موثقة فقط؛ لا تولّد أو تنشر محتوى تلقائيًا.</p></div>
+</section>
 <section class="view" data-view="settings"><div class="section-heading"><h2>Settings</h2></div><div class="panel" id="settings-panel"></div><div class="panel"><div class="list-title">Owner Control Token</div><input id="control-token" type="password" autocomplete="off" placeholder="Paste token here"><button id="save-control-token">Save on this device</button><div class="meta">Stored only in this browser localStorage. Never commit the token.</div></div></section>
 </main>
 <nav class="bottom-nav" aria-label="Primary navigation">
-<button data-nav="dashboard" class="nav-item active">Dashboard</button><button data-nav="control" class="nav-item">Codex</button><button data-nav="projects" class="nav-item">Projects</button><button data-nav="opportunities" class="nav-item">Opportunities</button><button data-nav="contacts" class="nav-item">CRM</button><button data-nav="tasks" class="nav-item">Tasks</button><button data-nav="approvals" class="nav-item">Approvals</button><button data-nav="activity" class="nav-item">Activity</button><button data-nav="agents" class="nav-item">Agents</button><button data-nav="settings" class="nav-item">Settings</button>
+<button data-nav="dashboard" class="nav-item active">Dashboard</button><button data-nav="control" class="nav-item">Codex</button><button data-nav="projects" class="nav-item">Projects</button><button data-nav="opportunities" class="nav-item">Opportunities</button><button data-nav="contacts" class="nav-item">CRM</button><button data-nav="tasks" class="nav-item">Tasks</button><button data-nav="approvals" class="nav-item">Approvals</button><button data-nav="activity" class="nav-item">Activity</button><button data-nav="agents" class="nav-item">Agents</button><button data-nav="content-factory" class="nav-item">Content Factory</button><button data-nav="settings" class="nav-item">Settings</button>
 </nav></div>
 <script type="module" src="/app.js"></script>
 </body></html>

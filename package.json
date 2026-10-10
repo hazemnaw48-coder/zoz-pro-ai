@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test",
-    "build": "node --check src/domain.js && node --check src/store.js && node --check src/control.js && node --check src/workflow.js && node --check src/opportunities.js && node --check src/crm.js && node --check src/outreach.js && node --check src/server.js && node --check scripts/codex-executor.mjs && node --check public/app.js",
+    "build": "node --check src/domain.js && node --check src/store.js && node --check src/control.js && node --check src/workflow.js && node --check src/opportunities.js && node --check src/crm.js && node --check src/outreach.js && node --check src/content-factory.js && node --check src/server.js && node --check scripts/codex-executor.mjs && node --check public/app.js",
     "executor": "node scripts/codex-executor.mjs",
     "test:control": "node --test test/control.test.js",
     "test:server": "node --test test/server.test.js"
