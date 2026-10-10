@@ -19,6 +19,7 @@ import { normalizeOutreachInput, OUTREACH_STATUSES } from "./outreach.js";
 import { isAuthorized, sendUnauthorized } from "./auth.js";
 import { assertTaskCanReceiveCommand, normalizeTaskVerificationInput } from "./workflow.js";
 import { assignTask, evaluateExecutionGate } from "./orchestrator.js";
+import { getContentFactoryStatus } from "./content-factory.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -120,6 +121,10 @@ async function handleApi(req, res, url) {
   }
 
   if (!isAuthorized(req)) return sendUnauthorized(res);
+
+  if (req.method === "GET" && url.pathname === "/api/content-factory/status") {
+    return sendJson(res, 200, getContentFactoryStatus({ state }));
+  }
 
   if (req.method === "GET" && url.pathname === "/api/state") {
     return sendJson(res, 200, state);
