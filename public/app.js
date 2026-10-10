@@ -212,6 +212,60 @@ function renderAgents() {
     <div class="meta">${escapeHtml(agent.role)}</div><div class="meta">Write access: ${escapeHtml(agent.writeAccess)}</div></article>`).join("");
 }
 
+
+function renderContentFactory(status) {
+  const label = {
+    ready: "جاهز",
+    online: "متصل",
+    offline: "غير متصل",
+    not_connected: "غير مربوط",
+    not_configured: "غير مُعد",
+    not_integrated: "غير مدمج",
+    not_verified: "لم يُختبر",
+    configured_unverified: "إعداد موجود — غير مُتحقق",
+    disabled_pending_approval: "معطل — ينتظر الموافقة",
+    incomplete: "غير مكتمل",
+    ready_for_review: "جاهز للمراجعة",
+  };
+  $("#factory-overall").textContent = label[status.overallStatus] ?? status.overallStatus;
+  $("#factory-phase").textContent = status.phase;
+  $("#factory-checked-at").textContent = `آخر فحص: ${new Date(status.checkedAt).toLocaleString()}`;
+  $("#factory-safety").textContent = status.safety.publishingEnabled
+    ? "تحذير: النشر مفعّل."
+    : "النشر التلقائي متوقف؛ فحص الحالة لا يرسل طلبات خارجية ولا يكشف الأسرار.";
+  $("#factory-connectors").innerHTML = status.connectors.map((item) => `
+    <article class="list-item">
+      <div class="section-heading"><div class="list-title">${escapeHtml(item.name)}</div><span class="status">${escapeHtml(label[item.status] ?? item.status)}</span></div>
+      <div class="meta">${escapeHtml(item.detail)}</div>
+      <div class="meta">التحقق الحي: ${item.verified ? "تم" : "لم يتم"}</div>
+    </article>`).join("");
+  $("#factory-next-steps").textContent = status.nextSteps[0] ?? "لا توجد خطوات إضافية.";
+}
+
+async function refreshContentFactory() {
+  const button = $("#refresh-content-factory");
+  button.disabled = true;
+  try {
+    const status = await fetchJson("/api/content-factory/status");
+    renderContentFactory(status);
+  } catch (error) {
+    $("#factory-overall").textContent = "تعذر جلب الحالة";
+    $("#factory-safety").textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function showView(name) {
+  const target = document.querySelector(`[data-view="${name}"]`);
+  const nav = document.querySelector(`[data-nav="${name}"]`);
+  if (!target || !nav) return;
+  document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item === nav));
+  document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view === target));
+  history.replaceState(null, "", `#${name}`);
+  if (name === "content-factory") refreshContentFactory();
+}
+
 function renderSettings() {
   $("#settings-panel").innerHTML = `
     <div class="list-title">Safety controls</div>
@@ -245,14 +299,9 @@ async function checkHealth() {
 }
 
 document.querySelectorAll("[data-nav]").forEach((button) => {
-  button.addEventListener("click", () => {
-    document.querySelectorAll(".nav-item").forEach((item) => item.classList.remove("active"));
-    document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
-    button.classList.add("active");
-    document.querySelector(`[data-view="${button.dataset.nav}"]`).classList.add("active");
-    history.replaceState(null, "", `#${button.dataset.nav}`);
-  });
+  button.addEventListener("click", () => showView(button.dataset.nav));
 });
+if (location.hash) showView(decodeURIComponent(location.hash.slice(1)));
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 await loadState();
@@ -277,3 +326,10 @@ if (saveTokenButton) saveTokenButton.addEventListener("click", () => {
   localStorage.setItem("zoz_control_token", value);
   location.reload();
 });
+
+const refreshFactoryButton = document.querySelector("#refresh-content-factory");
+if (refreshFactoryButton) refreshFactoryButton.addEventListener("click", refreshContentFactory);
+const openCodexButton = document.querySelector("#open-codex-control");
+if (openCodexButton) openCodexButton.addEventListener("click", () => showView("control"));
+const openApprovalsButton = document.querySelector("#open-approvals");
+if (openApprovalsButton) openApprovalsButton.addEventListener("click", () => showView("approvals"));
