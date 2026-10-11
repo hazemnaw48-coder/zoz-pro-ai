@@ -20,6 +20,13 @@ import { isAuthorized, sendUnauthorized } from "./auth.js";
 import { assertTaskCanReceiveCommand, normalizeTaskVerificationInput } from "./workflow.js";
 import { assignTask, evaluateExecutionGate } from "./orchestrator.js";
 import { getContentFactoryStatus } from "./content-factory.js";
+import {
+  ContentPublisherError,
+  checkYouTubePublicationStatus,
+  getContentPublisherStatus,
+  normalizeContentPublicationRequest,
+  submitYouTubePublication,
+} from "./content-publisher.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -124,6 +131,145 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/content-factory/status") {
     return sendJson(res, 200, getContentFactoryStatus({ state }));
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/content-factory/publisher/status") {
+    return sendJson(res, 200, getContentPublisherStatus());
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/content-factory/publications") {
+    try {
+      const body = await readJson(req);
+      const publicationInput = normalizeContentPublicationRequest(body);
+      const task = state.tasks.find((item) => item.id === publicationInput.taskId);
+      if (!task) return sendJson(res, 404, { error: "task not found" });
+      if (task.status !== "assigned" && task.status !== "executing" && task.status !== "verification" && task.status !== "completed") {
+        return sendJson(res, 409, { error: "task_not_ready_for_publication", message: "Link publication to a real ZOZ Pro task before requesting owner approval." });
+      }
+
+      state.publications ??= [];
+      const duplicate = state.publications.find((item) => item.taskId === publicationInput.taskId && item.jobId === publicationInput.jobId && ["awaiting_approval", "approved", "queued", "processing", "needs_reconciliation", "published"].includes(item.status));
+      if (duplicate) return sendJson(res, 409, { error: "publication_already_exists", publication: duplicate });
+
+      const id = "PUB-" + Date.now();
+      const approval = {
+        id: "APR-" + Date.now() + "-" + id,
+        taskId: publicationInput.taskId,
+        actionType: "external_send",
+        status: "pending",
+        requestedBy: "Owner",
+        decidedBy: null,
+        decidedAt: null,
+        reason: "YouTube publication requested from ZOZ Pro Content Factory.",
+        publicationId: id,
+      };
+      const publication = {
+        id,
+        ...publicationInput,
+        status: "awaiting_approval",
+        approvalId: approval.id,
+        provider: "Upload-Post",
+        providerRequestId: null,
+        postUrl: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        lastError: null,
+      };
+      state.approvals.unshift(approval);
+      state.publications.unshift(publication);
+      appendActivity(state, {
+        type: "content_publication_approval_requested",
+        actor: "Owner",
+        taskId: publication.taskId,
+        message: id + " requests owner approval before sending video to YouTube.",
+      });
+      await store.save(state);
+      return sendJson(res, 201, { publication, approval });
+    } catch (error) {
+      if (error instanceof ContentPublisherError) {
+        return sendJson(res, error.httpStatus, { error: error.code, message: error.message, details: error.details });
+      }
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  const publicationSubmitMatch = url.pathname.match(/^\/api\/content-factory\/publications\/([^/]+)\/submit$/);
+  if (req.method === "POST" && publicationSubmitMatch) {
+    const publicationId = decodeURIComponent(publicationSubmitMatch[1]);
+    const publication = (state.publications ?? []).find((item) => item.id === publicationId);
+    if (!publication) return sendJson(res, 404, { error: "publication not found" });
+    if (publication.status === "queued" || publication.status === "processing" || publication.status === "published" || publication.status === "needs_reconciliation") {
+      return sendJson(res, 409, { error: "publication_already_submitted", publication });
+    }
+    const approval = state.approvals.find((item) => item.id === publication.approvalId);
+    if (!approval || approval.status !== "approved" || approval.actionType !== "external_send") {
+      return sendJson(res, 409, { error: "owner_approval_required", message: "An explicit owner approval for external_send is required before publishing." });
+    }
+    if (publication.status !== "approved") {
+      return sendJson(res, 409, { error: "publication_not_approved", message: "Publication must be in approved state before submission." });
+    }
+
+    try {
+      const result = await submitYouTubePublication({ publication });
+      publication.status = result.status;
+      publication.providerRequestId = result.requestId;
+      publication.postUrl = result.postUrl;
+      publication.lastError = null;
+      publication.updatedAt = new Date().toISOString();
+      appendActivity(state, {
+        type: "content_publication_submitted",
+        actor: "Owner",
+        taskId: publication.taskId,
+        message: publication.id + " submission result: " + result.status + (result.requestId ? "; request " + result.requestId : ""),
+      });
+      await store.save(state);
+      return sendJson(res, result.status === "published" ? 200 : 202, { publication, provider: result });
+    } catch (error) {
+      publication.lastError = error.message || String(error);
+      publication.updatedAt = new Date().toISOString();
+      appendActivity(state, {
+        type: "content_publication_submission_failed",
+        actor: "Owner",
+        taskId: publication.taskId,
+        message: publication.id + " was not confirmed published: " + publication.lastError,
+      });
+      await store.save(state);
+      if (error instanceof ContentPublisherError) {
+        return sendJson(res, error.httpStatus, { error: error.code, message: error.message, details: error.details, publication });
+      }
+      return sendJson(res, 502, { error: "publication_failed", message: "Publication was not confirmed.", publication });
+    }
+  }
+
+  const publicationStatusMatch = url.pathname.match(/^\/api\/content-factory\/publications\/([^/]+)$/);
+  if (req.method === "GET" && publicationStatusMatch) {
+    const publicationId = decodeURIComponent(publicationStatusMatch[1]);
+    const publication = (state.publications ?? []).find((item) => item.id === publicationId);
+    if (!publication) return sendJson(res, 404, { error: "publication not found" });
+
+    if (publication.providerRequestId && ["queued", "processing", "completed_unverified"].includes(publication.status)) {
+      try {
+        const result = await checkYouTubePublicationStatus({ requestId: publication.providerRequestId });
+        publication.status = result.status;
+        publication.postUrl = result.postUrl;
+        publication.updatedAt = new Date().toISOString();
+        publication.lastError = result.status === "failed" ? result.message : null;
+        appendActivity(state, {
+          type: "content_publication_status_checked",
+          actor: "Owner",
+          taskId: publication.taskId,
+          message: publication.id + " status check: " + result.status,
+        });
+        await store.save(state);
+        return sendJson(res, 200, { publication, provider: result });
+      } catch (error) {
+        if (error instanceof ContentPublisherError) {
+          return sendJson(res, error.httpStatus, { error: error.code, message: error.message, publication });
+        }
+        return sendJson(res, 502, { error: "publication_status_failed", publication });
+      }
+    }
+    return sendJson(res, 200, { publication });
   }
 
   if (req.method === "GET" && url.pathname === "/api/state") {
@@ -541,6 +687,18 @@ async function handleApi(req, res, url) {
     const command = (state.controlCommands ?? []).find(
       (item) => item.approvalId === approval.id && item.status === "awaiting_approval",
     );
+    const publication = (state.publications ?? []).find((item) => item.approvalId === approval.id);
+    if (publication) {
+      publication.status = approval.status === "approved" ? "approved" : "rejected";
+      publication.updatedAt = new Date().toISOString();
+      if (approval.status === "rejected") publication.lastError = "Owner rejected publication approval.";
+      appendActivity(state, {
+        type: "content_publication_approval_" + approval.status,
+        actor: approval.decidedBy,
+        taskId: publication.taskId,
+        message: publication.id + " publication approval " + approval.status + ".",
+      });
+    }
     if (command && approval.status === "approved") {
       command.status = "queued";
       appendActivity(state, {
