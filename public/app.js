@@ -212,6 +212,161 @@ function renderAgents() {
     <div class="meta">${escapeHtml(agent.role)}</div><div class="meta">Write access: ${escapeHtml(agent.writeAccess)}</div></article>`).join("");
 }
 
+
+function renderContentFactory(status, publisherStatus) {
+  const label = {
+    ready: "جاهز", online: "متصل", offline: "غير متصل", not_connected: "غير مربوط",
+    not_configured: "غير مُعد", not_integrated: "غير مدمج", not_verified: "لم يُختبر",
+    configured_unverified: "إعداد موجود — غير مُتحقق", disabled_by_default: "معطل افتراضيًا",
+    disabled_pending_approval: "معطل — ينتظر الموافقة", incomplete: "غير مكتمل",
+    ready_for_review: "جاهز للمراجعة"
+  };
+  $("#factory-overall").textContent = label[status.overallStatus] ?? status.overallStatus;
+  $("#factory-phase").textContent = status.phase;
+  $("#factory-checked-at").textContent = "آخر فحص: " + new Date(status.checkedAt).toLocaleString();
+  $("#factory-safety").textContent = status.safety.publishingEnabled
+    ? "تحذير: النشر مفعّل."
+    : "النشر لا يعمل تلقائيًا؛ يلزم إعداد الخادم وموافقة المالك قبل الإرسال.";
+  const connectors = [...status.connectors];
+  if (publisherStatus) {
+    connectors.push({
+      name: "Upload-Post → YouTube",
+      status: publisherStatus.status,
+      detail: publisherStatus.detail + (publisherStatus.profileName ? " | Profile: " + publisherStatus.profileName : ""),
+      verified: publisherStatus.verified
+    });
+  }
+  $("#factory-connectors").innerHTML = connectors.map((item) =>
+    '<article class="list-item"><div class="section-heading"><div class="list-title">' +
+    escapeHtml(item.name) + '</div><span class="status">' +
+    escapeHtml(label[item.status] ?? item.status) + '</span></div><div class="meta">' +
+    escapeHtml(item.detail) + '</div><div class="meta">التحقق الحي: ' +
+    (item.verified ? "تم" : "لم يتم") + '</div></article>'
+  ).join("");
+  $("#factory-next-steps").textContent = (publisherStatus && !publisherStatus.configured)
+    ? "إعداد موصل الاستوديو وUpload-Post في أسرار الخادم، ثم التحقق من رابط الفيديو قبل طلب الموافقة."
+    : (status.nextSteps[0] ?? "لا توجد خطوات إضافية.");
+  renderPublicationQueue();
+}
+
+function renderPublicationQueue() {
+  const queue = $("#publication-queue");
+  if (!queue) return;
+  const publications = state?.publications ?? [];
+  queue.innerHTML = publications.length ? publications.map((item) =>
+    '<article class="list-item"><div class="section-heading"><div class="list-title">' +
+    escapeHtml(item.title) + '</div><span class="status">' + escapeHtml(labelPublicationStatus(item.status)) +
+    '</span></div><div class="meta">ID: ' + escapeHtml(item.id) + ' · Task: ' + escapeHtml(item.taskId) +
+    ' · Job: ' + escapeHtml(item.jobId) + '</div><div class="meta">' + escapeHtml(item.lastError ?? "") +
+    '</div>' + (item.postUrl ? '<div><a href="' + escapeHtml(item.postUrl) + '" target="_blank" rel="noopener noreferrer">فتح فيديو يوتيوب</a></div>' : '') +
+    '<div class="control-row">' +
+    (item.status === "approved" ? '<button data-submit-publication="' + escapeHtml(item.id) + '">إرسال إلى يوتيوب الآن</button>' : '') +
+    (["queued","processing","completed_unverified"].includes(item.status) ? '<button data-check-publication="' + escapeHtml(item.id) + '">فحص حالة النشر</button>' : '') +
+    '</div></article>'
+  ).join("") : '<div class="panel muted-text">لا توجد طلبات نشر بعد.</div>';
+
+  document.querySelectorAll("[data-submit-publication]").forEach((button) => button.addEventListener("click", async () => {
+    if (!confirm("سيتم إرسال الفيديو إلى يوتيوب باستخدام حساب النشر المتصل. هل توافق على الإرسال الآن؟")) return;
+    button.disabled = true;
+    try {
+      const result = await fetchJson("/api/content-factory/publications/" + encodeURIComponent(button.dataset.submitPublication) + "/submit", {
+        method: "POST", headers: { "content-type": "application/json" }, body: "{}"
+      });
+      alert(result.provider?.message ?? "تم تسجيل نتيجة طلب الرفع؛ تحقق من الحالة قبل اعتبار الفيديو منشورًا.");
+      await loadState();
+      await refreshContentFactory();
+    } catch (error) {
+      alert(error.message);
+      await loadState();
+      await refreshContentFactory();
+    } finally {
+      button.disabled = false;
+    }
+  }));
+
+  document.querySelectorAll("[data-check-publication]").forEach((button) => button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      const result = await fetchJson("/api/content-factory/publications/" + encodeURIComponent(button.dataset.checkPublication));
+      if (result.provider?.message) alert(result.provider.message);
+      await loadState();
+      await refreshContentFactory();
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      button.disabled = false;
+    }
+  }));
+}
+
+function labelPublicationStatus(status) {
+  const labels = {
+    awaiting_approval: "ينتظر الموافقة", approved: "موافق عليه", rejected: "مرفوض",
+    queued: "في طابور الرفع", processing: "قيد المعالجة", published: "تم النشر",
+    failed: "فشل", needs_reconciliation: "يحتاج إلى مطابقة الحالة",
+    completed_unverified: "اكتمل دون رابط مؤكد"
+  };
+  return labels[status] ?? status;
+}
+
+async function requestPublicationApproval() {
+  const button = $("#request-publication-approval");
+  const status = $("#publication-form-status");
+  const taskId = $("#publication-task-id").value.trim();
+  const jobId = $("#publication-job-id").value.trim();
+  const title = $("#publication-title").value.trim();
+  const description = $("#publication-description").value.trim();
+  const hashtags = $("#publication-hashtags").value.split(",").map((item) => item.trim()).filter(Boolean);
+  const privacyStatus = $("#publication-privacy").value;
+  if (!taskId || !jobId || !title || !description) {
+    status.textContent = "أكمل المهمة ومعرّف الرندر والعنوان والوصف.";
+    return;
+  }
+  button.disabled = true;
+  status.textContent = "جارٍ حفظ طلب النشر وطلب الموافقة…";
+  try {
+    const result = await fetchJson("/api/content-factory/publications", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ taskId, jobId, title, description, hashtags, privacyStatus })
+    });
+    status.textContent = "تم حفظ الطلب " + result.publication.id + "؛ ينتظر موافقة المالك. لم يتم إرسال الفيديو.";
+    await loadState();
+    await refreshContentFactory();
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function refreshContentFactory() {
+  const button = $("#refresh-content-factory");
+  if (button) button.disabled = true;
+  try {
+    const results = await Promise.all([
+      fetchJson("/api/content-factory/status"),
+      fetchJson("/api/content-factory/publisher/status")
+    ]);
+    renderContentFactory(results[0], results[1]);
+  } catch (error) {
+    $("#factory-overall").textContent = "تعذر جلب الحالة";
+    $("#factory-safety").textContent = error.message;
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+function showView(name) {
+  const target = document.querySelector(`[data-view="${name}"]`);
+  const nav = document.querySelector(`[data-nav="${name}"]`);
+  if (!target || !nav) return;
+  document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item === nav));
+  document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view === target));
+  history.replaceState(null, "", `#${name}`);
+  if (name === "content-factory") refreshContentFactory();
+}
+
 function renderSettings() {
   $("#settings-panel").innerHTML = `
     <div class="list-title">Safety controls</div>
@@ -245,14 +400,9 @@ async function checkHealth() {
 }
 
 document.querySelectorAll("[data-nav]").forEach((button) => {
-  button.addEventListener("click", () => {
-    document.querySelectorAll(".nav-item").forEach((item) => item.classList.remove("active"));
-    document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
-    button.classList.add("active");
-    document.querySelector(`[data-view="${button.dataset.nav}"]`).classList.add("active");
-    history.replaceState(null, "", `#${button.dataset.nav}`);
-  });
+  button.addEventListener("click", () => showView(button.dataset.nav));
 });
+if (location.hash) showView(decodeURIComponent(location.hash.slice(1)));
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 await loadState();
@@ -277,3 +427,12 @@ if (saveTokenButton) saveTokenButton.addEventListener("click", () => {
   localStorage.setItem("zoz_control_token", value);
   location.reload();
 });
+
+const requestPublicationButton = document.querySelector("#request-publication-approval");
+if (requestPublicationButton) requestPublicationButton.addEventListener("click", requestPublicationApproval);
+const refreshFactoryButton = document.querySelector("#refresh-content-factory");
+if (refreshFactoryButton) refreshFactoryButton.addEventListener("click", refreshContentFactory);
+const openCodexButton = document.querySelector("#open-codex-control");
+if (openCodexButton) openCodexButton.addEventListener("click", () => showView("control"));
+const openApprovalsButton = document.querySelector("#open-approvals");
+if (openApprovalsButton) openApprovalsButton.addEventListener("click", () => showView("approvals"));

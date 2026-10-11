@@ -21,6 +21,19 @@ test("server exposes state and enforces approval gate", async () => {
     const state = await stateResponse.json();
     assert.equal(state.project.repository, "hazemnaw48-coder/zoz-pro-ai");
 
+    const unauthorizedFactoryStatus = await fetch(`http://127.0.0.1:${port}/api/content-factory/status`);
+    assert.equal(unauthorizedFactoryStatus.status, 401);
+
+    const factoryStatusResponse = await fetch(`http://127.0.0.1:${port}/api/content-factory/status`, {
+      headers: { authorization: "Bearer test-control-token" },
+    });
+    assert.equal(factoryStatusResponse.status, 200);
+    const factoryStatus = await factoryStatusResponse.json();
+    assert.equal(factoryStatus.projectBoundary.legacyZoZAiMayBeModified, false);
+    assert.equal(factoryStatus.safety.publishingEnabled, false);
+    assert.equal(factoryStatus.safety.outboundConnectionChecksPerformed, false);
+    assert.ok(factoryStatus.connectors.some((item) => item.id === "zoz-content-studio" && item.status === "not_connected"));
+
     const transition = await fetch(`http://127.0.0.1:${port}/api/tasks/ZP-001/transition`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: "Bearer test-control-token" },
