@@ -80,7 +80,7 @@ test("verify Upload-Post account reads credentials server-side and does not expo
 });
 
 test("publication uses the approved profile, source URL, async mode and idempotency key", async () => {
-  let request;
+  const requests = [];
   const result = await submitYouTubePublication({
     env: configuredEnv(),
     publication: {
@@ -92,13 +92,19 @@ test("publication uses the approved profile, source URL, async mode and idempote
       privacyStatus: "public",
     },
     fetchImpl: async (url, options) => {
-      request = { url, options };
+      requests.push({ url, options });
+      if (url.endsWith("/uploadposts/me")) {
+        return new Response(JSON.stringify({ success: true, email: "service@example.com", plan: "Default" }), {
+          status: 200, headers: { "content-type": "application/json" },
+        });
+      }
       return new Response(JSON.stringify({ success: true, request_id: "zp_PUB-test-123", status: "queued" }), {
         status: 200, headers: { "content-type": "application/json" },
       });
     },
   });
-
+  const request = requests[1];
+  assert.equal(requests[0].url, "https://api.upload-post.com/api/uploadposts/me");
   assert.equal(request.url, "https://api.upload-post.com/api/upload");
   assert.equal(request.options.headers.Authorization, "Apikey test-only-secret");
   assert.equal(request.options.headers["Idempotency-Key"], "zoz-pro-zozpro_PUB-test-123");
