@@ -211,6 +211,7 @@ export async function verifyUploadPostAccount({ env = process.env, fetchImpl = f
 
 export async function submitYouTubePublication({ publication, env = process.env, fetchImpl = fetch } = {}) {
   assertPublisherConfigured(env);
+  await verifyUploadPostAccount({ env, fetchImpl });
   if (!publication || typeof publication !== "object") {
     throw new ContentPublisherError("invalid_publication", "Publication details are required.", 400);
   }
@@ -354,7 +355,7 @@ export async function checkYouTubePublicationStatus({ requestId, env = process.e
   if (["pending", "queued"].includes(providerStatus)) status = "queued";
   else if (["processing", "in_progress"].includes(providerStatus)) status = "processing";
   else if (providerStatus === "failed") status = "failed";
-  else if (providerStatus === "completed") {
+  else if (providerStatus === "completed" || providerStatus === "success") {
     status = youtubeResult?.success === true && hasValue(youtubeResult.url)
       ? "published"
       : "completed_unverified";
