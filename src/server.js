@@ -13,6 +13,8 @@ import {
   canExecuteControlCommand,
 } from "./control.js";
 import { createStateStore, StateWriteConflictError } from "./store.js";
+import { isSupportedCloudInstruction } from "./cloud-worker.js";
+import { enqueueCloudCommand, isVercelRuntime } from "./cloud-queue.js";
 import { normalizeOpportunityInput, normalizeIntelligenceInput, OPPORTUNITY_STATUSES } from "./opportunities.js";
 import { normalizeContactInput, CONTACT_STATUSES } from "./crm.js";
 import { normalizeOutreachInput, OUTREACH_STATUSES } from "./outreach.js";
@@ -122,6 +124,7 @@ async function handleApi(req, res, url) {
       status: "ok",
       project: state.project.repository,
       controlPlane: "ready",
+      executionRuntime: isVercelRuntime() ? "vercel-queue" : "local-cli",
       queuedCommands: state.controlCommands?.filter((c) => c.status === "queued").length ?? 0,
     });
   }
@@ -414,16 +417,54 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/control/commands") {
     try {
-      const command = createControlCommand(state, await readJson(req));
+      const body = await readJson(req);
+      const cloudRuntime = isVercelRuntime();
+      if (cloudRuntime && body.actionType == null && !isSupportedCloudInstruction(body.instruction)) {
+        return sendJson(res, 422, {
+          error: "cloud_instruction_not_supported",
+          message: "The cloud worker only executes read-only tasks: system:health-check or system:project-summary. Other commands are not queued for execution.",
+          supportedInstructions: ["system:health-check", "system:project-summary"],
+        });
+      }
+
+      const command = createControlCommand(state, body);
       state.controlCommands ??= [];
       state.controlCommands.unshift(command);
       appendActivity(state, {
         type: "control_command_created",
         actor: command.requestedBy,
         taskId: command.taskId,
-        message: `${command.id} queued for Codex: ${command.instruction}`,
+        message: `${command.id} queued for ${cloudRuntime ? "the Vercel Queue worker" : "Codex"}: ${command.instruction}`,
       });
       await store.save(state);
+
+      // Only allowlisted, non-risky commands reach the cloud queue. Risky
+      // commands retain their owner-approval record and are never auto-dispatched.
+      if (cloudRuntime && command.status === "queued" && !command.actionType) {
+        try {
+          await enqueueCloudCommand(command.id);
+        } catch {
+          const latest = await store.load();
+          const latestCommand = (latest.controlCommands ?? []).find(item => item.id === command.id);
+          if (latestCommand?.status === "queued") {
+            latestCommand.status = "failed";
+            latestCommand.failedAt = new Date().toISOString();
+            latestCommand.error = "Cloud queue dispatch failed; execution was not confirmed.";
+            appendActivity(latest, {
+              type: "control_command_dispatch_failed",
+              actor: "ZOZ Pro Cloud Worker",
+              taskId: latestCommand.taskId,
+              message: `${latestCommand.id} was not confirmed queued with Vercel Queue; no execution was confirmed.`,
+            });
+            await store.save(latest);
+          }
+          return sendJson(res, 503, {
+            error: "cloud_worker_dispatch_failed",
+            commandId: command.id,
+            message: "The cloud worker could not be reached. Check the command status before retrying.",
+          });
+        }
+      }
       return sendJson(res, 201, command);
     } catch (error) {
       return sendJson(res, 400, { error: error.message });
@@ -699,13 +740,25 @@ async function handleApi(req, res, url) {
       });
     }
     if (command && approval.status === "approved") {
-      command.status = "queued";
-      appendActivity(state, {
-        type: "control_command_released",
-        actor: approval.decidedBy,
-        taskId: command.taskId,
-        message: `${command.id} released to Codex after explicit owner approval.`,
-      });
+      if (isVercelRuntime()) {
+        command.status = "blocked";
+        command.blockedAt = new Date().toISOString();
+        command.error = "Approval recorded; this cloud worker does not execute financial or external actions.";
+        appendActivity(state, {
+          type: "control_command_blocked",
+          actor: "ZOZ Pro Cloud Worker",
+          taskId: command.taskId,
+          message: `${command.id} was not dispatched: approved high-risk actions require a dedicated action handler.`,
+        });
+      } else {
+        command.status = "queued";
+        appendActivity(state, {
+          type: "control_command_released",
+          actor: approval.decidedBy,
+          taskId: command.taskId,
+          message: `${command.id} released to Codex after explicit owner approval.`,
+        });
+      }
     }
     if (command && approval.status === "rejected") {
       command.status = "cancelled";

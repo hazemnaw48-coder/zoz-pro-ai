@@ -7,6 +7,7 @@ export const CONTROL_COMMAND_STATUSES = [
   "completed",
   "failed",
   "cancelled",
+  "blocked",
 ];
 
 export function normalizeControlCommandInput(input = {}) {
@@ -29,11 +30,12 @@ export function normalizeControlCommandInput(input = {}) {
 export function canTransitionControlCommand(from, to) {
   const transitions = {
     queued: new Set(["claimed", "cancelled"]),
-    awaiting_approval: new Set(["queued", "cancelled"]),
+    awaiting_approval: new Set(["queued", "cancelled", "blocked"]),
     claimed: new Set(["completed", "failed", "cancelled"]),
     completed: new Set([]),
     failed: new Set([]),
     cancelled: new Set([]),
+    blocked: new Set(["cancelled"]),
   };
 
   return Boolean(transitions[from]?.has(to));

@@ -9,6 +9,15 @@
     },
     "api/cron/heartbeat.js": {
       "maxDuration": 30
+    },
+    "api/queue/control-command.js": {
+      "maxDuration": 60,
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "zoz-pro-control-commands"
+        }
+      ]
     }
   },
   "crons": [
