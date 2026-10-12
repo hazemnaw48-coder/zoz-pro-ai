@@ -174,7 +174,7 @@ export function validateStudioOutputUrl(value, env = process.env) {
   if (source.protocol !== "https:" || source.origin !== base.origin || source.username || source.password) {
     throw new Error("source_url_must_match_configured_https_studio");
   }
-  if (!source.pathname.startsWith("/outputs/") || source.pathname.includes("/../") || source.pathname.includes("%2e%2e")) {
+  if (!source.pathname.startsWith("/api/zoz-pro/outputs/") || source.pathname.includes("/../") || source.pathname.toLowerCase().includes("%2e%2e")) {
     throw new Error("source_url_must_be_a_studio_output");
   }
   return source;
@@ -183,7 +183,10 @@ export function validateStudioOutputUrl(value, env = process.env) {
 export async function importStudioOutput({ sourceUrl, filename, direction = "from-gemini" }) {
   direction = normalizeHandoffDirection(direction);
   const source = validateStudioOutputUrl(sourceUrl);
+  const token = process.env.ZOZ_CONTENT_STUDIO_TOKEN;
+  if (!token) throw new Error("studio_handoff_token_not_configured");
   const response = await fetch(source, {
+    headers: { authorization: `Bearer ${token}` },
     redirect: "manual",
     signal: AbortSignal.timeout(60_000)
   });
