@@ -23,7 +23,7 @@ import { createStateStore } from "./store.js";
 import { normalizeOpportunityInput, normalizeIntelligenceInput, OPPORTUNITY_STATUSES } from "./opportunities.js";
 import { normalizeContactInput, CONTACT_STATUSES } from "./crm.js";
 import { normalizeOutreachInput, OUTREACH_STATUSES } from "./outreach.js";
-import { isAuthorized, sendUnauthorized } from "./auth.js";
+import { isAuthorized, isHandoffAuthorized, sendUnauthorized } from "./auth.js";
 import { assertTaskCanReceiveCommand, normalizeTaskVerificationInput } from "./workflow.js";
 import { assignTask, evaluateExecutionGate } from "./orchestrator.js";
 import { getContentFactoryStatus } from "./content-factory.js";
@@ -140,7 +140,20 @@ async function handleApi(req, res, url) {
     });
   }
 
-  if (!isAuthorized(req)) return sendUnauthorized(res);
+  const ownerAuthorized = isAuthorized(req);
+  const handoffAuthorized = url.pathname.startsWith("/api/handoff") && isHandoffAuthorized(req);
+  if (!ownerAuthorized && !handoffAuthorized) return sendUnauthorized(res);
+  if (handoffAuthorized && !ownerAuthorized) {
+    if (req.method === "GET" && url.pathname === "/api/handoff") {
+      // Integration token can only list files intentionally handed to Gemini.
+      url.searchParams.set("direction", "to-gemini");
+    } else if (req.method === "GET" && url.pathname === "/api/handoff/file") {
+      const pathname = url.searchParams.get("pathname") || "";
+      if (!pathname.startsWith("handoff/to-gemini/")) return sendUnauthorized(res);
+    } else if (!(req.method === "POST" && url.pathname === "/api/handoff/import")) {
+      return sendUnauthorized(res);
+    }
+  }
 
   if (req.method === "GET" && url.pathname === "/api/handoff") {
     try {
