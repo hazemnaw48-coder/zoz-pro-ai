@@ -17,8 +17,8 @@ All routes below require the ZOZ Pro owner bearer token. Never place the token i
   `{"direction":"from-gemini","filename":"notes.md","contentBase64":"...","contentType":"text/markdown"}`.
   Inline payload limit: 3 MiB.
 - `POST /api/handoff/import` — import a larger file from the configured Studio output origin:
-  `{"direction":"from-gemini","filename":"final-video.mp4","sourceUrl":"https://<configured-studio-origin>/outputs/<jobId>/video.mp4"}`.
-  The URL must be HTTPS, match the exact configured Studio origin, and use an `/outputs/` path. Redirects are rejected. Maximum streamed file size: 100 MiB.
+  `{"direction":"from-gemini","filename":"video.mp4","sourceUrl":"https://<configured-studio-origin>/api/zoz-pro/outputs/<jobId>/video.mp4"}`.
+  The URL must be HTTPS, match the exact configured Studio origin, and use the Studio’s token-protected `/api/zoz-pro/outputs/<jobId>/<filename>` route. Redirects are rejected. The Studio route requires a dedicated shared secret; do not use the owner control token. Maximum streamed file size: 100 MiB.
 - `GET /api/handoff/file?pathname=<URL-encoded-pathname>` — download a previously listed file.
 
 Direction meanings:
@@ -29,7 +29,7 @@ Files are stored in private Vercel Blob storage when running on Vercel; local mo
 
 ## Configuration required for end-to-end transfer
 
-Set `ZOZ_CONTENT_STUDIO_URL` only after identifying the actual deployed Google AI Studio/Content Studio origin that serves `/outputs/<jobId>/<filename>`. Do not guess this URL. If the Studio currently exports files only to the browser's Downloads folder, this server-to-server import route cannot read that folder; use the small-file upload endpoint or first add a real authenticated Studio export endpoint.
+Set `ZOZ_CONTENT_STUDIO_URL` only after identifying the actual deployed Google AI Studio/Content Studio origin that serves `/api/zoz-pro/outputs/<jobId>/<filename>`. Set `ZOZ_CONTENT_STUDIO_TOKEN` and `ZOZ_STUDIO_HANDOFF_TOKEN` to the same dedicated, high-entropy file-handoff secret configured in the Studio runtime as `ZOZ_PRO_HANDOFF_TOKEN`. This token may list/download only `to-gemini` files and import outputs from the configured Studio origin; it cannot access task state, approvals, or executor controls. Do not guess this URL. If the Studio currently exports files only to the browser's Downloads folder, this server-to-server import route cannot read that folder; use the small-file upload endpoint or first add a real authenticated Studio export endpoint.
 
 The ZOZ Pro API is not yet evidence that Google AI Studio is connected. End-to-end file transfer must be tested against the real Studio deployment before the connector can be marked verified.
 
