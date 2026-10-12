@@ -217,7 +217,7 @@ function renderContentFactory(status, publisherStatus) {
   const label = {
     ready: "جاهز", online: "متصل", offline: "غير متصل", not_connected: "غير مربوط",
     not_configured: "غير مُعد", not_integrated: "غير مدمج", not_verified: "لم يُختبر",
-    configured_unverified: "إعداد موجود — غير مُتحقق", disabled_by_default: "معطل افتراضيًا",
+    configured_unverified: "إعداد موجود — غير مُتحقق", available_unverified: "متاح — يحتاج اختبارًا", disabled_by_default: "معطل افتراضيًا",
     disabled_pending_approval: "معطل — ينتظر الموافقة", incomplete: "غير مكتمل",
     ready_for_review: "جاهز للمراجعة"
   };
@@ -340,6 +340,117 @@ async function requestPublicationApproval() {
   }
 }
 
+function bytesToBase64(bytes) {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
+
+async function loadHandoffFiles() {
+  const list = $("#handoff-files");
+  if (!list) return;
+  list.innerHTML = '<div class="meta">جارٍ تحميل قائمة الملفات…</div>';
+  try {
+    const result = await fetchJson("/api/handoff");
+    const files = result.files ?? [];
+    list.innerHTML = files.length ? files.map((file) =>
+      '<article class="list-item"><div class="section-heading"><div class="list-title">' +
+      escapeHtml(file.filename) + '</div><span class="status">' +
+      escapeHtml(file.direction === "from-gemini" ? "من Gemini" : "إلى Gemini") +
+      '</span></div><div class="meta">' + escapeHtml((file.size / 1024).toFixed(1)) +
+      ' KiB · ' + escapeHtml(file.uploadedAt ?? "") + '</div><div class="meta">' +
+      escapeHtml(file.pathname) + '</div><button type="button" data-handoff-download="' +
+      escapeHtml(file.pathname) + '">تنزيل الملف</button></article>'
+    ).join("") : '<div class="meta">لا توجد ملفات في صندوق التبادل بعد.</div>';
+    list.querySelectorAll("[data-handoff-download]").forEach((button) => button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        const url = "/api/handoff/file?pathname=" + encodeURIComponent(button.dataset.handoffDownload);
+        const response = await fetch(url, { headers: CONTROL_TOKEN ? { Authorization: `Bearer ${CONTROL_TOKEN}` } : {} });
+        if (!response.ok) {
+          let message = "تعذر تنزيل الملف";
+          try { message = (await response.json()).error ?? message; } catch {}
+          throw new Error(message);
+        }
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = button.closest(".list-item")?.querySelector(".list-title")?.textContent ?? "handoff-file";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(objectUrl);
+      } catch (error) {
+        alert(error.message);
+      } finally {
+        button.disabled = false;
+      }
+    }));
+  } catch (error) {
+    list.innerHTML = '<div class="meta">تعذر تحميل الملفات: ' + escapeHtml(error.message) + '</div>';
+  }
+}
+
+async function uploadHandoffFile() {
+  const input = $("#handoff-file");
+  const status = $("#handoff-status");
+  const button = $("#handoff-upload");
+  const file = input?.files?.[0];
+  if (!file) { status.textContent = "اختر ملفًا أولًا."; return; }
+  if (file.size > 3 * 1024 * 1024) { status.textContent = "الملف أكبر من 3 MiB. استخدم استيراد رابط مخرجات الاستوديو للملفات حتى 100 MiB."; return; }
+  button.disabled = true;
+  status.textContent = "جارٍ حفظ الملف…";
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const result = await fetchJson("/api/handoff", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        direction: $("#handoff-direction").value,
+        filename: file.name,
+        contentType: file.type,
+        contentBase64: bytesToBase64(bytes)
+      })
+    });
+    status.textContent = "تم حفظ " + result.file.filename + "؛ SHA-256: " + result.file.sha256;
+    input.value = "";
+    await loadHandoffFiles();
+  } catch (error) {
+    status.textContent = "فشل الحفظ: " + error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function importHandoffFile() {
+  const status = $("#handoff-status");
+  const button = $("#handoff-import");
+  const sourceUrl = $("#handoff-source-url").value.trim();
+  const filename = $("#handoff-source-name").value.trim();
+  if (!sourceUrl || !filename) { status.textContent = "أدخل رابط المخرجات واسم الملف."; return; }
+  button.disabled = true;
+  status.textContent = "جارٍ استيراد الملف من الاستوديو والتحقق من حجمه…";
+  try {
+    const result = await fetchJson("/api/handoff/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ direction: "from-gemini", sourceUrl, filename })
+    });
+    status.textContent = "تم استيراد " + result.file.filename + " (" + result.file.size + " bytes)؛ SHA-256: " + result.file.sha256;
+    $("#handoff-source-url").value = "";
+    $("#handoff-source-name").value = "";
+    await loadHandoffFiles();
+  } catch (error) {
+    status.textContent = "فشل الاستيراد: " + error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function refreshContentFactory() {
   const button = $("#refresh-content-factory");
   if (button) button.disabled = true;
@@ -364,7 +475,7 @@ function showView(name) {
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item === nav));
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view === target));
   history.replaceState(null, "", `#${name}`);
-  if (name === "content-factory") refreshContentFactory();
+  if (name === "content-factory") { refreshContentFactory(); loadHandoffFiles(); }
 }
 
 function renderSettings() {
@@ -430,6 +541,12 @@ if (saveTokenButton) saveTokenButton.addEventListener("click", () => {
 
 const requestPublicationButton = document.querySelector("#request-publication-approval");
 if (requestPublicationButton) requestPublicationButton.addEventListener("click", requestPublicationApproval);
+const handoffUploadButton = document.querySelector("#handoff-upload");
+if (handoffUploadButton) handoffUploadButton.addEventListener("click", uploadHandoffFile);
+const handoffImportButton = document.querySelector("#handoff-import");
+if (handoffImportButton) handoffImportButton.addEventListener("click", importHandoffFile);
+const handoffRefreshButton = document.querySelector("#refresh-handoff");
+if (handoffRefreshButton) handoffRefreshButton.addEventListener("click", loadHandoffFiles);
 const refreshFactoryButton = document.querySelector("#refresh-content-factory");
 if (refreshFactoryButton) refreshFactoryButton.addEventListener("click", refreshContentFactory);
 const openCodexButton = document.querySelector("#open-codex-control");

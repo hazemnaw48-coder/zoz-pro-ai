@@ -22,6 +22,23 @@
   <div class="panel"><div class="panel-header"><h3 id="factory-overall">جارٍ فحص الحالة…</h3><span id="factory-phase" class="badge">Checking</span></div><p id="factory-checked-at" class="meta">لم يتم الفحص بعد.</p><p id="factory-safety" class="meta"></p></div>
   <div id="factory-connectors" class="stack"></div>
   <div class="panel">
+    <h3>تبادل الملفات مع Google AI Studio / Gemini</h3>
+    <p class="meta">استلام وتسليم الملفات الخاصة. رفع المتصفح محدود بـ3 MiB؛ للملفات الأكبر استخدم رابط مخرجات HTTPS من الاستوديو (حتى 100 MiB).</p>
+    <label for="handoff-direction">اتجاه الملف</label>
+    <select id="handoff-direction"><option value="from-gemini">من Gemini إلى ZOZ Pro</option><option value="to-gemini">من ZOZ Pro إلى Gemini</option></select>
+    <label for="handoff-file">ملف صغير</label>
+    <input id="handoff-file" type="file" accept=".zip,.mp4,.mov,.webm,.mkv,.mp3,.wav,.m4a,.srt,.vtt,.json,.txt,.pdf,.png,.jpg,.jpeg,.webp,.gif,.md,.ts,.tsx,.js,.jsx,.py,.html,.css,.xml,.csv">
+    <button id="handoff-upload" type="button">حفظ الملف في صندوق ZOZ Pro الخاص</button>
+    <label for="handoff-source-url">رابط ملف من مخرجات الاستوديو (HTTPS)</label>
+    <input id="handoff-source-url" type="url" maxlength="2000" placeholder="https://.../outputs/job-id/video.mp4">
+    <label for="handoff-source-name">اسم الملف</label>
+    <input id="handoff-source-name" maxlength="120" placeholder="final-video.mp4">
+    <button id="handoff-import" type="button">استيراد ملف من الاستوديو</button>
+    <p id="handoff-status" class="meta">لم يتم إجراء نقل بعد.</p>
+    <div class="panel-header"><h3>الملفات المحفوظة</h3><button id="refresh-handoff" type="button">تحديث الملفات</button></div>
+    <div id="handoff-files" class="stack"></div>
+  </div>
+  <div class="panel">
     <h3>طلب نشر فيديو</h3>
     <p class="meta">أدخل معرّف الرندر من الاستوديو. سيُحفظ الطلب وينتظر موافقة المالك؛ لا يتم النشر تلقائيًا.</p>
     <label for="publication-task-id">مهمة ZOZ Pro</label>

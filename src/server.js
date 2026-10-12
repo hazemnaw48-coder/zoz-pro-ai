@@ -1,4 +1,11 @@
 import http from "node:http";
+import { Readable } from "node:stream";
+import {
+  saveInlineHandoff,
+  importStudioOutput,
+  listHandoffFiles,
+  openHandoffFile,
+} from "./file-handoff.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,7 +23,7 @@ import { createStateStore } from "./store.js";
 import { normalizeOpportunityInput, normalizeIntelligenceInput, OPPORTUNITY_STATUSES } from "./opportunities.js";
 import { normalizeContactInput, CONTACT_STATUSES } from "./crm.js";
 import { normalizeOutreachInput, OUTREACH_STATUSES } from "./outreach.js";
-import { isAuthorized, sendUnauthorized } from "./auth.js";
+import { isAuthorized, isHandoffAuthorized, sendUnauthorized } from "./auth.js";
 import { assertTaskCanReceiveCommand, normalizeTaskVerificationInput } from "./workflow.js";
 import { assignTask, evaluateExecutionGate } from "./orchestrator.js";
 import { getContentFactoryStatus } from "./content-factory.js";
@@ -53,7 +60,13 @@ function sendJson(res, status, payload) {
 
 async function readJson(req) {
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let size = 0;
+  const maxBytes = 5 * 1024 * 1024;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > maxBytes) throw new Error("request_body_too_large");
+    chunks.push(chunk);
+  }
   if (chunks.length === 0) return {};
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
@@ -127,7 +140,107 @@ async function handleApi(req, res, url) {
     });
   }
 
-  if (!isAuthorized(req)) return sendUnauthorized(res);
+  const ownerAuthorized = isAuthorized(req);
+  const handoffAuthorized = url.pathname.startsWith("/api/handoff") && isHandoffAuthorized(req);
+  if (!ownerAuthorized && !handoffAuthorized) return sendUnauthorized(res);
+  if (handoffAuthorized && !ownerAuthorized) {
+    if (req.method === "GET" && url.pathname === "/api/handoff") {
+      // Integration token can only list files intentionally handed to Gemini.
+      url.searchParams.set("direction", "to-gemini");
+    } else if (req.method === "GET" && url.pathname === "/api/handoff/file") {
+      const pathname = url.searchParams.get("pathname") || "";
+      if (!pathname.startsWith("handoff/to-gemini/")) return sendUnauthorized(res);
+    } else if (!(req.method === "POST" && url.pathname === "/api/handoff/import")) {
+      return sendUnauthorized(res);
+    }
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/handoff") {
+    try {
+      const direction = url.searchParams.get("direction") || null;
+      const files = await listHandoffFiles(direction);
+      return sendJson(res, 200, {
+        files,
+        policy: {
+          storage: process.env.VERCEL || process.env.ZOZ_CLOUD_STATE === "true" ? "vercel-blob-private" : "local-private",
+          inlineLimitBytes: 3 * 1024 * 1024,
+          studioImportLimitBytes: 100 * 1024 * 1024,
+          acceptedDirections: ["from-gemini", "to-gemini"],
+        },
+      });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/handoff") {
+    try {
+      const body = await readJson(req);
+      const file = await saveInlineHandoff({
+        direction: body.direction,
+        filename: body.filename,
+        contentBase64: body.contentBase64,
+        contentType: body.contentType,
+      });
+      appendActivity(state, {
+        type: "file_handoff_received",
+        actor: body.direction === "from-gemini" ? "Gemini / Google AI Studio" : "ZOZ Pro",
+        message: `Saved ${file.filename} (${file.size} bytes) to private handoff storage; SHA-256 ${file.sha256}.`,
+      });
+      await store.save(state);
+      return sendJson(res, 201, { file });
+    } catch (error) {
+      const tooLarge = /limit_exceeded|file_too_large/.test(error.message);
+      return sendJson(res, tooLarge ? 413 : 400, { error: error.message });
+    }
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/handoff/import") {
+    try {
+      const body = await readJson(req);
+      if (body.direction && body.direction !== "from-gemini") {
+        return sendJson(res, 400, { error: "studio import direction must be from-gemini" });
+      }
+      const file = await importStudioOutput({
+        sourceUrl: body.sourceUrl,
+        filename: body.filename,
+        direction: "from-gemini",
+      });
+      appendActivity(state, {
+        type: "studio_file_imported",
+        actor: "ZOZ Pro",
+        message: `Imported ${file.filename} (${file.size} bytes) from the configured Google AI Studio output origin; SHA-256 ${file.sha256}.`,
+      });
+      await store.save(state);
+      return sendJson(res, 201, { file });
+    } catch (error) {
+      const tooLarge = /limit_exceeded|file_too_large/.test(error.message);
+      return sendJson(res, tooLarge ? 413 : 400, { error: error.message });
+    }
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/handoff/file") {
+    try {
+      const pathname = url.searchParams.get("pathname");
+      if (!pathname) return sendJson(res, 400, { error: "pathname_required" });
+      const file = await openHandoffFile(pathname);
+      res.writeHead(200, {
+        "content-type": file.contentType,
+        "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
+        "cache-control": "private, no-store",
+        "x-content-type-options": "nosniff",
+      });
+      if (typeof file.stream.getReader === "function") {
+        Readable.fromWeb(file.stream).pipe(res);
+      } else {
+        file.stream.pipe(res);
+      }
+      return;
+    } catch (error) {
+      const missing = /not_found/.test(error.message);
+      return sendJson(res, missing ? 404 : 400, { error: error.message });
+    }
+  }
 
   if (req.method === "GET" && url.pathname === "/api/content-factory/status") {
     return sendJson(res, 200, getContentFactoryStatus({ state }));
@@ -744,18 +857,23 @@ async function serveStatic(req, res, url) {
   }
 }
 
-const server = http.createServer(async (req, res) => {
+export async function requestHandler(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
     if (url.pathname.startsWith("/api/")) await handleApi(req, res, url);
     else await serveStatic(req, res, url);
   } catch (error) {
+    if (error?.message === "request_body_too_large") {
+      return sendJson(res, 413, { error: "request_body_too_large" });
+    }
     console.error(error);
     sendJson(res, 500, { error: "internal_server_error" });
   }
-});
+}
 
-if (process.env.NODE_ENV !== "test") {
+const server = http.createServer(requestHandler);
+
+if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
   server.listen(PORT, "0.0.0.0", () => {
     console.log(`ZOZ Pro listening on http://0.0.0.0:${PORT}`);
   });
