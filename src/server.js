@@ -766,4 +766,4 @@ const server = http.createServer(handleRequest);
 
 // Listening is intentionally owned by src/start.js, never by this imported
 // module. Vercel imports handleRequest inside a serverless invocation.
-export { server, handleRequest, createInitialState };
+export { server, createInitialState };
