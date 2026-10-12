@@ -744,16 +744,19 @@ async function serveStatic(req, res, url) {
   }
 }
 
-const server = http.createServer(async (req, res) => {
+export async function handleRequest(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
     if (url.pathname.startsWith("/api/")) await handleApi(req, res, url);
     else await serveStatic(req, res, url);
   } catch (error) {
     console.error(error);
-    sendJson(res, 500, { error: "internal_server_error" });
+    if (!res.headersSent) sendJson(res, 500, { error: "internal_server_error" });
+    else res.end();
   }
-});
+}
+
+const server = http.createServer(handleRequest);
 
 if (process.env.NODE_ENV !== "test") {
   server.listen(PORT, "0.0.0.0", () => {
