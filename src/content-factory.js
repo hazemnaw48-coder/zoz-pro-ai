@@ -6,6 +6,7 @@ const hasValue = (value) => typeof value === "string" && value.trim().length > 0
  */
 export function getContentFactoryStatus({ state = null, env = process.env } = {}) {
   const studioConfigured = hasValue(env.ZOZ_CONTENT_STUDIO_URL);
+  const handoffTokenConfigured = hasValue(env.ZOZ_STUDIO_HANDOFF_TOKEN) && hasValue(env.ZOZ_CONTENT_STUDIO_TOKEN);
   const ffmpegConfigured = hasValue(env.FFMPEG_PATH) || hasValue(env.FFMPEG_BINARY);
   const codexOnline = state?.executor?.status === "online";
 
@@ -53,9 +54,11 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
     {
       id: "file-handoff",
       name: "Private Gemini ↔ ZOZ Pro file handoff",
-      status: "available_unverified",
+      status: handoffTokenConfigured ? "configured_unverified" : "available_unverified",
       verified: false,
-      detail: "Authenticated upload, listing, and download routes are implemented. End-to-end transfer from the real Google AI Studio deployment is not yet verified.",
+      detail: handoffTokenConfigured
+        ? "Dedicated file-exchange tokens are configured, but the real Studio round-trip is not yet verified."
+        : "Authenticated file routes are implemented, but the shared Studio handoff token is not fully configured.",
       secretValuesExposed: false,
     },
     {
