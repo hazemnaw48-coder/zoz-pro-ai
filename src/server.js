@@ -755,7 +755,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-if (process.env.NODE_ENV !== "test") {
+if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
   server.listen(PORT, "0.0.0.0", () => {
     console.log(`ZOZ Pro listening on http://0.0.0.0:${PORT}`);
   });
