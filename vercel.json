@@ -8,6 +8,10 @@
   },
   "rewrites": [
     {
+      "source": "/api/cron/heartbeat",
+      "destination": "/api/cron/heartbeat"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
