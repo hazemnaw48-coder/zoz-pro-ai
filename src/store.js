@@ -11,6 +11,25 @@ export function getDefaultStateFile() {
 
 export const DEFAULT_STATE_FILE = getDefaultStateFile();
 
+export class StateWriteConflictError extends Error {
+  constructor() {
+    super("Persistent state changed during this request. Reload the latest state and retry.");
+    this.name = "StateWriteConflictError";
+    this.code = "state_write_conflict";
+  }
+}
+
+export function isStateWriteConflict(error) {
+  const status = Number(error?.status ?? error?.statusCode ?? error?.response?.status);
+  const code = String(error?.code ?? "");
+  const name = String(error?.name ?? "");
+  const message = String(error?.message ?? "");
+  return status === 412
+    || /precondition/i.test(code)
+    || /precondition/i.test(name)
+    || /precondition|etag.*(?:mismatch|conflict|match)|(?:mismatch|conflict).*etag/i.test(message);
+}
+
 function getVercelStatePath() {
   if (process.env.VERCEL_ENV === "production") return "state/production/zoz-pro-state.json";
 
@@ -82,7 +101,13 @@ function createVercelBlobStore() {
       };
       if (etag) options.ifMatch = etag;
 
-      const saved = await put(pathname, JSON.stringify(state, null, 2) + "\n", options);
+      let saved;
+      try {
+        saved = await put(pathname, JSON.stringify(state, null, 2) + "\n", options);
+      } catch (error) {
+        if (isStateWriteConflict(error)) throw new StateWriteConflictError();
+        throw error;
+      }
       etag = saved.etag;
     },
   };
@@ -115,9 +140,22 @@ function createFileStateStore(filePath) {
 }
 
 export function createStateStore(filePath) {
-  // Vercel functions are ephemeral: never silently write to a local JSON file.
-  if (filePath === undefined && process.env.VERCEL === "1") {
+  // Explicit file paths are used by isolated tests and local tooling.
+  if (filePath !== undefined) return createFileStateStore(filePath);
+
+  // Never rely on optional Vercel system variables to choose durable storage.
+  const vercelRuntime = process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
+  if (vercelRuntime || process.env.ZOZ_PRO_STORAGE_MODE === "blob") {
     return createVercelBlobStore();
   }
-  return createFileStateStore(filePath ?? getDefaultStateFile());
+
+  // Local/test use defaults to files only outside production. A production
+  // deployment with missing runtime indicators must fail closed, not use disk.
+  if (process.env.NODE_ENV !== "production" && process.env.ZOZ_PRO_STORAGE_MODE !== "blob") {
+    return createFileStateStore(getDefaultStateFile());
+  }
+
+  throw new Error(
+    "ZOZ_PRO_STORAGE_MODE=blob is required for production state; ephemeral local storage is disabled.",
+  );
 }
