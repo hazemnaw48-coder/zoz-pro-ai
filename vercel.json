@@ -1,29 +1,20 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "buildCommand": "npm run build",
+  "outputDirectory": "public",
   "functions": {
     "api/[...path].js": {
       "maxDuration": 60
+    },
+    "api/cron/heartbeat.js": {
+      "maxDuration": 30
     }
   },
-  "rewrites": [
-    {
-      "source": "/api/cron/heartbeat",
-      "destination": "/api/cron/heartbeat"
-    },
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/api/$1"
-    }
-  ],
   "crons": [
     {
       "path": "/api/cron/heartbeat",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }
