@@ -55,7 +55,7 @@ function createVercelBlobStore() {
 
   async function readCurrent() {
     const { get } = await getSdk();
-    return get(pathname, { access: "private" });
+    return get(pathname, { access: "private", useCache: false });
   }
 
   async function parseCurrent(result) {
