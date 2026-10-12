@@ -29,11 +29,11 @@ test("handoff validates same-origin HTTPS Studio output URLs", () => {
   );
   assert.throws(
     () => validateStudioOutputUrl("https://evil.example.com/outputs/job-123/video.mp4", env),
-    /same_configured_https_studio/,
+    /match_configured_https_studio/,
   );
   assert.throws(
     () => validateStudioOutputUrl("http://studio.example.com/outputs/job-123/video.mp4", env),
-    /same_configured_https_studio/,
+    /match_configured_https_studio/,
   );
   assert.throws(
     () => validateStudioOutputUrl("https://studio.example.com/private/state.json", env),
