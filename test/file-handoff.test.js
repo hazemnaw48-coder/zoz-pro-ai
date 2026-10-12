@@ -24,19 +24,19 @@ test("handoff accepts only explicit directions and safe file types", () => {
 test("handoff validates same-origin HTTPS Studio output URLs", () => {
   const env = { ZOZ_CONTENT_STUDIO_URL: "https://studio.example.com" };
   assert.equal(
-    validateStudioOutputUrl("https://studio.example.com/outputs/job-123/video.mp4", env).pathname,
-    "/outputs/job-123/video.mp4",
+    validateStudioOutputUrl("https://studio.example.com/api/zoz-pro/outputs/render_123/video.mp4", env).pathname,
+    "/api/zoz-pro/outputs/render_123/video.mp4",
   );
   assert.throws(
-    () => validateStudioOutputUrl("https://evil.example.com/outputs/job-123/video.mp4", env),
+    () => validateStudioOutputUrl("https://evil.example.com/api/zoz-pro/outputs/render_123/video.mp4", env),
     /match_configured_https_studio/,
   );
   assert.throws(
-    () => validateStudioOutputUrl("http://studio.example.com/outputs/job-123/video.mp4", env),
+    () => validateStudioOutputUrl("http://studio.example.com/api/zoz-pro/outputs/render_123/video.mp4", env),
     /match_configured_https_studio/,
   );
   assert.throws(
-    () => validateStudioOutputUrl("https://studio.example.com/private/state.json", env),
+    () => validateStudioOutputUrl("https://studio.example.com/api/zoz-pro/private/state.json", env),
     /studio_output/,
   );
 });
