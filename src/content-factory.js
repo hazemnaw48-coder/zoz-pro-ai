@@ -6,7 +6,6 @@ const hasValue = (value) => typeof value === "string" && value.trim().length > 0
  */
 export function getContentFactoryStatus({ state = null, env = process.env } = {}) {
   const studioConfigured = hasValue(env.ZOZ_CONTENT_STUDIO_URL);
-  const claudeConfigured = hasValue(env.ANTHROPIC_API_KEY);
   const ffmpegConfigured = hasValue(env.FFMPEG_PATH) || hasValue(env.FFMPEG_BINARY);
   const codexOnline = state?.executor?.status === "online";
 
@@ -42,21 +41,21 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
     },
     {
       id: "gemini",
-      name: "Gemini generation services",
-      status: "not_integrated",
+      name: "Google AI Studio / Gemini",
+      status: studioConfigured ? "configured_unverified" : "not_connected",
       verified: false,
-      detail: "Gemini is reported as part of the existing content studio; ZOZ Pro has not verified a direct Gemini integration.",
+      configurationKey: "ZOZ_CONTENT_STUDIO_URL",
+      detail: studioConfigured
+        ? "The Google AI Studio output origin is configured, but the live studio contract and file exchange still require verification."
+        : "No Google AI Studio output origin is configured. ZOZ Pro's authenticated handoff API is present, but no studio is connected.",
       secretValuesExposed: false,
     },
     {
-      id: "claude-api",
-      name: "Claude API reviewer",
-      status: claudeConfigured ? "configured_unverified" : "not_configured",
+      id: "file-handoff",
+      name: "Private Gemini ↔ ZOZ Pro file handoff",
+      status: handoffConfigured ? "available_unverified" : "not_connected",
       verified: false,
-      configurationKey: "ANTHROPIC_API_KEY",
-      detail: claudeConfigured
-        ? "An API key is present on the server, but no Claude request or billing usage is triggered by this status check."
-        : "Claude API is not configured on the ZOZ Pro server. No request or charge is triggered.",
+      detail: "Authenticated upload, listing, and download routes are implemented. End-to-end transfer from the real Google AI Studio deployment is not yet verified.",
       secretValuesExposed: false,
     },
     {
@@ -104,7 +103,7 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
     nextSteps: [
       "Keep ZOZ Pro as the task, approval and audit control plane.",
       "Confirm the actual Content Studio API contract before setting ZOZ_CONTENT_STUDIO_URL.",
-      "Implement and test an authenticated adapter before sending commands to the Content Studio.",
+      "Verify authenticated private file handoff from the actual Google AI Studio deployment.",
       "Keep ZOZ AI separate and in standby until its repository access is restored and independently verified.",
       "Do not enable publishing or production deployment until explicit owner approval.",
     ],
