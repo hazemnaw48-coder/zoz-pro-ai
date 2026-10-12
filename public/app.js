@@ -179,7 +179,25 @@ function renderTasks() {
       <span class="status">${escapeHtml(task.status)}</span></div>
       <div class="meta">Checks: ${escapeHtml(task.requiredChecks.join(", "))}</div>
       <div class="meta">Result: ${escapeHtml(task.result ?? "Pending")}</div>
+      ${task.status === "planned" ? `<div class="opp-actions"><button type="button" data-assign-task="${escapeHtml(task.id)}">Assign to Codex</button></div>` : ""}
     </article>`).join("");
+
+  document.querySelectorAll("[data-assign-task]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        await fetchJson(`/api/tasks/${encodeURIComponent(button.dataset.assignTask)}/assign`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ agent: "codex", actor: "Owner" }),
+        });
+        await loadState();
+      } catch (error) {
+        alert(error.message);
+        button.disabled = false;
+      }
+    });
+  });
 }
 
 async function approve(id, decision) {
