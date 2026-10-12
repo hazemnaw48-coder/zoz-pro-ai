@@ -53,7 +53,7 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
     {
       id: "file-handoff",
       name: "Private Gemini ↔ ZOZ Pro file handoff",
-      status: handoffConfigured ? "available_unverified" : "not_connected",
+      status: "available_unverified",
       verified: false,
       detail: "Authenticated upload, listing, and download routes are implemented. End-to-end transfer from the real Google AI Studio deployment is not yet verified.",
       secretValuesExposed: false,
