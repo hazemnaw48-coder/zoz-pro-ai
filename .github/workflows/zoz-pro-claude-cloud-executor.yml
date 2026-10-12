@@ -1,0 +1,131 @@
+name: ZOZ Pro Claude Cloud Executor
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: zoz-pro-claude-cloud-executor
+  cancel-in-progress: false
+
+jobs:
+  execute-one:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ZOZ_PRO_CONTROL_URL: ${{ vars.ZOZ_PRO_CONTROL_URL }}
+      ZOZ_CONTROL_TOKEN: ${{ secrets.ZOZ_CONTROL_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - name: Validate required configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${ZOZ_PRO_CONTROL_URL}" || { echo "::error::Set repository variable ZOZ_PRO_CONTROL_URL to the deployed HTTPS origin."; exit 1; }
+          test -n "${ZOZ_CONTROL_TOKEN}" || { echo "::error::Set repository secret ZOZ_CONTROL_TOKEN."; exit 1; }
+          test -n "${ANTHROPIC_API_KEY}" || { echo "::error::Set repository secret ANTHROPIC_API_KEY to enable Claude. Never put it in source."; exit 1; }
+          case "${ZOZ_PRO_CONTROL_URL}" in https://*) ;; *) echo "::error::ZOZ_PRO_CONTROL_URL must use HTTPS."; exit 1;; esac
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Read queue and choose one safe command
+        id: queue
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer ${ZOZ_CONTROL_TOKEN}" \
+            "${ZOZ_PRO_CONTROL_URL%/}/api/state" > state.json
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const state = JSON.parse(fs.readFileSync("state.json", "utf8"));
+          const command = (state.controlCommands || []).find(c =>
+            c.status === "queued" &&
+            c.requiresApproval !== true &&
+            !["financial","external_send","destructive","irreversible","production_affecting","credential_affecting","account_affecting"].includes(c.actionType)
+          );
+          if (!command) {
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, "has_command=false\n");
+            process.exit(0);
+          }
+          if (!command.taskId || !command.instruction) throw new Error("Queued command lacks taskId or instruction.");
+          const task = (state.tasks || []).find(t => t.id === command.taskId);
+          if (!task || !task.branch || ["completed","failed","blocked"].includes(task.status)) {
+            throw new Error("Command task is missing, terminal, or has no assigned branch.");
+          }
+          fs.writeFileSync("cloud-command.json", JSON.stringify({command, task}));
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, "has_command=true\n");
+          NODE
+
+      - name: Execute one queued task with Claude on its task branch
+        if: steps.queue.outputs.has_command == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          command_id="$(node -p "JSON.parse(require('fs').readFileSync('cloud-command.json','utf8')).command.id")"
+          task_id="$(node -p "JSON.parse(require('fs').readFileSync('cloud-command.json','utf8')).task.id")"
+          task_branch="$(node -p "JSON.parse(require('fs').readFileSync('cloud-command.json','utf8')).task.branch")"
+          instruction="$(node -p "JSON.parse(require('fs').readFileSync('cloud-command.json','utf8')).command.instruction")"
+
+          curl --fail-with-body --silent --show-error -X POST \
+            -H "Authorization: Bearer ${ZOZ_CONTROL_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"actor":"ZOZ Pro Claude Cloud Executor"}' \
+            "${ZOZ_PRO_CONTROL_URL%/}/api/control/commands/${command_id}/claim"
+
+          git fetch origin "+refs/heads/*:refs/remotes/origin/*"
+          if git show-ref --verify --quiet "refs/remotes/origin/${task_branch}"; then
+            git checkout -B "${task_branch}" "origin/${task_branch}"
+          else
+            git checkout -B "${task_branch}" origin/main
+          fi
+
+          cat > /tmp/zoz-claude-prompt.txt <<'PROMPT'
+          You are the single implementation agent for the independent ZOZ Pro repository.
+          Follow only the task instruction below and work only in this checkout and the assigned task branch.
+          Never access the legacy ZOZ AI repository. Never merge to main or deploy.
+          Do not modify secrets, credentials, accounts, billing, external send, WhatsApp, financial actions, or production configuration.
+          Do not bypass owner approval. Do not create parallel agents.
+          Inspect existing code first. Make the smallest necessary change.
+          Run npm test and npm run build. If either fails, report the failure and do not claim success.
+          Task instruction:
+          PROMPT
+          printf '\n%s\n' "${instruction}" >> /tmp/zoz-claude-prompt.txt
+
+          npm install --global @anthropic-ai/claude-code
+          claude -p --permission-mode acceptEdits --allowedTools "Read,Edit,Write,Bash(npm test),Bash(npm run build),Bash(git status),Bash(git diff),Bash(git add:*),Bash(git commit:*),Bash(git push:*)" "$(cat /tmp/zoz-claude-prompt.txt)"
+
+          npm test
+          npm run build
+          git status --short
+          if ! git diff --quiet || ! git diff --cached --quiet; then
+            git add -A
+            git config user.name "ZOZ Pro Claude Cloud Executor"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "ZOZ Pro cloud task ${task_id}"
+          fi
+          commit_sha="$(git rev-parse HEAD)"
+          git push --set-upstream origin "${task_branch}"
+
+          curl --fail-with-body --silent --show-error -X POST \
+            -H "Authorization: Bearer ${ZOZ_CONTROL_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(COMMIT_SHA="${commit_sha}" node --input-type=module -e 'process.stdout.write(JSON.stringify({actor:"ZOZ Pro Claude Cloud Executor",status:"verification",result:"Claude implementation finished; awaiting independent verification. commit="+process.env.COMMIT_SHA}))')" \
+            "${ZOZ_PRO_CONTROL_URL%/}/api/tasks/${task_id}/transition"
+
+          curl --fail-with-body --silent --show-error -X POST \
+            -H "Authorization: Bearer ${ZOZ_CONTROL_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(COMMIT_SHA="${commit_sha}" node --input-type=module -e 'process.stdout.write(JSON.stringify({actor:"ZOZ Pro Claude Cloud Executor",result:"Claude implementation finished; awaiting independent verification. commit="+process.env.COMMIT_SHA}))')" \
+            "${ZOZ_PRO_CONTROL_URL%/}/api/control/commands/${command_id}/complete"
