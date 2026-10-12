@@ -20,3 +20,13 @@ export function sendUnauthorized(res) {
     message: "Owner control token is required.",
   }));
 }
+
+/**
+ * Dedicated integration token for the private Gemini/Studio file handoff only.
+ * It must never authorize task, state, approval, or executor endpoints.
+ */
+export function isHandoffAuthorized(req) {
+  const expected = process.env.ZOZ_STUDIO_HANDOFF_TOKEN ?? "";
+  if (!expected) return false;
+  return (req.headers.authorization ?? "") === `Bearer ${expected}`;
+}
