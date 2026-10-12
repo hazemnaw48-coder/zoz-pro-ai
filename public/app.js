@@ -217,7 +217,7 @@ function renderContentFactory(status, publisherStatus) {
   const label = {
     ready: "جاهز", online: "متصل", offline: "غير متصل", not_connected: "غير مربوط",
     not_configured: "غير مُعد", not_integrated: "غير مدمج", not_verified: "لم يُختبر",
-    configured_unverified: "إعداد موجود — غير مُتحقق", disabled_by_default: "معطل افتراضيًا",
+    configured_unverified: "إعداد موجود — غير مُتحقق", available_unverified: "متاح — يحتاج اختبارًا", disabled_by_default: "معطل افتراضيًا",
     disabled_pending_approval: "معطل — ينتظر الموافقة", incomplete: "غير مكتمل",
     ready_for_review: "جاهز للمراجعة"
   };
