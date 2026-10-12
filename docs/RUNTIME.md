@@ -1,50 +1,33 @@
-# ZOZ Pro Runtime — Vercel-independent
+# ZOZ Pro Runtime — independent cloud path
 
-## Runtime policy
+This branch prepares an isolated Vercel serverless deployment from the existing ZOZ Pro repository. Floot is not modified or removed.
 
-Vercel is optional. A Vercel rate limit or preview failure must never block ZOZ Pro development or local operation.
+## Architecture
+Phone/browser -> Vercel API function -> private Vercel Blob state
+GitHub Actions Cloud Executor -> authenticated ZOZ Pro API -> task branch -> verification/audit
 
-Authoritative runtime for the current local-first phase:
+## Required configuration (never commit values)
+Vercel project environment:
+- `ZOZ_CONTROL_TOKEN`: strong random owner control token.
+- `BLOB_READ_WRITE_TOKEN`: supplied by the Vercel Blob store integration.
 
-Phone -> Tailscale Serve -> Windows ZOZ Pro server -> Codex Executor
+GitHub repository Actions configuration:
+- Variable `ZOZ_PRO_CONTROL_URL`: final deployed HTTPS origin.
+- Secret `ZOZ_CONTROL_TOKEN`: the same owner control token.
+- For code execution, configure exactly one supported executor credential in a later, separately reviewed step. Do not add a secret until the chosen executor and its permission model are approved.
 
-The authoritative state remains on the Windows machine. A free cloud filesystem must not be treated as the primary state store.
+## Data safety
+- Local JSON remains the default for tests and local runtime.
+- Cloud mode is selected by Vercel runtime or `ZOZ_CLOUD_STATE=true`.
+- State is stored as one private Blob snapshot. This is suitable for a limited single-writer pilot, not concurrent multi-writer production. Before production, move state to a transactional database and add concurrency-safe mutations.
+- Do not copy local data into the cloud until the owner reviews the export and confirms the target is empty or intentionally replaceable.
 
-## Windows setup
+## Security boundaries
+- API control routes still require `Authorization: Bearer <ZOZ_CONTROL_TOKEN>`.
+- `/api/health` is a non-sensitive health check.
+- Risky, financial, external-send, destructive, irreversible, credential/account, and production-affecting actions still require explicit owner approval.
+- Cloud executor is not enabled by deployment alone. GitHub Actions secrets and variable must be configured, and an approved executor must be selected.
+- No automatic merge to `main` or production deployment is authorized by this branch.
 
-1. Install Tailscale on Windows and sign in to the same account used by the phone.
-2. Set the owner token in PowerShell:
-
-   $env:ZOZ_CONTROL_TOKEN="<YOUR_OWNER_TOKEN>"
-
-3. From the ZOZ Pro repository run:
-
-   .\scripts\start-zoz-pro-tailnet.ps1
-
-4. Run:
-
-   tailscale serve status
-
-5. Open the private HTTPS URL shown for port 3000 on the phone.
-
-## Codex Executor
-
-Keep the Codex Executor local to the Windows checkout. It can use the local loopback URL:
-
-   $env:ZOZ_PRO_CONTROL_URL="http://127.0.0.1:3000"
-   .\scripts\start-codex-executor.ps1
-
-The phone uses the private Tailscale URL. Codex uses the local loopback URL on the same computer.
-
-## Security
-
-Use Tailscale Serve, not Funnel, for the owner control plane. Serve keeps access within the tailnet; Funnel exposes the service to the public internet.
-The existing bearer token remains required for API requests.
-
-## Optional public preview
-
-Render can host a free Node web service for testing, but its free service can spin down and its local filesystem is ephemeral. Render is therefore a preview option, not the authoritative stateful runtime for the current architecture.
-
-## Vercel
-
-Vercel remains optional for previews. A Vercel deployment failure is not a runtime failure and must not be used as the ZOZ Pro operating dependency.
+## Verification
+Run `npm test` and `npm run build` in GitHub Actions. Deploy this branch only as a preview after adding required environment configuration. Confirm health, owner authentication, state read/write, and approval rejection paths before any production switch.
