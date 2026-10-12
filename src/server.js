@@ -12,7 +12,7 @@ import {
   normalizeControlCommandInput,
   canExecuteControlCommand,
 } from "./control.js";
-import { createStateStore } from "./store.js";
+import { createStateStore, StateWriteConflictError } from "./store.js";
 import { normalizeOpportunityInput, normalizeIntelligenceInput, OPPORTUNITY_STATUSES } from "./opportunities.js";
 import { normalizeContactInput, CONTACT_STATUSES } from "./crm.js";
 import { normalizeOutreachInput, OUTREACH_STATUSES } from "./outreach.js";
@@ -31,7 +31,6 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const publicDir = path.resolve(__dirname, "../public");
-const PORT = Number(process.env.PORT ?? 3000);
 
 const CONTENT_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -750,6 +749,13 @@ export async function handleRequest(req, res) {
     if (url.pathname.startsWith("/api/")) await handleApi(req, res, url);
     else await serveStatic(req, res, url);
   } catch (error) {
+    if (error instanceof StateWriteConflictError) {
+      return sendJson(res, 409, {
+        error: "state_write_conflict",
+        retryable: true,
+        message: error.message,
+      });
+    }
     console.error(error);
     if (!res.headersSent) sendJson(res, 500, { error: "internal_server_error" });
     else res.end();
@@ -758,10 +764,6 @@ export async function handleRequest(req, res) {
 
 const server = http.createServer(handleRequest);
 
-if (process.env.NODE_ENV !== "test") {
-  server.listen(PORT, "0.0.0.0", () => {
-    console.log(`ZOZ Pro listening on http://0.0.0.0:${PORT}`);
-  });
-}
-
-export { server, createInitialState };
+// Listening is intentionally owned by src/start.js, never by this imported
+// module. Vercel imports handleRequest inside a serverless invocation.
+export { server, handleRequest, createInitialState };
