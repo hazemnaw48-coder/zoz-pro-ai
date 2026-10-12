@@ -10,8 +10,10 @@ test("handoff API requires owner token and persists files with authenticated dow
   const oldToken = process.env.ZOZ_CONTROL_TOKEN;
   const oldCloud = process.env.ZOZ_CLOUD_STATE;
   const oldVercel = process.env.VERCEL;
+  const oldStudioToken = process.env.ZOZ_STUDIO_HANDOFF_TOKEN;
   process.env.ZOZ_DATA_DIR = dir;
   process.env.ZOZ_CONTROL_TOKEN = "test-handoff-owner-token";
+  process.env.ZOZ_STUDIO_HANDOFF_TOKEN = "test-studio-handoff-token";
   delete process.env.ZOZ_CLOUD_STATE;
   delete process.env.VERCEL;
 
@@ -44,6 +46,38 @@ test("handoff API requires owner token and persists files with authenticated dow
     assert.equal(listed.status, 200);
     assert.equal((await listed.json()).files.length, 1);
 
+    const outbound = await fetch(`${origin}/api/handoff`, {
+      method: "POST",
+      headers: { ...auth, "content-type": "application/json" },
+      body: JSON.stringify({
+        direction: "to-gemini",
+        filename: "owner-brief.md",
+        contentBase64: Buffer.from("Owner-approved brief").toString("base64"),
+        contentType: "text/markdown"
+      })
+    });
+    assert.equal(outbound.status, 201);
+    const outboundFile = (await outbound.json()).file;
+
+    const studioList = await fetch(`${origin}/api/handoff?direction=from-gemini`, {
+      headers: { authorization: "Bearer test-studio-handoff-token" }
+    });
+    assert.equal(studioList.status, 200);
+    const studioFiles = (await studioList.json()).files;
+    assert.equal(studioFiles.length, 1);
+    assert.equal(studioFiles[0].direction, "to-gemini");
+
+    const deniedState = await fetch(`${origin}/api/state`, {
+      headers: { authorization: "Bearer test-studio-handoff-token" }
+    });
+    assert.equal(deniedState.status, 401);
+
+    const deniedInboundFile = await fetch(
+      `${origin}/api/handoff/file?pathname=${encodeURIComponent(saved.pathname)}`,
+      { headers: { authorization: "Bearer test-studio-handoff-token" } }
+    );
+    assert.equal(deniedInboundFile.status, 401);
+
     const download = await fetch(`${origin}/api/handoff/file?pathname=${encodeURIComponent(saved.pathname)}`, { headers: auth });
     assert.equal(download.status, 200);
     assert.equal(download.headers.get("content-disposition").includes("gemini-result.txt"), true);
@@ -61,6 +95,7 @@ test("handoff API requires owner token and persists files with authenticated dow
     if (oldToken === undefined) delete process.env.ZOZ_CONTROL_TOKEN; else process.env.ZOZ_CONTROL_TOKEN = oldToken;
     if (oldCloud === undefined) delete process.env.ZOZ_CLOUD_STATE; else process.env.ZOZ_CLOUD_STATE = oldCloud;
     if (oldVercel === undefined) delete process.env.VERCEL; else process.env.VERCEL = oldVercel;
+    if (oldStudioToken === undefined) delete process.env.ZOZ_STUDIO_HANDOFF_TOKEN; else process.env.ZOZ_STUDIO_HANDOFF_TOKEN = oldStudioToken;
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
