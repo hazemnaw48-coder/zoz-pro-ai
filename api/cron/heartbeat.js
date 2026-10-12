@@ -8,12 +8,19 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "method_not_allowed" });
   }
 
+  // Vercel Cron sends this header when CRON_SECRET is configured.
+  // Fail closed rather than exposing scheduled status checks publicly.
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret || req.headers.authorization !== `Bearer ${cronSecret}`) {
+    return res.status(401).json({ status: "unauthorized" });
+  }
+
   if (process.env.VERCEL_ENV !== "production") {
     return res.status(200).json({
       status: "preview_only",
       project: "ZOZ Pro",
       checkedAt: new Date().toISOString(),
-      note: "Scheduled cloud worker remains disabled outside production.",
+      note: "Scheduled cloud readiness check is disabled outside production.",
     });
   }
 
