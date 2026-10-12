@@ -850,6 +850,9 @@ export async function requestHandler(req, res) {
     if (url.pathname.startsWith("/api/")) await handleApi(req, res, url);
     else await serveStatic(req, res, url);
   } catch (error) {
+    if (error?.message === "request_body_too_large") {
+      return sendJson(res, 413, { error: "request_body_too_large" });
+    }
     console.error(error);
     sendJson(res, 500, { error: "internal_server_error" });
   }
