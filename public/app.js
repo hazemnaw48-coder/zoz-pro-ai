@@ -8,7 +8,7 @@ async function fetchJson(url, options = {}) {
   if (CONTROL_TOKEN) headers.set("Authorization", `Bearer ${CONTROL_TOKEN}`);
   const response = await fetch(url, { ...options, headers });
   const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Request failed");
+  if (!response.ok) throw new Error(body.message ?? body.error ?? "Request failed");
   return body;
 }
 
