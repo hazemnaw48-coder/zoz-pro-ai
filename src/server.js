@@ -60,7 +60,13 @@ function sendJson(res, status, payload) {
 
 async function readJson(req) {
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let size = 0;
+  const maxBytes = 5 * 1024 * 1024;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > maxBytes) throw new Error("request_body_too_large");
+    chunks.push(chunk);
+  }
   if (chunks.length === 0) return {};
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
@@ -179,10 +185,13 @@ async function handleApi(req, res, url) {
   if (req.method === "POST" && url.pathname === "/api/handoff/import") {
     try {
       const body = await readJson(req);
+      if (body.direction && body.direction !== "from-gemini") {
+        return sendJson(res, 400, { error: "studio import direction must be from-gemini" });
+      }
       const file = await importStudioOutput({
         sourceUrl: body.sourceUrl,
         filename: body.filename,
-        direction: body.direction ?? "from-gemini",
+        direction: "from-gemini",
       });
       appendActivity(state, {
         type: "studio_file_imported",
