@@ -20,6 +20,7 @@ import { isAuthorized, sendUnauthorized } from "./auth.js";
 import { assertTaskCanReceiveCommand, normalizeTaskVerificationInput } from "./workflow.js";
 import { assignTask, evaluateExecutionGate } from "./orchestrator.js";
 import { getContentFactoryStatus } from "./content-factory.js";
+import { getExecutorStatus } from "./executor-heartbeat.js";
 import {
   ContentPublisherError,
   checkYouTubePublicationStatus,
@@ -393,10 +394,7 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "GET" && url.pathname === "/api/executor/status") {
-    return sendJson(res, 200, state.executor ?? {
-      agent: "Codex", status: "offline", lastSeen: null, hostname: null,
-      currentCommandId: null, lastError: null,
-    });
+    return sendJson(res, 200, getExecutorStatus(state.executor));
   }
 
   if (req.method === "POST" && url.pathname === "/api/executor/heartbeat") {
