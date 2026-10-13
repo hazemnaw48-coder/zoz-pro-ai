@@ -25,20 +25,32 @@ jobs:
           [scriptblock]::Create($tailnet) | Out-Null
           if ($install -notmatch 'param\(') { throw 'Installer parameter declaration missing' }
           if ($tailnet -notmatch 'tailscale serve --bg 3000') { throw 'Tailnet launcher missing Tailscale Serve command' }
-      - name: Probe live Preview API (diagnostic, no secrets)
+      - name: Probe live Preview API using authorized Vercel CLI when available
         shell: bash
         continue-on-error: true
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           set -u
           url="https://zoz-pro-ai-git-feature-zp-012-vercel-cl-42791b-hazemnaw48-coder.vercel.app/api/health"
-          code="$(curl -sS --max-time 20 -o /tmp/zoz-health-response.txt -w '%{http_code}' "$url" 2>/tmp/zoz-health-curl-error.txt || true)"
-          echo "Preview health HTTP status: ${code:-no-response}"
-          if [ -s /tmp/zoz-health-curl-error.txt ]; then cat /tmp/zoz-health-curl-error.txt; fi
-          if [ -s /tmp/zoz-health-response.txt ]; then head -c 1500 /tmp/zoz-health-response.txt; fi
+          if [ -n "${VERCEL_TOKEN:-}" ]; then
+            echo "Using repository-provided Vercel token; secret value will not be printed."
+            output="$(npx --yes vercel@latest --token "$VERCEL_TOKEN" --scope hazemnaw48-coder curl "$url" 2>&1)"
+            result=$?
+            printf '%s\n' "$output" | head -c 2000
+            printf '%s\n' "$output" > /tmp/zoz-health-response.txt
+            code="vercel-cli-exit-$result"
+          else
+            echo "VERCEL_TOKEN is not configured in repository secrets; probing without auth to identify deployment protection."
+            code="$(curl -sS --max-time 20 -o /tmp/zoz-health-response.txt -w '%{http_code}' "$url" 2>/tmp/zoz-health-curl-error.txt || true)"
+            echo "Preview health HTTP status: ${code:-no-response}"
+            if [ -s /tmp/zoz-health-curl-error.txt ]; then cat /tmp/zoz-health-curl-error.txt; fi
+            if [ -s /tmp/zoz-health-response.txt ]; then head -c 1500 /tmp/zoz-health-response.txt; fi
+          fi
           {
             echo "## Live Preview API diagnostic"
             echo "- URL: /api/health"
-            echo "- HTTP status: ${code:-no-response}"
+            echo "- Access method/result: ${code:-no-response}"
+            if [ -s /tmp/zoz-health-response.txt ]; then echo "- Response (first 2000 bytes):"; echo '~~~'; head -c 2000 /tmp/zoz-health-response.txt; echo; echo '~~~'; fi
             if [ -s /tmp/zoz-health-curl-error.txt ]; then echo "- Transport error:"; sed 's/^/  /' /tmp/zoz-health-curl-error.txt; fi
-            if [ -s /tmp/zoz-health-response.txt ]; then echo "- Response body (first 1500 bytes):"; echo '~~~'; head -c 1500 /tmp/zoz-health-response.txt; echo; echo '~~~'; fi
           } >> "$GITHUB_STEP_SUMMARY"
