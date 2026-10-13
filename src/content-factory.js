@@ -1,5 +1,6 @@
 import { getContentStudioClientStatus } from "./content-studio-client.js";
 import { getGpuWorkerStatus } from "./gpu-worker-client.js";
+import { getKaggleStatus } from "./kaggle-mcp-client.js";
 
 const hasValue = (value) => typeof value === "string" && value.trim().length > 0;
 
@@ -10,6 +11,7 @@ const hasValue = (value) => typeof value === "string" && value.trim().length > 0
 export function getContentFactoryStatus({ state = null, env = process.env } = {}) {
   const studioStatus = getContentStudioClientStatus({ env });
   const gpuWorkerStatus = getGpuWorkerStatus({ env });
+  const kaggleStatus = getKaggleStatus({ env });
   const claudeConfigured = hasValue(env.ANTHROPIC_API_KEY);
   const ffmpegConfigured = hasValue(env.FFMPEG_PATH) || hasValue(env.FFMPEG_BINARY);
   const codexOnline = state?.executor?.status === "online";
@@ -51,11 +53,9 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
       id: "kaggle-free-gpu",
       name: "Kaggle GPU notebook — free renewable quota",
       provider: "Kaggle",
-      status: "not_connected",
-      configured: false,
-      verified: false,
+      ...kaggleStatus,
       scope: "zoz_pro_only",
-      configurationKeys: ["ZOZ_PRO_KAGGLE_MCP_URL", "ZOZ_PRO_KAGGLE_KERNEL", "ZOZ_PRO_KAGGLE_API_TOKEN"],
+      configurationKeys: ["ZOZ_PRO_KAGGLE_MCP_TOKEN"],
       quota: {
         amount: 30,
         unit: "GPU-hours",
@@ -69,7 +69,7 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
         kaggleHostResolutionObservedInZoZAiRuntimeLogs: true,
         legacyCredentialsCopied: false,
       },
-      detail: "Kaggle is the strongest match for the reported 30 free GPU hours. The legacy ZOZ AI Railway configuration contains Kaggle API/MCP/kernel settings and runtime logs show Kaggle traffic. ZOZ Pro is deliberately not connected yet; use a separately authorized token and confirm the MCP/API contract first.",
+      detail: kaggleStatus.detail,
       secretValuesExposed: false,
     },
     {
