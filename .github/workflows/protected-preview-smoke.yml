@@ -45,7 +45,6 @@ jobs:
           set -euo pipefail
           curl -fsS --max-time 20 "$PREVIEW_URL/api/health" \
             -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
-            -H "x-vercel-set-bypass-cookie: true" \
             -o /tmp/health.json
           jq -e '.status == "ok" and .project == "hazemnaw48-coder/zoz-pro-ai" and .executionRuntime == "vercel-queue"' /tmp/health.json >/dev/null
           jq '{status,project,controlPlane,executionRuntime,queuedCommands}' /tmp/health.json
