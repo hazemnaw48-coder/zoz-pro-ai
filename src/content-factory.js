@@ -1,3 +1,5 @@
+import { getContentStudioClientStatus } from "./content-studio-client.js";
+
 const hasValue = (value) => typeof value === "string" && value.trim().length > 0;
 
 /**
@@ -5,7 +7,7 @@ const hasValue = (value) => typeof value === "string" && value.trim().length > 0
  * This deliberately does not make outbound requests or expose configured secret values.
  */
 export function getContentFactoryStatus({ state = null, env = process.env } = {}) {
-  const studioConfigured = hasValue(env.ZOZ_CONTENT_STUDIO_URL);
+  const studioStatus = getContentStudioClientStatus({ env });
   const claudeConfigured = hasValue(env.ANTHROPIC_API_KEY);
   const ffmpegConfigured = hasValue(env.FFMPEG_PATH) || hasValue(env.FFMPEG_BINARY);
   const codexOnline = state?.executor?.status === "online";
@@ -30,14 +32,10 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
       secretValuesExposed: false,
     },
     {
-      id: "zoz-content-studio",
+      ...studioStatus,
       name: "ZOZ Content Production Studio",
-      status: studioConfigured ? "configured_unverified" : "not_connected",
-      verified: false,
       configurationKey: "ZOZ_CONTENT_STUDIO_URL",
-      detail: studioConfigured
-        ? "A server-side base URL is configured, but the adapter and live health check are not verified."
-        : "No server-side studio URL is configured. No request has been sent to the studio.",
+      detail: studioStatus.detail,
       secretValuesExposed: false,
     },
     {
@@ -90,10 +88,10 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
   ];
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     checkedAt: new Date().toISOString(),
     phase: "connection_preparation",
-    overallStatus: connectors.some((item) => item.status === "not_connected" || item.status === "not_configured" || item.status === "offline")
+    overallStatus: connectors.some((item) => ["not_connected", "not_configured", "offline", "invalid_configuration", "not_verified"].includes(item.status))
       ? "incomplete"
       : "ready_for_review",
     projectBoundary: {
@@ -123,9 +121,9 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
     nextSteps: [
       "Keep all new integrations, credentials, databases and workflow modules under ZOZ Pro only.",
       "Do not alter or disconnect any existing ZOZ AI integration; keep it independently usable as before.",
-      "Confirm the actual Content Studio API contract before setting ZOZ_CONTENT_STUDIO_URL.",
-      "Identify the provider/workspace for the owner-reported 30-hour video tool before configuring a separate ZOZ Pro connection.",
-      "Implement and test an authenticated adapter before sending commands to the Content Studio.",
+      "Configure ZOZ_CONTENT_STUDIO_URL and a dedicated ZOZ_CONTENT_STUDIO_TOKEN only on the ZOZ Pro server after the Studio exposes the protected /api/zozpro/health endpoint.",
+      "Use POST /api/content-factory/studio/verify to run the explicit, read-only authenticated handshake after configuration.",
+      "Identify the provider/workspace for the owner-reported 30-hour video tool before configuring a separate provider connection.",
       "If the legacy provider cannot support a separate authorization, use an explicit exported-asset handoff rather than reusing ZOZ AI secrets or changing its connection.",
       "Do not enable publishing or production deployment until explicit owner approval.",
     ],
