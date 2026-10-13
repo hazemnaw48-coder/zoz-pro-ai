@@ -45,10 +45,12 @@ test("legacy ZOZ AI stays out of scope and publishing remains disabled", () => {
   assert.equal(result.projectBoundary.controllerRepository, "hazemnaw48-coder/zoz-pro-ai");
   assert.equal(result.projectBoundary.legacyZoZAiMayBeModified, false);
   assert.equal(result.projectBoundary.legacyCredentialsMayBeReusedInZOZPro, false);
-  assert.equal(result.projectBoundary.legacyVideoToolReuseMode, "separate_provider_authorization_or_explicit_asset_handoff");
+  assert.equal(result.projectBoundary.legacyVideoToolReuseMode, "kaggle_free_gpu_separate_authorization; paid_gpu_provider_remains_separate_or_explicit_asset_handoff");
   assert.equal(result.projectBoundary.ownerReportedVideoAllowance.amount, 30);
-  assert.equal(result.projectBoundary.ownerReportedVideoAllowance.unit, "hours");
-  assert.equal(result.projectBoundary.ownerReportedVideoAllowance.providerIdentified, false);
+  assert.equal(result.projectBoundary.ownerReportedVideoAllowance.unit, "GPU-hours");
+  assert.equal(result.projectBoundary.ownerReportedVideoAllowance.provider, "Kaggle");
+  assert.equal(result.projectBoundary.ownerReportedVideoAllowance.providerIdentified, true);
+  assert.equal(result.projectBoundary.ownerReportedVideoAllowance.actual_ZOZ_Pro_connection_verified, false);
   assert.equal(result.safety.legacyZoZAiConnectionsModified, false);
   assert.equal(result.projectBoundary.automaticPublishing, false);
   assert.equal(result.safety.secretsReturned, false);
@@ -57,12 +59,20 @@ test("legacy ZOZ AI stays out of scope and publishing remains disabled", () => {
   assert.ok(result.connectors.every((item) => item.secretValuesExposed === false));
 });
 
-test("legacy video tool remains explicitly disconnected until provider is identified", () => {
+test("Kaggle quota and RunPod image endpoint are distinct and disconnected", () => {
   const result = getContentFactoryStatus({ state: { executor: { status: "offline" } }, env: {} });
-  const video = result.connectors.find((item) => item.id === "legacy-video-tool-handoff");
-  assert.ok(video);
-  assert.equal(video.status, "not_connected");
-  assert.equal(video.verified, false);
-  assert.equal(video.scope, "legacy_zoz_ai");
-  assert.match(video.detail, /Leave its ZOZ AI connection untouched/);
+  const kaggle = result.connectors.find((item) => item.id === "kaggle-free-gpu");
+  const runpod = result.connectors.find((item) => item.id === "runpod-legacy-image-endpoint");
+  assert.ok(kaggle);
+  assert.ok(runpod);
+  assert.equal(kaggle.provider, "Kaggle");
+  assert.equal(kaggle.status, "not_connected");
+  assert.equal(kaggle.verified, false);
+  assert.equal(kaggle.quota.amount, 30);
+  assert.equal(kaggle.quota.period, "week");
+  assert.equal(kaggle.legacyEvidence.kaggleEnvironmentVariablesObservedInZoZAiRailway, true);
+  assert.equal(runpod.provider, "RunPod");
+  assert.equal(runpod.status, "not_connected");
+  assert.equal(runpod.capability, "image_generation_unverified_video");
+  assert.match(runpod.detail, /does not prove that the configured RunPod endpoint supports video generation/);
 });
