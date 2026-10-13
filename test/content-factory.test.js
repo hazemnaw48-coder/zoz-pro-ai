@@ -20,6 +20,7 @@ test("configured values never imply a verified live integration", () => {
     state: { executor: { status: "online" } },
     env: {
       ZOZ_CONTENT_STUDIO_URL: "https://studio.invalid",
+      ZOZ_CONTENT_STUDIO_TOKEN: "z".repeat(40),
       ANTHROPIC_API_KEY: "secret-test-value",
       FFMPEG_PATH: "/usr/bin/ffmpeg",
     },
