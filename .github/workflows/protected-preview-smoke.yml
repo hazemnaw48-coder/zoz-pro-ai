@@ -1,0 +1,92 @@
+name: ZOZ Pro Protected Preview Smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zoz-pro-protected-preview-smoke
+  cancel-in-progress: false
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: preview-smoke
+    env:
+      PREVIEW_URL: https://zoz-pro-ai-git-feature-zp-012-vercel-cl-42791b-hazemnaw48-coder.vercel.app
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      ZOZ_CONTROL_TOKEN: ${{ secrets.ZOZ_CONTROL_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify owner credentials exist without exposing them
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$VERCEL_TOKEN" ]]; then
+            echo "::error::Add VERCEL_TOKEN to the preview-smoke environment secrets."
+            exit 1
+          fi
+          if [[ -z "$ZOZ_CONTROL_TOKEN" ]]; then
+            echo "::error::Add ZOZ_CONTROL_TOKEN to the preview-smoke environment secrets."
+            exit 1
+          fi
+          echo "Required secret names are present. Secret values will not be printed."
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Verify protected Preview API health
+        shell: bash
+        run: |
+          set -euo pipefail
+          vercel --token "$VERCEL_TOKEN" --scope hazemnaw48-coder curl "$PREVIEW_URL/api/health" -- -sS -o /tmp/health.json
+          jq -e '.status == "ok" and .project == "hazemnaw48-coder/zoz-pro-ai" and .executionRuntime == "vercel-queue"' /tmp/health.json >/dev/null
+          jq '{status,project,controlPlane,executionRuntime,queuedCommands}' /tmp/health.json
+
+      - name: Submit safe cloud health-check command
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 20 "$PREVIEW_URL/api/state"             -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" -o /tmp/state-before.json
+          status="$(jq -r '.tasks[] | select(.id=="ZP-006") | .status' /tmp/state-before.json)"
+          assigned="$(jq -r '.tasks[] | select(.id=="ZP-006") | .assignedAgent' /tmp/state-before.json)"
+          if [[ "$status" == "planned" ]]; then
+            curl -fsS --max-time 20 -X POST "$PREVIEW_URL/api/tasks/ZP-006/assign"               -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN"               -H 'Content-Type: application/json'               -d '{"agent":"codex","actor":"Owner"}' -o /tmp/assignment.json
+          elif [[ "$status" == "assigned" && "$assigned" == "codex" ]]; then
+            echo "Task is already assigned to Codex; preserving state."
+          else
+            echo "::error::Safe smoke stopped without overwriting task state; ZP-006 status=$status assignedAgent=$assigned"
+            exit 1
+          fi
+          curl -fsS --max-time 20 -X POST "$PREVIEW_URL/api/control/commands"             -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN"             -H 'Content-Type: application/json'             -d '{"instruction":"system:health-check","taskId":"ZP-006","requestedBy":"Owner"}' -o /tmp/command.json
+          id="$(jq -er '.id' /tmp/command.json)"
+          echo "Submitted allowlisted read-only command: $id"
+          complete=false
+          for attempt in $(seq 1 36); do
+            curl -fsS --max-time 20 "$PREVIEW_URL/api/state"               -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" -o /tmp/state.json
+            status="$(jq -r --arg id "$id" '.controlCommands[] | select(.id==$id) | .status' /tmp/state.json)"
+            if [[ "$status" == "completed" || "$status" == "failed" || "$status" == "blocked" ]]; then complete=true; break; fi
+            sleep 5
+          done
+          if [[ "$complete" != true ]]; then
+            echo "::error::Cloud command did not reach terminal state within 180 seconds."
+            exit 1
+          fi
+          if [[ "$status" != "completed" ]]; then
+            jq --arg id "$id" '.controlCommands[] | select(.id==$id) | {id,status,error}' /tmp/state.json
+            echo "::error::Cloud worker did not complete the health-check command."
+            exit 1
+          fi
+          jq -e --arg id "$id" '
+            (.controlCommands | any(.id==$id and .status=="completed" and ((.result // "") | contains("cloud health check completed"))))
+            and (.tasks | any(.id=="ZP-006" and .status=="verification"))
+            and (.executor.mode=="vercel_queue" and (.executor.lastSeen | type=="string") and .executor.lastCompletedCommandId==$id)
+            and (.activity | any(.type=="control_command_claimed" and .taskId=="ZP-006" and (.message | contains($id))))
+            and (.activity | any(.type=="executor_heartbeat" and .taskId=="ZP-006" and (.message | contains($id))))
+            and (.activity | any(.type=="control_command_completed" and .taskId=="ZP-006" and (.message | contains($id))))
+          ' /tmp/state.json >/dev/null
+          echo "PASS: worker completed command $id; result, heartbeat, task state and audit entries were read back from durable state."
