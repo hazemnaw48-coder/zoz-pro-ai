@@ -71,6 +71,15 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
       secretValuesExposed: false,
     },
     {
+      id: "legacy-video-tool-handoff",
+      name: "Existing 30-hour video tool (legacy ZOZ AI; preserve)",
+      status: "not_connected",
+      verified: false,
+      scope: "legacy_zoz_ai",
+      detail: "The owner reports a renewable 30-hour allowance and prior use to produce a published video, but the exact provider/workspace is not identified in this ZOZ Pro runtime. Leave its ZOZ AI connection untouched. ZOZ Pro access requires a provider-supported separate authorization; if unavailable, use an explicit exported-asset handoff. No request has been sent.",
+      secretValuesExposed: false,
+    },
+    {
       id: "publishing",
       name: "Channel publishing",
       status: "disabled_pending_approval",
@@ -81,7 +90,7 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
   ];
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     checkedAt: new Date().toISOString(),
     phase: "connection_preparation",
     overallStatus: connectors.some((item) => item.status === "not_connected" || item.status === "not_configured" || item.status === "offline")
@@ -89,8 +98,17 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
       : "ready_for_review",
     projectBoundary: {
       controllerRepository: "hazemnaw48-coder/zoz-pro-ai",
-      legacyZoZAi: "standby_and_out_of_scope",
+      newIntegrationsTarget: "ZOZ_PRO_ONLY",
+      legacyZoZAi: "preserved_and_usable_separately",
       legacyZoZAiMayBeModified: false,
+      legacyCredentialsMayBeReusedInZOZPro: false,
+      legacyVideoToolReuseMode: "separate_provider_authorization_or_explicit_asset_handoff",
+      ownerReportedVideoAllowance: {
+        amount: 30,
+        unit: "hours",
+        renewal: "reported_by_owner_not_independently_verified",
+        providerIdentified: false,
+      },
       deploymentStatus: state?.project?.deploymentStatus ?? "unknown",
       automaticPublishing: false,
     },
@@ -99,13 +117,16 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
       outboundConnectionChecksPerformed: false,
       publishingEnabled: false,
       ownerApprovalRequiredForExternalSendOrProductionChanges: true,
+      legacyZoZAiConnectionsModified: false,
     },
     connectors,
     nextSteps: [
-      "Keep ZOZ Pro as the task, approval and audit control plane.",
+      "Keep all new integrations, credentials, databases and workflow modules under ZOZ Pro only.",
+      "Do not alter or disconnect any existing ZOZ AI integration; keep it independently usable as before.",
       "Confirm the actual Content Studio API contract before setting ZOZ_CONTENT_STUDIO_URL.",
+      "Identify the provider/workspace for the owner-reported 30-hour video tool before configuring a separate ZOZ Pro connection.",
       "Implement and test an authenticated adapter before sending commands to the Content Studio.",
-      "Keep ZOZ AI separate and in standby until its repository access is restored and independently verified.",
+      "If the legacy provider cannot support a separate authorization, use an explicit exported-asset handoff rather than reusing ZOZ AI secrets or changing its connection.",
       "Do not enable publishing or production deployment until explicit owner approval.",
     ],
   };
