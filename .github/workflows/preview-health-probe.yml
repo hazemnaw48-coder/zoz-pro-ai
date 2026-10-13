@@ -1,0 +1,21 @@
+name: Preview Health Probe
+on:
+  push:
+    branches:
+      - feature/ZP-012-vercel-cloud-runtime
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe preview health
+        run: |
+          set -eu
+          url="https://zoz-pro-ai-git-feature-zp-012-vercel-cl-42791b-hazemnaw48-coder.vercel.app/api/health"
+          status="$(curl -sS --max-time 20 -o /tmp/health.json -w '%{http_code}' "$url" || true)"
+          echo "HTTP status: $status"
+          cat /tmp/health.json || true
+          test "$status" = "200"
+          node -e 'const x=require("/tmp/health.json"); if(x.status!=="ok" || x.project!=="hazemnaw48-coder/zoz-pro-ai" || x.executionRuntime!=="vercel-queue") process.exit(1)'
