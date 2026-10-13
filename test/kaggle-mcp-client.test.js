@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { getKaggleStatus, verifyKaggleMcp } from "../src/kaggle-mcp-client.js";
 
-const token = "kaggle-zoz-pro-test-token-123456";
+const token = "KGAT_zoz_pro_test_token_123456";
 
 test("Kaggle connector defaults disconnected and never contacts remote service in status", () => {
   const status = getKaggleStatus({ env: {} });
