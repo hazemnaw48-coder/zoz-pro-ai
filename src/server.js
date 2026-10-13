@@ -21,6 +21,7 @@ import { assertTaskCanReceiveCommand, normalizeTaskVerificationInput } from "./w
 import { assignTask, evaluateExecutionGate } from "./orchestrator.js";
 import { getContentFactoryStatus } from "./content-factory.js";
 import { verifyContentStudioHandshake, ContentStudioClientError } from "./content-studio-client.js";
+import { verifyGpuWorkerHandshake, GpuWorkerClientError } from "./gpu-worker-client.js";
 import {
   ContentPublisherError,
   checkYouTubePublicationStatus,
@@ -132,6 +133,28 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/content-factory/status") {
     return sendJson(res, 200, getContentFactoryStatus({ state }));
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/content-factory/gpu-worker/verify") {
+    try {
+      const result = await verifyGpuWorkerHandshake();
+      appendActivity(state, {
+        type: "gpu_worker_handshake_verified",
+        actor: "Owner",
+        message: "ZOZ Pro completed a read-only authenticated GPU worker handshake; no rental or generation was started.",
+      });
+      await store.save(state);
+      return sendJson(res, 200, { success: true, connection: result });
+    } catch (error) {
+      if (error instanceof GpuWorkerClientError) {
+        return sendJson(res, error.httpStatus, {
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+      return sendJson(res, 502, { success: false, error: "worker_handshake_failed", message: "The GPU worker handshake was not verified." });
+    }
   }
 
   if (req.method === "POST" && url.pathname === "/api/content-factory/studio/verify") {
