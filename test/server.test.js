@@ -286,3 +286,32 @@ test("ZP-006 verification requires every declared check and completes only from 
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
+
+
+test("GPU worker verification requires owner auth and does not rent by default", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "zoz-pro-gpu-worker-"));
+  process.env.ZOZ_DATA_DIR = dir;
+  process.env.ZOZ_CONTROL_TOKEN = "test-control-token";
+  delete process.env.ZOZ_GPU_WORKER_URL;
+  delete process.env.ZOZ_GPU_WORKER_TOKEN;
+  const { server } = await import("../src/server.js");
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = server.address().port;
+  try {
+    const denied = await fetch(`http://127.0.0.1:${port}/api/content-factory/gpu-worker/verify`, { method: "POST" });
+    assert.equal(denied.status, 401);
+    const noWorker = await fetch(`http://127.0.0.1:${port}/api/content-factory/gpu-worker/verify`, {
+      method: "POST",
+      headers: { authorization: "Bearer test-control-token" },
+    });
+    assert.equal(noWorker.status, 409);
+    assert.equal((await noWorker.json()).error, "worker_not_configured");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    delete process.env.ZOZ_DATA_DIR;
+    delete process.env.ZOZ_CONTROL_TOKEN;
+    delete process.env.ZOZ_GPU_WORKER_URL;
+    delete process.env.ZOZ_GPU_WORKER_TOKEN;
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
