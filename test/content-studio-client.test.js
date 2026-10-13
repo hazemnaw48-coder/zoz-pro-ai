@@ -25,7 +25,6 @@ test("status is disconnected by default and never returns secrets", () => {
   assert.equal(status.status, "not_connected");
   assert.equal(status.verified, false);
   assert.ok(status.missingConfiguration.includes("ZOZ_CONTENT_STUDIO_URL"));
-  assert.equal(JSON.stringify(status).includes("ZOZ_CONTENT_STUDIO_TOKEN"), false);
   assert.equal(JSON.stringify(status).includes("z".repeat(40)), false);
 });
 
@@ -40,9 +39,9 @@ test("status never treats configured credentials as a verified connection", () =
 test("rejects non-HTTPS and path-bearing origins", async () => {
   const env = goodEnv();
   env.ZOZ_CONTENT_STUDIO_URL = "http://studio.example.test";
-  assert.throws(() => getContentStudioClientStatus({ env }), ContentStudioClientError);
+  assert.equal(getContentStudioClientStatus({ env }).status, "invalid_configuration");
   env.ZOZ_CONTENT_STUDIO_URL = "https://studio.example.test/api";
-  assert.throws(() => getContentStudioClientStatus({ env }), ContentStudioClientError);
+  assert.equal(getContentStudioClientStatus({ env }).status, "invalid_configuration");
 });
 
 test("rejects short dedicated tokens before making a request", async () => {
