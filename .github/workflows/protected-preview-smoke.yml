@@ -2,6 +2,9 @@ name: ZOZ Pro Protected Preview Smoke
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feature/ZP-012-vercel-cloud-runtime
 
 permissions:
   contents: read
@@ -12,6 +15,7 @@ concurrency:
 
 jobs:
   live-smoke:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'chore: trigger protected preview smoke once')
     runs-on: ubuntu-latest
     timeout-minutes: 8
     environment: preview-smoke
