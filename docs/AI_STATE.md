@@ -60,3 +60,14 @@ Keep the existing production deployment (commit `f7ee581e0c1ab5b05af3b2e1cb91e88
 3. Owner adds the missing `CRON_SECRET` in the correct Vercel project without sharing the value.
 4. Owner performs the actual authenticated Preview smoke through the mobile UI, refreshes state in a separate request, and checks command ID, worker status/heartbeat, result and audit event.
 5. Merge/promote only after those live gates have verified evidence.
+
+## ZP-012 current handoff — 2026-10-13
+
+- Current head at this checkpoint: `19c820f8c1b9c96a8f82ab3d3aca3b6db40b3a9c`.
+- The Blob state reader now requests `useCache: false` for mutable state, so separate worker invocations do not read a stale cached snapshot.
+- The Tasks view exposes an explicit Assign to Codex action for planned tasks before a cloud diagnostic can be queued.
+- CI passed for the current head and its Vercel Preview deployment is Ready. Existing production remains on `f7ee581e0c1ab5b05af3b2e1cb91e8843254b474`; do not merge or promote based on CI alone.
+- GitHub review connector is available. The last Codex review attempt could not run because its review usage limit was reached; do not repeat until it resets.
+- The remaining gate is a live, owner-authenticated Preview smoke: assign `ZP-006` if still planned, submit `system:health-check`, refresh state in a separate request, and verify command completion, task status `verification`, persisted result, executor heartbeat/mode, and corresponding audit entries.
+- Current Vercel connector access returns `403` for deployment inspection, runtime logs, and environment metadata; this is an access limitation, not evidence that the app itself returns an error.
+- The daily readiness cron is not the command worker. The queue worker only allows `system:health-check` and `system:project-summary`; it cannot run arbitrary shell/Codex instructions or external/financial actions.
