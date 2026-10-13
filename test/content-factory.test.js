@@ -43,9 +43,25 @@ test("legacy ZOZ AI stays out of scope and publishing remains disabled", () => {
 
   assert.equal(result.projectBoundary.controllerRepository, "hazemnaw48-coder/zoz-pro-ai");
   assert.equal(result.projectBoundary.legacyZoZAiMayBeModified, false);
+  assert.equal(result.projectBoundary.legacyCredentialsMayBeReusedInZOZPro, false);
+  assert.equal(result.projectBoundary.legacyVideoToolReuseMode, "separate_provider_authorization_or_explicit_asset_handoff");
+  assert.equal(result.projectBoundary.ownerReportedVideoAllowance.amount, 30);
+  assert.equal(result.projectBoundary.ownerReportedVideoAllowance.unit, "hours");
+  assert.equal(result.projectBoundary.ownerReportedVideoAllowance.providerIdentified, false);
+  assert.equal(result.safety.legacyZoZAiConnectionsModified, false);
   assert.equal(result.projectBoundary.automaticPublishing, false);
   assert.equal(result.safety.secretsReturned, false);
   assert.equal(result.safety.publishingEnabled, false);
   assert.equal(result.safety.ownerApprovalRequiredForExternalSendOrProductionChanges, true);
   assert.ok(result.connectors.every((item) => item.secretValuesExposed === false));
+});
+
+test("legacy video tool remains explicitly disconnected until provider is identified", () => {
+  const result = getContentFactoryStatus({ state: { executor: { status: "offline" } }, env: {} });
+  const video = result.connectors.find((item) => item.id === "legacy-video-tool-handoff");
+  assert.ok(video);
+  assert.equal(video.status, "not_connected");
+  assert.equal(video.verified, false);
+  assert.equal(video.scope, "legacy_zoz_ai");
+  assert.match(video.detail, /Leave its ZOZ AI connection untouched/);
 });
