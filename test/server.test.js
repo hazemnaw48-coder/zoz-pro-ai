@@ -34,6 +34,16 @@ test("server exposes state and enforces approval gate", async () => {
     assert.equal(factoryStatus.safety.outboundConnectionChecksPerformed, false);
     assert.ok(factoryStatus.connectors.some((item) => item.id === "zoz-content-studio" && item.status === "not_connected"));
 
+    const deniedKaggleVerify = await fetch(`http://127.0.0.1:${port}/api/content-factory/kaggle/verify`, { method: "POST" });
+    assert.equal(deniedKaggleVerify.status, 401);
+
+    const noKaggleTokenVerify = await fetch(`http://127.0.0.1:${port}/api/content-factory/kaggle/verify`, {
+      method: "POST",
+      headers: { authorization: "Bearer test-control-token" },
+    });
+    assert.equal(noKaggleTokenVerify.status, 409);
+    assert.equal((await noKaggleTokenVerify.json()).error, "kaggle_not_configured");
+
     const transition = await fetch(`http://127.0.0.1:${port}/api/tasks/ZP-001/transition`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: "Bearer test-control-token" },
