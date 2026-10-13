@@ -17,7 +17,7 @@ jobs:
     environment: preview-smoke
     env:
       PREVIEW_URL: https://zoz-pro-ai-git-feature-zp-012-vercel-cl-42791b-hazemnaw48-coder.vercel.app
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
       ZOZ_CONTROL_TOKEN: ${{ secrets.ZOZ_CONTROL_TOKEN }}
     steps:
       - uses: actions/checkout@v4
@@ -26,8 +26,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "$VERCEL_TOKEN" ]]; then
-            echo "::error::Add VERCEL_TOKEN to the preview-smoke environment secrets."
+          if [[ -z "$VERCEL_AUTOMATION_BYPASS_SECRET" ]]; then
+            echo "::error::Add VERCEL_AUTOMATION_BYPASS_SECRET to the preview-smoke environment secrets."
             exit 1
           fi
           if [[ -z "$ZOZ_CONTROL_TOKEN" ]]; then
@@ -36,14 +36,14 @@ jobs:
           fi
           echo "Required secret names are present. Secret values will not be printed."
 
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-
       - name: Verify protected Preview API health
         shell: bash
         run: |
           set -euo pipefail
-          vercel --token "$VERCEL_TOKEN" --scope hazemnaw48-coder curl "$PREVIEW_URL/api/health" -- -sS -o /tmp/health.json
+          curl -fsS --max-time 20 "$PREVIEW_URL/api/health" \
+            -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
+            -H "x-vercel-set-bypass-cookie: true" \
+            -o /tmp/health.json
           jq -e '.status == "ok" and .project == "hazemnaw48-coder/zoz-pro-ai" and .executionRuntime == "vercel-queue"' /tmp/health.json >/dev/null
           jq '{status,project,controlPlane,executionRuntime,queuedCommands}' /tmp/health.json
 
@@ -51,23 +51,37 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsS --max-time 20 "$PREVIEW_URL/api/state"             -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" -o /tmp/state-before.json
+          curl -fsS --max-time 20 "$PREVIEW_URL/api/state" \
+            -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
+            -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
+            -o /tmp/state-before.json
           status="$(jq -r '.tasks[] | select(.id=="ZP-006") | .status' /tmp/state-before.json)"
           assigned="$(jq -r '.tasks[] | select(.id=="ZP-006") | .assignedAgent' /tmp/state-before.json)"
           if [[ "$status" == "planned" ]]; then
-            curl -fsS --max-time 20 -X POST "$PREVIEW_URL/api/tasks/ZP-006/assign"               -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN"               -H 'Content-Type: application/json'               -d '{"agent":"codex","actor":"Owner"}' -o /tmp/assignment.json
+            curl -fsS --max-time 20 -X POST "$PREVIEW_URL/api/tasks/ZP-006/assign" \
+              -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
+              -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
+              -H 'Content-Type: application/json' \
+              -d '{"agent":"codex","actor":"Owner"}' -o /tmp/assignment.json
           elif [[ "$status" == "assigned" && "$assigned" == "codex" ]]; then
             echo "Task is already assigned to Codex; preserving state."
           else
             echo "::error::Safe smoke stopped without overwriting task state; ZP-006 status=$status assignedAgent=$assigned"
             exit 1
           fi
-          curl -fsS --max-time 20 -X POST "$PREVIEW_URL/api/control/commands"             -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN"             -H 'Content-Type: application/json'             -d '{"instruction":"system:health-check","taskId":"ZP-006","requestedBy":"Owner"}' -o /tmp/command.json
+          curl -fsS --max-time 20 -X POST "$PREVIEW_URL/api/control/commands" \
+            -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
+            -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{"instruction":"system:health-check","taskId":"ZP-006","requestedBy":"Owner"}' -o /tmp/command.json
           id="$(jq -er '.id' /tmp/command.json)"
           echo "Submitted allowlisted read-only command: $id"
           complete=false
           for attempt in $(seq 1 36); do
-            curl -fsS --max-time 20 "$PREVIEW_URL/api/state"               -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" -o /tmp/state.json
+            curl -fsS --max-time 20 "$PREVIEW_URL/api/state" \
+              -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
+              -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
+              -o /tmp/state.json
             status="$(jq -r --arg id "$id" '.controlCommands[] | select(.id==$id) | .status' /tmp/state.json)"
             if [[ "$status" == "completed" || "$status" == "failed" || "$status" == "blocked" ]]; then complete=true; break; fi
             sleep 5
