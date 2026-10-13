@@ -13,7 +13,7 @@ function getToken(env) {
   const token = typeof env.ZOZ_PRO_KAGGLE_MCP_TOKEN === "string"
     ? env.ZOZ_PRO_KAGGLE_MCP_TOKEN.trim()
     : "";
-  return token.length >= 20 ? token : null;
+  return token.startsWith("KGAT") && token.length >= 20 ? token : null;
 }
 
 export function getKaggleStatus({ env = process.env } = {}) {
