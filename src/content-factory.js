@@ -1,4 +1,5 @@
 import { getContentStudioClientStatus } from "./content-studio-client.js";
+import { getGpuWorkerStatus } from "./gpu-worker-client.js";
 
 const hasValue = (value) => typeof value === "string" && value.trim().length > 0;
 
@@ -8,6 +9,7 @@ const hasValue = (value) => typeof value === "string" && value.trim().length > 0
  */
 export function getContentFactoryStatus({ state = null, env = process.env } = {}) {
   const studioStatus = getContentStudioClientStatus({ env });
+  const gpuWorkerStatus = getGpuWorkerStatus({ env });
   const claudeConfigured = hasValue(env.ANTHROPIC_API_KEY);
   const ffmpegConfigured = hasValue(env.FFMPEG_PATH) || hasValue(env.FFMPEG_BINARY);
   const codexOnline = state?.executor?.status === "online";
@@ -36,6 +38,13 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
       name: "ZOZ Content Production Studio",
       configurationKey: "ZOZ_CONTENT_STUDIO_URL",
       detail: studioStatus.detail,
+      secretValuesExposed: false,
+    },
+    {
+      ...gpuWorkerStatus,
+      name: "Hourly rented GPU video-generation worker",
+      configurationKey: "ZOZ_GPU_WORKER_URL",
+      detail: gpuWorkerStatus.detail,
       secretValuesExposed: false,
     },
     {
@@ -124,6 +133,8 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
       "Configure ZOZ_CONTENT_STUDIO_URL and a dedicated ZOZ_CONTENT_STUDIO_TOKEN only on the ZOZ Pro server after the Studio exposes the protected /api/zozpro/health endpoint.",
       "Use POST /api/content-factory/studio/verify to run the explicit, read-only authenticated handshake after configuration.",
       "Identify the provider/workspace for the owner-reported 30-hour video tool before configuring a separate provider connection.",
+      "Configure ZOZ_GPU_WORKER_URL and a dedicated ZOZ_GPU_WORKER_TOKEN only after a protected worker-side /api/zozpro/health endpoint exists.",
+      "Use the owner-authenticated GPU verification endpoint to confirm the rented worker without starting a rental or generation job.",
       "If the legacy provider cannot support a separate authorization, use an explicit exported-asset handoff rather than reusing ZOZ AI secrets or changing its connection.",
       "Do not enable publishing or production deployment until explicit owner approval.",
     ],
