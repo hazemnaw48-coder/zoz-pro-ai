@@ -22,6 +22,7 @@ import { assignTask, evaluateExecutionGate } from "./orchestrator.js";
 import { getContentFactoryStatus } from "./content-factory.js";
 import { verifyContentStudioHandshake, ContentStudioClientError } from "./content-studio-client.js";
 import { verifyGpuWorkerHandshake, GpuWorkerClientError } from "./gpu-worker-client.js";
+import { verifyKaggleMcp, KaggleMcpError } from "./kaggle-mcp-client.js";
 import {
   ContentPublisherError,
   checkYouTubePublicationStatus,
@@ -133,6 +134,32 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/content-factory/status") {
     return sendJson(res, 200, getContentFactoryStatus({ state }));
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/content-factory/kaggle/verify") {
+    try {
+      const result = await verifyKaggleMcp();
+      appendActivity(state, {
+        type: "kaggle_mcp_verified",
+        actor: "Owner",
+        message: "ZOZ Pro completed Kaggle MCP read-only discovery; no notebook was started and no GPU quota was consumed.",
+      });
+      await store.save(state);
+      return sendJson(res, 200, { success: true, connection: result });
+    } catch (error) {
+      if (error instanceof KaggleMcpError) {
+        return sendJson(res, error.status, {
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+      return sendJson(res, 502, {
+        success: false,
+        error: "kaggle_verify_failed",
+        message: "Kaggle MCP connection was not verified. No notebook was started.",
+      });
+    }
   }
 
   if (req.method === "POST" && url.pathname === "/api/content-factory/gpu-worker/verify") {
