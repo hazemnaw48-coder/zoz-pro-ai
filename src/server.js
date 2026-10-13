@@ -20,6 +20,7 @@ import { isAuthorized, sendUnauthorized } from "./auth.js";
 import { assertTaskCanReceiveCommand, normalizeTaskVerificationInput } from "./workflow.js";
 import { assignTask, evaluateExecutionGate } from "./orchestrator.js";
 import { getContentFactoryStatus } from "./content-factory.js";
+import { verifyContentStudioHandshake, ContentStudioClientError } from "./content-studio-client.js";
 import {
   ContentPublisherError,
   checkYouTubePublicationStatus,
@@ -131,6 +132,28 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/content-factory/status") {
     return sendJson(res, 200, getContentFactoryStatus({ state }));
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/content-factory/studio/verify") {
+    try {
+      const result = await verifyContentStudioHandshake();
+      appendActivity(state, {
+        type: "content_studio_handshake_verified",
+        actor: "Owner",
+        message: "ZOZ Pro completed a read-only authenticated Content Studio handshake.",
+      });
+      await store.save(state);
+      return sendJson(res, 200, { success: true, connection: result });
+    } catch (error) {
+      if (error instanceof ContentStudioClientError) {
+        return sendJson(res, error.httpStatus, {
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+      return sendJson(res, 502, { success: false, error: "studio_handshake_failed", message: "The Content Studio handshake was not verified." });
+    }
   }
 
   if (req.method === "GET" && url.pathname === "/api/content-factory/publisher/status") {
