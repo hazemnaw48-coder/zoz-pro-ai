@@ -77,3 +77,13 @@ Codex — primary implementer
 
 ## Deployment Status
 not_deployed
+
+
+## 2026-10-14 — ZOZ Pro Groq integration checkpoint
+- Active system: **ZOZ Pro only**. Repository `hazemnaw48-coder/zoz-pro-ai`; integration branch `feature/ZP-013-isolated-tool-integrations`; PR #15 remains open/draft. Do not merge or deploy production.
+- Added `src/groq-text-client.js`, Content Factory status registration, and owner-authenticated `POST /api/content-factory/text/draft`. The route is draft-only, stores up to 25 drafts in ZOZ Pro state, has input caps, 1200 output-token cap, 15-second timeout, no tool calling, no send/publish, and no retry or paid fallback on 429.
+- Server secret expected: `GROQ_API_KEY`; optional model setting `GROQ_MODEL`; default model `qwen/qwen3.8-27b` is a Preview candidate and must not be considered live-verified. No key was created or configured, and no real Groq request has been sent.
+- Never use the Groq organization/key associated with `zozai.manager2026@gmail.com` inside ZOZ Pro. Use a separate owner-authorized credential under `hazemnaw48@gmail.com`.
+- Added deterministic client tests and status assertions. Next: add the Content Factory UI, finish route-level persistence/auth tests, run GitHub Actions, then inspect Vercel Preview. Runtime logs remain 403; end-to-end health is not yet verified.
+- Floot daily action limit blocked reading resources/files for Cloud Runtime `e63d1fa8-d477-4708-bed1-e3f539ef224e` and Alternate Video Production Center `894a0e3a-85c4-43de-b8f7-205db24685b9`. After reset, inspect both read-only before choosing the final runtime endpoint or configuring secrets.
+- Keep Gemini and existing image/video/render/export pipeline unchanged. Groq is only a text-draft assistant. Owner approval remains required for external sends, publishing, financial, sensitive, destructive, and production-impacting actions.
