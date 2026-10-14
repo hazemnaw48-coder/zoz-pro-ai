@@ -10,6 +10,8 @@ test("content factory defaults to conservative disconnected states", () => {
   assert.equal(result.overallStatus, "incomplete");
   assert.equal(byId["zoz-content-studio"].status, "not_connected");
   assert.equal(byId["claude-api"].status, "not_configured");
+  assert.equal(byId["groq-text-drafting"].status, "not_configured");
+  assert.equal(byId["groq-text-drafting"].verified, false);
   assert.equal(byId["media-renderer"].status, "not_verified");
   assert.equal(byId["codex-executor"].status, "offline");
   assert.equal(byId.publishing.status, "disabled_pending_approval");
@@ -22,6 +24,7 @@ test("configured values never imply a verified live integration", () => {
       ZOZ_CONTENT_STUDIO_URL: "https://studio.invalid",
       ZOZ_CONTENT_STUDIO_TOKEN: "z".repeat(40),
       ANTHROPIC_API_KEY: "secret-test-value",
+      GROQ_API_KEY: "gsk-test-secret-not-to-return",
       FFMPEG_PATH: "/usr/bin/ffmpeg",
     },
   });
@@ -30,12 +33,16 @@ test("configured values never imply a verified live integration", () => {
   assert.equal(byId["zoz-content-studio"].status, "configured_unverified");
   assert.equal(byId["zoz-content-studio"].verified, false);
   assert.equal(byId["claude-api"].status, "configured_unverified");
+  assert.equal(byId["groq-text-drafting"].status, "configured_unverified");
+  assert.equal(byId["groq-text-drafting"].verified, false);
+  assert.equal(byId["groq-text-drafting"].model, "qwen/qwen3.8-27b");
   assert.equal(byId["claude-api"].verified, false);
   assert.equal(byId["media-renderer"].status, "configured_unverified");
   assert.equal(byId["media-renderer"].verified, false);
   assert.equal(byId["codex-executor"].status, "online");
   assert.equal(result.safety.outboundConnectionChecksPerformed, false);
   assert.equal(JSON.stringify(result).includes("secret-test-value"), false);
+  assert.equal(JSON.stringify(result).includes("gsk-test-secret-not-to-return"), false);
   assert.equal(JSON.stringify(result).includes("https://studio.invalid"), false);
 });
 
