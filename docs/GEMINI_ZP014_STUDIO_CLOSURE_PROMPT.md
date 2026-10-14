@@ -39,6 +39,7 @@ These require `Authorization: Bearer <ZOZ_PRO_STUDIO_INTEGRATION_TOKEN>`, a sepa
 - `GET /api/content-factory/studio/assets?limit=50`
 - `GET /api/content-factory/studio/assets/{assetId}/download-url`
 - `POST /api/content-factory/studio/assets/upload-ticket` — source is assigned server-side to `google-ai-studio` for assets produced by this Studio.
+- `POST /api/content-factory/studio/assets/{assetId}/complete` — verifies a Studio-originated upload has reached private Blob storage and records it as ready before any import receipt is accepted.
 - `POST /api/content-factory/studio/assets/{assetId}/receipt` — acknowledge an imported asset only after downloading and validating its bytes. Body must include `studioAssetId`, `validated: true`, actual `contentType`, actual `sizeBytes`, and for video actual `durationSeconds`, `width`, `height`, `videoCodec`, `audioCodec` when available, and `checksumSha256` when calculated.
 - The receipt is an import acknowledgement, not a publishing acknowledgement.
 
