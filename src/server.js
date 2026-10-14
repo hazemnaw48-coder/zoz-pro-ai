@@ -53,10 +53,33 @@ function sendJson(res, status, payload) {
 }
 
 async function readJson(req) {
+  // Safe retryable mutations cache their request body before the first attempt,
+  // so a state-write conflict can replay the same request against fresh state.
+  if (Buffer.isBuffer(req.__zozBodyBuffer)) {
+    if (req.__zozBodyBuffer.length === 0) return {};
+    return JSON.parse(req.__zozBodyBuffer.toString("utf8"));
+  }
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
   if (chunks.length === 0) return {};
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+function isRetryableStateMutation(req, url) {
+  if (req.method !== "POST") return false;
+  return url.pathname === "/api/tasks"
+    || /^\\/api\\/tasks\\/[^/]+\\/(?:assign|transition|verify)$/.test(url.pathname)
+    || url.pathname === "/api/control/commands";
+}
+
+async function bufferRequestBody(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(Buffer.from(chunk));
+  req.__zozBodyBuffer = Buffer.concat(chunks);
+}
+
+function waitForStateConflictRetry(attempt) {
+  return new Promise((resolve) => setTimeout(resolve, Math.min(800, 50 * (2 ** attempt))));
 }
 
 function appendActivity(state, activity) {
@@ -467,6 +490,7 @@ async function handleApi(req, res, url) {
       }
       return sendJson(res, 201, command);
     } catch (error) {
+      if (error instanceof StateWriteConflictError) throw error;
       return sendJson(res, 400, { error: error.message });
     }
   }
@@ -598,6 +622,7 @@ async function handleApi(req, res, url) {
       await store.save(state);
       return sendJson(res, 200, task);
     } catch (error) {
+      if (error instanceof StateWriteConflictError) throw error;
       return sendJson(res, 409, { error: error.message });
     }
   }
@@ -799,8 +824,29 @@ async function serveStatic(req, res, url) {
 export async function handleRequest(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
-    if (url.pathname.startsWith("/api/")) await handleApi(req, res, url);
-    else await serveStatic(req, res, url);
+    if (url.pathname.startsWith("/api/")) {
+      const retryableMutation = isRetryableStateMutation(req, url);
+      if (retryableMutation) await bufferRequestBody(req);
+
+      // Blob uses ETag conditional writes to prevent lost updates. On a conflict,
+      // replay only these deterministic, non-external mutation routes against a
+      // newly loaded state. Never replay publish/send/financial/destructive routes.
+      const maxRetries = retryableMutation ? 5 : 0;
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          await handleApi(req, res, url);
+          return;
+        } catch (error) {
+          if (!(error instanceof StateWriteConflictError) || attempt >= maxRetries) {
+            throw error;
+          }
+          console.warn(`Retryable state write conflict on ${url.pathname}; attempt ${attempt + 1}/${maxRetries}.`);
+          await waitForStateConflictRetry(attempt);
+        }
+      }
+    } else {
+      await serveStatic(req, res, url);
+    }
   } catch (error) {
     if (error instanceof StateWriteConflictError) {
       return sendJson(res, 409, {
