@@ -8,7 +8,7 @@ async function fetchJson(url, options = {}) {
   if (CONTROL_TOKEN) headers.set("Authorization", `Bearer ${CONTROL_TOKEN}`);
   const response = await fetch(url, { ...options, headers });
   const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Request failed");
+  if (!response.ok) throw new Error(body.message ?? body.error ?? "Request failed");
   return body;
 }
 
@@ -340,6 +340,48 @@ async function requestPublicationApproval() {
   }
 }
 
+async function generateGroqDraft() {
+  const button = $("#generate-groq-draft");
+  const status = $("#groq-draft-status");
+  const output = $("#groq-draft-output");
+  const subject = $("#groq-draft-subject")?.value.trim() ?? "";
+  if (subject.length < 3) { status.textContent = "اكتب موضوعًا أو نصًا لا يقل عن 3 أحرف."; return; }
+  button.disabled = true;
+  status.textContent = "جارٍ إنشاء مسودة نصية؛ لن يحدث إرسال أو نشر…";
+  try {
+    const result = await fetchJson("/api/content-factory/text/draft", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        purpose: $("#groq-draft-purpose").value,
+        subject,
+        context: $("#groq-draft-context").value,
+        requirements: $("#groq-draft-requirements").value,
+        language: "ar"
+      })
+    });
+    output.value = result.draft.text;
+    output.dataset.draftId = result.draft.id;
+    status.textContent = "حُفظت المسودة " + result.draft.id + " للمراجعة فقط باستخدام " + result.draft.model + ". لم تُرسل ولم تُنشر.";
+    await loadState();
+    await refreshContentFactory();
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function renderLatestGroqDraft() {
+  const output = $("#groq-draft-output");
+  const status = $("#groq-draft-status");
+  const latest = state?.contentDrafts?.[0];
+  if (!output || !latest || output.dataset.draftId === latest.id) return;
+  output.value = latest.text ?? "";
+  output.dataset.draftId = latest.id;
+  if (status) status.textContent = "المسودة المحفوظة " + latest.id + " — للمراجعة فقط؛ لم تُرسل ولم تُنشر.";
+}
+
 async function refreshContentFactory() {
   const button = $("#refresh-content-factory");
   if (button) button.disabled = true;
@@ -383,7 +425,7 @@ function bindControlActions() {
 
 async function loadState() {
   state = await fetchJson("/api/state");
-  renderDashboard(); renderProjects(); renderTasks(); renderControl(); renderApprovals(); renderActivity(); renderAgents(); renderSettings(); renderOpportunities(); renderIntelligence(); renderContacts(); bindControlActions();
+  renderDashboard(); renderProjects(); renderTasks(); renderControl(); renderApprovals(); renderActivity(); renderAgents(); renderSettings(); renderOpportunities(); renderIntelligence(); renderContacts(); bindControlActions(); renderLatestGroqDraft();
 }
 
 async function checkHealth() {
@@ -432,6 +474,8 @@ const requestPublicationButton = document.querySelector("#request-publication-ap
 if (requestPublicationButton) requestPublicationButton.addEventListener("click", requestPublicationApproval);
 const refreshFactoryButton = document.querySelector("#refresh-content-factory");
 if (refreshFactoryButton) refreshFactoryButton.addEventListener("click", refreshContentFactory);
+const generateGroqDraftButton = document.querySelector("#generate-groq-draft");
+if (generateGroqDraftButton) generateGroqDraftButton.addEventListener("click", generateGroqDraft);
 const openCodexButton = document.querySelector("#open-codex-control");
 if (openCodexButton) openCodexButton.addEventListener("click", () => showView("control"));
 const openApprovalsButton = document.querySelector("#open-approvals");
