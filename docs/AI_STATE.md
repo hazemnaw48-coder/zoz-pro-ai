@@ -71,3 +71,44 @@ Keep the existing production deployment (commit `f7ee581e0c1ab5b05af3b2e1cb91e88
 - The remaining gate is a live, owner-authenticated Preview smoke: assign `ZP-006` if still planned, submit `system:health-check`, refresh state in a separate request, and verify command completion, task status `verification`, persisted result, executor heartbeat/mode, and corresponding audit entries.
 - Current Vercel connector access returns `403` for deployment inspection, runtime logs, and environment metadata; this is an access limitation, not evidence that the app itself returns an error.
 - The daily readiness cron is not the command worker. The queue worker only allows `system:health-check` and `system:project-summary`; it cannot run arbitrary shell/Codex instructions or external/financial actions.
+
+
+## Scope correction and verified handoff — 2026-10-14 UTC
+
+### Strict system separation
+
+- This repository and this handoff are for **ZOZ Pro only**: `hazemnaw48-coder/zoz-pro-ai`.
+- The Vercel connection explicitly labelled **ZOZ Pro** (owner account `hazemnaw48@gmail.com`) is the only Vercel connection to use for the current ZOZ Pro project.
+- Authoritative Vercel project ID: `prj_T6J2NwjPcGcOo6Zi4nW31EyS7YDc`, account/team ID: `team_wFgewvIh3gjYHAIqxG6POeN1`, Node.js `24.x`.
+- A separate Vercel connection labelled **Vercel** exposes projects including `zoz-ai-control` (`prj_BLhyNy2Rg8hFYVuM6bBMS5Emzbvx`), `zoz_ai_core_v3-2`, and other projects, plus an older similarly named `zoz-pro-ai` project (`prj_KRfSApBtANdNF5BgliSrczuc2eMB`). **Do not use that connection or its project IDs to inspect, change, or deploy ZOZ Pro.** Similar names are not proof they are the same project.
+- Keep ZOZ Pro separate from `zozaimanager2026-design/zoz-ai-control`, its Railway service, database, credentials, deployment history, and error investigations. No action on ZOZ AI is authorized by this ZOZ Pro work.
+- Deployment/log/secret checks must always pass both the ZOZ Pro connection and exact project ID; never resolve the project by the name `zoz-pro-ai` alone.
+
+### Verified Vercel inventory
+
+- Correct project `prj_T6J2NwjPcGcOo6Zi4nW31EyS7YDc` currently reports `live: false` and its latest listed deployment target is `null` (not a confirmed Production deployment).
+- Latest deployment in the correct project at inspection time: `dpl_3XLBERp2RNXWwESic46toFBLR6M1`, state `READY`, branch `feature/ZP-013-isolated-tool-integrations`, commit `a2a81a2b8edc4b6b33c7f93217585e8b8c8f960c`, URL `https://zoz-pro-4chka2yml-hazemnaw48-coder.vercel.app`. This is a Preview build, not proof of production operation.
+- PR #14: `feature/ZP-012-vercel-cloud-runtime`, head at inspection `8e4ad373d66a34107ee3d3e6b39924621642ed8f`; CI workflow run #324 passed and its Preview deployment `dpl_Hcw2QEcFvDV8a9k6TQbCeHLbayZG` reported `READY`. PR remains open; the required owner-authenticated smoke is not verified.
+- PR #15: `feature/ZP-013-isolated-tool-integrations`, head `a2a81a2b8edc4b6b33c7f93217585e8b8c8f960c`; CI workflow run #389 passed. PR remains a draft. Kaggle connector / kernel contract is not verified end-to-end and this branch does not prove a rendered MP4.
+- Vercel API requests for runtime logs, environment metadata, build events, and protected-preview fetch returned `403` under the ZOZ Pro connection during this review. This confirms a connector/access limitation only; it is **not** evidence of an application HTTP 404, and it does not prove the cloud runtime is healthy. No ZOZ Pro app-level 404 has been confirmed in this inspection.
+- Environment variable inventory could not be re-checked because of the `403`. The previous 2026-10-13 note said `ZOZ_CONTROL_TOKEN` and `BLOB_READ_WRITE_TOKEN` were present and `CRON_SECRET` was missing then; treat that inventory as stale until safely re-verified. Never read or expose secret values.
+
+### Separate production-center record (Floot)
+
+- The production center is a different project: `ZOZ Pro — Alternate Video Production Center`, Floot project ID `894a0e3a-85c4-43de-b8f7-205db24685b9`. Keep it dedicated to content creation; use Vercel for the ZOZ Pro cloud-control/runtime work.
+- Floot project status at this review: unpublished, Free plan; local project data is stored in browser `localStorage`; no cloud synchronization was verified.
+- Connected resources reported by Floot: `GEMINI_API_KEY` (Arabic TTS), `GROQ_API_KEY` (draft text), and `KAGGLE_API_TOKEN`. Resource connection alone does not prove the API token works. Code search found no Kaggle implementation yet.
+- Floot typecheck was clean; available test run reported one spec passed and zero failed. These tests do not prove audio/video generation, MP4 export, cross-device persistence, or publishing.
+- Floot request logs showed `POST /_api/generate-text` returned HTTP 200 at `2026-10-14T03:50:45Z`; this verifies that one text-generation endpoint request returned successfully, not that the complete production workflow is closed.
+- A Floot code-search attempt was blocked by the daily build-action limit; the tool reported reset at `2026-10-15T02:00:00Z`. Do not retry metered code-change/search calls before the limit clears.
+
+### Remaining closure gates
+
+1. Restore authorized access specifically to Vercel project `prj_T6J2NwjPcGcOo6Zi4nW31EyS7YDc`; do not switch to the generic Vercel connection.
+2. Perform the owner-authenticated Preview `system:health-check`, read back status in a separate request, and verify command completion, task status `verification`, result, `executor.mode=vercel_queue`, heartbeat, persisted state and matching audit events.
+3. Verify current environment-variable presence by names only; owner must set `CRON_SECRET` if still missing. Do not merge PR #14 or promote Production until these gates are evidenced.
+4. Keep PR #15 a draft until the separate ZOZ Pro Kaggle authorization and exact notebook/MCP execution and artifact-return contract are verified. Do not run paid jobs or launch generation without explicit approval.
+5. After the Floot quota resets, continue the separate production-center work: reliable persistent project/asset ledger, verify real TTS output, implement/test a safe Kaggle inspect/status/download path, test actual exported media on a phone, then review video quality and require owner approval before external publishing.
+6. Mark publishing complete only after a real platform URL/ID is supplied and verified. Do not claim continuous production or automated publishing from a passing CI/build alone.
+
+No production deployment, merge, environment mutation, secret read, paid generation, external send, or publishing was performed during this audit.
