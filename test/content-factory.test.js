@@ -9,6 +9,7 @@ test("content factory defaults to conservative disconnected states", () => {
   assert.equal(result.phase, "connection_preparation");
   assert.equal(result.overallStatus, "incomplete");
   assert.equal(byId["zoz-content-studio"].status, "not_connected");
+  assert.equal(byId["google-ai-studio-handoff"].status, "not_connected");
   assert.equal(byId["claude-api"].status, "not_configured");
   assert.equal(byId["media-renderer"].status, "not_verified");
   assert.equal(byId["codex-executor"].status, "offline");
@@ -28,6 +29,7 @@ test("configured values never imply a verified live integration", () => {
 
   assert.equal(byId["zoz-content-studio"].status, "configured_unverified");
   assert.equal(byId["zoz-content-studio"].verified, false);
+  assert.equal(byId["google-ai-studio-handoff"].verified, false);
   assert.equal(byId["claude-api"].status, "configured_unverified");
   assert.equal(byId["claude-api"].verified, false);
   assert.equal(byId["media-renderer"].status, "configured_unverified");
