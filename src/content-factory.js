@@ -1,3 +1,5 @@
+import { getStudioIntegrationStatus } from "./media-assets.js";
+
 const hasValue = (value) => typeof value === "string" && value.trim().length > 0;
 
 /**
@@ -9,6 +11,7 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
   const claudeConfigured = hasValue(env.ANTHROPIC_API_KEY);
   const ffmpegConfigured = hasValue(env.FFMPEG_PATH) || hasValue(env.FFMPEG_BINARY);
   const codexOnline = state?.executor?.status === "online";
+  const studioHandoff = getStudioIntegrationStatus({ env });
 
   const connectors = [
     {
@@ -46,6 +49,14 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
       status: "not_integrated",
       verified: false,
       detail: "Gemini is reported as part of the existing content studio; ZOZ Pro has not verified a direct Gemini integration.",
+      secretValuesExposed: false,
+    },
+    {
+      id: "google-ai-studio-handoff",
+      name: "Google AI Studio media handoff",
+      status: studioHandoff.status,
+      verified: false,
+      detail: studioHandoff.detail,
       secretValuesExposed: false,
     },
     {
@@ -104,6 +115,7 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
     nextSteps: [
       "Keep ZOZ Pro as the task, approval and audit control plane.",
       "Confirm the actual Content Studio API contract before setting ZOZ_CONTENT_STUDIO_URL.",
+      "Configure a private Blob store and the dedicated ZOZ_PRO_STUDIO_INTEGRATION_TOKEN before testing Google AI Studio media handoff.",
       "Implement and test an authenticated adapter before sending commands to the Content Studio.",
       "Keep ZOZ AI separate and in standby until its repository access is restored and independently verified.",
       "Do not enable publishing or production deployment until explicit owner approval.",
