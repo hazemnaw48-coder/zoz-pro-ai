@@ -185,13 +185,13 @@ async function handleApi(req, res, url) {
         return sendJson(res, 201, ticket);
       } catch (error) { return mediaErrorResponse(error); }
     }
-    const studioDownloadMatch = url.pathname.match(/^\\/api\\/content-factory\\/studio\\/assets\\/([0-9a-f-]{36})\\/download-url$/);
+    const studioDownloadMatch = url.pathname.match(/^\/api\/content-factory\/studio\/assets\/([0-9a-f-]{36})\/download-url$/);
     if (req.method === "GET" && studioDownloadMatch) {
       try {
         return sendJson(res, 200, await createMediaDownloadUrl(studioDownloadMatch[1]));
       } catch (error) { return mediaErrorResponse(error); }
     }
-    const studioReceiptMatch = url.pathname.match(/^\\/api\\/content-factory\\/studio\\/assets\\/([0-9a-f-]{36})\\/receipt$/);
+    const studioReceiptMatch = url.pathname.match(/^\/api\/content-factory\/studio\/assets\/([0-9a-f-]{36})\/receipt$/);
     if (req.method === "POST" && studioReceiptMatch) {
       try {
         const body = await readJson(req);
@@ -216,13 +216,13 @@ async function handleApi(req, res, url) {
       return sendJson(res, 201, await createMediaUploadTicket(await readJson(req)));
     } catch (error) { return mediaErrorResponse(error); }
   }
-  const mediaCompleteMatch = url.pathname.match(/^\\/api\\/content-factory\\/media\\/assets\\/([0-9a-f-]{36})\\/complete$/);
+  const mediaCompleteMatch = url.pathname.match(/^\/api\/content-factory\/media\/assets\/([0-9a-f-]{36})\/complete$/);
   if (req.method === "POST" && mediaCompleteMatch) {
     try {
       return sendJson(res, 200, await completeMediaUpload(mediaCompleteMatch[1]));
     } catch (error) { return mediaErrorResponse(error); }
   }
-  const mediaDownloadMatch = url.pathname.match(/^\\/api\\/content-factory\\/media\\/assets\\/([0-9a-f-]{36})\\/download-url$/);
+  const mediaDownloadMatch = url.pathname.match(/^\/api\/content-factory\/media\/assets\/([0-9a-f-]{36})\/download-url$/);
   if (req.method === "GET" && mediaDownloadMatch) {
     try {
       return sendJson(res, 200, await createMediaDownloadUrl(mediaDownloadMatch[1]));
