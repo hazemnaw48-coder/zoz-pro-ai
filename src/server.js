@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import http from "node:http";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -144,7 +145,11 @@ async function handleApi(req, res, url) {
   const studioAuthorized = () => {
     const expected = process.env.ZOZ_PRO_STUDIO_INTEGRATION_TOKEN || "";
     const supplied = req.headers.authorization ?? "";
-    return expected.length >= 32 && supplied === `Bearer ${expected}`;
+    const prefix = "Bearer ";
+    if (expected.length < 32 || !supplied.startsWith(prefix)) return false;
+    const candidate = supplied.slice(prefix.length).trim();
+    if (!candidate || candidate.length !== expected.length) return false;
+    return timingSafeEqual(Buffer.from(candidate), Buffer.from(expected));
   };
   const mediaErrorResponse = (error) => {
     if (error instanceof MediaAssetError) {
