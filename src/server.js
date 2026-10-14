@@ -23,6 +23,7 @@ import { getContentFactoryStatus } from "./content-factory.js";
 import { verifyContentStudioHandshake, ContentStudioClientError } from "./content-studio-client.js";
 import { verifyGpuWorkerHandshake, GpuWorkerClientError } from "./gpu-worker-client.js";
 import { verifyKaggleMcp, KaggleMcpError } from "./kaggle-mcp-client.js";
+import { generateGroqDraft, GroqTextClientError } from "./groq-text-client.js";
 import {
   ContentPublisherError,
   checkYouTubePublicationStatus,
@@ -134,6 +135,33 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/content-factory/status") {
     return sendJson(res, 200, getContentFactoryStatus({ state }));
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/content-factory/text/draft") {
+    let body;
+    try { body = await readJson(req); } catch {
+      return sendJson(res, 400, { success: false, error: "invalid_json", message: "Request body must be valid JSON." });
+    }
+    let result;
+    try { result = await generateGroqDraft(body); } catch (error) {
+      if (error instanceof GroqTextClientError) {
+        return sendJson(res, error.httpStatus, { success: false, error: error.code, message: error.message });
+      }
+      return sendJson(res, 502, { success: false, error: "groq_generation_failed", message: "No draft was verified. Nothing was sent or published." });
+    }
+    const draft = {
+      id: `DRAFT-${Date.now()}`, provider: result.provider, model: result.model,
+      purpose: result.purpose, subject: result.subject, text: result.text,
+      status: "draft_for_review", createdAt: result.generatedAt, publishedAt: null, sentAt: null
+    };
+    state.contentDrafts ??= [];
+    state.contentDrafts.unshift(draft);
+    state.contentDrafts = state.contentDrafts.slice(0, 25);
+    appendActivity(state, { type: "content_draft_generated", actor: "Owner", message: "Groq generated a text draft saved for owner review only; it was not sent or published." });
+    try { await store.save(state); } catch {
+      return sendJson(res, 500, { success: false, error: "draft_storage_failed", message: "Could not verify draft persistence. Nothing was published.", draft });
+    }
+    return sendJson(res, 200, { success: true, draft, publicationEnabled: false, message: "Draft saved for owner review only; not sent or published." });
   }
 
   if (req.method === "POST" && url.pathname === "/api/content-factory/kaggle/verify") {
