@@ -61,7 +61,7 @@ jobs:
             -o /tmp/state-before.json
 
           # Create a fresh smoke task rather than relying on seeded/stale Preview tasks.
-          if ! curl -fsS --max-time 20 -X POST "$PREVIEW_URL/api/tasks" \
+          if ! curl --fail-with-body -sS --max-time 20 -X POST "$PREVIEW_URL/api/tasks" \
             -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
             -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
             -H 'Content-Type: application/json' \
@@ -73,7 +73,7 @@ jobs:
           fi
           jq -e --arg task "$TASK_ID" '.id == $task and .status == "planned"' /tmp/task-create.json >/dev/null
 
-          if ! curl -fsS --max-time 20 -X POST "$PREVIEW_URL/api/tasks/$TASK_ID/assign" \
+          if ! curl --fail-with-body -sS --max-time 20 -X POST "$PREVIEW_URL/api/tasks/$TASK_ID/assign" \
             -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
             -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
             -H 'Content-Type: application/json' \
@@ -84,7 +84,7 @@ jobs:
           fi
           jq -e --arg task "$TASK_ID" '.id == $task and .status == "assigned" and .assignedAgent == "codex"' /tmp/assignment.json >/dev/null
 
-          if ! curl -fsS --max-time 20 -X POST "$PREVIEW_URL/api/control/commands" \
+          if ! curl --fail-with-body -sS --max-time 20 -X POST "$PREVIEW_URL/api/control/commands" \
             -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
             -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
             -H 'Content-Type: application/json' \
