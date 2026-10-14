@@ -87,3 +87,14 @@ not_deployed
 - Added deterministic client tests and status assertions. Next: add the Content Factory UI, finish route-level persistence/auth tests, run GitHub Actions, then inspect Vercel Preview. Runtime logs remain 403; end-to-end health is not yet verified.
 - Floot daily action limit blocked reading resources/files for Cloud Runtime `e63d1fa8-d477-4708-bed1-e3f539ef224e` and Alternate Video Production Center `894a0e3a-85c4-43de-b8f7-205db24685b9`. After reset, inspect both read-only before choosing the final runtime endpoint or configuring secrets.
 - Keep Gemini and existing image/video/render/export pipeline unchanged. Groq is only a text-draft assistant. Owner approval remains required for external sends, publishing, financial, sensitive, destructive, and production-impacting actions.
+
+
+## 2026-10-14 — ZP-014 central media handoff checkpoint
+- Active system: **ZOZ Pro only**; repository `hazemnaw48-coder/zoz-pro-ai`, owner GitHub connection `hazemnaw48@gmail.com`.
+- Created isolated branch `feature/ZP-014-media-handoff-map` from `feature/ZP-013-isolated-tool-integrations`. No merge or deployment.
+- Added `docs/CENTRAL_MEDIA_HANDOFF_AND_PUBLISHING_PLAN.md` documenting system boundaries, intended multi-generator file handoff, central review/publishing flow, current verified code, blockers, safety controls and acceptance criteria.
+- Required architecture: preserve the existing Floot Production Center interface; make ZOZ Pro Content Factory the secure intake/manifest/review/audit hub; target the specifically confirmed Google AI Studio workspace for review; publish only through a confirmed publisher with explicit owner approval. Cross-system boundary is media files only, never code, secrets, customer records, or database state.
+- Current connectors are not proof of a live Google AI Studio connection or actual media transfer. `src/content-studio-client.js` expects a separate token and protected `/api/zozpro/health` endpoint; `src/content-publisher.js` expects a reachable MP4 URL and Upload-Post account. Publishing remains disabled by default.
+- Current evidence: PR #14 Vercel runtime CI passed on `a32f36cecc9078c371a214a6a9898846bb2d73de`, but Protected Preview Smoke failed; PR #15 is draft/open and CI passed on `a2a81a2b8edc4b6b33c7f93217585e8b8c8f960c`. No production deployment or merge is authorized.
+- Next: inspect PR #14 Protected Preview Smoke failure; implement and test one minimal authenticated media-intake/manifest slice on this branch; inspect Floot export routes after daily limit reset; confirm exact ZOZ Pro Google AI Studio workspace before configuring integration.
+- Keep ZOZ AI and its store/marketing/automation/visual capabilities untouched and independent. No credentials copied between systems. No paid upgrades.
