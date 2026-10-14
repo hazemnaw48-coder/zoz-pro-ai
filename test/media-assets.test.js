@@ -28,10 +28,11 @@ test("media metadata normalizes supported video assets without accepting arbitra
 
 test("media metadata rejects traversal, unsupported formats, invalid sources and mismatched roles", () => {
   assert.equal(sanitizeMediaFilename("../../secret.mp4"), "secret.mp4");
-  assert.throws(() => normalizeMediaMetadata({ filename: "video.exe", sourceSystem: "other" }), (e) => e instanceof MediaAssetError && e.code === "unsupported_media_type");
-  assert.throws(() => normalizeMediaMetadata({ filename: "video.mp4", sourceSystem: "zoz-ai-private-db" }), (e) => e instanceof MediaAssetError && e.code === "unsupported_source_system");
-  assert.throws(() => normalizeMediaMetadata({ filename: "video.mp4", sourceSystem: "other", mediaRole: "thumbnail" }), (e) => e instanceof MediaAssetError && e.code === "media_role_type_mismatch");
-  assert.throws(() => normalizeMediaMetadata({ filename: "video.mp4", sourceSystem: "other", jobId: "../task" }), (e) => e instanceof MediaAssetError && e.code === "invalid_job_id");
+  const assetId = "d93c1d8b-9c24-4e41-93d2-7c0a91d24f35";
+  assert.throws(() => normalizeMediaMetadata({ assetId, filename: "video.exe", sourceSystem: "other" }), (e) => e instanceof MediaAssetError && e.code === "unsupported_media_type");
+  assert.throws(() => normalizeMediaMetadata({ assetId, filename: "video.mp4", sourceSystem: "zoz-ai-private-db" }), (e) => e instanceof MediaAssetError && e.code === "unsupported_source_system");
+  assert.throws(() => normalizeMediaMetadata({ assetId, filename: "video.mp4", sourceSystem: "other", mediaRole: "thumbnail" }), (e) => e instanceof MediaAssetError && e.code === "media_role_type_mismatch");
+  assert.throws(() => normalizeMediaMetadata({ assetId, filename: "video.mp4", sourceSystem: "other", jobId: "../task" }), (e) => e instanceof MediaAssetError && e.code === "invalid_job_id");
 });
 
 test("integration status never claims live Google AI Studio verification from environment variables alone", () => {
