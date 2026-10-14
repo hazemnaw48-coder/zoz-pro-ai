@@ -22,6 +22,28 @@
   <div class="panel"><div class="panel-header"><h3 id="factory-overall">جارٍ فحص الحالة…</h3><span id="factory-phase" class="badge">Checking</span></div><p id="factory-checked-at" class="meta">لم يتم الفحص بعد.</p><p id="factory-safety" class="meta"></p></div>
   <div id="factory-connectors" class="stack"></div>
   <div class="panel">
+    <h3>استقبال ملفات الإنتاج</h3>
+    <p class="meta">ارفع ملفًا فعليًا من مركز Floot أو Qwen أو أي مولّد. الملفات تحفظ خاصة في Vercel Blob؛ رابط التنزيل مؤقت ولا يتم النشر من هنا.</p>
+    <label for="media-source">مصدر الملف</label>
+    <select id="media-source">
+      <option value="floot-production-center">Floot Production Center</option>
+      <option value="qwen">Qwen</option>
+      <option value="google-ai-studio">Google AI Studio</option>
+      <option value="zoz-ai-export">ZOZ AI — ملف مُصدّر فقط</option>
+      <option value="openart">OpenArt</option>
+      <option value="runway">Runway</option>
+      <option value="other">مصدر آخر</option>
+    </select>
+    <label for="media-job-id">معرّف مهمة التوليد (اختياري)</label>
+    <input id="media-job-id" maxlength="120" placeholder="render_...">
+    <label for="media-file">ملف الفيديو أو الصورة أو الصوت أو الترجمة</label>
+    <input id="media-file" type="file" accept=".mp4,.mov,.webm,.mp3,.m4a,.wav,.png,.jpg,.jpeg,.webp,.srt,.vtt,.json,.txt">
+    <button id="media-upload-button" type="button">رفع الملف والتحقق منه</button>
+    <p id="media-upload-status" class="meta" role="status"></p>
+    <div class="panel-header"><h3>الأصول المستلمة</h3><button id="media-refresh-button" type="button">تحديث</button></div>
+    <div id="media-assets-list" class="stack"></div>
+  </div>
+  <div class="panel">
     <h3>طلب نشر فيديو</h3>
     <p class="meta">أدخل معرّف الرندر من الاستوديو. سيُحفظ الطلب وينتظر موافقة المالك؛ لا يتم النشر تلقائيًا.</p>
     <label for="publication-task-id">مهمة ZOZ Pro</label>
