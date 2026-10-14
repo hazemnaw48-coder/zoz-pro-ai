@@ -1,6 +1,7 @@
 import { getContentStudioClientStatus } from "./content-studio-client.js";
 import { getGpuWorkerStatus } from "./gpu-worker-client.js";
 import { getKaggleStatus } from "./kaggle-mcp-client.js";
+import { getGroqTextClientStatus } from "./groq-text-client.js";
 
 const hasValue = (value) => typeof value === "string" && value.trim().length > 0;
 
@@ -12,6 +13,7 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
   const studioStatus = getContentStudioClientStatus({ env });
   const gpuWorkerStatus = getGpuWorkerStatus({ env });
   const kaggleStatus = getKaggleStatus({ env });
+  const groqStatus = getGroqTextClientStatus({ env });
   const claudeConfigured = hasValue(env.ANTHROPIC_API_KEY);
   const ffmpegConfigured = hasValue(env.FFMPEG_PATH) || hasValue(env.FFMPEG_BINARY);
   const codexOnline = state?.executor?.status === "online";
@@ -96,6 +98,13 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
       secretValuesExposed: false,
     },
     {
+      ...groqStatus,
+      name: "Groq text drafting assistant",
+      configurationKey: "GROQ_API_KEY",
+      detail: groqStatus.detail,
+      secretValuesExposed: false,
+    },
+    {
       id: "claude-api",
       name: "Claude API reviewer",
       status: claudeConfigured ? "configured_unverified" : "not_configured",
@@ -166,6 +175,7 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
     connectors,
     nextSteps: [
       "Keep all new integrations, credentials, databases and workflow modules under ZOZ Pro only.",
+      "Configure GROQ_API_KEY only from a separately authorized ZOZ Pro Groq account, then use POST /api/content-factory/text/draft for bounded drafts; the route never calls tools or publishes.",
       "Do not alter or disconnect any existing ZOZ AI integration; keep it independently usable as before.",
       "Configure ZOZ_CONTENT_STUDIO_URL and a dedicated ZOZ_CONTENT_STUDIO_TOKEN only on the ZOZ Pro server after the Studio exposes the protected /api/zozpro/health endpoint.",
       "Use POST /api/content-factory/studio/verify to run the explicit, read-only authenticated handshake after configuration.",
