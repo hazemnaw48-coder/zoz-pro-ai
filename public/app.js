@@ -365,6 +365,88 @@ async function requestPublicationApproval() {
   }
 }
 
+
+function mediaAssetLabel(asset) {
+  return `<article class="list-item">
+    <div class="section-heading"><div class="list-title">${escapeHtml(asset.title || asset.originalFilename)}</div><span class="status">${escapeHtml(asset.status)}</span></div>
+    <div class="meta">${escapeHtml(asset.originalFilename)} · ${escapeHtml(asset.contentType || "unknown type")} · ${escapeHtml(asset.sizeBytes ? Math.round(asset.sizeBytes / 1024 / 1024 * 10) / 10 + " MB" : "size pending")}</div>
+    <div class="meta">Source: ${escapeHtml(asset.sourceSystem)} · ID: ${escapeHtml(asset.assetId)}</div>
+    ${asset.status === "ready_for_import" ? `<button data-media-download="${escapeHtml(asset.assetId)}" type="button">إنشاء رابط تنزيل مؤقت</button>` : ""}
+    ${asset.status === "imported_to_studio" ? '<span class="meta">تم تسجيل إيصال استيراد الاستوديو</span>' : ""}
+  </article>`;
+}
+
+async function refreshMediaAssets() {
+  const list = $("#media-assets-list");
+  if (!list) return;
+  list.innerHTML = '<div class="meta">جارٍ تحميل فهرس الوسائط…</div>';
+  try {
+    const result = await fetchJson("/api/content-factory/media/assets?limit=50");
+    list.innerHTML = result.assets.length ? result.assets.map(mediaAssetLabel).join("") : '<div class="meta">لا توجد ملفات مستلمة بعد.</div>';
+    document.querySelectorAll("[data-media-download]").forEach((button) => button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        const result = await fetchJson("/api/content-factory/media/assets/" + encodeURIComponent(button.dataset.mediaDownload) + "/download-url");
+        const link = document.createElement("a");
+        link.href = result.url;
+        link.download = result.filename;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.click();
+        alert("تم إنشاء رابط تنزيل مؤقت ينتهي في " + result.expiresAt + ". لم يتم إرسال الملف إلى الاستوديو تلقائيًا.");
+      } catch (error) { alert(error.message); }
+      finally { button.disabled = false; }
+    }));
+  } catch (error) {
+    list.innerHTML = '<div class="meta">تعذر قراءة الفهرس: ' + escapeHtml(error.message) + '</div>';
+  }
+}
+
+async function uploadMediaAsset() {
+  const input = $("#media-file");
+  const status = $("#media-upload-status");
+  const button = $("#media-upload-button");
+  const file = input?.files?.[0];
+  if (!file) { status.textContent = "اختر ملفًا أولًا."; return; }
+  const extension = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase() : "";
+  const maxBytes = extension === ".mp4" || extension === ".mov" || extension === ".webm" ? 250 * 1024 * 1024 : 25 * 1024 * 1024;
+  if (file.size <= 0 || file.size > maxBytes) {
+    status.textContent = "حجم الملف غير مسموح. الفيديو: حتى 250 MB؛ بقية الملفات: حتى 25 MB.";
+    return;
+  }
+  button.disabled = true;
+  status.textContent = "جارٍ إنشاء رابط رفع مؤقت…";
+  try {
+    const ticket = await fetchJson("/api/content-factory/media/upload-ticket", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        originalFilename: file.name,
+        sourceSystem: $("#media-source").value,
+        jobId: $("#media-job-id").value.trim(),
+        title: file.name,
+      }),
+    });
+    status.textContent = "جارٍ رفع الملف مباشرة إلى التخزين الخاص…";
+    const upload = await fetch(ticket.uploadUrl, {
+      method: "PUT",
+      headers: { "content-type": ticket.contentType },
+      body: file,
+    });
+    if (!upload.ok) throw new Error("فشل الرفع إلى التخزين الخاص (HTTP " + upload.status + ").");
+    status.textContent = "جارٍ التحقق من الملف وتسجيل بياناته…";
+    const verified = await fetchJson(ticket.completeEndpoint, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    status.textContent = "تم استقبال الملف والتحقق من نوعه وحجمه. الحالة: " + verified.status + ". لم يتم توليده أو نشره تلقائيًا.";
+    input.value = "";
+    await refreshMediaAssets();
+    await refreshContentFactory();
+  } catch (error) {
+    status.textContent = error.message || "تعذر رفع الملف.";
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function refreshContentFactory() {
   const button = $("#refresh-content-factory");
   if (button) button.disabled = true;
@@ -472,6 +554,10 @@ if (saveTokenButton) saveTokenButton.addEventListener("click", () => {
 
 const requestPublicationButton = document.querySelector("#request-publication-approval");
 if (requestPublicationButton) requestPublicationButton.addEventListener("click", requestPublicationApproval);
+const mediaUploadButton = document.querySelector("#media-upload-button");
+if (mediaUploadButton) mediaUploadButton.addEventListener("click", () => uploadMediaAsset());
+const mediaRefreshButton = document.querySelector("#media-refresh-button");
+if (mediaRefreshButton) mediaRefreshButton.addEventListener("click", () => refreshMediaAssets());
 const refreshFactoryButton = document.querySelector("#refresh-content-factory");
 if (refreshFactoryButton) refreshFactoryButton.addEventListener("click", refreshContentFactory);
 const openCodexButton = document.querySelector("#open-codex-control");
