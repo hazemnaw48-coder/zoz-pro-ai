@@ -185,6 +185,12 @@ async function handleApi(req, res, url) {
         return sendJson(res, 201, ticket);
       } catch (error) { return mediaErrorResponse(error); }
     }
+    const studioCompleteMatch = url.pathname.match(/^\/api\/content-factory\/studio\/assets\/([0-9a-f-]{36})\/complete$/);
+    if (req.method === "POST" && studioCompleteMatch) {
+      try {
+        return sendJson(res, 200, await completeMediaUpload(studioCompleteMatch[1]));
+      } catch (error) { return mediaErrorResponse(error); }
+    }
     const studioDownloadMatch = url.pathname.match(/^\/api\/content-factory\/studio\/assets\/([0-9a-f-]{36})\/download-url$/);
     if (req.method === "GET" && studioDownloadMatch) {
       try {
