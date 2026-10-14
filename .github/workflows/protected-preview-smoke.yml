@@ -61,27 +61,39 @@ jobs:
             -o /tmp/state-before.json
 
           # Create a fresh smoke task rather than relying on seeded/stale Preview tasks.
-          curl -fsS --max-time 20 -X POST "$PREVIEW_URL/api/tasks" \
+          if ! curl -fsS --max-time 20 -X POST "$PREVIEW_URL/api/tasks" \
             -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
             -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
             -H 'Content-Type: application/json' \
             -d "{\"id\":\"$TASK_ID\",\"title\":\"Isolated Preview smoke diagnostic\",\"owner\":\"Owner\",\"assignedAgent\":\"codex\",\"branch\":\"task/preview-smoke\",\"requiredChecks\":[\"build\",\"tests\"]}" \
-            -o /tmp/task-create.json
+            -o /tmp/task-create.json; then
+            cat /tmp/task-create.json
+            echo "::error::Failed to create isolated smoke task."
+            exit 1
+          fi
           jq -e --arg task "$TASK_ID" '.id == $task and .status == "planned"' /tmp/task-create.json >/dev/null
 
-          curl -fsS --max-time 20 -X POST "$PREVIEW_URL/api/tasks/$TASK_ID/assign" \
+          if ! curl -fsS --max-time 20 -X POST "$PREVIEW_URL/api/tasks/$TASK_ID/assign" \
             -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
             -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
             -H 'Content-Type: application/json' \
-            -d '{"agent":"codex","actor":"Owner"}' -o /tmp/assignment.json
+            -d '{"agent":"codex","actor":"Owner"}' -o /tmp/assignment.json; then
+            cat /tmp/assignment.json
+            echo "::error::Failed to assign isolated smoke task."
+            exit 1
+          fi
           jq -e --arg task "$TASK_ID" '.id == $task and .status == "assigned" and .assignedAgent == "codex"' /tmp/assignment.json >/dev/null
 
-          curl -fsS --max-time 20 -X POST "$PREVIEW_URL/api/control/commands" \
+          if ! curl -fsS --max-time 20 -X POST "$PREVIEW_URL/api/control/commands" \
             -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
             -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
             -H 'Content-Type: application/json' \
             -d "{\"instruction\":\"system:health-check\",\"taskId\":\"$TASK_ID\",\"requestedBy\":\"Owner\"}" \
-            -o /tmp/command.json
+            -o /tmp/command.json; then
+            cat /tmp/command.json
+            echo "::error::Failed to queue isolated smoke health-check command."
+            exit 1
+          fi
           id="$(jq -er '.id' /tmp/command.json)"
           echo "Submitted allowlisted read-only command $id for isolated task $TASK_ID."
 
