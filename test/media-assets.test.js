@@ -57,7 +57,7 @@ test("upload ticket is not created without private storage credentials", async (
 });
 
 test("studio receipt requires explicit validation and a checksum is only recorded when valid", async () => {
-  const fakeApi = {};
+  const fakeApi = { get: async () => null };
   await assert.rejects(
     recordStudioImportReceipt("d93c1d8b-9c24-4e41-93d2-7c0a91d24f35", {
       studioAssetId: "studio-file-1",
