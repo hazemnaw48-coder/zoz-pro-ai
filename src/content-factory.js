@@ -1,3 +1,8 @@
+import { getContentStudioClientStatus } from "./content-studio-client.js";
+import { getGpuWorkerStatus } from "./gpu-worker-client.js";
+import { getKaggleStatus } from "./kaggle-mcp-client.js";
+import { getGroqTextClientStatus } from "./groq-text-client.js";
+
 const hasValue = (value) => typeof value === "string" && value.trim().length > 0;
 
 /**
@@ -5,7 +10,10 @@ const hasValue = (value) => typeof value === "string" && value.trim().length > 0
  * This deliberately does not make outbound requests or expose configured secret values.
  */
 export function getContentFactoryStatus({ state = null, env = process.env } = {}) {
-  const studioConfigured = hasValue(env.ZOZ_CONTENT_STUDIO_URL);
+  const studioStatus = getContentStudioClientStatus({ env });
+  const gpuWorkerStatus = getGpuWorkerStatus({ env });
+  const kaggleStatus = getKaggleStatus({ env });
+  const groqStatus = getGroqTextClientStatus({ env });
   const claudeConfigured = hasValue(env.ANTHROPIC_API_KEY);
   const ffmpegConfigured = hasValue(env.FFMPEG_PATH) || hasValue(env.FFMPEG_BINARY);
   const codexOnline = state?.executor?.status === "online";
@@ -30,14 +38,55 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
       secretValuesExposed: false,
     },
     {
-      id: "zoz-content-studio",
+      ...studioStatus,
       name: "ZOZ Content Production Studio",
-      status: studioConfigured ? "configured_unverified" : "not_connected",
-      verified: false,
       configurationKey: "ZOZ_CONTENT_STUDIO_URL",
-      detail: studioConfigured
-        ? "A server-side base URL is configured, but the adapter and live health check are not verified."
-        : "No server-side studio URL is configured. No request has been sent to the studio.",
+      detail: studioStatus.detail,
+      secretValuesExposed: false,
+    },
+    {
+      ...gpuWorkerStatus,
+      name: "Hourly rented GPU video-generation worker",
+      configurationKey: "ZOZ_GPU_WORKER_URL",
+      detail: gpuWorkerStatus.detail,
+      secretValuesExposed: false,
+    },
+    {
+      id: "kaggle-free-gpu",
+      name: "Kaggle GPU notebook — free renewable quota",
+      provider: "Kaggle",
+      ...kaggleStatus,
+      scope: "zoz_pro_only",
+      configurationKeys: ["ZOZ_PRO_KAGGLE_MCP_TOKEN"],
+      quota: {
+        amount: 30,
+        unit: "GPU-hours",
+        period: "week",
+        renewable: true,
+        variability: "Kaggle notes the quota can be higher depending on demand and resources.",
+        source: "Kaggle official GPU usage documentation",
+      },
+      legacyEvidence: {
+        kaggleEnvironmentVariablesObservedInZoZAiRailway: true,
+        kaggleHostResolutionObservedInZoZAiRuntimeLogs: true,
+        legacyCredentialsCopied: false,
+      },
+      detail: kaggleStatus.detail,
+      secretValuesExposed: false,
+    },
+    {
+      id: "runpod-legacy-image-endpoint",
+      name: "RunPod image endpoint — separate legacy integration",
+      provider: "RunPod",
+      status: "not_connected",
+      verified: false,
+      scope: "legacy_zoz_ai",
+      legacyEvidence: {
+        endpointIdVariableObserved: "RUNPOD_IMAGE_ENDPOINT_ID",
+        valuesRead: false,
+      },
+      capability: "image_generation_unverified_video",
+      detail: "ZOZ AI has a separate RunPod image-endpoint setting. This is not the source of Kaggle's renewable 30-hour quota, and the current evidence does not prove that the configured RunPod endpoint supports video generation. Do not copy its credentials or route video jobs to it without capability verification.",
       secretValuesExposed: false,
     },
     {
@@ -46,6 +95,13 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
       status: "not_integrated",
       verified: false,
       detail: "Gemini is reported as part of the existing content studio; ZOZ Pro has not verified a direct Gemini integration.",
+      secretValuesExposed: false,
+    },
+    {
+      ...groqStatus,
+      name: "Groq text drafting assistant",
+      configurationKey: "GROQ_API_KEY",
+      detail: groqStatus.detail,
       secretValuesExposed: false,
     },
     {
@@ -81,16 +137,31 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
   ];
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 3,
     checkedAt: new Date().toISOString(),
     phase: "connection_preparation",
-    overallStatus: connectors.some((item) => item.status === "not_connected" || item.status === "not_configured" || item.status === "offline")
+    overallStatus: connectors.some((item) => ["not_connected", "not_configured", "offline", "invalid_configuration", "not_verified"].includes(item.status))
       ? "incomplete"
       : "ready_for_review",
     projectBoundary: {
       controllerRepository: "hazemnaw48-coder/zoz-pro-ai",
-      legacyZoZAi: "standby_and_out_of_scope",
+      newIntegrationsTarget: "ZOZ_PRO_ONLY",
+      legacyZoZAi: "preserved_and_usable_separately",
       legacyZoZAiMayBeModified: false,
+      legacyCredentialsMayBeReusedInZOZPro: false,
+      legacyVideoToolReuseMode: "kaggle_free_gpu_separate_authorization; paid_gpu_provider_remains_separate_or_explicit_asset_handoff",
+      observedLegacyProviders: {
+        kaggleGpu: "configured variables and runtime Kaggle traffic observed; exact MCP/kernel values withheld",
+        runpodImageEndpoint: "endpoint ID variable observed; actual media capability not verified",
+      },
+      ownerReportedVideoAllowance: {
+        amount: 30,
+        unit: "GPU-hours",
+        renewal: "weekly_quota_per_Kaggle_documentation; account quota can vary",
+        provider: "Kaggle",
+        providerIdentified: true,
+        actual_ZOZ_Pro_connection_verified: false,
+      },
       deploymentStatus: state?.project?.deploymentStatus ?? "unknown",
       automaticPublishing: false,
     },
@@ -99,13 +170,20 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
       outboundConnectionChecksPerformed: false,
       publishingEnabled: false,
       ownerApprovalRequiredForExternalSendOrProductionChanges: true,
+      legacyZoZAiConnectionsModified: false,
     },
     connectors,
     nextSteps: [
-      "Keep ZOZ Pro as the task, approval and audit control plane.",
-      "Confirm the actual Content Studio API contract before setting ZOZ_CONTENT_STUDIO_URL.",
-      "Implement and test an authenticated adapter before sending commands to the Content Studio.",
-      "Keep ZOZ AI separate and in standby until its repository access is restored and independently verified.",
+      "Keep all new integrations, credentials, databases and workflow modules under ZOZ Pro only.",
+      "Configure GROQ_API_KEY only from a separately authorized ZOZ Pro Groq account, then use POST /api/content-factory/text/draft for bounded drafts; the route never calls tools or publishes.",
+      "Do not alter or disconnect any existing ZOZ AI integration; keep it independently usable as before.",
+      "Configure ZOZ_CONTENT_STUDIO_URL and a dedicated ZOZ_CONTENT_STUDIO_TOKEN only on the ZOZ Pro server after the Studio exposes the protected /api/zozpro/health endpoint.",
+      "Use POST /api/content-factory/studio/verify to run the explicit, read-only authenticated handshake after configuration.",
+      "Kaggle is the strongest match for the 30 free GPU-hour clue; establish a separate ZOZ Pro Kaggle authorization and confirm the worker/MCP contract before running jobs.",
+      "Keep the legacy RunPod image endpoint separate; it is not proven to be a video-generation endpoint.",
+      "Configure ZOZ_GPU_WORKER_URL and a dedicated ZOZ_GPU_WORKER_TOKEN only after a protected worker-side /api/zozpro/health endpoint exists.",
+      "Use the owner-authenticated GPU verification endpoint to confirm the rented worker without starting a rental or generation job.",
+      "If the legacy provider cannot support a separate authorization, use an explicit exported-asset handoff rather than reusing ZOZ AI secrets or changing its connection.",
       "Do not enable publishing or production deployment until explicit owner approval.",
     ],
   };

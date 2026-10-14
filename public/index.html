@@ -22,6 +22,28 @@
   <div class="panel"><div class="panel-header"><h3 id="factory-overall">جارٍ فحص الحالة…</h3><span id="factory-phase" class="badge">Checking</span></div><p id="factory-checked-at" class="meta">لم يتم الفحص بعد.</p><p id="factory-safety" class="meta"></p></div>
   <div id="factory-connectors" class="stack"></div>
   <div class="panel">
+    <h3>مساعد الكتابة وإعداد المسودات — Groq</h3>
+    <p class="meta">مسودات نصية للمراجعة فقط. لا يوجد نشر أو إرسال أو استدعاء أدوات من هذا المساعد.</p>
+    <label for="groq-draft-purpose">نوع المهمة</label>
+    <select id="groq-draft-purpose">
+      <option value="script">سيناريو فيديو</option>
+      <option value="outline">مخطط محتوى أو مشاهد</option>
+      <option value="caption">عنوان ووصف وتعليق</option>
+      <option value="brief">موجز إنتاج</option>
+      <option value="proofread">مراجعة لغوية</option>
+    </select>
+    <label for="groq-draft-subject">الموضوع أو النص</label>
+    <textarea id="groq-draft-subject" rows="2" maxlength="1000" placeholder="اكتب الموضوع أو النص المراد مراجعته"></textarea>
+    <label for="groq-draft-context">سياق ومراجع (اختياري)</label>
+    <textarea id="groq-draft-context" rows="3" maxlength="4000" placeholder="الجمهور، معلومات مرجعية أو نص المصدر"></textarea>
+    <label for="groq-draft-requirements">شروط إضافية (اختياري)</label>
+    <textarea id="groq-draft-requirements" rows="2" maxlength="1600" placeholder="المدة، النبرة، التنسيق"></textarea>
+    <button id="generate-groq-draft" type="button">إنشاء مسودة وحفظها للمراجعة</button>
+    <p id="groq-draft-status" class="meta">يلزم إعداد GROQ_API_KEY على خادم ZOZ Pro بعد اعتماد حساب Groq مستقل.</p>
+    <label for="groq-draft-output">المسودة المحفوظة الأخيرة</label>
+    <textarea id="groq-draft-output" rows="12" readonly placeholder="ستظهر المسودة هنا بعد إعداد الربط بنجاح."></textarea>
+  </div>
+  <div class="panel">
     <h3>طلب نشر فيديو</h3>
     <p class="meta">أدخل معرّف الرندر من الاستوديو. سيُحفظ الطلب وينتظر موافقة المالك؛ لا يتم النشر تلقائيًا.</p>
     <label for="publication-task-id">مهمة ZOZ Pro</label>
