@@ -68,7 +68,7 @@ async function readJson(req) {
 function isRetryableStateMutation(req, url) {
   if (req.method !== "POST") return false;
   return url.pathname === "/api/tasks"
-    || /^\\/api\\/tasks\\/[^/]+\\/assign$/.test(url.pathname)
+    || (url.pathname.startsWith("/api/tasks/") && url.pathname.endsWith("/assign") && url.pathname.split("/").length === 5)
     || url.pathname === "/api/control/commands";
 }
 
