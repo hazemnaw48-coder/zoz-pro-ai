@@ -112,3 +112,38 @@ Keep the existing production deployment (commit `f7ee581e0c1ab5b05af3b2e1cb91e88
 6. Mark publishing complete only after a real platform URL/ID is supplied and verified. Do not claim continuous production or automated publishing from a passing CI/build alone.
 
 No production deployment, merge, environment mutation, secret read, paid generation, external send, or publishing was performed during this audit.
+
+
+## Production operation correction — 2026-10-14
+
+### User-confirmed prior successful output (preserve as completed history)
+
+The owner confirms that the existing Floot production center has already successfully:
+- generated narration audio;
+- exported an actual video;
+- published that video; and
+- saved the video on the owner's phone.
+
+Record this as **owner-confirmed prior success**. Do not downgrade it to “unverified/no production output” in future handoffs. Any later endpoint failures must be diagnosed against the specific new request, not used to invalidate this completed run.
+
+### Build quota vs. production runtime
+
+- Floot's daily build-action limit was reached at inspection, with a reset reported for 2026-10-15T02:00:00Z (05:00 Africa/Cairo). This blocks project editing/build-related tool actions in the connected Floot editor; it does not, by itself, prove that the existing user-facing app, external API endpoints, client-side export, or external publishing integrations have stopped.
+- The last available Floot server log showed `POST /_api/generate-text` returning HTTP 200 at `2026-10-14T03:50:45.966Z`. This is evidence that the text endpoint was working at that time; it is not proof of a current live request or of every separate provider.
+- Do not create a new Floot project, rebuild, or wait for the editor quota before using already-existing runtime routes. Test production through the current user-facing app when possible; classify each stage separately: brief/research, script, TTS, image generation, scene assembly/render/export, local phone save, and publication.
+- When the project-edit tools are quota-blocked, continue work that does not require source edits: research, script/caption/shot-list preparation, running the existing app if available, reviewing generated artifacts, and preparing the next episode pack. Do not claim a runtime call was tested when the blocked tools prevented it.
+- If a runtime action fails, capture exact route, time, HTTP status/error body, and stage; do not assume “Floot build limit” is the cause unless evidence connects the failure to that limit.
+- The editor/project quota state is not the same as Gemini, Groq, Kaggle, Runway, or Upload-Post quota/billing. Check each provider's own authorization, plan, and limits before spending credits. Do not use paid video generation as a substitute without owner authorization.
+
+### Immediate next content cycle
+
+A ready-to-use draft package was prepared for channel **فكرة**:
+- Working topic: why people perceive faces in ordinary objects (face pareidolia).
+- Package: Arabic script, 8-scene storyboard, original scene-generation prompts, narration guidance, title/description/hashtags, quality checklist, and cited scientific sources.
+- Companion SRT captions are provided as a separate file in the current conversation: `Fikra_Episode_02.srt`.
+- This is a prepared production brief only; do not mark the episode rendered, exported, or published until the center's actual artifact, playback, and platform URL/ID are checked.
+- Use the existing production center for the audio and export path; this assistant-side package is not a replacement for the center. After a successful run, record the actual exported filename, duration, format, phone playback result, and verified post URL/ID.
+
+### Current implementation limitation
+
+The center project `894a0e3a-85c4-43de-b8f7-205db24685b9` still uses browser `localStorage` for project state and no cross-device cloud sync was verified. This affects durable project continuity, not the fact that the owner has previously exported/published a video successfully. Keep the project as the dedicated production UI; later source changes should decouple the production artifact ledger and queue from editor/build quotas and store history/assets durably, without removing the existing working path.
