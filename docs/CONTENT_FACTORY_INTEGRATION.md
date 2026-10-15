@@ -1,66 +1,47 @@
-# ZOZ Pro Content Factory integration (ZP-009)
+# ZOZ Pro — Independent Content & Media Workflow (ZP-014)
 
-## Scope and boundary
+## Current owner decision
 
-This adapter lives in `hazemnaw48-coder/zoz-pro-ai` on the isolated branch `feature/ZP-009-zoz-ai-capability-bridge`. It does not read, write, migrate, or deploy the legacy `zozaimanager2026-design/zoz-ai-control` repository. ZOZ Pro's state store, bearer token, tasks, approvals, and audit log remain separate.
+The existing Google AI Studio production center is **out of scope and disconnected** until it is repaired or the owner accepts a working replacement. Do not configure a Studio endpoint, use a Studio token, call a Studio-specific route, or edit that Studio app/repository.
 
-The first concrete integration is a controlled production-to-publishing path:
+This branch implements a provider-neutral **manual file intake**. It does not automatically generate video and does not prove that a file can be exported from any generator. Open the external tool, create and download the actual artifact, then import it into ZOZ Pro.
 
-1. A completed render is identified by the studio `jobId`.
-2. ZOZ Pro creates a publication draft linked to a ZOZ Pro task.
-3. The owner explicitly approves the associated `external_send` approval.
-4. A second explicit submit action sends the video through Upload-Post.
-5. ZOZ Pro stores the provider request ID and checks status until a YouTube URL is returned.
+## Independent generator catalog
 
-This is not a claim that Google AI Studio is live-connected to ZOZ Pro. The studio URL and its output route must be configured and reachable from Upload-Post before this adapter can publish.
+- TAAFT Video Generator: `https://theresanaiforthat.com/@taaft/video-generator/?ref=header`
+- Qwen: `https://qwen.ai/home`
+- Digen AI: `https://digen.ai/app/`
 
-## Server-side configuration
+These links launch independent websites. No API call, credential transfer, recurring job or payment action is configured by the catalog.
 
-Set the following only in the ZOZ Pro runtime's server-side secrets/environment, not in source control or browser local storage:
+## Media intake workflow
 
-- `UPLOAD_POST_API_KEY`: Upload-Post API key.
-- `UPLOAD_POST_PROFILE`: exact profile name from Upload-Post `list_users`.
-- `ZOZ_CONTENT_STUDIO_URL`: public HTTPS origin that serves `/outputs/<jobId>/video.mp4`.
-- `ZOZ_PRO_PUBLISHING_ENABLED`: leave `false` until the account key, target profile, and public video URL have been verified.
+1. Open an external generator and create/download the actual MP4, image, audio or caption file.
+2. Return to ZOZ Pro Content Factory, choose the source label and select the downloaded file.
+3. ZOZ Pro creates a short-lived signed upload ticket; the browser sends the bytes directly to private Blob storage and then calls the generic completion route.
+4. The server verifies the stored object, media type and size, and records a manifest with status `ready_for_import`.
+5. Request a temporary download URL and verify the real file plays on the phone. A manifest or successful build alone is not acceptance evidence.
 
-Verified profile inventory at implementation time:
+Supported formats: MP4/MOV/WebM video, MP3/M4A/WAV audio, PNG/JPG/WEBP images, SRT/VTT/TXT captions and JSON/TXT manifests. Video limit: 250 MB; other supported files: 25 MB. Upload URLs expire after 15 minutes; download URLs expire after 5 minutes.
 
-- `ZozAI` → YouTube `@zozai-q6z` (ZOZ Ai brand channel).
-- `ZozAI2` → YouTube `@hazemelzoz7281` (Hazem Ahmed channel).
+## Owner-authenticated API routes
 
-The adapter does not choose between these channels automatically. The configured profile determines the destination.
+- `GET /api/content-factory/media/assets?limit=50`
+- `POST /api/content-factory/media/upload-ticket`
+- `POST /api/content-factory/media/assets/{assetId}/complete`
+- `GET /api/content-factory/media/assets/{assetId}/download-url`
+- `GET /api/content-factory/status`
+- `GET /api/content-factory/publisher/status`
 
-## API
+The former `/api/content-factory/studio/*` route family and dedicated Studio-token namespace are removed from this branch. Media routes use the existing ZOZ Pro owner-control bearer token; never place it in browser source, URL parameters, prompts or Git.
 
-All endpoints below require the existing ZOZ Pro bearer control token.
+## Publishing and export safety
 
-- `GET /api/content-factory/publisher/status`: configuration-only status; it never returns secret values.
-- `POST /api/content-factory/publications`: creates a draft and a pending owner approval. Body fields: `taskId`, `jobId`, `title`, `description`, optional `hashtags`, optional `privacyStatus` (`unlisted` by default).
-- `POST /api/approvals/:approvalId/approve`: owner approves the matching `external_send` request.
-- `POST /api/content-factory/publications/:publicationId/submit`: only submits an approved publication, after checking the Upload-Post API credential.
-- `GET /api/content-factory/publications/:publicationId`: retrieves and reconciles provider status when a request ID exists.
+Publishing remains unavailable until the owner selects a separate media center and its real file-delivery path is verified. The server requires `ZOZ_PRO_MEDIA_CENTER_SELECTED=true` even to create a publication draft. A future submission also requires publisher credentials, `ZOZ_PRO_PUBLISHING_ENABLED=true`, a verified HTTPS output origin, a matching owner-approved `external_send` action, and a real test against the chosen center. Do not set the selection flag to bypass this gate.
 
-The browser Content Factory panel exposes the draft/approval flow and shows publication status. A queued response is not treated as successful publication; a verified YouTube post URL is required.
+## Safety and acceptance
 
-## Safety rules
-
-- No secrets are committed or returned in API responses.
-- No publishing is enabled by default.
-- No upload is submitted without an explicit `external_send` approval and a separate submit action.
-- Requests use a stable request ID; unknown network outcomes are marked for reconciliation instead of automatic resubmission.
-- Publishing is external execution and must be tested first with an unlisted video.
-- Never copy customer/contact databases or owner credentials between ZOZ AI and ZOZ Pro.
-
-## Verification and remaining work
-
-The isolated branch's GitHub Actions workflow runs `npm test` and `npm run build`. Passing CI validates the adapter and approval gates against mocked provider responses; it does not prove that production secrets are configured, the studio URL is reachable, or a real video has been published.
-
-Next steps, in order:
-
-1. Configure the server-side values in a private runtime.
-2. Verify the Upload-Post credential and exact YouTube profile.
-3. Verify that the chosen studio URL returns the actual final MP4 to the Upload-Post service.
-4. Test one owner-approved unlisted publication and confirm the final YouTube URL.
-5. Only then consider queueing or extending this adapter to additional channels and ZOZ AI business workflows.
-
-No merge to `main` and no production deployment is included in this branch.
+- Do not read/copy credentials or runtime state from `zozaimanager2026-design/zoz-ai-control`.
+- A configured environment variable is not proof of a working integration.
+- Do not merge or deploy this branch without explicit owner approval.
+- Required evidence: actual uploaded file type/size, manifest/asset ID, successful temporary download, phone playback and recorded errors if any.
