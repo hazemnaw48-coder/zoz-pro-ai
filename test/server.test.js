@@ -32,7 +32,8 @@ test("server exposes state and enforces approval gate", async () => {
     assert.equal(factoryStatus.projectBoundary.legacyZoZAiMayBeModified, false);
     assert.equal(factoryStatus.safety.publishingEnabled, false);
     assert.equal(factoryStatus.safety.outboundConnectionChecksPerformed, false);
-    assert.ok(factoryStatus.connectors.some((item) => item.id === "zoz-content-studio" && item.status === "not_connected"));
+    assert.ok(factoryStatus.connectors.some((item) => item.id === "external-generator-tools" && item.status === "manual_export_import"));
+    assert.ok(factoryStatus.connectors.every((item) => item.id !== "google-ai-studio-handoff"));
 
     const transition = await fetch(`http://127.0.0.1:${port}/api/tasks/ZP-001/transition`, {
       method: "POST",
