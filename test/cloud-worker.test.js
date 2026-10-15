@@ -141,7 +141,7 @@ test("cloud worker sends a text-only Gemini task to the model and persists the r
     let requestBody;
     const result = await processCloudCommand("CMD-GEMINI-TEST", {
       geminiOptions: {
-        env: { GEMINI_API_KEY: "test-key", GEMINI_MODEL: "gemini-2.5-flash" },
+        env: { GEMINI_API_KEY: "test-key", GEMINI_MODEL: "gemini-3.8-flash" },
         timeoutMs: 2000,
         fetchImpl: async (_url, options) => {
           requestBody = JSON.parse(options.body);
