@@ -15,6 +15,7 @@ const configuredEnv = () => ({
   UPLOAD_POST_PROFILE: "ZozAI2",
   ZOZ_PRO_MEDIA_CENTER_URL: "https://media-center.example.com",
   ZOZ_PRO_PUBLISHING_ENABLED: "true",
+  ZOZ_PRO_MEDIA_CENTER_SELECTED: "true",
 });
 
 test("publisher readiness never exposes key values or claims a live verification", () => {
@@ -24,6 +25,27 @@ test("publisher readiness never exposes key values or claims a live verification
   assert.equal(status.verified, false);
   assert.equal(status.profileName, "ZozAI2");
   assert.equal(JSON.stringify(status).includes("test-only-secret"), false);
+});
+
+test("publisher is locked until an independent media center is selected", () => {
+  const env = configuredEnv();
+  delete env.ZOZ_PRO_MEDIA_CENTER_SELECTED;
+  const status = getContentPublisherStatus({ env });
+  assert.equal(status.configured, true);
+  assert.equal(status.mediaCenterSelected, false);
+  assert.equal(status.canSubmit, false);
+  assert.equal(status.status, "disabled_no_media_center");
+});
+
+test("publisher makes no outbound request when no media center is selected", async () => {
+  const env = configuredEnv();
+  delete env.ZOZ_PRO_MEDIA_CENTER_SELECTED;
+  let called = false;
+  await assert.rejects(submitYouTubePublication({
+    env, publication: { id: "PUB-test", jobId: "render_123", title: "Title", description: "Description", hashtags: [], privacyStatus: "unlisted" },
+    fetchImpl: async () => { called = true; throw new Error("must not run"); },
+  }), error => error instanceof ContentPublisherError && error.code === "media_center_not_selected");
+  assert.equal(called, false);
 });
 
 test("publisher remains disabled without its explicit server feature switch", () => {
