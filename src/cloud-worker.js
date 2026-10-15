@@ -87,6 +87,16 @@ async function failCommand(store, state, command, taskId, reason, now) {
   command.status = "failed";
   command.failedAt = timestamp(now);
   command.error = reason;
+  const failedTask = (state.tasks ?? []).find(item => item.id === taskId);
+  if (failedTask?.status === "executing") {
+    try {
+      assertTaskTransition(failedTask.status, "failed");
+      failedTask.status = "failed";
+      failedTask.result = null;
+    } catch {
+      // Preserve the original failure even if task state was concurrently changed.
+    }
+  }
   setExecutor(state, {
     status: "idle",
     currentCommandId: null,
