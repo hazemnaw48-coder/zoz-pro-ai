@@ -5,7 +5,7 @@ import {
   ContentPublisherError,
   getContentPublisherStatus,
   normalizeContentPublicationRequest,
-  resolveStudioVideoUrl,
+  resolveMediaCenterVideoUrl,
   submitYouTubePublication,
   verifyUploadPostAccount,
 } from "../src/content-publisher.js";
@@ -57,15 +57,15 @@ test("publisher remains disabled without its explicit server feature switch", ()
   assert.equal(status.status, "disabled_by_default");
 });
 
-test("studio source is derived from a trusted HTTPS origin and a safe job ID", () => {
+test("media-center source is derived from a trusted HTTPS origin and a safe job ID", () => {
   const env = configuredEnv();
   assert.equal(
-    resolveStudioVideoUrl("render_123-ab", { env }),
+    resolveMediaCenterVideoUrl("render_123-ab", { env }),
     "https://media-center.example.com/outputs/render_123-ab/video.mp4",
   );
-  assert.throws(() => resolveStudioVideoUrl("../secrets", { env }), ContentPublisherError);
+  assert.throws(() => resolveMediaCenterVideoUrl("../secrets", { env }), ContentPublisherError);
   env.ZOZ_PRO_MEDIA_CENTER_URL = "http://media-center.example.com";
-  assert.throws(() => resolveStudioVideoUrl("render_123", { env }), ContentPublisherError);
+  assert.throws(() => resolveMediaCenterVideoUrl("render_123", { env }), ContentPublisherError);
 });
 
 test("publication request validates title/privacy and normalizes tags", () => {
