@@ -37,7 +37,8 @@ test("publication draft requires owner approval and does not send when provider 
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "zoz-pro-publication-"));
   process.env.ZOZ_DATA_DIR = dir;
   process.env.ZOZ_CONTROL_TOKEN = "test-control-token";
-  process.env.ZOZ_CONTENT_STUDIO_URL = "https://studio.example.com";
+  process.env.ZOZ_PRO_MEDIA_CENTER_URL = "https://media-center.example.com";
+  delete process.env.ZOZ_PRO_MEDIA_CENTER_SELECTED;
   delete process.env.UPLOAD_POST_API_KEY;
   delete process.env.UPLOAD_POST_PROFILE;
   delete process.env.ZOZ_PRO_PUBLISHING_ENABLED;
@@ -46,7 +47,7 @@ test("publication draft requires owner approval and does not send when provider 
   const port = server.address().port;
   const headers = { "content-type": "application/json", authorization: "Bearer test-control-token" };
   try {
-    const draftResponse = await fetch("http://127.0.0.1:" + port + "/api/content-factory/publications", {
+    const blockedDraft = await fetch("http://127.0.0.1:" + port + "/api/content-factory/publications", {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -56,6 +57,12 @@ test("publication draft requires owner approval and does not send when provider 
         description: "وثائقي قصير عن بناء الأهرامات.",
         hashtags: ["الأهرامات", "مصر_القديمة"],
       }),
+    });
+    assert.equal(blockedDraft.status, 409);
+    assert.equal((await blockedDraft.json()).error, "media_center_not_selected");
+    process.env.ZOZ_PRO_MEDIA_CENTER_SELECTED = "true";
+    const draftResponse = await fetch("http://127.0.0.1:" + port + "/api/content-factory/publications", {
+      method: "POST", headers, body: JSON.stringify({ taskId: "ZP-001", jobId: "render_1791632034935_ekl8", title: "كيف شُيّدت الأهرامات المصرية؟", description: "وثائقي قصير عن بناء الأهرامات.", hashtags: ["الأهرامات", "مصر_القديمة"] }),
     });
     assert.equal(draftResponse.status, 201);
     const result = await draftResponse.json();
@@ -94,7 +101,8 @@ test("publication draft requires owner approval and does not send when provider 
     await new Promise((resolve) => server.close(resolve));
     delete process.env.ZOZ_DATA_DIR;
     delete process.env.ZOZ_CONTROL_TOKEN;
-    delete process.env.ZOZ_CONTENT_STUDIO_URL;
+    delete process.env.ZOZ_PRO_MEDIA_CENTER_URL;
+    delete process.env.ZOZ_PRO_MEDIA_CENTER_SELECTED;
     delete process.env.UPLOAD_POST_API_KEY;
     delete process.env.UPLOAD_POST_PROFILE;
     delete process.env.ZOZ_PRO_PUBLISHING_ENABLED;
