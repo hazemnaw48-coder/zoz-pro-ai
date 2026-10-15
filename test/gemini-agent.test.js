@@ -16,7 +16,7 @@ test("Gemini task prefix accepts bounded prompts and rejects malformed prompts",
 });
 
 test("Gemini model can be configured and invalid model identifiers fail closed", () => {
-  assert.equal(getConfiguredGeminiModel({}), "gemini-2.5-flash");
+  assert.equal(getConfiguredGeminiModel({}), "gemini-3.8-flash");
   assert.equal(getConfiguredGeminiModel({ GEMINI_MODEL: "gemini-2.5-pro" }), "gemini-2.5-pro");
   assert.throws(() => getConfiguredGeminiModel({ GEMINI_MODEL: "https://attacker.example" }), /model name is invalid/);
 });
@@ -25,7 +25,7 @@ test("Gemini text generation sends the task server-side and returns generated te
   let capturedUrl;
   let capturedOptions;
   const result = await generateGeminiText("اكتب مقدمة لفيديو أطفال عن القمر", {
-    env: { GEMINI_API_KEY: "test-key", GEMINI_MODEL: "gemini-2.5-flash" },
+    env: { GEMINI_API_KEY: "test-key", GEMINI_MODEL: "gemini-3.8-flash" },
     timeoutMs: 2000,
     fetchImpl: async (url, options) => {
       capturedUrl = url;
