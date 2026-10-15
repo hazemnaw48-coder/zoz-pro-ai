@@ -40,7 +40,7 @@ export function getContentPublisherStatus({ env = process.env } = {}) {
   const missingConfiguration = [];
   if (!hasValue(env.UPLOAD_POST_API_KEY)) missingConfiguration.push("UPLOAD_POST_API_KEY");
   if (!hasValue(env.UPLOAD_POST_PROFILE)) missingConfiguration.push("UPLOAD_POST_PROFILE");
-  if (!hasValue(env.ZOZ_CONTENT_STUDIO_URL)) missingConfiguration.push("ZOZ_CONTENT_STUDIO_URL");
+  if (!hasValue(env.ZOZ_PRO_MEDIA_CENTER_URL)) missingConfiguration.push("ZOZ_PRO_MEDIA_CENTER_URL");
 
   const configured = missingConfiguration.length === 0;
   const mediaCenterSelected = env.ZOZ_PRO_MEDIA_CENTER_SELECTED === "true";
@@ -83,15 +83,15 @@ export function resolveStudioVideoUrl(jobId, { env = process.env } = {}) {
     throw new ContentPublisherError("invalid_job_id", "jobId contains unsupported characters.", 400);
   }
 
-  if (!hasValue(env.ZOZ_CONTENT_STUDIO_URL)) {
-    throw new ContentPublisherError("studio_not_configured", "ZOZ_CONTENT_STUDIO_URL is not configured on the ZOZ Pro server.", 409);
+  if (!hasValue(env.ZOZ_PRO_MEDIA_CENTER_URL)) {
+    throw new ContentPublisherError("media_center_not_configured", "ZOZ_PRO_MEDIA_CENTER_URL is not configured on the ZOZ Pro server.", 409);
   }
 
   let base;
   try {
-    base = new URL(env.ZOZ_CONTENT_STUDIO_URL.trim());
+    base = new URL(env.ZOZ_PRO_MEDIA_CENTER_URL.trim());
   } catch {
-    throw new ContentPublisherError("invalid_studio_url", "ZOZ_CONTENT_STUDIO_URL must be an absolute HTTPS origin.", 409);
+    throw new ContentPublisherError("invalid_media_center_url", "ZOZ_PRO_MEDIA_CENTER_URL must be an absolute HTTPS origin.", 409);
   }
 
   if (
@@ -103,8 +103,8 @@ export function resolveStudioVideoUrl(jobId, { env = process.env } = {}) {
     (base.pathname !== "/" && base.pathname !== "")
   ) {
     throw new ContentPublisherError(
-      "invalid_studio_url",
-      "ZOZ_CONTENT_STUDIO_URL must be an HTTPS origin only, without credentials, query, fragment, or path.",
+      "invalid_media_center_url",
+      "ZOZ_PRO_MEDIA_CENTER_URL must be an HTTPS origin only, without credentials, query, fragment, or path.",
       409,
     );
   }
