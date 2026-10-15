@@ -7,7 +7,7 @@ import { createStateStore } from "../src/store.js";
 import { isSupportedCloudInstruction, processCloudCommand } from "../src/cloud-worker.js";
 import { server } from "../src/server.js";
 
-const ENV_KEYS = ["ZOZ_DATA_DIR", "ZOZ_CONTROL_TOKEN", "VERCEL", "VERCEL_ENV", "ZOZ_PRO_STORAGE_MODE", "NODE_ENV"];
+const ENV_KEYS = ["ZOZ_DATA_DIR", "ZOZ_CONTROL_TOKEN", "VERCEL", "VERCEL_ENV", "ZOZ_PRO_STORAGE_MODE", "NODE_ENV", "GEMINI_API_KEY", "GEMINI_MODEL"];
 
 function snapshotEnv() {
   return Object.fromEntries(ENV_KEYS.map(key => [key, process.env[key]]));
@@ -99,6 +99,116 @@ test("cloud worker executes a safe mobile command and persists result, heartbeat
     assert.ok(afterWorkerRestart.activity.some(item => item.type === "control_command_completed" && item.message.includes(command.id)));
   } finally {
     if (server.listening) await new Promise(resolve => server.close(resolve));
+    restoreEnv(previous);
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("cloud worker sends a text-only Gemini task to the model and persists the returned work product", async () => {
+  const previous = snapshotEnv();
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "zoz-pro-gemini-worker-"));
+  process.env.ZOZ_DATA_DIR = dir;
+  process.env.NODE_ENV = "test";
+  delete process.env.VERCEL;
+  delete process.env.VERCEL_ENV;
+  delete process.env.ZOZ_PRO_STORAGE_MODE;
+  try {
+    const store = createStateStore();
+    const state = await store.load();
+    state.tasks.unshift({
+      id: "ZP-GEMINI-TEST",
+      title: "Gemini text task test",
+      owner: "Owner",
+      assignedAgent: "codex",
+      branch: "task/gemini-test",
+      status: "planned",
+      requiredChecks: ["result", "persistence", "audit"],
+      result: null,
+    });
+    state.controlCommands.unshift({
+      id: "CMD-GEMINI-TEST",
+      taskId: "ZP-GEMINI-TEST",
+      instruction: "gemini:assist: اكتب مقدمة عربية قصيرة لفيديو أطفال عن القمر",
+      actionType: null,
+      requiresApproval: false,
+      status: "queued",
+      requestedBy: "Owner",
+      result: null,
+      error: null,
+    });
+    await store.save(state);
+
+    let requestBody;
+    const result = await processCloudCommand("CMD-GEMINI-TEST", {
+      geminiOptions: {
+        env: { GEMINI_API_KEY: "test-key", GEMINI_MODEL: "gemini-2.5-flash" },
+        timeoutMs: 2000,
+        fetchImpl: async (_url, options) => {
+          requestBody = JSON.parse(options.body);
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ candidates: [{ content: { parts: [{ text: "مقدمة عربية تجريبية للفيديو." }] } }] }),
+          };
+        },
+      },
+    });
+    assert.equal(result.outcome, "completed");
+    assert.equal(result.taskStatus, "verification");
+    assert.equal(result.result, "مقدمة عربية تجريبية للفيديو.");
+    assert.match(requestBody.contents[0].parts[0].text, /فيديو أطفال عن القمر/);
+
+    const persisted = await createStateStore().load();
+    assert.equal(persisted.controlCommands.find(item => item.id === "CMD-GEMINI-TEST").status, "completed");
+    assert.equal(persisted.tasks.find(item => item.id === "ZP-GEMINI-TEST").result, "مقدمة عربية تجريبية للفيديو.");
+    assert.ok(persisted.activity.some(item => item.type === "control_command_completed" && item.message.includes("CMD-GEMINI-TEST")));
+  } finally {
+    restoreEnv(previous);
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("cloud worker records a safe failure when Gemini is not configured", async () => {
+  const previous = snapshotEnv();
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "zoz-pro-gemini-missing-"));
+  process.env.ZOZ_DATA_DIR = dir;
+  process.env.NODE_ENV = "test";
+  delete process.env.VERCEL;
+  delete process.env.VERCEL_ENV;
+  delete process.env.ZOZ_PRO_STORAGE_MODE;
+  delete process.env.GEMINI_API_KEY;
+  try {
+    const store = createStateStore();
+    const state = await store.load();
+    state.tasks.unshift({
+      id: "ZP-GEMINI-MISSING",
+      title: "Gemini missing key test",
+      owner: "Owner",
+      assignedAgent: "codex",
+      branch: "task/gemini-missing",
+      status: "planned",
+      requiredChecks: [],
+      result: null,
+    });
+    state.controlCommands.unshift({
+      id: "CMD-GEMINI-MISSING",
+      taskId: "ZP-GEMINI-MISSING",
+      instruction: "gemini:assist: اكتب ملخصًا",
+      actionType: null,
+      requiresApproval: false,
+      status: "queued",
+      requestedBy: "Owner",
+      result: null,
+      error: null,
+    });
+    await store.save(state);
+    const result = await processCloudCommand("CMD-GEMINI-MISSING");
+    assert.equal(result.outcome, "failed");
+    assert.equal(result.reason, "gemini_not_configured");
+    const persisted = await createStateStore().load();
+    assert.equal(persisted.tasks.find(item => item.id === "ZP-GEMINI-MISSING").status, "failed");
+    assert.equal(persisted.controlCommands.find(item => item.id === "CMD-GEMINI-MISSING").status, "failed");
+  } finally {
     restoreEnv(previous);
     await fs.rm(dir, { recursive: true, force: true });
   }
