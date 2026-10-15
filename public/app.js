@@ -512,8 +512,8 @@ async function checkHealth() {
       $("#control-health").textContent = cloudSeen
         ? `Vercel Queue worker: ${ex.status ?? "unknown"} · last heartbeat: ${seen}`
         : "Vercel Queue configured; awaiting the first worker heartbeat.";
-      $("#control-help").textContent = "Cloud tasks: system:health-check or system:project-summary. These are read-only; external actions and arbitrary commands are not executed by this worker.";
-      $("#control-instruction").placeholder = "system:health-check  |  system:project-summary";
+      $("#control-help").textContent = "Cloud tasks: system:health-check, system:project-summary, or text-only Gemini work. For writing or analysis, start with gemini:assist: followed by your task. External actions, arbitrary code and sensitive actions are not executed.";
+      $("#control-instruction").placeholder = "gemini:assist: اكتب سكربت فيديو أطفال عن القمر";
     } else {
       $("#executor-badge").textContent = ex?.status === "online"
         ? `Codex online · ${ex.hostname ?? "worker"}`
