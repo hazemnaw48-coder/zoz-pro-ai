@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 
 export const MEDIA_MANIFEST_PREFIX = "zoz-pro-media/manifests/";
 export const MEDIA_OBJECT_PREFIX = "zoz-pro-media/assets/";
-export const MEDIA_RECEIPT_PREFIX = "zoz-pro-media/receipts/";
 export const MAX_VIDEO_BYTES = 250 * 1024 * 1024;
 export const MAX_OTHER_BYTES = 25 * 1024 * 1024;
 export const SIGNED_URL_TTL_MS = 5 * 60 * 1000;
@@ -28,11 +27,11 @@ const MIME_BY_EXTENSION = Object.freeze({
 const SOURCE_SYSTEMS = new Set([
   "floot-production-center",
   "qwen",
-  "google-ai-studio",
+  "taaft",
+  "digen-ai",
   "zoz-ai-export",
   "openart",
   "runway",
-  "gemini",
   "other",
 ]);
 
@@ -191,7 +190,6 @@ function manifestFromBlob(blob, metadata, now = new Date()) {
       typeof blob.uploadedAt === "string" && !Number.isNaN(Date.parse(blob.uploadedAt))
         ? new Date(blob.uploadedAt).toISOString()
         : now.toISOString(),
-    studioImport: null,
   };
 }
 
@@ -328,7 +326,6 @@ export async function createMediaUploadTicket(input, { blobApi = null, now = () 
     },
     createdAt: new Date(now()).toISOString(),
     uploadedAt: null,
-    studioImport: null,
   };
   await writeNewManifest(manifest, api);
 
@@ -340,7 +337,7 @@ export async function createMediaUploadTicket(input, { blobApi = null, now = () 
     contentType: metadata.contentType,
     maximumSizeBytes: metadata.contentType.startsWith("video/") ? MAX_VIDEO_BYTES : MAX_OTHER_BYTES,
     expiresAt: new Date(validUntil).toISOString(),
-    completeEndpoint: "/api/content-factory/studio/assets/" + metadata.assetId + "/complete",
+    completeEndpoint: "/api/content-factory/media/assets/" + metadata.assetId + "/complete",
   };
 }
 
@@ -417,7 +414,6 @@ export async function listMediaAssets({ limit = 50, cursor = undefined, blobApi 
       sizeBytes: asset.storage?.sizeBytes ?? null,
       uploadedAt: asset.uploadedAt ?? null,
       createdAt: asset.createdAt ?? null,
-      lastStudioImport: asset.studioImport ?? null,
     })),
     cursor: result.cursor ?? null,
     hasMore: result.hasMore === true,
@@ -453,98 +449,6 @@ export async function createMediaDownloadUrl(assetId, { blobApi = null, now = ()
   };
 }
 
-export async function recordStudioImportReceipt(assetId, input = {}, { blobApi = null, now = () => new Date() } = {}) {
-  const api = await resolveBlobApi(blobApi);
-  const manifest = await readMediaManifest(assetId, { blobApi: api });
-  if (!manifest) throw new MediaAssetError("media_asset_not_found", "Media asset was not found.", 404);
-  if (!["ready_for_import", "imported_to_studio"].includes(manifest.status)) {
-    throw new MediaAssetError("media_asset_not_ready", "Only a verified uploaded asset can be acknowledged by the Studio.", 409);
-  }
-
-  const studioAssetId = stringField(input.studioAssetId, "studioAssetId", 180, { required: true });
-  const validated = input.validated === true;
-  if (!validated) throw new MediaAssetError("studio_validation_required", "The Studio must confirm that the downloaded asset was validated before acknowledging import.", 409);
-  const receiptId = normalizeAssetId(input.receiptId, true);
-  const receipt = {
-    schemaVersion: 1,
-    receiptId,
-    assetId: manifest.assetId,
-    studio: "ZOZ Pro Google AI Studio",
-    studioAssetId,
-    sourceSystem: manifest.sourceSystem,
-    transferEtag: manifest.storage?.etag ?? null,
-    importedAt: now().toISOString(),
-    validated: true,
-    validation: {
-      contentType: stringField(input.contentType, "contentType", 120),
-      sizeBytes: Number.isSafeInteger(input.sizeBytes) && input.sizeBytes >= 0 ? input.sizeBytes : null,
-      durationSeconds: Number.isFinite(input.durationSeconds) && input.durationSeconds >= 0 ? input.durationSeconds : null,
-      width: Number.isInteger(input.width) && input.width > 0 ? input.width : null,
-      height: Number.isInteger(input.height) && input.height > 0 ? input.height : null,
-      videoCodec: stringField(input.videoCodec, "videoCodec", 80),
-      audioCodec: stringField(input.audioCodec, "audioCodec", 80),
-      checksumSha256: typeof input.checksumSha256 === "string" && /^[0-9a-f]{64}$/i.test(input.checksumSha256) ? input.checksumSha256.toLowerCase() : null,
-    },
-  };
-
-  const pathname = MEDIA_RECEIPT_PREFIX + manifest.assetId + "/" + receiptId + ".json";
-  await writeNewReceipt(pathname, receipt, api);
-
-  const current = await readBlobJson(api, mediaManifestPath(manifest.assetId));
-  if (!current) throw new MediaAssetError("media_asset_not_found", "Media manifest disappeared while recording the receipt.", 404);
-  const updated = {
-    ...current.value,
-    status: "imported_to_studio",
-    studioImport: {
-      receiptId,
-      studioAssetId,
-      importedAt: receipt.importedAt,
-      validated: true,
-    },
-  };
-  await overwriteManifest(current, updated, api);
-  return receipt;
-}
-
-async function writeNewReceipt(pathname, receipt, api) {
-  const current = await readBlobJson(api, pathname);
-  if (current) {
-    if (current.value.receiptId === receipt.receiptId && current.value.assetId === receipt.assetId) return current.value;
-    throw new MediaAssetError("studio_receipt_conflict", "A different Studio import receipt already exists at this path.", 409);
-  }
-  await api.put(pathname, JSON.stringify(receipt) + "\n", {
-    access: "private",
-    addRandomSuffix: false,
-    allowOverwrite: false,
-    contentType: "application/json",
-  });
-  return receipt;
-}
-
-export function getStudioIntegrationStatus({ env = process.env } = {}) {
-  const tokenConfigured = typeof env.ZOZ_PRO_STUDIO_INTEGRATION_TOKEN === "string" &&
-    env.ZOZ_PRO_STUDIO_INTEGRATION_TOKEN.trim().length >= 32;
-  const storageConfigured = typeof env.BLOB_READ_WRITE_TOKEN === "string" && env.BLOB_READ_WRITE_TOKEN.trim().length > 0;
-  return {
-    id: "google-ai-studio-handoff",
-    provider: "Google AI Studio",
-    scope: "zoz_pro_only",
-    status: !tokenConfigured ? "not_connected" : !storageConfigured ? "storage_not_configured" : "configured_unverified",
-    tokenConfigured,
-    storageConfigured,
-    verified: false,
-    healthPath: "/api/content-factory/studio/health",
-    secretName: "ZOZ_PRO_STUDIO_INTEGRATION_TOKEN",
-    capabilities: ["list_media_assets", "download_media_asset", "upload_generated_asset", "record_import_receipt"],
-    secretValuesExposed: false,
-    detail: !tokenConfigured
-      ? "A dedicated ZOZ Pro Studio integration token must be configured in this Vercel project and stored as a server-side secret in the ZOZ Pro Google AI Studio app. Do not reuse ZOZ AI or owner-control credentials."
-      : !storageConfigured
-        ? "Studio authentication is configured, but private Vercel Blob storage is not confirmed configured."
-        : "Dedicated token and media storage are configured; the live Google AI Studio handshake and media transfer are not yet verified.",
-  };
-}
-
 export function mediaAssetSummary(manifest) {
   return {
     assetId: manifest.assetId,
@@ -558,6 +462,5 @@ export function mediaAssetSummary(manifest) {
     sizeBytes: manifest.storage?.sizeBytes ?? null,
     uploadedAt: manifest.uploadedAt ?? null,
     createdAt: manifest.createdAt ?? null,
-    lastStudioImport: manifest.studioImport ?? null,
   };
 }
