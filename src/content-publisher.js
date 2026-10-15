@@ -77,7 +77,7 @@ export function getContentPublisherStatus({ env = process.env } = {}) {
   };
 }
 
-export function resolveStudioVideoUrl(jobId, { env = process.env } = {}) {
+export function resolveMediaCenterVideoUrl(jobId, { env = process.env } = {}) {
   const safeJobId = stringValue(jobId, "jobId", 120, true);
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/.test(safeJobId)) {
     throw new ContentPublisherError("invalid_job_id", "jobId contains unsupported characters.", 400);
@@ -146,7 +146,7 @@ export function normalizeContentPublicationRequest(input = {}, { env = process.e
     description,
     hashtags,
     privacyStatus,
-    sourceUrl: resolveStudioVideoUrl(jobId, { env }),
+    sourceUrl: resolveMediaCenterVideoUrl(jobId, { env }),
   };
 }
 
@@ -238,7 +238,7 @@ export async function submitYouTubePublication({ publication, env = process.env,
     throw new ContentPublisherError("invalid_privacy_status", "A valid, explicitly stored YouTube privacy status is required.", 400);
   }
 
-  const sourceUrl = resolveStudioVideoUrl(jobId, { env });
+  const sourceUrl = resolveMediaCenterVideoUrl(jobId, { env });
   const hashtags = Array.isArray(publication.hashtags) ? publication.hashtags : [];
   const cleanTags = [...new Set(hashtags
     .filter((tag) => typeof tag === "string")
