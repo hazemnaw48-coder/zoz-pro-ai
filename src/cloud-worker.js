@@ -201,7 +201,7 @@ export async function processCloudCommand(commandId, options = {}) {
     const prompt = extractGeminiPrompt(command.instruction);
     result = prompt === null
       ? makeResult(command.instruction, state, currentTask, command)
-      : await generateGeminiText(prompt, options.geminiOptions ?? {});
+      : await generateGeminiText(prompt, { ...(options.geminiOptions ?? {}), toolContext: { store, taskId: currentTask.id, commandId: command.id } });
   } catch (error) {
     const safeReason = error instanceof GeminiAgentError
       ? error.code
