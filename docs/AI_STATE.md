@@ -6,8 +6,8 @@ Resume from this file and Git history; do not rebuild completed work or mix this
 
 - Project: ZOZ Pro — independent Business OS
 - Repository: `hazemnaw48-coder/zoz-pro-ai`
-- Active task: ZP-012 — Vercel cloud runtime, durable state, and safe event-driven command worker
-- Active branch: `feature/ZP-012-vercel-cloud-runtime`
+- Active task: ZP-014 — independent media intake, generator catalog and publishing safety gate
+- Active branch: `feature/ZP-014-vercel-media-intake`
 - Baseline commit reviewed for this change: `8ebee6046b36a8100c57f9f8ce9d7dab354b70ea`
 - Excluded repository: `zozaimanager2026-design/zoz-ai-control`
 - Do not use another similarly named Vercel project or account.
@@ -178,3 +178,16 @@ The center project `894a0e3a-85c4-43de-b8f7-205db24685b9` still uses browser `lo
 - Vercel project environment-variable inventory currently does **not** include `ZOZ_PRO_STUDIO_INTEGRATION_TOKEN`. Do not reuse `ZOZ_PRO_CONTROL_TOKEN`, `ZOZ_CONTROL_TOKEN`, or the Blob token as the Studio integration credential.
 - Next secret action must create a new cryptographically random dedicated token as a sensitive Preview-only variable scoped to `feature/ZP-014-vercel-media-intake`, then the owner must transfer that value into the existing Google AI Studio app's server-side Secrets. Do not print the token into chat or source control. A separate `ZOZ_PRO_STUDIO_ACTION_TOKEN` must be configured server-side in the Studio.
 - Do not enable production target or redeploy production as part of this Preview integration step.
+
+
+## 2026-10-15 — ZP-014 independent media workflow decision
+
+- Owner decision: do not connect, call, configure, or transfer credentials to the current Google AI Studio production center until it is repaired or a working replacement is accepted.
+- Work only in `hazemnaw48-coder/zoz-pro-ai`, branch `feature/ZP-014-vercel-media-intake`, draft PR #16. This branch remains unmerged and not deployed to production.
+- The previous Google AI Studio handoff proposal is superseded. Studio-specific API routes, dedicated Studio-token handling, import receipts and status records are removed from the implementation. The historical Gemini execution brief is retired and must not be run.
+- New workflow: launch independent TAAFT Video Generator, Qwen or Digen AI links; generate and download a real file externally; manually upload it into ZOZ Pro's owner-authenticated private media intake. This is manual file exchange, not automatic generator API integration.
+- Accepted source identifiers include `taaft`, `qwen`, `digen-ai`, `floot-production-center`, `zoz-ai-export` (owner-exported files only), `openart`, `runway` and `other`. Google AI Studio/Gemini source identifiers are excluded from this bridge.
+- Media intake uses short-lived signed Blob URLs and server-side manifest/type/size checks. Environment-variable presence is not proof of storage connectivity. Acceptance still requires real upload, manifest, temporary download and playback on the phone.
+- Publisher source configuration is generic (`ZOZ_PRO_MEDIA_CENTER_URL`), not a Google Studio URL. Publishing and publication-draft creation remain locked unless `ZOZ_PRO_MEDIA_CENTER_SELECTED=true`; do not set this flag until a separate center and actual output path are selected and verified. Credentials and the publisher feature switch are additional gates.
+- Do not merge/deploy, purchase credits, create duplicate storage, edit the Google Studio app, or touch the legacy `zozaimanager2026-design/zoz-ai-control` repository or its credentials.
+- Verification still required: review full diff, run `npm test` and `npm run build` in CI, then test a real MP4 upload/download/playback on phone. No production deployment or publishing success is claimed.
