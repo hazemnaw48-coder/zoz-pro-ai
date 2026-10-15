@@ -239,10 +239,14 @@ function renderAgents() {
 
 
 function renderContentFactory(status, publisherStatus) {
+  const publisherReady = publisherStatus?.canSubmit === true;
+  const publicationButton = $("#request-publication-approval");
+  if (publicationButton) publicationButton.disabled = !publisherReady;
   const label = {
     ready: "جاهز", online: "متصل", offline: "غير متصل", not_connected: "غير مربوط",
     not_configured: "غير مُعد", not_integrated: "غير مدمج", not_verified: "لم يُختبر",
     configured_unverified: "إعداد موجود — غير مُتحقق", disabled_by_default: "معطل افتراضيًا",
+    disabled_no_media_center: "موقوف — لا يوجد مركز معتمد", manual_export_import: "توليد خارجي واستيراد يدوي",
     disabled_pending_approval: "معطل — ينتظر الموافقة", incomplete: "غير مكتمل",
     ready_for_review: "جاهز للمراجعة"
   };
@@ -268,9 +272,9 @@ function renderContentFactory(status, publisherStatus) {
     escapeHtml(item.detail) + '</div><div class="meta">التحقق الحي: ' +
     (item.verified ? "تم" : "لم يتم") + '</div></article>'
   ).join("");
-  $("#factory-next-steps").textContent = (publisherStatus && !publisherStatus.configured)
-    ? "إعداد موصل الاستوديو وUpload-Post في أسرار الخادم، ثم التحقق من رابط الفيديو قبل طلب الموافقة."
-    : (status.nextSteps[0] ?? "لا توجد خطوات إضافية.");
+  $("#factory-next-steps").textContent = publisherReady
+    ? "إعداد النشر لا يعني أنه تم اختباره؛ يلزم اختبار فعلي وموافقة المالك قبل الإرسال."
+    : "النشر والتصدير الخارجي موقوفان حتى اعتماد مركز مستقل والتحقق من مسار الملف النهائي. يمكن فتح أدوات التوليد المستقلة واستيراد ملفاتها.";
   renderPublicationQueue();
 }
 
@@ -285,7 +289,7 @@ function renderPublicationQueue() {
     ' · Job: ' + escapeHtml(item.jobId) + '</div><div class="meta">' + escapeHtml(item.lastError ?? "") +
     '</div>' + (item.postUrl ? '<div><a href="' + escapeHtml(item.postUrl) + '" target="_blank" rel="noopener noreferrer">فتح فيديو يوتيوب</a></div>' : '') +
     '<div class="control-row">' +
-    (item.status === "approved" ? '<button data-submit-publication="' + escapeHtml(item.id) + '">إرسال إلى يوتيوب الآن</button>' : '') +
+    (item.status === "approved" && publisherReady ? '<button data-submit-publication="' + escapeHtml(item.id) + '">إرسال إلى يوتيوب الآن</button>' : '') +
     (["queued","processing","completed_unverified"].includes(item.status) ? '<button data-check-publication="' + escapeHtml(item.id) + '">فحص حالة النشر</button>' : '') +
     '</div></article>'
   ).join("") : '<div class="panel muted-text">لا توجد طلبات نشر بعد.</div>';
@@ -367,12 +371,12 @@ async function requestPublicationApproval() {
 
 
 function mediaAssetLabel(asset) {
+  const sourceLabels = { "floot-production-center": "Floot Production Center", qwen: "Qwen", taaft: "TAAFT Video Generator", "digen-ai": "Digen AI", "zoz-ai-export": "ZOZ AI — ملف مُصدّر يدويًا", openart: "OpenArt", runway: "Runway", other: "مصدر آخر" };
   return `<article class="list-item">
     <div class="section-heading"><div class="list-title">${escapeHtml(asset.title || asset.originalFilename)}</div><span class="status">${escapeHtml(asset.status)}</span></div>
     <div class="meta">${escapeHtml(asset.originalFilename)} · ${escapeHtml(asset.contentType || "unknown type")} · ${escapeHtml(asset.sizeBytes ? Math.round(asset.sizeBytes / 1024 / 1024 * 10) / 10 + " MB" : "size pending")}</div>
-    <div class="meta">Source: ${escapeHtml(asset.sourceSystem)} · ID: ${escapeHtml(asset.assetId)}</div>
+    <div class="meta">Source: ${escapeHtml(sourceLabels[asset.sourceSystem] ?? asset.sourceSystem)} · ID: ${escapeHtml(asset.assetId)}</div>
     ${asset.status === "ready_for_import" ? `<button data-media-download="${escapeHtml(asset.assetId)}" type="button">إنشاء رابط تنزيل مؤقت</button>` : ""}
-    ${asset.status === "imported_to_studio" ? '<span class="meta">تم تسجيل إيصال استيراد الاستوديو</span>' : ""}
   </article>`;
 }
 
@@ -393,7 +397,7 @@ async function refreshMediaAssets() {
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         link.click();
-        alert("تم إنشاء رابط تنزيل مؤقت ينتهي في " + result.expiresAt + ". لم يتم إرسال الملف إلى الاستوديو تلقائيًا.");
+        alert("تم إنشاء رابط تنزيل مؤقت ينتهي في " + result.expiresAt + ". لم يتم إرسال الملف إلى أي مركز تلقائيًا.");
       } catch (error) { alert(error.message); }
       finally { button.disabled = false; }
     }));
