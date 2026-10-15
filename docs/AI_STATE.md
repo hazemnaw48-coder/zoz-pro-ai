@@ -6,8 +6,8 @@ Resume from this file and Git history; do not rebuild completed work or mix this
 
 - Project: ZOZ Pro — independent Business OS
 - Repository: `hazemnaw48-coder/zoz-pro-ai`
-- Active task: ZP-012 — Vercel cloud runtime, durable state, and safe event-driven command worker
-- Active branch: `feature/ZP-012-vercel-cloud-runtime`
+- Active task: ZP-014 — independent media intake, generator catalog and publishing safety gate
+- Active branch: `feature/ZP-014-vercel-media-intake`
 - Baseline commit reviewed for this change: `8ebee6046b36a8100c57f9f8ce9d7dab354b70ea`
 - Excluded repository: `zozaimanager2026-design/zoz-ai-control`
 - Do not use another similarly named Vercel project or account.
@@ -147,3 +147,47 @@ A ready-to-use draft package was prepared for channel **فكرة**:
 ### Current implementation limitation
 
 The center project `894a0e3a-85c4-43de-b8f7-205db24685b9` still uses browser `localStorage` for project state and no cross-device cloud sync was verified. This affects durable project continuity, not the fact that the owner has previously exported/published a video successfully. Keep the project as the dedicated production UI; later source changes should decouple the production artifact ledger and queue from editor/build quotas and store history/assets durably, without removing the existing working path.
+
+
+## 2026-10-14 — ZP-014 private media intake and Studio handoff implementation
+- Active system remains **ZOZ Pro only**. Branch `feature/ZP-014-vercel-media-intake` is based on `feature/ZP-012-vercel-cloud-runtime` to retain the actual Vercel runtime foundation; it is intentionally not based on the docs-only ZP-014 branch.
+- Added `src/media-assets.js`: media metadata validation, private Blob asset/manifest/receipt paths, direct signed upload/download URLs, upload completion validation, idempotent receipt handling, and explicit Google AI Studio integration readiness. Supported inputs: MP4/MOV/WebM, MP3/M4A/WAV, PNG/JPG/WEBP, SRT/VTT, JSON/TXT. Initial app limits: video 250 MB, other files 25 MB; signed URLs expire in 15 minutes for upload and 5 minutes for download.
+- Added authenticated API routes in `src/server.js`: owner routes for upload ticket, list, completion, and download; dedicated Studio-token routes for health, listing, download URL, reverse upload ticket, and validated import receipts. The Studio token is separate from owner and ZOZ AI credentials.
+- Updated `package.json` to require `@vercel/blob ^2.4.0` for signed URLs and syntax-check `src/media-assets.js`.
+- Added `test/media-assets.test.js` for metadata validation and conservative integration status. Added an upload panel and asset list to the existing ZOZ Pro Content Factory UI; this supports manual file export/import and does not yet prove that a generator API is connected.
+- Added `docs/GEMINI_ZP014_STUDIO_CLOSURE_PROMPT.md` with an execution brief for the existing intended ZOZ Pro Google AI Studio project, API contract, secure credential setup, actual video generation, export/import receipt, playback verification, and no-public-publish guard.
+- Vercel docs confirm private Blob and signed URLs are generally available; signed URLs are narrowly scoped to a single object/operation and expire. Sources: https://vercel.com/changelog/vercel-blob-private-blob-is-now-generally-available and https://vercel.com/changelog/signed-urls-are-now-available-for-vercel-blob.
+- **Not yet verified/complete:** this branch has not yet passed CI; the private Blob store and `BLOB_READ_WRITE_TOKEN` are not verified; `ZOZ_PRO_STUDIO_INTEGRATION_TOKEN` is not verified; Google AI Studio's actual project identity and its server-side secret capability have not been confirmed; no real file has yet been transferred or generated through this bridge. Publishing remains disabled and nothing was deployed or merged.
+- Next: wait for GitHub Actions results, fix every failure, inspect the SDK APIs against the resolved package, then configure private Blob and separate Studio secret in Vercel only after the project is verified. Ask Gemini to work on its existing ZOZ Pro Studio using `docs/GEMINI_ZP014_STUDIO_CLOSURE_PROMPT.md`; do not use any ZOZ AI Studio app. Run one real file round-trip and record evidence before calling this operational.
+
+
+## 2026-10-14 — Google AI Studio source identified and media bridge added
+- Identified the existing Google AI Studio source repository under the ZOZ Pro owner GitHub account: `hazemnaw48-coder/zoz-content-production-studio-source`. It is a React/Vite/Express Studio with a real FFmpeg render engine, Gemini script/TTS services, MP4/SRT/thumbnail/JSON output artifacts, and existing output files. This is the intended Studio source, not the legacy ZOZ AI system.
+- Created branch `feature/ZP-014-zozpro-media-handoff` in that Studio source and draft PR #3: https://github.com/hazemnaw48-coder/zoz-content-production-studio-source/pull/3.
+- Studio source CI passed on commit `7320a2378c0115467f7fc30863cf74d8f2ae5925`: storyboard + media-bridge tests, TypeScript lint/type-check and production build.
+- Studio branch adds an Asset Library panel to list/import ZOZ Pro media, an explicit post-render export button for MP4/SRT/thumbnail/JSON, server-side ZOZ Pro API calls, SHA-256 + ffprobe validation for imported video, import receipts, dedicated action/integration secrets, and a runbook. No live secrets are configured and no real file round-trip has run yet.
+- In this ZOZ Pro branch, added `POST /api/content-factory/studio/assets/{assetId}/complete` to finish Studio-originated uploads; CI passed on commit `8d7e1a0e0433c46c90d9e444443c310254f24392`.
+- ZOZ Pro media bridge draft PR #16: https://github.com/hazemnaw48-coder/zoz-pro-ai/pull/16 (target base `feature/ZP-012-vercel-cloud-runtime`, not merged). CI passed for media intake, tests, build and Windows launcher checks before the latest state-note update.
+- Required secret names: in ZOZ Pro Vercel, `BLOB_READ_WRITE_TOKEN` and `ZOZ_PRO_STUDIO_INTEGRATION_TOKEN`; in Google AI Studio server-side Secrets, `ZOZ_PRO_MEDIA_API_URL`, matching `ZOZ_PRO_STUDIO_INTEGRATION_TOKEN`, separate `ZOZ_PRO_STUDIO_ACTION_TOKEN`, and optional `ZOZ_PRO_VERCEL_BYPASS_SECRET` only if the selected Preview is protected. Never place secrets in source or frontend code.
+- Existing Vercel project is not live production and Preview is SSO-protected. Verified existing Blob store `zoz-pro-private-state` (`store_wXGrwfrsn0pTL1vR`) is `private`, `available`, attached to `zoz-pro-ai`, quota not exceeded; `BLOB_READ_WRITE_TOKEN` exists. Do not create a duplicate store. Next: verify existing private Blob store in Vercel dashboard, configure server-side secrets in each correct system, then test one real file round-trip and actual video playback. Social publishing remains disabled; this bridge is not yet proof of publication.
+- Floot source inspection/editing is still blocked until 2026-10-15 02:00 UTC / 05:00 Cairo. Do not upgrade or pay.
+
+
+## 2026-10-14 — Private Blob store verified
+- Read-only Vercel inspection confirmed the existing private Blob store `zoz-pro-private-state` is available, attached only to the `zoz-pro-ai` project, and its quota is not exceeded. The project already has `BLOB_READ_WRITE_TOKEN` configured for preview/production/development.
+- Vercel project environment-variable inventory currently does **not** include `ZOZ_PRO_STUDIO_INTEGRATION_TOKEN`. Do not reuse `ZOZ_PRO_CONTROL_TOKEN`, `ZOZ_CONTROL_TOKEN`, or the Blob token as the Studio integration credential.
+- Next secret action must create a new cryptographically random dedicated token as a sensitive Preview-only variable scoped to `feature/ZP-014-vercel-media-intake`, then the owner must transfer that value into the existing Google AI Studio app's server-side Secrets. Do not print the token into chat or source control. A separate `ZOZ_PRO_STUDIO_ACTION_TOKEN` must be configured server-side in the Studio.
+- Do not enable production target or redeploy production as part of this Preview integration step.
+
+
+## 2026-10-15 — ZP-014 independent media workflow decision
+
+- Owner decision: do not connect, call, configure, or transfer credentials to the current Google AI Studio production center until it is repaired or a working replacement is accepted.
+- Work only in `hazemnaw48-coder/zoz-pro-ai`, branch `feature/ZP-014-vercel-media-intake`, draft PR #16. This branch remains unmerged and not deployed to production.
+- The previous Google AI Studio handoff proposal is superseded. Studio-specific API routes, dedicated Studio-token handling, import receipts and status records are removed from the implementation. The historical Gemini execution brief is retired and must not be run.
+- New workflow: launch independent TAAFT Video Generator, Qwen or Digen AI links; generate and download a real file externally; manually upload it into ZOZ Pro's owner-authenticated private media intake. This is manual file exchange, not automatic generator API integration.
+- Accepted source identifiers include `taaft`, `qwen`, `digen-ai`, `floot-production-center`, `zoz-ai-export` (owner-exported files only), `openart`, `runway` and `other`. Google AI Studio/Gemini source identifiers are excluded from this bridge.
+- Media intake uses short-lived signed Blob URLs and server-side manifest/type/size checks. Environment-variable presence is not proof of storage connectivity. Acceptance still requires real upload, manifest, temporary download and playback on the phone.
+- Publisher source configuration is generic (`ZOZ_PRO_MEDIA_CENTER_URL`), not a Google Studio URL. Publishing and publication-draft creation remain locked unless `ZOZ_PRO_MEDIA_CENTER_SELECTED=true`; do not set this flag until a separate center and actual output path are selected and verified. Credentials and the publisher feature switch are additional gates.
+- Do not merge/deploy, purchase credits, create duplicate storage, edit the Google Studio app, or touch the legacy `zozaimanager2026-design/zoz-ai-control` repository or its credentials.
+- Verification still required: review full diff, run `npm test` and `npm run build` in CI, then test a real MP4 upload/download/playback on phone. No production deployment or publishing success is claimed.

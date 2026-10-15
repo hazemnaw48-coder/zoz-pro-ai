@@ -40,16 +40,19 @@ export function getContentPublisherStatus({ env = process.env } = {}) {
   const missingConfiguration = [];
   if (!hasValue(env.UPLOAD_POST_API_KEY)) missingConfiguration.push("UPLOAD_POST_API_KEY");
   if (!hasValue(env.UPLOAD_POST_PROFILE)) missingConfiguration.push("UPLOAD_POST_PROFILE");
-  if (!hasValue(env.ZOZ_CONTENT_STUDIO_URL)) missingConfiguration.push("ZOZ_CONTENT_STUDIO_URL");
+  if (!hasValue(env.ZOZ_PRO_MEDIA_CENTER_URL)) missingConfiguration.push("ZOZ_PRO_MEDIA_CENTER_URL");
 
   const configured = missingConfiguration.length === 0;
+  const mediaCenterSelected = env.ZOZ_PRO_MEDIA_CENTER_SELECTED === "true";
   const featureEnabled = env.ZOZ_PRO_PUBLISHING_ENABLED === "true";
-  const canSubmit = configured && featureEnabled;
+  const canSubmit = configured && mediaCenterSelected && featureEnabled;
   const status = !configured
     ? "not_configured"
-    : !featureEnabled
-      ? "disabled_by_default"
-      : "configured_unverified";
+    : !mediaCenterSelected
+      ? "disabled_no_media_center"
+      : !featureEnabled
+        ? "disabled_by_default"
+        : "configured_unverified";
 
   return {
     id: "upload-post-youtube",
@@ -59,33 +62,36 @@ export function getContentPublisherStatus({ env = process.env } = {}) {
     configured,
     featureEnabled,
     canSubmit,
+    mediaCenterSelected,
     verified: false,
     profileName: hasValue(env.UPLOAD_POST_PROFILE) ? env.UPLOAD_POST_PROFILE.trim() : null,
     missingConfiguration,
     secretValuesExposed: false,
     detail: !configured
       ? "Publishing is not wired to this ZOZ Pro runtime. Missing server-side settings: " + missingConfiguration.join(", ") + ". No publishing request has been sent."
-      : !featureEnabled
-        ? "Connector settings exist, but publishing is disabled by the ZOZ_PRO_PUBLISHING_ENABLED safety switch."
-        : "Settings are present, but the API account/profile has not been verified from this runtime. Every publication still requires a matching owner-approved external-send approval.",
+      : !mediaCenterSelected
+        ? "Publishing is locked until the owner selects an independent media center and verifies its real file-delivery path. No publishing request has been sent."
+        : !featureEnabled
+          ? "Connector settings exist, but publishing is disabled by the ZOZ_PRO_PUBLISHING_ENABLED safety switch."
+          : "Settings are present, but the API account/profile has not been verified from this runtime. Every publication still requires a matching owner-approved external-send approval.",
   };
 }
 
-export function resolveStudioVideoUrl(jobId, { env = process.env } = {}) {
+export function resolveMediaCenterVideoUrl(jobId, { env = process.env } = {}) {
   const safeJobId = stringValue(jobId, "jobId", 120, true);
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/.test(safeJobId)) {
     throw new ContentPublisherError("invalid_job_id", "jobId contains unsupported characters.", 400);
   }
 
-  if (!hasValue(env.ZOZ_CONTENT_STUDIO_URL)) {
-    throw new ContentPublisherError("studio_not_configured", "ZOZ_CONTENT_STUDIO_URL is not configured on the ZOZ Pro server.", 409);
+  if (!hasValue(env.ZOZ_PRO_MEDIA_CENTER_URL)) {
+    throw new ContentPublisherError("media_center_not_configured", "ZOZ_PRO_MEDIA_CENTER_URL is not configured on the ZOZ Pro server.", 409);
   }
 
   let base;
   try {
-    base = new URL(env.ZOZ_CONTENT_STUDIO_URL.trim());
+    base = new URL(env.ZOZ_PRO_MEDIA_CENTER_URL.trim());
   } catch {
-    throw new ContentPublisherError("invalid_studio_url", "ZOZ_CONTENT_STUDIO_URL must be an absolute HTTPS origin.", 409);
+    throw new ContentPublisherError("invalid_media_center_url", "ZOZ_PRO_MEDIA_CENTER_URL must be an absolute HTTPS origin.", 409);
   }
 
   if (
@@ -97,8 +103,8 @@ export function resolveStudioVideoUrl(jobId, { env = process.env } = {}) {
     (base.pathname !== "/" && base.pathname !== "")
   ) {
     throw new ContentPublisherError(
-      "invalid_studio_url",
-      "ZOZ_CONTENT_STUDIO_URL must be an HTTPS origin only, without credentials, query, fragment, or path.",
+      "invalid_media_center_url",
+      "ZOZ_PRO_MEDIA_CENTER_URL must be an HTTPS origin only, without credentials, query, fragment, or path.",
       409,
     );
   }
@@ -140,12 +146,19 @@ export function normalizeContentPublicationRequest(input = {}, { env = process.e
     description,
     hashtags,
     privacyStatus,
-    sourceUrl: resolveStudioVideoUrl(jobId, { env }),
+    sourceUrl: resolveMediaCenterVideoUrl(jobId, { env }),
   };
 }
 
 function assertPublisherConfigured(env) {
   const status = getContentPublisherStatus({ env });
+  if (!status.mediaCenterSelected) {
+    throw new ContentPublisherError(
+      "media_center_not_selected",
+      "Publishing is locked until an independent media center and a verified file-delivery path are selected.",
+      409,
+    );
+  }
   if (!status.configured) {
     throw new ContentPublisherError(
       "publisher_not_configured",
@@ -225,7 +238,7 @@ export async function submitYouTubePublication({ publication, env = process.env,
     throw new ContentPublisherError("invalid_privacy_status", "A valid, explicitly stored YouTube privacy status is required.", 400);
   }
 
-  const sourceUrl = resolveStudioVideoUrl(jobId, { env });
+  const sourceUrl = resolveMediaCenterVideoUrl(jobId, { env });
   const hashtags = Array.isArray(publication.hashtags) ? publication.hashtags : [];
   const cleanTags = [...new Set(hashtags
     .filter((tag) => typeof tag === "string")

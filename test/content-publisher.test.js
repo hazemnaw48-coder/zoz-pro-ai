@@ -5,7 +5,7 @@ import {
   ContentPublisherError,
   getContentPublisherStatus,
   normalizeContentPublicationRequest,
-  resolveStudioVideoUrl,
+  resolveMediaCenterVideoUrl,
   submitYouTubePublication,
   verifyUploadPostAccount,
 } from "../src/content-publisher.js";
@@ -13,8 +13,9 @@ import {
 const configuredEnv = () => ({
   UPLOAD_POST_API_KEY: "test-only-secret",
   UPLOAD_POST_PROFILE: "ZozAI2",
-  ZOZ_CONTENT_STUDIO_URL: "https://studio.example.com",
+  ZOZ_PRO_MEDIA_CENTER_URL: "https://media-center.example.com",
   ZOZ_PRO_PUBLISHING_ENABLED: "true",
+  ZOZ_PRO_MEDIA_CENTER_SELECTED: "true",
 });
 
 test("publisher readiness never exposes key values or claims a live verification", () => {
@@ -26,6 +27,27 @@ test("publisher readiness never exposes key values or claims a live verification
   assert.equal(JSON.stringify(status).includes("test-only-secret"), false);
 });
 
+test("publisher is locked until an independent media center is selected", () => {
+  const env = configuredEnv();
+  delete env.ZOZ_PRO_MEDIA_CENTER_SELECTED;
+  const status = getContentPublisherStatus({ env });
+  assert.equal(status.configured, true);
+  assert.equal(status.mediaCenterSelected, false);
+  assert.equal(status.canSubmit, false);
+  assert.equal(status.status, "disabled_no_media_center");
+});
+
+test("publisher makes no outbound request when no media center is selected", async () => {
+  const env = configuredEnv();
+  delete env.ZOZ_PRO_MEDIA_CENTER_SELECTED;
+  let called = false;
+  await assert.rejects(submitYouTubePublication({
+    env, publication: { id: "PUB-test", jobId: "render_123", title: "Title", description: "Description", hashtags: [], privacyStatus: "unlisted" },
+    fetchImpl: async () => { called = true; throw new Error("must not run"); },
+  }), error => error instanceof ContentPublisherError && error.code === "media_center_not_selected");
+  assert.equal(called, false);
+});
+
 test("publisher remains disabled without its explicit server feature switch", () => {
   const env = configuredEnv();
   delete env.ZOZ_PRO_PUBLISHING_ENABLED;
@@ -35,15 +57,15 @@ test("publisher remains disabled without its explicit server feature switch", ()
   assert.equal(status.status, "disabled_by_default");
 });
 
-test("studio source is derived from a trusted HTTPS origin and a safe job ID", () => {
+test("media-center source is derived from a trusted HTTPS origin and a safe job ID", () => {
   const env = configuredEnv();
   assert.equal(
-    resolveStudioVideoUrl("render_123-ab", { env }),
-    "https://studio.example.com/outputs/render_123-ab/video.mp4",
+    resolveMediaCenterVideoUrl("render_123-ab", { env }),
+    "https://media-center.example.com/outputs/render_123-ab/video.mp4",
   );
-  assert.throws(() => resolveStudioVideoUrl("../secrets", { env }), ContentPublisherError);
-  env.ZOZ_CONTENT_STUDIO_URL = "http://studio.example.com";
-  assert.throws(() => resolveStudioVideoUrl("render_123", { env }), ContentPublisherError);
+  assert.throws(() => resolveMediaCenterVideoUrl("../secrets", { env }), ContentPublisherError);
+  env.ZOZ_PRO_MEDIA_CENTER_URL = "http://media-center.example.com";
+  assert.throws(() => resolveMediaCenterVideoUrl("render_123", { env }), ContentPublisherError);
 });
 
 test("publication request validates title/privacy and normalizes tags", () => {
@@ -56,7 +78,7 @@ test("publication request validates title/privacy and normalizes tags", () => {
   }, { env: configuredEnv() });
   assert.equal(result.privacyStatus, "unlisted");
   assert.deepEqual(result.hashtags, ["الأهرامات", "مصر_القديمة"]);
-  assert.equal(result.sourceUrl, "https://studio.example.com/outputs/render_123/video.mp4");
+  assert.equal(result.sourceUrl, "https://media-center.example.com/outputs/render_123/video.mp4");
   assert.throws(() => normalizeContentPublicationRequest({
     taskId: "ZP-009", jobId: "render_123", title: "Documentary", description: "Description", privacyStatus: "publicly",
   }, { env: configuredEnv() }), ContentPublisherError);
@@ -110,7 +132,7 @@ test("publication uses the approved profile, source URL, async mode and idempote
   assert.equal(request.options.headers["Idempotency-Key"], "zoz-pro-zozpro_PUB-test-123");
   assert.equal(request.options.body.get("user"), "ZozAI2");
   assert.equal(request.options.body.get("platform[]"), "youtube");
-  assert.equal(request.options.body.get("video"), "https://studio.example.com/outputs/render_123/video.mp4");
+  assert.equal(request.options.body.get("video"), "https://media-center.example.com/outputs/render_123/video.mp4");
   assert.equal(request.options.body.get("privacyStatus"), "public");
   assert.equal(request.options.body.get("async_upload"), "true");
   assert.equal(request.options.body.get("tags[]"), "الأهرامات");

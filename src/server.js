@@ -23,6 +23,13 @@ import { assertTaskCanReceiveCommand, normalizeTaskVerificationInput } from "./w
 import { assignTask, evaluateExecutionGate } from "./orchestrator.js";
 import { getContentFactoryStatus } from "./content-factory.js";
 import {
+  MediaAssetError,
+  completeMediaUpload,
+  createMediaDownloadUrl,
+  createMediaUploadTicket,
+  listMediaAssets,
+} from "./media-assets.js";
+import {
   ContentPublisherError,
   checkYouTubePublicationStatus,
   getContentPublisherStatus,
@@ -152,7 +159,42 @@ async function handleApi(req, res, url) {
     });
   }
 
+
+  const mediaErrorResponse = (error) => {
+    if (error instanceof MediaAssetError) {
+      return sendJson(res, error.httpStatus, { error: error.code, message: error.message });
+    }
+    console.error("ZOZ Pro media operation failed:", error?.message ?? "unknown error");
+    return sendJson(res, 502, { error: "media_operation_failed", message: "The media operation could not be completed." });
+  };
+
   if (!isAuthorized(req)) return sendUnauthorized(res);
+
+  if (req.method === "GET" && url.pathname === "/api/content-factory/media/assets") {
+    try {
+      return sendJson(res, 200, await listMediaAssets({
+        limit: url.searchParams.get("limit") ?? 50,
+        cursor: url.searchParams.get("cursor") ?? undefined,
+      }));
+    } catch (error) { return mediaErrorResponse(error); }
+  }
+  if (req.method === "POST" && url.pathname === "/api/content-factory/media/upload-ticket") {
+    try {
+      return sendJson(res, 201, await createMediaUploadTicket(await readJson(req)));
+    } catch (error) { return mediaErrorResponse(error); }
+  }
+  const mediaCompleteMatch = url.pathname.match(/^\/api\/content-factory\/media\/assets\/([0-9a-f-]{36})\/complete$/);
+  if (req.method === "POST" && mediaCompleteMatch) {
+    try {
+      return sendJson(res, 200, await completeMediaUpload(mediaCompleteMatch[1]));
+    } catch (error) { return mediaErrorResponse(error); }
+  }
+  const mediaDownloadMatch = url.pathname.match(/^\/api\/content-factory\/media\/assets\/([0-9a-f-]{36})\/download-url$/);
+  if (req.method === "GET" && mediaDownloadMatch) {
+    try {
+      return sendJson(res, 200, await createMediaDownloadUrl(mediaDownloadMatch[1]));
+    } catch (error) { return mediaErrorResponse(error); }
+  }
 
   if (req.method === "GET" && url.pathname === "/api/content-factory/status") {
     return sendJson(res, 200, getContentFactoryStatus({ state }));
@@ -164,6 +206,12 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/content-factory/publications") {
     try {
+      if (process.env.ZOZ_PRO_MEDIA_CENTER_SELECTED !== "true") {
+        return sendJson(res, 409, {
+          error: "media_center_not_selected",
+          message: "Publishing is locked until an independent media center and a verified file-delivery path are selected.",
+        });
+      }
       const body = await readJson(req);
       const publicationInput = normalizeContentPublicationRequest(body);
       const task = state.tasks.find((item) => item.id === publicationInput.taskId);
