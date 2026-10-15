@@ -26,9 +26,9 @@ For example: `gemini:assist: اكتب سكربت فيديو مدته دقيقة 
 2. Set `ZOZ_CONTROL_TOKEN` as a sensitive secret in Production and Preview.
 3. Create/use a private Vercel Blob store and set `BLOB_READ_WRITE_TOKEN` in Production and Preview.
 4. To enable Gemini text tasks, set `GEMINI_API_KEY` as a sensitive server-side environment variable for the intended environment. Optionally set `GEMINI_MODEL` to a model ID available to that API key. Never expose either variable in the browser or repository.
-4. Set `CRON_SECRET` as a sensitive Production environment variable (and Preview if checking the Preview cron endpoint). The readiness endpoint fails closed with HTTP 401 when it is missing or incorrect.
-5. Do not set external publishing/integration secrets or enable sending as part of the cloud-worker smoke test.
-6. Verify the latest Preview with a non-destructive `system:health-check`, then inspect the command result, worker heartbeat, audit trail and persisted state across a separate request before considering production promotion.
+5. Set `CRON_SECRET` as a sensitive Production environment variable (and Preview if checking the Preview cron endpoint). The readiness endpoint fails closed with HTTP 401 when it is missing or incorrect.
+6. Do not set external publishing/integration secrets or enable sending as part of the cloud-worker smoke test.
+7. Verify the latest Preview with a non-destructive `system:health-check`, then inspect the command result, worker heartbeat, audit trail and persisted state across a separate request before considering production promotion.
 
 ## Delivery and persistence
 
