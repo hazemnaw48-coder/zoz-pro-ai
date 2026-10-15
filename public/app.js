@@ -512,8 +512,8 @@ async function checkHealth() {
       $("#control-health").textContent = cloudSeen
         ? `Vercel Queue worker: ${ex.status ?? "unknown"} · last heartbeat: ${seen}`
         : "Vercel Queue configured; awaiting the first worker heartbeat.";
-      $("#control-help").textContent = "Cloud tasks: system:health-check or system:project-summary. These are read-only; external actions and arbitrary commands are not executed by this worker.";
-      $("#control-instruction").placeholder = "system:health-check  |  system:project-summary";
+      $("#control-help").textContent = "Cloud tasks: system:health-check, system:project-summary, or text-only Gemini work. For writing or analysis, start with gemini:assist: followed by your task. External actions, arbitrary code and sensitive actions are not executed.";
+      $("#control-instruction").placeholder = "gemini:assist: اكتب سكربت فيديو أطفال عن القمر";
     } else {
       $("#executor-badge").textContent = ex?.status === "online"
         ? `Codex online · ${ex.hostname ?? "worker"}`
@@ -534,13 +534,58 @@ document.querySelectorAll("[data-nav]").forEach((button) => {
 if (location.hash) showView(decodeURIComponent(location.hash.slice(1)));
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
-await loadState();
-await checkHealth();
-setInterval(async () => { try { await loadState(); await checkHealth(); } catch {} }, 5000);
 
+// Bind owner-token setup before any authenticated API request. Otherwise an
+// initial 401 aborts this module before the Save button can be wired up.
 const tokenInput = document.querySelector("#control-token");
 const saveTokenButton = document.querySelector("#save-control-token");
 if (tokenInput) tokenInput.value = CONTROL_TOKEN;
+
+if (saveTokenButton) saveTokenButton.addEventListener("click", () => {
+  const value = tokenInput?.value.trim() ?? "";
+  if (!value) {
+    alert("Enter the ZOZ Pro owner control token first.");
+    return;
+  }
+  localStorage.setItem("zoz_control_token", value);
+  location.reload();
+});
+
+function showControlSetupRequired() {
+  const hasSavedToken = Boolean(CONTROL_TOKEN);
+  const healthBadge = $("#health-badge");
+  const executorBadge = $("#executor-badge");
+  const settingsPanel = $("#settings-panel");
+  if (healthBadge) healthBadge.textContent = hasSavedToken ? "Control unavailable" : "Owner token required";
+  if (executorBadge) executorBadge.textContent = "Control locked";
+  if (settingsPanel) {
+    settingsPanel.textContent = hasSavedToken
+      ? "تعذّر تحميل حالة النظام بالرمز المحفوظ. تأكد من تسجيل الدخول إلى Vercel، ثم أدخل رمز ZOZ Pro owner control الصحيح. لا تُنفَّذ الأوامر حتى تنجح المصادقة."
+      : "لا يوجد رمز مالك محفوظ على هذا المتصفح. أدخل رمز التحكم الخاص بـ ZOZ Pro المطابق لمتغير ZOZ_CONTROL_TOKEN، ثم اضغط Save on this device. لا تستخدم GEMINI_API_KEY هنا.";
+  }
+  showView("settings");
+}
+
+let controlStateLoaded = false;
+if (CONTROL_TOKEN) {
+  try {
+    await loadState();
+    controlStateLoaded = true;
+  } catch {
+    // Keep the settings/token form usable when the token is missing or rejected,
+    // or when Vercel SSO redirects the first API request.
+  }
+}
+await checkHealth();
+if (!controlStateLoaded) showControlSetupRequired();
+
+setInterval(async () => {
+  if (CONTROL_TOKEN) {
+    try { await loadState(); } catch {}
+  }
+  try { await checkHealth(); } catch {}
+  if (!state) showControlSetupRequired();
+}, 5000);
 const createContactButton = document.querySelector("#create-contact");
 if (createContactButton) createContactButton.addEventListener("click", () => createContact().catch((e) => alert(e.message)));
 const createOpportunityButton = document.querySelector("#create-opportunity");
@@ -549,13 +594,6 @@ const createIntelligenceButton = document.querySelector("#create-intelligence");
 if (createIntelligenceButton) createIntelligenceButton.addEventListener("click", () => createIntelligence().catch((e) => alert(e.message)));
 const createTaskButton = document.querySelector("#create-task");
 if (createTaskButton) createTaskButton.addEventListener("click", () => createTask().catch((e) => alert(e.message)));
-
-if (saveTokenButton) saveTokenButton.addEventListener("click", () => {
-  const value = tokenInput.value.trim();
-  if (!value) return;
-  localStorage.setItem("zoz_control_token", value);
-  location.reload();
-});
 
 const requestPublicationButton = document.querySelector("#request-publication-approval");
 if (requestPublicationButton) requestPublicationButton.addEventListener("click", requestPublicationApproval);

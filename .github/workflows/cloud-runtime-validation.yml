@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - feature/ZP-014-vercel-media-intake
+      - feature/ZP-015-gemini-cloud-agent
   pull_request:
     branches:
       - main
+      - feature/ZP-014-vercel-media-intake
     paths:
       - "api/**"
       - "src/**"

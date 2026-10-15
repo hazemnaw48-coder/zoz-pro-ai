@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { assertTaskTransition } from "./domain.js";
 import { evaluateExecutionGate } from "./orchestrator.js";
 import { createStateStore } from "./store.js";
+import { extractGeminiPrompt, generateGeminiText, GeminiAgentError } from "./gemini-agent.js";
 
 export const CLOUD_SAFE_INSTRUCTIONS = Object.freeze([
   "system:health-check",
@@ -16,7 +17,7 @@ export function normalizeCloudInstruction(value) {
 }
 
 export function isSupportedCloudInstruction(value) {
-  return SAFE_INSTRUCTIONS.has(normalizeCloudInstruction(value));
+  return SAFE_INSTRUCTIONS.has(normalizeCloudInstruction(value)) || extractGeminiPrompt(value) !== null;
 }
 
 function timestamp(now) {
@@ -42,7 +43,7 @@ function setExecutor(state, updates, now) {
     agent: CLOUD_WORKER,
     mode: "vercel_queue",
     protocol: "zoz-control-v1",
-    capabilities: ["read-only-diagnostics"],
+    capabilities: ["read-only-diagnostics", "gemini-text-generation"],
     lastSeen: timestamp(now),
     hostname: "vercel-serverless",
     ...updates,
@@ -86,6 +87,16 @@ async function failCommand(store, state, command, taskId, reason, now) {
   command.status = "failed";
   command.failedAt = timestamp(now);
   command.error = reason;
+  const failedTask = (state.tasks ?? []).find(item => item.id === taskId);
+  if (failedTask?.status === "executing") {
+    try {
+      assertTaskTransition(failedTask.status, "failed");
+      failedTask.status = "failed";
+      failedTask.result = null;
+    } catch {
+      // Preserve the original failure even if task state was concurrently changed.
+    }
+  }
   setExecutor(state, {
     status: "idle",
     currentCommandId: null,
@@ -185,7 +196,18 @@ export async function processCloudCommand(commandId, options = {}) {
     return failCommand(store, state, command, currentTask?.id, "claimed_task_state_mismatch", now);
   }
 
-  const result = makeResult(command.instruction, state, currentTask, command);
+  let result;
+  try {
+    const prompt = extractGeminiPrompt(command.instruction);
+    result = prompt === null
+      ? makeResult(command.instruction, state, currentTask, command)
+      : await generateGeminiText(prompt, { ...(options.geminiOptions ?? {}), toolContext: { store, taskId: currentTask.id, commandId: command.id } });
+  } catch (error) {
+    const safeReason = error instanceof GeminiAgentError
+      ? error.code
+      : "cloud_agent_execution_failed";
+    return failCommand(store, state, command, currentTask.id, safeReason, now);
+  }
 
   // Finalize from a fresh durable read to avoid overwriting an intervening
   // owner action. A conflicting conditional write is retried by the queue.

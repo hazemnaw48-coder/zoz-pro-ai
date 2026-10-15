@@ -16,17 +16,19 @@ The generic cloud worker is deliberately restricted to these read-only commands:
 
 - `system:health-check`
 - `system:project-summary`
+- `gemini:assist:<your text task>` for drafting, writing, summarization, planning and text analysis through the Gemini API.
 
-Unrecognized free-text commands are rejected in Vercel. Financial, destructive, publishing, messaging, credential/account and other external actions are never executed by this generic worker. Approval records remain explicit; an owner approval does not by itself give the read-only worker a risky-action handler.
+For example: `gemini:assist: اكتب سكربت فيديو مدته دقيقة للأطفال عن القمر مع تقسيم المشاهد`. The Gemini path returns text to the task record; it does not run code or call external tools. Financial, destructive, publishing, messaging, credential/account and other external actions are never executed. Approval records remain explicit; owner approval alone does not give this text-only worker a risky-action handler.
 
 ## Required Vercel configuration
 
 1. Link the Vercel project to `hazemnaw48-coder/zoz-pro-ai` (the ZOZ Pro account's existing project).
 2. Set `ZOZ_CONTROL_TOKEN` as a sensitive secret in Production and Preview.
 3. Create/use a private Vercel Blob store and set `BLOB_READ_WRITE_TOKEN` in Production and Preview.
-4. Set `CRON_SECRET` as a sensitive Production environment variable (and Preview if checking the Preview cron endpoint). The readiness endpoint fails closed with HTTP 401 when it is missing or incorrect.
-5. Do not set external publishing/integration secrets or enable sending as part of the cloud-worker smoke test.
-6. Verify the latest Preview with a non-destructive `system:health-check`, then inspect the command result, worker heartbeat, audit trail and persisted state across a separate request before considering production promotion.
+4. To enable Gemini text tasks, set `GEMINI_API_KEY` as a sensitive server-side environment variable for the intended environment. Optionally set `GEMINI_MODEL` to a model ID available to that API key. Never expose either variable in the browser or repository.
+5. Set `CRON_SECRET` as a sensitive Production environment variable (and Preview if checking the Preview cron endpoint). The readiness endpoint fails closed with HTTP 401 when it is missing or incorrect.
+6. Do not set external publishing/integration secrets or enable sending as part of the cloud-worker smoke test.
+7. Verify the latest Preview with a non-destructive `system:health-check`, then inspect the command result, worker heartbeat, audit trail and persisted state across a separate request before considering production promotion.
 
 ## Delivery and persistence
 
