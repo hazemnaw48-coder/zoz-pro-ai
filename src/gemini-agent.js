@@ -391,15 +391,14 @@ export async function generateGeminiText(prompt, options = {}) {
       };
     }
     functionResponses.push({
-      role: "function",
-      parts: [{ functionResponse: { name: functionCall.name, response: toolResult } }],
+      functionResponse: { name: functionCall.name, response: toolResult },
     });
   }
 
   const followUpContents = [
     ...initialContents,
     { role: "model", parts: firstContent.parts },
-    ...functionResponses,
+    { role: "user", parts: functionResponses },
   ];
   const finalContent = await callGeminiApi(followUpContents, requestOptions, false);
   const finalText = textFromContent(finalContent);
