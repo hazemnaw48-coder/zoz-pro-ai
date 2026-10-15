@@ -121,7 +121,7 @@ test("cloud worker sends a text-only Gemini task to the model and persists the r
       owner: "Owner",
       assignedAgent: "codex",
       branch: "task/gemini-test",
-      status: "planned",
+      status: "assigned",
       requiredChecks: ["result", "persistence", "audit"],
       result: null,
     });
@@ -186,7 +186,7 @@ test("cloud worker records a safe failure when Gemini is not configured", async 
       owner: "Owner",
       assignedAgent: "codex",
       branch: "task/gemini-missing",
-      status: "planned",
+      status: "assigned",
       requiredChecks: [],
       result: null,
     });
