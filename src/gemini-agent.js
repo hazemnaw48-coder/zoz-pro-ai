@@ -1,7 +1,7 @@
 const INSTRUCTION_PREFIX = "gemini:assist:";
 const MAX_PROMPT_CHARS = 3500;
 const MAX_OUTPUT_CHARS = 12000;
-const DEFAULT_MODEL = "gemini-2.5-flash";
+const DEFAULT_MODEL = "gemini-3.8-flash";
 
 export class GeminiAgentError extends Error {
   constructor(code, message) {
