@@ -22,13 +22,23 @@
   <div class="panel"><div class="panel-header"><h3 id="factory-overall">جارٍ فحص الحالة…</h3><span id="factory-phase" class="badge">Checking</span></div><p id="factory-checked-at" class="meta">لم يتم الفحص بعد.</p><p id="factory-safety" class="meta"></p></div>
   <div id="factory-connectors" class="stack"></div>
   <div class="panel">
-    <h3>استقبال ملفات الإنتاج</h3>
-    <p class="meta">ارفع ملفًا فعليًا من مركز Floot أو Qwen أو أي مولّد. الملفات تحفظ خاصة في Vercel Blob؛ رابط التنزيل مؤقت ولا يتم النشر من هنا.</p>
+    <h3>أدوات التوليد المستقلة</h3>
+    <p class="meta">تعمل هذه الأدوات خارج ZOZ Pro. أنشئ المحتوى ونزّل الملف إلى هاتفك، ثم ارجع وارفعه هنا. هذه روابط مستقلة وليست اتصال API أو ربطًا بمركز Google AI Studio.</p>
+    <div class="stack">
+      <article class="list-item"><div class="list-title">TAAFT Video Generator</div><div class="meta">مولد الفيديو الذي تم اختباره بنجاح.</div><a href="https://theresanaiforthat.com/@taaft/video-generator/?ref=header" target="_blank" rel="noopener noreferrer">فتح TAAFT</a></article>
+      <article class="list-item"><div class="list-title">Qwen</div><div class="meta">توليد مستقل وتنزيل الملف من موقع الأداة.</div><a href="https://qwen.ai/home" target="_blank" rel="noopener noreferrer">فتح Qwen</a></article>
+      <article class="list-item"><div class="list-title">Digen AI</div><div class="meta">مولد فيديو مستقل.</div><a href="https://digen.ai/app/" target="_blank" rel="noopener noreferrer">فتح Digen AI</a></article>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>استقبال ملفات الإنتاج داخل ZOZ Pro</h3>
+    <p class="meta">ارفع الملف الفعلي الذي نزّلته من إحدى الأدوات. يتطلب الرفع إعداد التخزين الخاص والتحقق من الملف؛ لا يحدث توليد أو نشر تلقائي.</p>
     <label for="media-source">مصدر الملف</label>
     <select id="media-source">
       <option value="floot-production-center">Floot Production Center</option>
       <option value="qwen">Qwen</option>
-      <option value="google-ai-studio">Google AI Studio</option>
+      <option value="taaft">TAAFT Video Generator</option>
+      <option value="digen-ai">Digen AI</option>
       <option value="zoz-ai-export">ZOZ AI — ملف مُصدّر فقط</option>
       <option value="openart">OpenArt</option>
       <option value="runway">Runway</option>
@@ -44,8 +54,8 @@
     <div id="media-assets-list" class="stack"></div>
   </div>
   <div class="panel">
-    <h3>طلب نشر فيديو</h3>
-    <p class="meta">أدخل معرّف الرندر من الاستوديو. سيُحفظ الطلب وينتظر موافقة المالك؛ لا يتم النشر تلقائيًا.</p>
+    <h3>التصدير والنشر — موقوفان مؤقتًا</h3>
+    <p class="meta">لا يتم إنشاء طلب نشر حتى اختيار مركز مستقل والتحقق من مسار الملف النهائي. رفع ملف إلى ZOZ Pro لا يعني أنه جاهز للنشر.</p>
     <label for="publication-task-id">مهمة ZOZ Pro</label>
     <input id="publication-task-id" value="ZP-001" maxlength="100" placeholder="ZP-001">
     <label for="publication-job-id">معرّف الرندر (jobId)</label>
@@ -58,7 +68,7 @@
     <input id="publication-hashtags" maxlength="1000" placeholder="الأهرامات, مصر_القديمة">
     <label for="publication-privacy">خصوصية الفيديو</label>
     <select id="publication-privacy"><option value="unlisted">غير مدرج — اختبار آمن</option><option value="private">خاص</option><option value="public">عام</option></select>
-    <button id="request-publication-approval" type="button">حفظ الطلب وطلب موافقة المالك</button>
+    <button id="request-publication-approval" type="button" disabled>النشر موقوف حتى اعتماد مركز وسائط</button>
     <p id="publication-form-status" class="meta"></p>
   </div>
   <div class="panel"><h3>طابور النشر</h3><div id="publication-queue" class="stack"></div></div>
