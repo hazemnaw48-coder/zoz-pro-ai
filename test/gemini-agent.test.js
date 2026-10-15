@@ -38,7 +38,7 @@ test("Gemini text generation sends the task server-side and returns generated te
     },
   });
   assert.equal(result, "مقدمة تجريبية آمنة.");
-  assert.match(capturedUrl, /models\/gemini-2\.5-flash:generateContent$/);
+  assert.match(capturedUrl, /models\/gemini-3\.8-flash:generateContent$/);
   assert.equal(capturedOptions.headers["x-goog-api-key"], "test-key");
   assert.equal(capturedOptions.method, "POST");
   assert.match(JSON.stringify(JSON.parse(capturedOptions.body)), /اكتب مقدمة لفيديو أطفال عن القمر/);
