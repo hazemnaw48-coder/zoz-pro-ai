@@ -43,13 +43,16 @@ export function getContentPublisherStatus({ env = process.env } = {}) {
   if (!hasValue(env.ZOZ_CONTENT_STUDIO_URL)) missingConfiguration.push("ZOZ_CONTENT_STUDIO_URL");
 
   const configured = missingConfiguration.length === 0;
+  const mediaCenterSelected = env.ZOZ_PRO_MEDIA_CENTER_SELECTED === "true";
   const featureEnabled = env.ZOZ_PRO_PUBLISHING_ENABLED === "true";
-  const canSubmit = configured && featureEnabled;
+  const canSubmit = configured && mediaCenterSelected && featureEnabled;
   const status = !configured
     ? "not_configured"
-    : !featureEnabled
-      ? "disabled_by_default"
-      : "configured_unverified";
+    : !mediaCenterSelected
+      ? "disabled_no_media_center"
+      : !featureEnabled
+        ? "disabled_by_default"
+        : "configured_unverified";
 
   return {
     id: "upload-post-youtube",
@@ -59,15 +62,18 @@ export function getContentPublisherStatus({ env = process.env } = {}) {
     configured,
     featureEnabled,
     canSubmit,
+    mediaCenterSelected,
     verified: false,
     profileName: hasValue(env.UPLOAD_POST_PROFILE) ? env.UPLOAD_POST_PROFILE.trim() : null,
     missingConfiguration,
     secretValuesExposed: false,
     detail: !configured
       ? "Publishing is not wired to this ZOZ Pro runtime. Missing server-side settings: " + missingConfiguration.join(", ") + ". No publishing request has been sent."
-      : !featureEnabled
-        ? "Connector settings exist, but publishing is disabled by the ZOZ_PRO_PUBLISHING_ENABLED safety switch."
-        : "Settings are present, but the API account/profile has not been verified from this runtime. Every publication still requires a matching owner-approved external-send approval.",
+      : !mediaCenterSelected
+        ? "Publishing is locked until the owner selects an independent media center and verifies its real file-delivery path. No publishing request has been sent."
+        : !featureEnabled
+          ? "Connector settings exist, but publishing is disabled by the ZOZ_PRO_PUBLISHING_ENABLED safety switch."
+          : "Settings are present, but the API account/profile has not been verified from this runtime. Every publication still requires a matching owner-approved external-send approval.",
   };
 }
 
@@ -146,6 +152,13 @@ export function normalizeContentPublicationRequest(input = {}, { env = process.e
 
 function assertPublisherConfigured(env) {
   const status = getContentPublisherStatus({ env });
+  if (!status.mediaCenterSelected) {
+    throw new ContentPublisherError(
+      "media_center_not_selected",
+      "Publishing is locked until an independent media center and a verified file-delivery path are selected.",
+      409,
+    );
+  }
   if (!status.configured) {
     throw new ContentPublisherError(
       "publisher_not_configured",
