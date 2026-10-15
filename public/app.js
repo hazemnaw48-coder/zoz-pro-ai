@@ -1,4 +1,5 @@
 let state = null;
+let publisherReady = false;
 const CONTROL_TOKEN = localStorage.getItem("zoz_control_token") ?? "";
 
 const $ = (selector) => document.querySelector(selector);
@@ -239,7 +240,7 @@ function renderAgents() {
 
 
 function renderContentFactory(status, publisherStatus) {
-  const publisherReady = publisherStatus?.canSubmit === true;
+  publisherReady = publisherStatus?.canSubmit === true;
   const publicationButton = $("#request-publication-approval");
   if (publicationButton) publicationButton.disabled = !publisherReady;
   const label = {
