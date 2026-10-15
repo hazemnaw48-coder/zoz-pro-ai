@@ -1,4 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
 import http from "node:http";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -28,10 +27,7 @@ import {
   completeMediaUpload,
   createMediaDownloadUrl,
   createMediaUploadTicket,
-  getStudioIntegrationStatus,
   listMediaAssets,
-  readMediaManifest,
-  recordStudioImportReceipt,
 } from "./media-assets.js";
 import {
   ContentPublisherError,
@@ -141,16 +137,6 @@ async function handleApi(req, res, url) {
   }
 
 
-  const studioStatus = getStudioIntegrationStatus();
-  const studioAuthorized = () => {
-    const expected = process.env.ZOZ_PRO_STUDIO_INTEGRATION_TOKEN || "";
-    const supplied = req.headers.authorization ?? "";
-    const prefix = "Bearer ";
-    if (expected.length < 32 || !supplied.startsWith(prefix)) return false;
-    const candidate = supplied.slice(prefix.length).trim();
-    if (!candidate || candidate.length !== expected.length) return false;
-    return timingSafeEqual(Buffer.from(candidate), Buffer.from(expected));
-  };
   const mediaErrorResponse = (error) => {
     if (error instanceof MediaAssetError) {
       return sendJson(res, error.httpStatus, { error: error.code, message: error.message });
@@ -158,59 +144,6 @@ async function handleApi(req, res, url) {
     console.error("ZOZ Pro media operation failed:", error?.message ?? "unknown error");
     return sendJson(res, 502, { error: "media_operation_failed", message: "The media operation could not be completed." });
   };
-
-  // Google AI Studio integration endpoints use a dedicated server-to-server token.
-  // Never fall back to the owner-control token or any ZOZ AI credential.
-  if (url.pathname.startsWith("/api/content-factory/studio/")) {
-    if (!studioAuthorized()) {
-      return sendJson(res, 401, { error: "studio_unauthorized", message: "A dedicated ZOZ Pro Studio integration token is required." });
-    }
-    if (req.method === "GET" && url.pathname === "/api/content-factory/studio/health") {
-      return sendJson(res, studioStatus.status === "configured_unverified" ? 200 : 503, {
-        status: studioStatus.status === "configured_unverified" ? "configured_unverified" : "not_ready",
-        project: "hazemnaw48-coder/zoz-pro-ai",
-        scope: "zoz_pro_only",
-        storageConfigured: studioStatus.storageConfigured,
-        liveTransferVerified: false,
-        publishingEnabled: false,
-      });
-    }
-    if (req.method === "GET" && url.pathname === "/api/content-factory/studio/assets") {
-      try {
-        return sendJson(res, 200, await listMediaAssets({
-          limit: url.searchParams.get("limit") ?? 50,
-          cursor: url.searchParams.get("cursor") ?? undefined,
-        }));
-      } catch (error) { return mediaErrorResponse(error); }
-    }
-    if (req.method === "POST" && url.pathname === "/api/content-factory/studio/assets/upload-ticket") {
-      try {
-        const body = await readJson(req);
-        const ticket = await createMediaUploadTicket({ ...body, sourceSystem: "google-ai-studio" });
-        return sendJson(res, 201, ticket);
-      } catch (error) { return mediaErrorResponse(error); }
-    }
-    const studioCompleteMatch = url.pathname.match(/^\/api\/content-factory\/studio\/assets\/([0-9a-f-]{36})\/complete$/);
-    if (req.method === "POST" && studioCompleteMatch) {
-      try {
-        return sendJson(res, 200, await completeMediaUpload(studioCompleteMatch[1]));
-      } catch (error) { return mediaErrorResponse(error); }
-    }
-    const studioDownloadMatch = url.pathname.match(/^\/api\/content-factory\/studio\/assets\/([0-9a-f-]{36})\/download-url$/);
-    if (req.method === "GET" && studioDownloadMatch) {
-      try {
-        return sendJson(res, 200, await createMediaDownloadUrl(studioDownloadMatch[1]));
-      } catch (error) { return mediaErrorResponse(error); }
-    }
-    const studioReceiptMatch = url.pathname.match(/^\/api\/content-factory\/studio\/assets\/([0-9a-f-]{36})\/receipt$/);
-    if (req.method === "POST" && studioReceiptMatch) {
-      try {
-        const body = await readJson(req);
-        return sendJson(res, 201, await recordStudioImportReceipt(studioReceiptMatch[1], body));
-      } catch (error) { return mediaErrorResponse(error); }
-    }
-    return sendJson(res, 404, { error: "studio_route_not_found" });
-  }
 
   if (!isAuthorized(req)) return sendUnauthorized(res);
 
@@ -240,8 +173,6 @@ async function handleApi(req, res, url) {
     } catch (error) { return mediaErrorResponse(error); }
   }
 
-  if (!isAuthorized(req)) return sendUnauthorized(res);
-
   if (req.method === "GET" && url.pathname === "/api/content-factory/status") {
     return sendJson(res, 200, getContentFactoryStatus({ state }));
   }
@@ -252,6 +183,12 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/content-factory/publications") {
     try {
+      if (process.env.ZOZ_PRO_MEDIA_CENTER_SELECTED !== "true") {
+        return sendJson(res, 409, {
+          error: "media_center_not_selected",
+          message: "Publishing is locked until an independent media center and a verified file-delivery path are selected.",
+        });
+      }
       const body = await readJson(req);
       const publicationInput = normalizeContentPublicationRequest(body);
       const task = state.tasks.find((item) => item.id === publicationInput.taskId);
