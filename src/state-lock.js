@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { StateWriteConflictError } from "./state-errors.js";
+import { normalizeBlobEtag } from "./blob-etag.js";
 
 const DEFAULT_LEASE_MS = 30000;
 const DEFAULT_HEARTBEAT_MS = 5000;
@@ -71,9 +72,18 @@ export function createStateLock(options = {}) {
     } catch {
       record = null;
     }
-    const etag = response.blob?.etag ?? response.etag ?? null;
-    if (!etag) throw new Error("The state lock did not include an ETag.");
-    return { record, etag };
+    // Use the same canonical metadata ETag source as PUT, rather than
+    // passing the GET response-header representation directly to ifMatch.
+    const getEtag = response.blob?.etag ?? response.etag ?? null;
+    const metadata = await client.head(path);
+    const metadataEtag = metadata?.etag ?? null;
+    if (!normalizeBlobEtag(getEtag) || !normalizeBlobEtag(metadataEtag)) {
+      throw new Error("The state lock did not include a usable Blob ETag.");
+    }
+    if (normalizeBlobEtag(getEtag) !== normalizeBlobEtag(metadataEtag)) {
+      throw conflict("The state lock changed while its version was being read.");
+    }
+    return { record, etag: metadataEtag };
   }
 
   async function acquire(path) {
