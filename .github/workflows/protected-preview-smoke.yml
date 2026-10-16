@@ -101,12 +101,14 @@ jobs:
             exit 1
           fi
           jq -e --arg task "$TASK_ID" '.id == $task and .status == "planned"' /tmp/task-create.json >/dev/null
+          jq '{id,status,assignedAgent}' /tmp/task-create.json
 
           if ! post_json_retry "$PREVIEW_URL/api/tasks/$TASK_ID/assign" '{"agent":"codex","actor":"Owner"}' /tmp/assignment.json; then
             echo "::error::Failed to assign isolated smoke task."
             exit 1
           fi
           jq -e --arg task "$TASK_ID" '.id == $task and .status == "assigned" and .assignedAgent == "codex"' /tmp/assignment.json >/dev/null
+          jq '{id,status,assignedAgent}' /tmp/assignment.json
 
           if ! post_json_retry "$PREVIEW_URL/api/control/commands" "{\"instruction\":\"system:health-check\",\"taskId\":\"$TASK_ID\",\"requestedBy\":\"Owner\"}" /tmp/command.json; then
             echo "::error::Failed to queue isolated smoke health-check command."
@@ -149,4 +151,13 @@ jobs:
           jq -e --arg id "$id" --arg task "$TASK_ID" '
             .controlCommands | any(.id==$id and .taskId==$task and .status=="completed" and ((.result // "") | ascii_downcase | contains("zoz pro cloud health check completed")))
           ' /tmp/state-reread.json >/dev/null
-          echo "PASS: Preview Queue + system health-check + durable result + independent read-back succeeded for $id."
+          # Emit non-secret proof fields from the independent read-back request.
+          jq --arg id "$id" --arg task "$TASK_ID" '
+            {
+              task: ([.tasks[] | select(.id==$task) | {id,status,assignedAgent,result}][0]),
+              command: ([.controlCommands[] | select(.id==$id) | {id,taskId,status,result,error}][0]),
+              worker: (.executor | {mode,status,lastSeen,lastCompletedCommandId}),
+              activity: [.activity[] | select(.taskId==$task and (.type=="control_command_claimed" or .type=="executor_heartbeat" or .type=="control_command_completed")) | {type,taskId,message}]
+            }
+          ' /tmp/state-reread.json
+          echo "PASS: Preview Queue + system health-check + durable result + independent read-back succeeded for task $TASK_ID and command $id."
