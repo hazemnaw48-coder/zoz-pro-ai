@@ -18,6 +18,66 @@
           "topic": "zoz-pro-control-commands"
         }
       ]
+    },
+    "api/content-factory/status.js": {
+      "maxDuration": 60
+    },
+    "api/content-factory/publisher/status.js": {
+      "maxDuration": 60
+    },
+    "api/content-factory/publications.js": {
+      "maxDuration": 60
+    },
+    "api/content-factory/publications/[publicationId].js": {
+      "maxDuration": 60
+    },
+    "api/content-factory/publications/[publicationId]/submit.js": {
+      "maxDuration": 60
+    },
+    "api/executor/status.js": {
+      "maxDuration": 60
+    },
+    "api/executor/heartbeat.js": {
+      "maxDuration": 60
+    },
+    "api/control/commands.js": {
+      "maxDuration": 60
+    },
+    "api/control/commands/[commandId]/claim.js": {
+      "maxDuration": 60
+    },
+    "api/control/commands/[commandId]/complete.js": {
+      "maxDuration": 60
+    },
+    "api/control/commands/[commandId]/fail.js": {
+      "maxDuration": 60
+    },
+    "api/control/commands/[commandId]/cancel.js": {
+      "maxDuration": 60
+    },
+    "api/tasks/[taskId]/assign.js": {
+      "maxDuration": 60
+    },
+    "api/tasks/[taskId]/verify.js": {
+      "maxDuration": 60
+    },
+    "api/tasks/[taskId]/transition.js": {
+      "maxDuration": 60
+    },
+    "api/approvals/[approvalId]/approve.js": {
+      "maxDuration": 60
+    },
+    "api/approvals/[approvalId]/reject.js": {
+      "maxDuration": 60
+    },
+    "api/outreach/[outreachId]/status.js": {
+      "maxDuration": 60
+    },
+    "api/contacts/[contactId]/status.js": {
+      "maxDuration": 60
+    },
+    "api/opportunities/[opportunityId]/status.js": {
+      "maxDuration": 60
     }
   },
   "crons": [
