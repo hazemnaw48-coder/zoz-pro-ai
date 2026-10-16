@@ -12,7 +12,7 @@ import {
   normalizeControlCommandInput,
   canExecuteControlCommand,
 } from "./control.js";
-import { createStateStore, StateWriteConflictError } from "./store.js";
+import { createStateStore, getStateBackendInfo, StateWriteConflictError } from "./store.js";
 import { withStateLock } from "./state-lock.js";
 import { isSupportedCloudInstruction } from "./cloud-worker.js";
 import { enqueueCloudCommand, isVercelRuntime } from "./cloud-queue.js";
@@ -164,18 +164,29 @@ function createControlCommand(state, body) {
 
 async function handleApi(req, res, url) {
   const store = getStore();
-  const state = await store.load();
-
-  if (req.method === "GET" && url.pathname === "/api/health") {
-    return sendJson(res, 200, {
-      status: "ok",
-      project: state.project.repository,
-      controlPlane: "ready",
-      executionRuntime: isVercelRuntime() ? "vercel-queue" : "local-cli",
-      queuedCommands: state.controlCommands?.filter((c) => c.status === "queued").length ?? 0,
-    });
+  const backend = getStateBackendInfo();
+  if (req.method === "GET" && (url.pathname === "/api/health" || url.pathname === "/api/readiness")) {
+    try {
+      const state = await store.load();
+      return sendJson(res, 200, {
+        status: "ok", ready: true, project: state.project.repository,
+        stateBackend: backend.backend, concurrency: backend.concurrency,
+        persistence: { ready: true, backend: backend.backend },
+        controlPlane: "ready",
+        executionRuntime: isVercelRuntime() ? "vercel-queue" : "local-cli",
+        queuedCommands: state.controlCommands?.filter((c) => c.status === "queued").length ?? 0,
+      });
+    } catch (error) {
+      const allowed = new Set(["state_backend_invalid","supabase_configuration_missing","supabase_configuration_invalid","supabase_access_denied","supabase_schema_missing","supabase_state_not_initialized","supabase_state_invalid","supabase_version_invalid","supabase_state_version_missing","supabase_unavailable","supabase_rate_limited","supabase_request_failed","supabase_invalid_response","state_write_conflict"]);
+      return sendJson(res, 503, {
+        status: "degraded", ready: false, project: "hazemnaw48-coder/zoz-pro-ai",
+        stateBackend: backend.backend, concurrency: backend.concurrency,
+        persistence: { ready: false, backend: backend.backend, error: allowed.has(error?.code) ? error.code : "state_backend_unavailable" },
+        controlPlane: "not_ready", executionRuntime: isVercelRuntime() ? "vercel-queue" : "local-cli",
+      });
+    }
   }
-
+  const state = await store.load();
   if (!isAuthorized(req)) return sendUnauthorized(res);
 
   if (req.method === "GET" && url.pathname === "/api/content-factory/status") {
