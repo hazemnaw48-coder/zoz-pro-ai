@@ -134,6 +134,35 @@ test("release treats a concurrent owner change as a retryable state conflict", a
   assert.equal(JSON.parse(client.inspectCurrent().body).owner, "intervening-owner");
 });
 
+test("release retries a same-owner ETag race and expires the lock promptly", async () => {
+  const client = makeBlobClient();
+  const lock = createTestLock(client);
+  let inject = false;
+  const originalHead = client.head.bind(client);
+  client.head = async path => {
+    if (inject) {
+      inject = false;
+      const current = client.inspectCurrent();
+      const record = JSON.parse(current.body);
+      client.replaceCurrent(JSON.stringify({ ...record, expiresAt: Date.now() + 30000 }));
+    }
+    return originalHead(path);
+  };
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args);
+  try {
+    await lock.withLock(async () => {
+      await lock.assertOwned();
+      inject = true;
+    });
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.equal(warnings.length, 0);
+  assert.equal(JSON.parse(client.inspectCurrent().body).expiresAt, 0);
+});
+
 test("distributed lock serializes concurrent callers across independent lock instances", async () => {
   const client = makeBlobClient();
   const locks = [createTestLock(client), createTestLock(client), createTestLock(client)];
