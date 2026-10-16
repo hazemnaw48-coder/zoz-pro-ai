@@ -45,6 +45,20 @@ test("Gemini text generation sends the task server-side and returns generated te
   assert.doesNotMatch(result, /sent|published/i);
 });
 
+test("Gemini agent accepts the isolated ZOZ Now Preview key alias", async () => {
+  let capturedOptions;
+  const result = await generateGeminiText("Write a draft", {
+    env: { ZOZ_NOW_GEMINI_API_KEY: "preview-test-key", GEMINI_MODEL: "gemini-3.8-flash" },
+    timeoutMs: 2000,
+    fetchImpl: async (_url, options) => {
+      capturedOptions = options;
+      return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: "preview key works" }] } }] }) };
+    },
+  });
+  assert.equal(result, "preview key works");
+  assert.equal(capturedOptions.headers["x-goog-api-key"], "preview-test-key");
+});
+
 test("Gemini agent fails closed when the API key is absent", async () => {
   await assert.rejects(
     generateGeminiText("Write a draft", { env: {}, fetchImpl: async () => { throw new Error("must not call"); } }),
