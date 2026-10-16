@@ -1,6 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createInitialState, validateState } from "./domain.js";
+import { StateWriteConflictError } from "./state-errors.js";
+import { assertStateLockOwnership, withStateLock } from "./state-lock.js";
+export { StateWriteConflictError } from "./state-errors.js";
 
 export function getDefaultStateFile() {
   return path.resolve(
@@ -10,14 +13,6 @@ export function getDefaultStateFile() {
 }
 
 export const DEFAULT_STATE_FILE = getDefaultStateFile();
-
-export class StateWriteConflictError extends Error {
-  constructor() {
-    super("Persistent state changed during this request. Reload the latest state and retry.");
-    this.name = "StateWriteConflictError";
-    this.code = "state_write_conflict";
-  }
-}
 
 export function isStateWriteConflict(error) {
   const status = Number(error?.status ?? error?.statusCode ?? error?.response?.status);
@@ -76,22 +71,29 @@ function createVercelBlobStore() {
       const existing = await parseCurrent(result);
       if (existing) return existing;
 
-      // First-writer wins on initialization. If two cold starts race, read back
-      // the state that was created first instead of overwriting it.
-      const initial = createInitialState();
-      try {
-        await this.save(initial);
-        return initial;
-      } catch (writeError) {
-        const raced = await readCurrent().catch(() => null);
-        const recovered = await parseCurrent(raced).catch(() => null);
+      // Initialization is a write too. Acquire the same distributed lock and
+      // re-read before creating the first state so concurrent cold starts agree.
+      return withStateLock(async () => {
+        const latest = await readCurrent();
+        const recovered = await parseCurrent(latest);
         if (recovered) return recovered;
-        throw writeError;
-      }
+
+        const initial = createInitialState();
+        try {
+          await this.save(initial);
+          return initial;
+        } catch (writeError) {
+          const raced = await readCurrent().catch(() => null);
+          const afterRace = await parseCurrent(raced).catch(() => null);
+          if (afterRace) return afterRace;
+          throw writeError;
+        }
+      });
     },
 
     async save(state) {
       validateState(state);
+      await assertStateLockOwnership();
       const { put } = await getSdk();
       const options = {
         access: "private",
