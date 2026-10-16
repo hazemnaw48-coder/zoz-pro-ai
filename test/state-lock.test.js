@@ -38,6 +38,12 @@ function makeBlobClient() {
       }
       current = null;
     },
+    replaceCurrent(body) {
+      current = { body: String(body), etag: "etag-" + (++version) };
+    },
+    inspectCurrent() {
+      return current ? { ...current } : null;
+    },
   };
 }
 
@@ -73,6 +79,59 @@ test("default acquisition wait allows an abandoned 30-second lease to expire", a
     assert.ok(now >= 15000, "the stale owner lease must expire before this request acquires the lock");
     await lock.assertOwned();
   });
+});
+
+test("acquisition retries a GET/HEAD version race without failing or overwriting the newer lock", async () => {
+  const client = makeBlobClient();
+  await client.put("state-lock-test.json", JSON.stringify({
+    owner: "expired-owner",
+    expiresAt: 0,
+  }), { access: "private", addRandomSuffix: false, allowOverwrite: false });
+  const originalHead = client.head.bind(client);
+  let injected = false;
+  client.head = async path => {
+    if (!injected) {
+      injected = true;
+      client.replaceCurrent(JSON.stringify({ owner: "expired-owner", expiresAt: 0 }));
+    }
+    return originalHead(path);
+  };
+  const lock = createTestLock(client);
+  await lock.withLock(async () => {
+    await lock.assertOwned();
+    assert.equal(JSON.parse(client.inspectCurrent().body).owner.length > 0, true);
+    assert.notEqual(JSON.parse(client.inspectCurrent().body).owner, "expired-owner");
+  });
+});
+
+test("release treats a concurrent owner change as a retryable state conflict", async () => {
+  const client = makeBlobClient();
+  const lock = createTestLock(client);
+  let inject = false;
+  const originalHead = client.head.bind(client);
+  client.head = async path => {
+    if (inject) {
+      inject = false;
+      client.replaceCurrent(JSON.stringify({
+        owner: "intervening-owner",
+        expiresAt: Date.now() + 60000,
+      }));
+    }
+    return originalHead(path);
+  };
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args);
+  try {
+    await lock.withLock(async () => {
+      await lock.assertOwned();
+      inject = true;
+    });
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.equal(warnings.length, 0);
+  assert.equal(JSON.parse(client.inspectCurrent().body).owner, "intervening-owner");
 });
 
 test("distributed lock serializes concurrent callers across independent lock instances", async () => {
