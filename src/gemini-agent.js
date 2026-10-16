@@ -289,8 +289,9 @@ export async function executeGeminiInternalTool(name, args = {}, context = {}) {
 }
 
 async function callGeminiApi(contents, options, includeTools) {
-  const apiKey = typeof options.env.GEMINI_API_KEY === "string" ? options.env.GEMINI_API_KEY.trim() : "";
-  if (!apiKey) throw new GeminiAgentError("gemini_not_configured", "Gemini is not configured on the cloud worker; GEMINI_API_KEY is missing.");
+  const configuredKey = options.env.GEMINI_API_KEY ?? options.env.ZOZ_NOW_GEMINI_API_KEY;
+  const apiKey = typeof configuredKey === "string" ? configuredKey.trim() : "";
+  if (!apiKey) throw new GeminiAgentError("gemini_not_configured", "Gemini is not configured on the cloud worker; no supported Gemini API key variable is set.");
 
   const model = getConfiguredGeminiModel(options.env);
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
