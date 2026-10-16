@@ -107,7 +107,37 @@ function createVercelBlobStore() {
       try {
         saved = await put(pathname, JSON.stringify(state, null, 2) + "\n", options);
       } catch (error) {
-        if (isStateWriteConflict(error)) throw new StateWriteConflictError(undefined, { cause: error });
+        if (isStateWriteConflict(error)) {
+          // Diagnose the compare-and-swap without emitting blob ETags, payloads,
+          // request headers, or credentials. A second uncached read tells us
+          // whether state changed despite the distributed lock.
+          let latestEtag = null;
+          try {
+            const latest = await readCurrent();
+            latestEtag = latest?.blob?.etag ?? latest?.etag ?? null;
+          } catch {
+            // Keep the original precondition error as the primary failure.
+          }
+          const message = String(error?.message ?? "").toLowerCase();
+          const messageClass = /etag/.test(message)
+            ? "etag"
+            : /precondition/.test(message)
+              ? "precondition"
+              : /already.?exists|overwrite/.test(message)
+                ? "exists"
+                : "other";
+          console.warn("ZOZ Pro durable state compare-and-swap conflict", {
+            path: pathname,
+            expectedEtagPresent: Boolean(etag),
+            latestEtagPresent: Boolean(latestEtag),
+            latestEtagMatchesExpected: etag && latestEtag ? latestEtag === etag : null,
+            messageClass,
+            errorName: error?.name ?? null,
+            errorCode: error?.code ?? null,
+            errorStatus: error?.status ?? error?.statusCode ?? error?.response?.status ?? null,
+          });
+          throw new StateWriteConflictError(undefined, { cause: error });
+        }
         throw error;
       }
       etag = saved.etag;
