@@ -187,21 +187,31 @@ export function createStateLock(options = {}) {
   }
 
   async function release(lock) {
-    try {
-      const current = await readLock(lock.pathname);
-      if (!current || current.record?.owner !== lock.owner) return;
-      // Mark the lease expired with ETag-conditional overwrite. The next
-      // acquirer can atomically claim it; no unconditional delete is used.
-      const client = await getClient();
-      await client.put(lock.pathname, JSON.stringify({ owner: lock.owner, expiresAt: 0 }), {
-        access: "private",
-        addRandomSuffix: false,
-        allowOverwrite: true,
-        ifMatch: current.etag,
-        contentType: "application/json",
-      });
-    } catch (error) {
-      if (!isConditionalConflict(error)) {
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      try {
+        const current = await readLock(lock.pathname);
+        if (!current || current.record?.owner !== lock.owner) return;
+        // Mark the lease expired with ETag-conditional overwrite. The next
+        // acquirer can atomically claim it; no unconditional delete is used.
+        const client = await getClient();
+        await client.put(lock.pathname, JSON.stringify({ owner: lock.owner, expiresAt: 0 }), {
+          access: "private",
+          addRandomSuffix: false,
+          allowOverwrite: true,
+          ifMatch: current.etag,
+          contentType: "application/json",
+        });
+        return;
+      } catch (error) {
+        if (isConditionalConflict(error)) {
+          // A concurrent heartbeat may update the same owner's ETag between
+          // GET and HEAD. Re-read and release only if we still own the lock.
+          if (attempt < 5) {
+            await sleep(25 + Math.floor(random() * 75));
+            continue;
+          }
+          return;
+        }
         const rawMessage = String(error?.message ?? "");
         const safeMessage = rawMessage
           .replace(/https?:\/\/[^\s"'\x60]+/gi, "[url]")
@@ -214,6 +224,7 @@ export function createStateLock(options = {}) {
           errorCode: typeof error?.code === "string" ? error.code.slice(0, 80) : null,
           safeMessage,
         });
+        return;
       }
     }
   }
