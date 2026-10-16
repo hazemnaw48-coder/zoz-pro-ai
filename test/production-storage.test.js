@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { StateWriteConflictError, createStateStore, isStateWriteConflict } from "../src/store.js";
 
 test("production fails closed when optional platform variables are unavailable", () => {
-  const keys = ["NODE_ENV", "VERCEL", "VERCEL_ENV", "ZOZ_PRO_STORAGE_MODE"];
+  const keys = ["NODE_ENV", "VERCEL", "VERCEL_ENV", "ZOZ_PRO_STORAGE_MODE", "ZOZ_PRO_STATE_BACKEND"];
   const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 
   try {
@@ -11,9 +11,10 @@ test("production fails closed when optional platform variables are unavailable",
     delete process.env.VERCEL;
     delete process.env.VERCEL_ENV;
     delete process.env.ZOZ_PRO_STORAGE_MODE;
+    delete process.env.ZOZ_PRO_STATE_BACKEND;
     assert.throws(
       () => createStateStore(),
-      /ZOZ_PRO_STORAGE_MODE=blob is required for production state/,
+      /ZOZ_PRO_STATE_BACKEND must explicitly select supabase or blob for production state/,
     );
   } finally {
     for (const key of keys) {
