@@ -81,64 +81,80 @@ test("default acquisition wait allows an abandoned 30-second lease to expire", a
   });
 });
 
-test("acquisition retries a GET/HEAD version race without failing or overwriting the newer lock", async () => {
+test("acquisition preserves a newer owner if the conditional claim races", async () => {
   const client = makeBlobClient();
+  let now = 0;
   await client.put("state-lock-test.json", JSON.stringify({
     owner: "expired-owner",
     expiresAt: 0,
   }), { access: "private", addRandomSuffix: false, allowOverwrite: false });
-  const originalHead = client.head.bind(client);
+
+  const originalPut = client.put.bind(client);
   let injected = false;
-  client.head = async path => {
-    if (!injected) {
-      injected = true;
-      client.replaceCurrent(JSON.stringify({ owner: "expired-owner", expiresAt: 0 }));
+  let preservedWhileActive = false;
+  const originalGet = client.get.bind(client);
+  client.get = async (...args) => {
+    const current = client.inspectCurrent();
+    if (now < 100 && current && JSON.parse(current.body).owner === "intervening-owner") {
+      preservedWhileActive = true;
     }
-    return originalHead(path);
+    return originalGet(...args);
   };
-  const lock = createTestLock(client);
+  client.put = async (path, body, options = {}) => {
+    if (!injected && options.ifMatch) {
+      injected = true;
+      client.replaceCurrent(JSON.stringify({
+        owner: "intervening-owner",
+        expiresAt: now + 100,
+      }));
+    }
+    return originalPut(path, body, options);
+  };
+
+  const lock = createStateLock({
+    client,
+    enabled: true,
+    pathname: "state-lock-test.json",
+    now: () => now,
+    sleep: async milliseconds => { now += milliseconds; },
+    random: () => 0,
+  });
   await lock.withLock(async () => {
     await lock.assertOwned();
-    assert.equal(JSON.parse(client.inspectCurrent().body).owner.length > 0, true);
     assert.notEqual(JSON.parse(client.inspectCurrent().body).owner, "expired-owner");
   });
+  assert.equal(injected, true);
+  assert.equal(preservedWhileActive, true, "the competing owner must remain intact until its lease expires");
 });
 
-test("readLock retries multiple transient GET/HEAD version changes", async () => {
+test("lock reads use the ETag paired with the GET body without a separate HEAD", async () => {
   const client = makeBlobClient();
-  const lock = createTestLock(client);
-  let remainingRaces = 3;
-  const originalHead = client.head.bind(client);
-  client.head = async path => {
-    if (remainingRaces > 0) {
-      remainingRaces -= 1;
-      const current = client.inspectCurrent();
-      const record = JSON.parse(current.body);
-      client.replaceCurrent(JSON.stringify({ ...record, expiresAt: record.expiresAt + 1 }));
-    }
-    return originalHead(path);
+  let headCalls = 0;
+  client.head = async () => {
+    headCalls += 1;
+    throw new Error("HEAD should not be required to read a state lock");
   };
-
+  const lock = createTestLock(client);
   await lock.withLock(async () => {
     await lock.assertOwned();
-    assert.equal(remainingRaces, 0, "readLock should retry until GET and HEAD refer to one version");
   });
+  assert.equal(headCalls, 0);
 });
 
-test("release treats a concurrent owner change as a retryable state conflict", async () => {
+test("release preserves a newer owner when a conditional write races", async () => {
   const client = makeBlobClient();
   const lock = createTestLock(client);
   let inject = false;
-  const originalHead = client.head.bind(client);
-  client.head = async path => {
-    if (inject) {
+  const originalPut = client.put.bind(client);
+  client.put = async (path, body, options = {}) => {
+    if (inject && options.ifMatch && options.allowOverwrite) {
       inject = false;
       client.replaceCurrent(JSON.stringify({
         owner: "intervening-owner",
         expiresAt: Date.now() + 60000,
       }));
     }
-    return originalHead(path);
+    return originalPut(path, body, options);
   };
   const warnings = [];
   const originalWarn = console.warn;
@@ -151,23 +167,28 @@ test("release treats a concurrent owner change as a retryable state conflict", a
   } finally {
     console.warn = originalWarn;
   }
-  assert.equal(warnings.length, 0, "a GET/HEAD race should be resolved internally");
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0][0], "ZOZ Pro state-lock conditional release conflict");
+  assert.equal(warnings[0][1].stage, "conditional-put");
   assert.equal(JSON.parse(client.inspectCurrent().body).owner, "intervening-owner");
 });
 
-test("release retries a same-owner ETag race and expires the lock promptly", async () => {
+test("release retries a same-owner conditional write race and expires the lock promptly", async () => {
   const client = makeBlobClient();
   const lock = createTestLock(client);
   let inject = false;
-  const originalHead = client.head.bind(client);
-  client.head = async path => {
-    if (inject) {
+  const originalPut = client.put.bind(client);
+  client.put = async (path, body, options = {}) => {
+    if (inject && options.ifMatch && options.allowOverwrite) {
       inject = false;
       const current = client.inspectCurrent();
       const record = JSON.parse(current.body);
-      client.replaceCurrent(JSON.stringify({ ...record, expiresAt: Date.now() + 30000 }));
+      client.replaceCurrent(JSON.stringify({
+        ...record,
+        expiresAt: Date.now() + 30000,
+      }));
     }
-    return originalHead(path);
+    return originalPut(path, body, options);
   };
   const warnings = [];
   const originalWarn = console.warn;
@@ -180,7 +201,9 @@ test("release retries a same-owner ETag race and expires the lock promptly", asy
   } finally {
     console.warn = originalWarn;
   }
-  assert.equal(warnings.length, 0, "a same-owner ETag race should be resolved internally");
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0][0], "ZOZ Pro state-lock conditional release conflict");
+  assert.equal(warnings[0][1].stage, "conditional-put");
   assert.equal(JSON.parse(client.inspectCurrent().body).expiresAt, 0);
 });
 
