@@ -188,12 +188,14 @@ export function createStateLock(options = {}) {
 
   async function release(lock) {
     for (let attempt = 1; attempt <= 5; attempt += 1) {
+      let stage = "read";
       try {
         const current = await readLock(lock.pathname);
         if (!current || current.record?.owner !== lock.owner) return;
         // Mark the lease expired with ETag-conditional overwrite. The next
         // acquirer can atomically claim it; no unconditional delete is used.
         const client = await getClient();
+        stage = "conditional-put";
         await client.put(lock.pathname, JSON.stringify({ owner: lock.owner, expiresAt: 0 }), {
           access: "private",
           addRandomSuffix: false,
@@ -203,7 +205,21 @@ export function createStateLock(options = {}) {
         });
         return;
       } catch (error) {
+        const rawMessage = String(error?.message ?? "");
+        const safeMessage = rawMessage
+          .replace(/https?:\/\/[^\s"'\x60]+/gi, "[url]")
+          .replace(/\bBearer\s+\S+/gi, "Bearer [redacted]")
+          .replace(/(token|authorization)\s*[:=]\s*[^,\s]+/gi, "$1=[redacted]")
+          .slice(0, 180);
         if (isConditionalConflict(error)) {
+          console.warn("ZOZ Pro state-lock conditional release conflict", {
+            attempt,
+            stage,
+            errorName: error?.name ?? null,
+            errorStatus: error?.status ?? error?.statusCode ?? error?.response?.status ?? null,
+            errorCode: typeof error?.code === "string" ? error.code.slice(0, 80) : null,
+            safeMessage,
+          });
           // A concurrent heartbeat may update the same owner's ETag between
           // GET and HEAD. Re-read and release only if we still own the lock.
           if (attempt < 5) {
@@ -212,12 +228,6 @@ export function createStateLock(options = {}) {
           }
           return;
         }
-        const rawMessage = String(error?.message ?? "");
-        const safeMessage = rawMessage
-          .replace(/https?:\/\/[^\s"'\x60]+/gi, "[url]")
-          .replace(/\bBearer\s+\S+/gi, "Bearer [redacted]")
-          .replace(/(token|authorization)\s*[:=]\s*[^,\s]+/gi, "$1=[redacted]")
-          .slice(0, 180);
         console.warn("Could not release the ZOZ Pro state lock; it will expire automatically.", {
           errorName: error?.name ?? null,
           errorStatus: error?.status ?? error?.statusCode ?? error?.response?.status ?? null,
