@@ -885,7 +885,17 @@ export async function handleRequest(req, res) {
             || ((!(error instanceof StateWriteConflictError) && error?.code !== "state_write_conflict") || attempt >= maxRetries)) {
             throw error;
           }
-          console.warn(`Retryable state write conflict on ${url.pathname}; attempt ${attempt + 1}/${maxRetries}.`);
+          console.warn("Retryable state write conflict", {
+            path: url.pathname,
+            attempt: attempt + 1,
+            maxRetries,
+            errorName: error?.name ?? null,
+            errorCode: error?.code ?? null,
+            errorStatus: error?.status ?? error?.statusCode ?? error?.response?.status ?? null,
+            causeName: error?.cause?.name ?? null,
+            causeCode: error?.cause?.code ?? null,
+            causeStatus: error?.cause?.status ?? error?.cause?.statusCode ?? error?.cause?.response?.status ?? null,
+          });
           await waitForStateConflictRetry(attempt);
         }
       }
