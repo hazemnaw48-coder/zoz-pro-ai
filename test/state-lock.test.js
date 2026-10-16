@@ -130,7 +130,10 @@ test("release treats a concurrent owner change as a retryable state conflict", a
   } finally {
     console.warn = originalWarn;
   }
-  assert.equal(warnings.length, 0);
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0][0], "ZOZ Pro state-lock conditional release conflict");
+  assert.equal(warnings[0][1].stage, "read");
+  assert.equal(typeof warnings[0][1].safeMessage, "string");
   assert.equal(JSON.parse(client.inspectCurrent().body).owner, "intervening-owner");
 });
 
@@ -159,7 +162,9 @@ test("release retries a same-owner ETag race and expires the lock promptly", asy
   } finally {
     console.warn = originalWarn;
   }
-  assert.equal(warnings.length, 0);
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0][0], "ZOZ Pro state-lock conditional release conflict");
+  assert.equal(warnings[0][1].stage, "read");
   assert.equal(JSON.parse(client.inspectCurrent().body).expiresAt, 0);
 });
 
