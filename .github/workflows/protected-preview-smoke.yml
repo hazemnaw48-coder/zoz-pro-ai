@@ -65,7 +65,7 @@ jobs:
             }
           if [[ "$http_status" != "200" ]]; then
             if [[ "$http_status" == "401" ]]; then
-              echo "::error::Preview rejected the GitHub ZOZ_PRO_CONTROL_TOKEN (HTTP 401). Confirm its value exactly matches the branch-scoped ZOZ_PRO_CONTROL_TOKEN in this Vercel Preview deployment; variable presence alone does not prove a match."
+              echo "::error::Preview rejected the dedicated GitHub ZOZ_PRO_PREVIEW_CONTROL_TOKEN (HTTP 401). Confirm it matches the Preview-only token configured for this ZOZ Pro Preview deployment; variable presence alone does not prove a match."
             else
               echo "::error::Preview state read returned HTTP $http_status."
             fi
