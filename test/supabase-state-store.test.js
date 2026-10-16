@@ -37,7 +37,7 @@ test("Preview initialization is explicit and versioned; production never seeds e
   const db = dbWith();
   const store = createSupabaseStateStore({ env: env({ ZOZ_PRO_SUPABASE_ALLOW_EMPTY_PREVIEW_INIT: "true" }), fetchImpl: db.fetch });
   assert.equal((await store.load()).project.repository, "hazemnaw48-coder/zoz-pro-ai");
-  assert.equal(db.current().version, 1);
+  assert.equal(String(db.current().version), "1");
   const prodDb = dbWith();
   const prod = createSupabaseStateStore({ env: env({ VERCEL_ENV: "production", ZOZ_PRO_SUPABASE_ALLOW_EMPTY_PREVIEW_INIT: "true" }), fetchImpl: prodDb.fetch });
   await assert.rejects(prod.load(), e => e.code === "supabase_state_not_initialized");
@@ -63,7 +63,7 @@ test("concurrent saves use version CAS and reject stale writers", async () => {
   const outcomes = await Promise.allSettled([a.save(sa), b.save(sb)]);
   assert.equal(outcomes.filter(x => x.status === "fulfilled").length, 1);
   assert.equal(outcomes.find(x => x.status === "rejected").reason.code, "state_write_conflict");
-  assert.equal(db.current().version, 2);
+  assert.equal(String(db.current().version), "2");
 });
 
 test("completed task result persists and reads back through a new store instance", async () => {
@@ -82,5 +82,5 @@ test("completed task result persists and reads back through a new store instance
   assert.equal(saved.controlCommands[0].result, "health-check completed");
   assert.equal(saved.tasks[0].result, "health-check completed");
   assert.equal(saved.executor.lastCompletedCommandId, "CMD-TEST");
-  assert.equal(db.current().version, 8);
+  assert.equal(String(db.current().version), "8");
 });
