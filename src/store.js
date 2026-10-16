@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createInitialState, validateState } from "./domain.js";
 import { StateWriteConflictError } from "./state-errors.js";
+import { normalizeBlobEtag } from "./blob-etag.js";
 import { assertStateLockOwnership, withStateLock } from "./state-lock.js";
 export { StateWriteConflictError } from "./state-errors.js";
 
@@ -61,7 +62,21 @@ function createVercelBlobStore() {
     const raw = await new Response(result.stream).text();
     const state = JSON.parse(raw);
     validateState(state);
-    etag = result.blob?.etag ?? result.etag ?? null;
+
+    // GET exposes its ETag from the HTTP response header; PUT returns the
+    // canonical metadata ETag in JSON. Use HEAD's metadata ETag for ifMatch,
+    // after verifying it represents the same version that GET just returned.
+    const getEtag = result.blob?.etag ?? result.etag ?? null;
+    const { head } = await getSdk();
+    const metadata = await head(pathname);
+    const metadataEtag = metadata?.etag ?? null;
+    if (!normalizeBlobEtag(getEtag) || !normalizeBlobEtag(metadataEtag)) {
+      throw new Error("Vercel Blob did not return a usable ETag for durable state.");
+    }
+    if (normalizeBlobEtag(getEtag) !== normalizeBlobEtag(metadataEtag)) {
+      throw new StateWriteConflictError("Persistent state changed while it was being read; reload and retry.");
+    }
+    etag = metadataEtag;
     return state;
   }
 
