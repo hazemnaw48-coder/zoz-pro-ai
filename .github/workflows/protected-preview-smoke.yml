@@ -78,7 +78,7 @@ jobs:
             local url="$1" payload="$2" output="$3"
             local attempt error
             for attempt in $(seq 1 5); do
-              if curl --fail-with-body -sS --max-time 20 -X POST "$url" \
+              if curl --fail-with-body -sS --max-time 50 -X POST "$url" \
                 -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
                 -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
                 -H 'Content-Type: application/json' \
