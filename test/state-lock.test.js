@@ -24,8 +24,12 @@ function makeBlobClient() {
       return {
         statusCode: 200,
         stream: new Response(current.body).body,
-        blob: { etag: current.etag },
+        blob: { etag: `"${current.etag}"` },
       };
+    },
+    async head() {
+      if (!current) throw error("blob not found", 404, "not_found");
+      return { etag: current.etag };
     },
     async del(_path, options = {}) {
       if (!current) return;
