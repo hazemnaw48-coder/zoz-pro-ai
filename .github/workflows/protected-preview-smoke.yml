@@ -132,10 +132,10 @@ jobs:
             and (.activity | any(.type=="control_command_completed" and .taskId==$task and (.message | contains($id))))
           ' /tmp/state.json >/dev/null
           curl -fsS --max-time 20 "$PREVIEW_URL/api/state" \
-  -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
-  -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
-  -o /tmp/state-reread.json
-jq -e --arg id "$id" --arg task "$TASK_ID" '
-  .controlCommands | any(.id==$id and .taskId==$task and .status=="completed" and .result=="ZOZ_PRO_GEMINI_LIVE_OK")
-' /tmp/state-reread.json >/dev/null
-echo "PASS: Preview Queue + live Gemini + durable result + independent read-back succeeded for $id."
+            -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
+            -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
+            -o /tmp/state-reread.json
+          jq -e --arg id "$id" --arg task "$TASK_ID" '
+            .controlCommands | any(.id==$id and .taskId==$task and .status=="completed" and .result=="ZOZ_PRO_GEMINI_LIVE_OK")
+          ' /tmp/state-reread.json >/dev/null
+          echo "PASS: Preview Queue + live Gemini + durable result + independent read-back succeeded for $id."
