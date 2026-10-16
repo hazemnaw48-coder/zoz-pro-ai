@@ -9,6 +9,8 @@ const DEFAULT_HEARTBEAT_MS = 5000;
 const DEFAULT_WAIT_TIMEOUT_MS = DEFAULT_LEASE_MS + 5000;
 
 function shouldUseDistributedLock() {
+  // Supabase uses atomic PostgreSQL version-CAS writes, not Blob leases.
+  if (String(process.env.ZOZ_PRO_STATE_BACKEND ?? "").trim().toLowerCase() === "supabase") return false;
   return process.env.VERCEL === "1"
     || Boolean(process.env.VERCEL_ENV)
     || process.env.ZOZ_PRO_STORAGE_MODE === "blob";
