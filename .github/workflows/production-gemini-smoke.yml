@@ -46,29 +46,50 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          CURRENT_STEP="initialize smoke test"
+          diagnostic_on_error() {
+            rc=$?
+            echo "::error::Production Gemini smoke failed during: ${CURRENT_STEP} (exit ${rc})"
+            for file in /tmp/task-create.json /tmp/assignment.json /tmp/command-create.json /tmp/command-error.json; do
+              if [[ -s "$file" ]]; then
+                echo "Safe response summary from $(basename "$file"):"
+                jq -c '{error:(.error // null),message:(.message // null),status:(.status // null),id:(.id // null)}' "$file" 2>/dev/null || echo "Response was not JSON; body omitted."
+              fi
+            done
+            exit "$rc"
+          }
+          trap diagnostic_on_error ERR
           TASK_ID="ZP-GEMINI-SMOKE-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           auth=(-H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" -H 'Content-Type: application/json')
 
+          CURRENT_STEP="read initial authenticated state"
           curl --fail-with-body -sS --max-time 20 "$PRODUCTION_URL/api/state" "${auth[@]}" -o /tmp/state-before.json
 
+          CURRENT_STEP="create isolated task"
           curl --fail-with-body -sS --max-time 20 -X POST "$PRODUCTION_URL/api/tasks" "${auth[@]}" \
             -d "{\"id\":\"$TASK_ID\",\"title\":\"Isolated production Gemini smoke test\",\"owner\":\"Owner\",\"assignedAgent\":\"codex\",\"branch\":\"task/production-gemini-smoke\",\"requiredChecks\":[\"build\",\"tests\"]}" \
             -o /tmp/task-create.json
+          CURRENT_STEP="validate task creation response"
           jq -e --arg task "$TASK_ID" '.id == $task and .status == "planned"' /tmp/task-create.json >/dev/null
 
+          CURRENT_STEP="assign isolated task"
           curl --fail-with-body -sS --max-time 20 -X POST "$PRODUCTION_URL/api/tasks/$TASK_ID/assign" "${auth[@]}" \
             -d '{"agent":"codex","actor":"Owner"}' -o /tmp/assignment.json
+          CURRENT_STEP="validate task assignment response"
           jq -e --arg task "$TASK_ID" '.id == $task and .status == "assigned" and .assignedAgent == "codex"' /tmp/assignment.json >/dev/null
 
           PROMPT='gemini:assist:For this connectivity smoke test, reply with exactly ZOZ_PRO_GEMINI_LIVE_OK and nothing else. Do not call tools or save records.'
           jq -n --arg instruction "$PROMPT" --arg task "$TASK_ID" '{instruction:$instruction,taskId:$task,requestedBy:"Owner"}' > /tmp/command-payload.json
+          CURRENT_STEP="create isolated Gemini command"
           curl --fail-with-body -sS --max-time 20 -X POST "$PRODUCTION_URL/api/control/commands" "${auth[@]}" \
             --data-binary @/tmp/command-payload.json -o /tmp/command-create.json
+          CURRENT_STEP="validate Gemini command creation response"
           COMMAND_ID="$(jq -er '.id' /tmp/command-create.json)"
           echo "Created isolated Gemini smoke command: $COMMAND_ID"
 
           terminal=false
           for attempt in $(seq 1 36); do
+            CURRENT_STEP="poll command state (poll $attempt)"
             curl --fail-with-body -sS --max-time 20 "$PRODUCTION_URL/api/state" "${auth[@]}" -o /tmp/state-after.json
             status="$(jq -r --arg id "$COMMAND_ID" '.controlCommands[] | select(.id==$id) | .status' /tmp/state-after.json)"
             if [[ "$status" == "completed" || "$status" == "failed" || "$status" == "blocked" ]]; then terminal=true; break; fi
@@ -85,6 +106,7 @@ jobs:
             exit 1
           fi
 
+          CURRENT_STEP="validate completed command and task result"
           jq -e --arg id "$COMMAND_ID" --arg task "$TASK_ID" '
             (.controlCommands | any(.id==$id and .taskId==$task and .status=="completed" and .result=="ZOZ_PRO_GEMINI_LIVE_OK"))
             and (.tasks | any(.id==$task and .status=="verification" and .result=="ZOZ_PRO_GEMINI_LIVE_OK"))
@@ -93,6 +115,7 @@ jobs:
           ' /tmp/state-after.json >/dev/null
 
           # Read the same persisted result again in a separate request.
+          CURRENT_STEP="independent durable read-back"
           curl --fail-with-body -sS --max-time 20 "$PRODUCTION_URL/api/state" "${auth[@]}" -o /tmp/state-reread.json
           jq -e --arg id "$COMMAND_ID" --arg task "$TASK_ID" '
             .controlCommands | any(.id==$id and .taskId==$task and .status=="completed" and .result=="ZOZ_PRO_GEMINI_LIVE_OK")
