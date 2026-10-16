@@ -445,8 +445,8 @@ async function handleApi(req, res, url) {
       if (cloudRuntime && body.actionType == null && !isSupportedCloudInstruction(body.instruction)) {
         return sendJson(res, 422, {
           error: "cloud_instruction_not_supported",
-          message: "The cloud worker only executes read-only tasks: system:health-check or system:project-summary. Other commands are not queued for execution.",
-          supportedInstructions: ["system:health-check", "system:project-summary"],
+          message: "The cloud worker supports system:health-check, system:project-summary, or text-only Gemini tasks prefixed with gemini:assist:. Arbitrary code, external actions and approval-gated actions are not executed.",
+          supportedInstructions: ["system:health-check", "system:project-summary", "gemini:assist:<your text task>"],
         });
       }
 
