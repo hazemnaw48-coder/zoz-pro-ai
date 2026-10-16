@@ -52,6 +52,29 @@ function createTestLock(client) {
   });
 }
 
+test("default acquisition wait allows an abandoned 30-second lease to expire", async () => {
+  const client = makeBlobClient();
+  let now = 0;
+  await client.put("state-lock-expiry-test.json", JSON.stringify({
+    owner: "previous-invocation",
+    expiresAt: 15000,
+  }), { access: "private", addRandomSuffix: false, allowOverwrite: false });
+
+  const lock = createStateLock({
+    client,
+    enabled: true,
+    pathname: "state-lock-expiry-test.json",
+    now: () => now,
+    sleep: async milliseconds => { now += milliseconds; },
+    random: () => 0,
+  });
+
+  await lock.withLock(async () => {
+    assert.ok(now >= 15000, "the stale owner lease must expire before this request acquires the lock");
+    await lock.assertOwned();
+  });
+});
+
 test("distributed lock serializes concurrent callers across independent lock instances", async () => {
   const client = makeBlobClient();
   const locks = [createTestLock(client), createTestLock(client), createTestLock(client)];
