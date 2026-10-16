@@ -3,6 +3,7 @@ import path from "node:path";
 import { createInitialState, validateState } from "./domain.js";
 import { StateWriteConflictError } from "./state-errors.js";
 import { normalizeBlobEtag } from "./blob-etag.js";
+import { createSupabaseStateStore } from "./supabase-state-store.js";
 import { assertStateLockOwnership, withStateLock } from "./state-lock.js";
 export { StateWriteConflictError } from "./state-errors.js";
 
@@ -190,23 +191,22 @@ function createFileStateStore(filePath) {
   };
 }
 
-export function createStateStore(filePath) {
-  // Explicit file paths are used by isolated tests and local tooling.
-  if (filePath !== undefined) return createFileStateStore(filePath);
-
-  // Never rely on optional Vercel system variables to choose durable storage.
+export function getStateBackendInfo() {
+  const configured = String(process.env.ZOZ_PRO_STATE_BACKEND ?? "").trim().toLowerCase();
   const vercelRuntime = process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
-  if (vercelRuntime || process.env.ZOZ_PRO_STORAGE_MODE === "blob") {
-    return createVercelBlobStore();
-  }
+  const backend = configured || (vercelRuntime || process.env.ZOZ_PRO_STORAGE_MODE === "blob" ? "blob" : process.env.NODE_ENV === "production" ? "unconfigured" : "file");
+  return {
+    backend: ["supabase", "blob", "file"].includes(backend) ? backend : "invalid",
+    durable: backend === "supabase" || backend === "blob",
+    concurrency: backend === "supabase" ? "postgres-version-cas" : backend === "blob" ? "blob-etag-cas" : "local-file",
+  };
+}
 
-  // Local/test use defaults to files only outside production. A production
-  // deployment with missing runtime indicators must fail closed, not use disk.
-  if (process.env.NODE_ENV !== "production" && process.env.ZOZ_PRO_STORAGE_MODE !== "blob") {
-    return createFileStateStore(getDefaultStateFile());
-  }
-
-  throw new Error(
-    "ZOZ_PRO_STORAGE_MODE=blob is required for production state; ephemeral local storage is disabled.",
-  );
+export function createStateStore(filePath) {
+  if (filePath !== undefined) return createFileStateStore(filePath);
+  const info = getStateBackendInfo();
+  if (info.backend === "supabase") return createSupabaseStateStore();
+  if (info.backend === "blob") return createVercelBlobStore();
+  if (info.backend === "file" && process.env.NODE_ENV !== "production") return createFileStateStore(getDefaultStateFile());
+  throw new Error("ZOZ_PRO_STATE_BACKEND must explicitly select supabase or blob for production state.");
 }
