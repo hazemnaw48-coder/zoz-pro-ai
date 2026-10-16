@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 8
     environment: preview-smoke
     env:
-      PREVIEW_URL: https://zoz-pro-30rjvsowj-hazemnaw48-coder.vercel.app
+      PREVIEW_URL: https://zoz-pro-2c7y7r8te-hazemnaw48-coder.vercel.app
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
       ZOZ_CONTROL_TOKEN: ${{ secrets.ZOZ_PRO_PREVIEW_CONTROL_TOKEN }}
     steps:
