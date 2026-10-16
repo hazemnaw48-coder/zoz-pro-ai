@@ -33,7 +33,7 @@ function isConditionalConflict(error) {
   const status = Number(error?.status ?? error?.statusCode ?? error?.response?.status);
   const code = String(error?.code ?? "");
   const message = String(error?.message ?? "");
-  return status === 409 || status === 412
+  return code === "state_write_conflict" || status === 409 || status === 412
     || /already[_ -]?exists|precondition|etag.*mismatch/i.test(code + " " + message);
 }
 
@@ -93,10 +93,24 @@ export function createStateLock(options = {}) {
 
     while (true) {
       const expiresAt = now() + leaseMs;
+      let readConflict = false;
       const current = await readLock(path).catch(error => {
         if (Number(error?.status ?? error?.statusCode) === 404 || /not found/i.test(String(error?.message ?? ""))) return null;
+        if (isConditionalConflict(error)) {
+          readConflict = true;
+          return null;
+        }
         throw error;
       });
+      if (readConflict) {
+        if (now() - startedAt >= waitTimeoutMs) {
+          const busy = conflict("Timed out waiting for a stable read of the ZOZ Pro state lock.");
+          busy.lockBusy = true;
+          throw busy;
+        }
+        await sleep(50 + Math.floor(random() * 150));
+        continue;
+      }
       try {
         const client = await getClient();
         let saved;
@@ -188,7 +202,18 @@ export function createStateLock(options = {}) {
       });
     } catch (error) {
       if (!isConditionalConflict(error)) {
-        console.warn("Could not release the ZOZ Pro state lock; it will expire automatically.");
+        const rawMessage = String(error?.message ?? "");
+        const safeMessage = rawMessage
+          .replace(/https?:\/\/[^\s"'\x60]+/gi, "[url]")
+          .replace(/\bBearer\s+\S+/gi, "Bearer [redacted]")
+          .replace(/(token|authorization)\s*[:=]\s*[^,\s]+/gi, "$1=[redacted]")
+          .slice(0, 180);
+        console.warn("Could not release the ZOZ Pro state lock; it will expire automatically.", {
+          errorName: error?.name ?? null,
+          errorStatus: error?.status ?? error?.statusCode ?? error?.response?.status ?? null,
+          errorCode: typeof error?.code === "string" ? error.code.slice(0, 80) : null,
+          safeMessage,
+        });
       }
     }
   }
