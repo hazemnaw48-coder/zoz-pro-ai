@@ -63,20 +63,15 @@ function createVercelBlobStore() {
     const state = JSON.parse(raw);
     validateState(state);
 
-    // GET exposes its ETag from the HTTP response header; PUT returns the
-    // canonical metadata ETag in JSON. Use HEAD's metadata ETag for ifMatch,
-    // after verifying it represents the same version that GET just returned.
+    // Keep the ETag paired with the exact body returned by GET. Normalize
+    // HTTP quoting before ifMatch so a separate HEAD cannot introduce a
+    // second-version race with concurrent writers.
     const getEtag = result.blob?.etag ?? result.etag ?? null;
-    const { head } = await getSdk();
-    const metadata = await head(pathname);
-    const metadataEtag = metadata?.etag ?? null;
-    if (!normalizeBlobEtag(getEtag) || !normalizeBlobEtag(metadataEtag)) {
+    const normalizedEtag = normalizeBlobEtag(getEtag);
+    if (!normalizedEtag) {
       throw new Error("Vercel Blob did not return a usable ETag for durable state.");
     }
-    if (normalizeBlobEtag(getEtag) !== normalizeBlobEtag(metadataEtag)) {
-      throw new StateWriteConflictError("Persistent state changed while it was being read; reload and retry.");
-    }
-    etag = metadataEtag;
+    etag = normalizedEtag;
     return state;
   }
 
