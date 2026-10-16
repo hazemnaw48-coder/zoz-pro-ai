@@ -75,19 +75,19 @@ function isRetryableStateMutation(req, url) {
   // can perform an external side effect before the state write.
   return pathname === "/api/content-factory/publications"
     || pathname === "/api/outreach"
-    || /^\\/api\\/outreach\\/[^/]+\\/status$/.test(pathname)
+    || /^\/api\/outreach\/[^/]+\/status$/.test(pathname)
     || pathname === "/api/contacts"
-    || /^\\/api\\/contacts\\/[^/]+\\/status$/.test(pathname)
+    || /^\/api\/contacts\/[^/]+\/status$/.test(pathname)
     || pathname === "/api/opportunities"
-    || /^\\/api\\/opportunities\\/[^/]+\\/status$/.test(pathname)
+    || /^\/api\/opportunities\/[^/]+\/status$/.test(pathname)
     || pathname === "/api/intelligence"
     || pathname === "/api/executor/heartbeat"
     || pathname === "/api/control/commands"
-    || /^\\/api\\/control\\/commands\\/[^/]+\\/(claim|complete|fail|cancel)$/.test(pathname)
+    || /^\/api\/control\/commands\/[^/]+\/(claim|complete|fail|cancel)$/.test(pathname)
     || pathname === "/api/tasks"
-    || /^\\/api\\/tasks\\/[^/]+\\/(assign|verify|transition)$/.test(pathname)
+    || /^\/api\/tasks\/[^/]+\/(assign|verify|transition)$/.test(pathname)
     || pathname === "/api/approvals"
-    || /^\\/api\\/approvals\\/[^/]+\\/(approve|reject)$/.test(pathname);
+    || /^\/api\/approvals\/[^/]+\/(approve|reject)$/.test(pathname);
 }
 
 async function bufferRequestBody(req) {
