@@ -3,10 +3,13 @@ export function getControlToken() {
 }
 
 export function isAuthorized(req) {
-  const expected = getControlToken();
-  if (!expected) return false;
   const value = req.headers.authorization ?? "";
-  return value === `Bearer ${expected}`;
+  if (!value.startsWith("Bearer ")) return false;
+  const presented = value.slice("Bearer ".length);
+  if (!presented) return false;
+  const accepted = [process.env.ZOZ_PRO_CONTROL_TOKEN, process.env.ZOZ_CONTROL_TOKEN]
+    .filter((token) => typeof token === "string" && token.length > 0);
+  return accepted.some((token) => value === `Bearer ${token}`);
 }
 
 export function sendUnauthorized(res) {
