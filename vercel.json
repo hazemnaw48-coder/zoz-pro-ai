@@ -1,0 +1,29 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "public",
+  "functions": {
+    "api/[...path].js": {
+      "maxDuration": 60
+    },
+    "api/cron/heartbeat.js": {
+      "maxDuration": 30
+    },
+    "api/queue/control-command.js": {
+      "maxDuration": 60,
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "zoz-pro-control-commands"
+        }
+      ]
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/heartbeat",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}

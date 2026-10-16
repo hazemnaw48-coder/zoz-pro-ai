@@ -8,7 +8,7 @@ async function fetchJson(url, options = {}) {
   if (CONTROL_TOKEN) headers.set("Authorization", `Bearer ${CONTROL_TOKEN}`);
   const response = await fetch(url, { ...options, headers });
   const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? "Request failed");
+  if (!response.ok) throw new Error(body.message ?? body.error ?? "Request failed");
   return body;
 }
 
@@ -24,11 +24,18 @@ function card(label, value) {
 
 function renderControl() {
   const commands = state.controlCommands ?? [];
+  const worker = state.executor ?? {};
+  const heartbeat = worker.lastSeen ? new Date(worker.lastSeen).toLocaleString() : "not yet recorded";
+  if ($("#control-health")) {
+    $("#control-health").textContent = worker.mode === "vercel_queue"
+      ? `Cloud worker: ${worker.status ?? "unknown"} · last heartbeat: ${heartbeat}`
+      : "Local Codex executor status is shown below.";
+  }
   $("#control-list").innerHTML = commands.length
     ? commands.map((c) => `<article class="list-item">
         <div class="section-heading"><div class="list-title">${escapeHtml(c.id)}</div><span class="status">${escapeHtml(c.status)}</span></div>
         <div class="meta">${escapeHtml(c.instruction)}</div>
-        <div class="meta">Codex state: ${escapeHtml(c.claimedAt ? "claimed" : "waiting")} · ${escapeHtml(c.result ?? c.error ?? "")}</div>
+        <div class="meta">Worker state: ${escapeHtml(c.claimedAt ? "claimed" : "waiting")} · ${escapeHtml(c.result ?? c.error ?? c.executionNote ?? "")}</div>
       </article>`).join("")
     : '<div class="panel muted-text">No commands yet.</div>';
 }
@@ -172,7 +179,25 @@ function renderTasks() {
       <span class="status">${escapeHtml(task.status)}</span></div>
       <div class="meta">Checks: ${escapeHtml(task.requiredChecks.join(", "))}</div>
       <div class="meta">Result: ${escapeHtml(task.result ?? "Pending")}</div>
+      ${task.status === "planned" ? `<div class="opp-actions"><button type="button" data-assign-task="${escapeHtml(task.id)}">Assign to Codex</button></div>` : ""}
     </article>`).join("");
+
+  document.querySelectorAll("[data-assign-task]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        await fetchJson(`/api/tasks/${encodeURIComponent(button.dataset.assignTask)}/assign`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ agent: "codex", actor: "Owner" }),
+        });
+        await loadState();
+      } catch (error) {
+        alert(error.message);
+        button.disabled = false;
+      }
+    });
+  });
 }
 
 async function approve(id, decision) {
@@ -390,9 +415,26 @@ async function checkHealth() {
   try {
     const health = await fetchJson("/api/health");
     $("#health-badge").textContent = health.status === "ok" ? "Healthy" : "Unknown";
-    $("#control-health").textContent = health.controlPlane === "ready" ? "Control ready" : "Control unavailable";
     const ex = state?.executor;
-    $("#executor-badge").textContent = ex?.status === "online" ? `Codex online · ${ex.hostname ?? "worker"}` : "Codex offline";
+    if (health.executionRuntime === "vercel-queue") {
+      const seen = ex?.lastSeen ? new Date(ex.lastSeen).toLocaleString() : "not yet recorded";
+      const cloudSeen = ex?.mode === "vercel_queue";
+      $("#executor-badge").textContent = cloudSeen
+        ? `Cloud worker ${ex.status ?? "unknown"}`
+        : "Cloud worker not yet seen";
+      $("#control-health").textContent = cloudSeen
+        ? `Vercel Queue worker: ${ex.status ?? "unknown"} · last heartbeat: ${seen}`
+        : "Vercel Queue configured; awaiting the first worker heartbeat.";
+      $("#control-help").textContent = "Cloud tasks: system:health-check or system:project-summary. These are read-only; external actions and arbitrary commands are not executed by this worker.";
+      $("#control-instruction").placeholder = "system:health-check  |  system:project-summary";
+    } else {
+      $("#executor-badge").textContent = ex?.status === "online"
+        ? `Codex online · ${ex.hostname ?? "worker"}`
+        : "Codex offline";
+      $("#control-health").textContent = health.controlPlane === "ready" ? "Control ready" : "Control unavailable";
+      $("#control-help").textContent = "الأوامر الخطرة لا تصبح قابلة للتنفيذ إلا بعد موافقة المالك.";
+      $("#control-instruction").placeholder = "اكتب المهمة التي تريد من Codex تنفيذها…";
+    }
   } catch {
     $("#health-badge").textContent = "Offline";
     $("#control-health").textContent = "Offline";

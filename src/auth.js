@@ -1,5 +1,5 @@
 export function getControlToken() {
-  return process.env.ZOZ_CONTROL_TOKEN ?? "";
+  return process.env.ZOZ_PRO_CONTROL_TOKEN || process.env.ZOZ_CONTROL_TOKEN || "";
 }
 
 export function isAuthorized(req) {

@@ -12,7 +12,9 @@ import {
   normalizeControlCommandInput,
   canExecuteControlCommand,
 } from "./control.js";
-import { createStateStore } from "./store.js";
+import { createStateStore, StateWriteConflictError } from "./store.js";
+import { isSupportedCloudInstruction } from "./cloud-worker.js";
+import { enqueueCloudCommand, isVercelRuntime } from "./cloud-queue.js";
 import { normalizeOpportunityInput, normalizeIntelligenceInput, OPPORTUNITY_STATUSES } from "./opportunities.js";
 import { normalizeContactInput, CONTACT_STATUSES } from "./crm.js";
 import { normalizeOutreachInput, OUTREACH_STATUSES } from "./outreach.js";
@@ -31,7 +33,6 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const publicDir = path.resolve(__dirname, "../public");
-const PORT = Number(process.env.PORT ?? 3000);
 
 const CONTENT_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -52,10 +53,33 @@ function sendJson(res, status, payload) {
 }
 
 async function readJson(req) {
+  // Safe retryable mutations cache their request body before the first attempt,
+  // so a state-write conflict can replay the same request against fresh state.
+  if (Buffer.isBuffer(req.__zozBodyBuffer)) {
+    if (req.__zozBodyBuffer.length === 0) return {};
+    return JSON.parse(req.__zozBodyBuffer.toString("utf8"));
+  }
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
   if (chunks.length === 0) return {};
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+function isRetryableStateMutation(req, url) {
+  if (req.method !== "POST") return false;
+  return url.pathname === "/api/tasks"
+    || (url.pathname.startsWith("/api/tasks/") && url.pathname.endsWith("/assign") && url.pathname.split("/").length === 5)
+    || url.pathname === "/api/control/commands";
+}
+
+async function bufferRequestBody(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(Buffer.from(chunk));
+  req.__zozBodyBuffer = Buffer.concat(chunks);
+}
+
+function waitForStateConflictRetry(attempt) {
+  return new Promise((resolve) => setTimeout(resolve, Math.min(800, 50 * (2 ** attempt))));
 }
 
 function appendActivity(state, activity) {
@@ -123,6 +147,7 @@ async function handleApi(req, res, url) {
       status: "ok",
       project: state.project.repository,
       controlPlane: "ready",
+      executionRuntime: isVercelRuntime() ? "vercel-queue" : "local-cli",
       queuedCommands: state.controlCommands?.filter((c) => c.status === "queued").length ?? 0,
     });
   }
@@ -415,18 +440,57 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/control/commands") {
     try {
-      const command = createControlCommand(state, await readJson(req));
+      const body = await readJson(req);
+      const cloudRuntime = isVercelRuntime();
+      if (cloudRuntime && body.actionType == null && !isSupportedCloudInstruction(body.instruction)) {
+        return sendJson(res, 422, {
+          error: "cloud_instruction_not_supported",
+          message: "The cloud worker only executes read-only tasks: system:health-check or system:project-summary. Other commands are not queued for execution.",
+          supportedInstructions: ["system:health-check", "system:project-summary"],
+        });
+      }
+
+      const command = createControlCommand(state, body);
       state.controlCommands ??= [];
       state.controlCommands.unshift(command);
       appendActivity(state, {
         type: "control_command_created",
         actor: command.requestedBy,
         taskId: command.taskId,
-        message: `${command.id} queued for Codex: ${command.instruction}`,
+        message: `${command.id} queued for ${cloudRuntime ? "the Vercel Queue worker" : "Codex"}: ${command.instruction}`,
       });
       await store.save(state);
+
+      // Only allowlisted, non-risky commands reach the cloud queue. Risky
+      // commands retain their owner-approval record and are never auto-dispatched.
+      if (cloudRuntime && command.status === "queued" && !command.actionType) {
+        try {
+          await enqueueCloudCommand(command.id);
+        } catch {
+          const latest = await store.load();
+          const latestCommand = (latest.controlCommands ?? []).find(item => item.id === command.id);
+          if (latestCommand?.status === "queued") {
+            latestCommand.status = "failed";
+            latestCommand.failedAt = new Date().toISOString();
+            latestCommand.error = "Cloud queue dispatch failed; execution was not confirmed.";
+            appendActivity(latest, {
+              type: "control_command_dispatch_failed",
+              actor: "ZOZ Pro Cloud Worker",
+              taskId: latestCommand.taskId,
+              message: `${latestCommand.id} was not confirmed queued with Vercel Queue; no execution was confirmed.`,
+            });
+            await store.save(latest);
+          }
+          return sendJson(res, 503, {
+            error: "cloud_worker_dispatch_failed",
+            commandId: command.id,
+            message: "The cloud worker could not be reached. Check the command status before retrying.",
+          });
+        }
+      }
       return sendJson(res, 201, command);
     } catch (error) {
+      if (error instanceof StateWriteConflictError) throw error;
       return sendJson(res, 400, { error: error.message });
     }
   }
@@ -558,6 +622,7 @@ async function handleApi(req, res, url) {
       await store.save(state);
       return sendJson(res, 200, task);
     } catch (error) {
+      if (error instanceof StateWriteConflictError) throw error;
       return sendJson(res, 409, { error: error.message });
     }
   }
@@ -700,13 +765,25 @@ async function handleApi(req, res, url) {
       });
     }
     if (command && approval.status === "approved") {
-      command.status = "queued";
-      appendActivity(state, {
-        type: "control_command_released",
-        actor: approval.decidedBy,
-        taskId: command.taskId,
-        message: `${command.id} released to Codex after explicit owner approval.`,
-      });
+      if (isVercelRuntime()) {
+        command.status = "blocked";
+        command.blockedAt = new Date().toISOString();
+        command.error = "Approval recorded; this cloud worker does not execute financial or external actions.";
+        appendActivity(state, {
+          type: "control_command_blocked",
+          actor: "ZOZ Pro Cloud Worker",
+          taskId: command.taskId,
+          message: `${command.id} was not dispatched: approved high-risk actions require a dedicated action handler.`,
+        });
+      } else {
+        command.status = "queued";
+        appendActivity(state, {
+          type: "control_command_released",
+          actor: approval.decidedBy,
+          taskId: command.taskId,
+          message: `${command.id} released to Codex after explicit owner approval.`,
+        });
+      }
     }
     if (command && approval.status === "rejected") {
       command.status = "cancelled";
@@ -744,21 +821,48 @@ async function serveStatic(req, res, url) {
   }
 }
 
-const server = http.createServer(async (req, res) => {
+export async function handleRequest(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
-    if (url.pathname.startsWith("/api/")) await handleApi(req, res, url);
-    else await serveStatic(req, res, url);
-  } catch (error) {
-    console.error(error);
-    sendJson(res, 500, { error: "internal_server_error" });
-  }
-});
+    if (url.pathname.startsWith("/api/")) {
+      const retryableMutation = isRetryableStateMutation(req, url);
+      if (retryableMutation) await bufferRequestBody(req);
 
-if (process.env.NODE_ENV !== "test") {
-  server.listen(PORT, "0.0.0.0", () => {
-    console.log(`ZOZ Pro listening on http://0.0.0.0:${PORT}`);
-  });
+      // Blob uses ETag conditional writes to prevent lost updates. On a conflict,
+      // replay only these deterministic, non-external mutation routes against a
+      // newly loaded state. Never replay publish/send/financial/destructive routes.
+      const maxRetries = retryableMutation ? 5 : 0;
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          await handleApi(req, res, url);
+          return;
+        } catch (error) {
+          if (!(error instanceof StateWriteConflictError) || attempt >= maxRetries) {
+            throw error;
+          }
+          console.warn(`Retryable state write conflict on ${url.pathname}; attempt ${attempt + 1}/${maxRetries}.`);
+          await waitForStateConflictRetry(attempt);
+        }
+      }
+    } else {
+      await serveStatic(req, res, url);
+    }
+  } catch (error) {
+    if (error instanceof StateWriteConflictError) {
+      return sendJson(res, 409, {
+        error: "state_write_conflict",
+        retryable: true,
+        message: error.message,
+      });
+    }
+    console.error(error);
+    if (!res.headersSent) sendJson(res, 500, { error: "internal_server_error" });
+    else res.end();
+  }
 }
 
+const server = http.createServer(handleRequest);
+
+// Listening is intentionally owned by src/start.js, never by this imported
+// module. Vercel imports handleRequest inside a serverless invocation.
 export { server, createInitialState };
