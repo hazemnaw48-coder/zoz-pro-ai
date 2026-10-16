@@ -64,33 +64,22 @@ export function createStateLock(options = {}) {
 
   async function readLock(path) {
     const client = await getClient();
-    // GET and HEAD are separate requests. A live lease renewal can happen
-    // between them, so retry that narrow race before treating the lock as busy.
-    // Never pair a record body with an ETag from a different version.
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const response = await client.get(path, { access: "private", useCache: false });
-      if (!response || response.statusCode !== 200 || !response.stream) return null;
-      const raw = await new Response(response.stream).text();
-      let record;
-      try {
-        record = JSON.parse(raw);
-      } catch {
-        record = null;
-      }
-      const getEtag = response.blob?.etag ?? response.etag ?? null;
-      const metadata = await client.head(path);
-      const metadataEtag = metadata?.etag ?? null;
-      if (!normalizeBlobEtag(getEtag) || !normalizeBlobEtag(metadataEtag)) {
-        throw new Error("The state lock did not include a usable Blob ETag.");
-      }
-      if (normalizeBlobEtag(getEtag) === normalizeBlobEtag(metadataEtag)) {
-        return { record, etag: metadataEtag };
-      }
-      if (attempt < 4) {
-        await sleep(10 + Math.floor(random() * 25));
-      }
+    const response = await client.get(path, { access: "private", useCache: false });
+    if (!response || response.statusCode !== 200 || !response.stream) return null;
+    const raw = await new Response(response.stream).text();
+    let record;
+    try {
+      record = JSON.parse(raw);
+    } catch {
+      record = null;
     }
-    throw conflict("The state lock changed while its version was being read.");
+    // Pair the record with the ETag returned by the same GET. A separate
+    // HEAD can observe a live lease renewal between requests and falsely
+    // report a version conflict. Normalization removes HTTP quote wrappers;
+    // the conditional PUT still rejects any truly stale version.
+    const etag = normalizeBlobEtag(response.blob?.etag ?? response.etag ?? null);
+    if (!etag) throw new Error("The state lock did not include a usable Blob ETag.");
+    return { record, etag };
   }
 
   async function acquire(path) {
