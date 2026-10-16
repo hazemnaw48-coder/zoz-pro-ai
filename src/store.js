@@ -118,20 +118,29 @@ function createVercelBlobStore() {
           } catch {
             // Keep the original precondition error as the primary failure.
           }
-          const message = String(error?.message ?? "").toLowerCase();
-          const messageClass = /etag/.test(message)
-            ? "etag"
-            : /precondition/.test(message)
-              ? "precondition"
-              : /already.?exists|overwrite/.test(message)
-                ? "exists"
-                : "other";
+          const rawMessage = String(error?.message ?? "");
+          const message = rawMessage.toLowerCase();
+          const messageClass = /etag/.test(message) && /match|mismatch|changed|modified|precondition/.test(message)
+            ? "etag_condition"
+            : /etag/.test(message)
+              ? "etag_other"
+              : /precondition/.test(message)
+                ? "precondition"
+                : /already.?exists|overwrite/.test(message)
+                  ? "exists"
+                  : "other";
+          const safeMessage = rawMessage
+            .replace(/https?:\/\/[^\s"'\x60]+/gi, "[url]")
+            .replace(/\bBearer\s+\S+/gi, "Bearer [redacted]")
+            .replace(/(token|authorization)\s*[:=]\s*[^,\s]+/gi, "$1=[redacted]")
+            .slice(0, 180);
           console.warn("ZOZ Pro durable state compare-and-swap conflict", {
             path: pathname,
             expectedEtagPresent: Boolean(etag),
             latestEtagPresent: Boolean(latestEtag),
             latestEtagMatchesExpected: etag && latestEtag ? latestEtag === etag : null,
             messageClass,
+            safeMessage,
             errorName: error?.name ?? null,
             errorCode: error?.code ?? null,
             errorStatus: error?.status ?? error?.statusCode ?? error?.response?.status ?? null,
