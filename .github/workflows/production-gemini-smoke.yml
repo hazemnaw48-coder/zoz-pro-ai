@@ -1,0 +1,114 @@
+name: ZOZ Pro Production Gemini Smoke
+
+on:
+  push:
+    branches:
+      - feature/ZP-015-production-smoke
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zoz-pro-production-gemini-smoke
+  cancel-in-progress: false
+
+jobs:
+  live-gemini:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: preview-smoke
+    env:
+      PRODUCTION_URL: https://zoz-pro-ai-ruddy.vercel.app
+      ZOZ_CONTROL_TOKEN: ${{ secrets.ZOZ_PRO_CONTROL_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify control credential exists without exposing it
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$ZOZ_CONTROL_TOKEN" ]]; then
+            echo "::error::Missing ZOZ_PRO_CONTROL_TOKEN in the preview-smoke GitHub environment."
+            exit 1
+          fi
+          echo "Control token is configured; value will not be printed."
+
+      - name: Verify production health
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 20 "$PRODUCTION_URL/api/health" -o /tmp/health.json
+          jq -e '.status == "ok" and .project == "hazemnaw48-coder/zoz-pro-ai" and .executionRuntime == "vercel-queue"' /tmp/health.json >/dev/null
+          jq '{status,project,controlPlane,executionRuntime,queuedCommands}' /tmp/health.json
+
+      - name: Submit one isolated real Gemini task and verify durable result
+        shell: bash
+        run: |
+          set -euo pipefail
+          TASK_ID="ZP-GEMINI-SMOKE-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          auth=(-H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" -H 'Content-Type: application/json')
+
+          curl --fail-with-body -sS --max-time 20 "$PRODUCTION_URL/api/state" "${auth[@]}" -o /tmp/state-before.json
+
+          curl --fail-with-body -sS --max-time 20 -X POST "$PRODUCTION_URL/api/tasks" "${auth[@]}" \
+            -d "{\"id\":\"$TASK_ID\",\"title\":\"Isolated production Gemini smoke test\",\"owner\":\"Owner\",\"assignedAgent\":\"codex\",\"branch\":\"task/production-gemini-smoke\",\"requiredChecks\":[\"build\",\"tests\"]}" \
+            -o /tmp/task-create.json
+          jq -e --arg task "$TASK_ID" '.id == $task and .status == "planned"' /tmp/task-create.json >/dev/null
+
+          curl --fail-with-body -sS --max-time 20 -X POST "$PRODUCTION_URL/api/tasks/$TASK_ID/assign" "${auth[@]}" \
+            -d '{"agent":"codex","actor":"Owner"}' -o /tmp/assignment.json
+          jq -e --arg task "$TASK_ID" '.id == $task and .status == "assigned" and .assignedAgent == "codex"' /tmp/assignment.json >/dev/null
+
+          PROMPT='gemini:assist:For this connectivity smoke test, reply with exactly ZOZ_PRO_GEMINI_LIVE_OK and nothing else. Do not call tools or save records.'
+          jq -n --arg instruction "$PROMPT" --arg task "$TASK_ID" '{instruction:$instruction,taskId:$task,requestedBy:"Owner"}' > /tmp/command-payload.json
+          curl --fail-with-body -sS --max-time 20 -X POST "$PRODUCTION_URL/api/control/commands" "${auth[@]}" \
+            --data-binary @/tmp/command-payload.json -o /tmp/command-create.json
+          COMMAND_ID="$(jq -er '.id' /tmp/command-create.json)"
+          echo "Created isolated Gemini smoke command: $COMMAND_ID"
+
+          terminal=false
+          for attempt in $(seq 1 36); do
+            curl --fail-with-body -sS --max-time 20 "$PRODUCTION_URL/api/state" "${auth[@]}" -o /tmp/state-after.json
+            status="$(jq -r --arg id "$COMMAND_ID" '.controlCommands[] | select(.id==$id) | .status' /tmp/state-after.json)"
+            if [[ "$status" == "completed" || "$status" == "failed" || "$status" == "blocked" ]]; then terminal=true; break; fi
+            sleep 5
+          done
+
+          if [[ "$terminal" != true ]]; then
+            echo "::error::Gemini command did not reach a terminal state within 180 seconds."
+            exit 1
+          fi
+          if [[ "$status" != "completed" ]]; then
+            jq --arg id "$COMMAND_ID" '.controlCommands[] | select(.id==$id) | {id,status,error}' /tmp/state-after.json
+            echo "::error::Production Gemini command failed or was blocked."
+            exit 1
+          fi
+
+          jq -e --arg id "$COMMAND_ID" --arg task "$TASK_ID" '
+            (.controlCommands | any(.id==$id and .taskId==$task and .status=="completed" and .result=="ZOZ_PRO_GEMINI_LIVE_OK"))
+            and (.tasks | any(.id==$task and .status=="verification" and .result=="ZOZ_PRO_GEMINI_LIVE_OK"))
+            and (.executor.mode=="vercel_queue" and .executor.lastCompletedCommandId==$id)
+            and (.activity | any(.type=="control_command_completed" and .taskId==$task and (.message | contains($id))))
+          ' /tmp/state-after.json >/dev/null
+
+          # Read the same persisted result again in a separate request.
+          curl --fail-with-body -sS --max-time 20 "$PRODUCTION_URL/api/state" "${auth[@]}" -o /tmp/state-reread.json
+          jq -e --arg id "$COMMAND_ID" --arg task "$TASK_ID" '
+            .controlCommands | any(.id==$id and .taskId==$task and .status=="completed" and .result=="ZOZ_PRO_GEMINI_LIVE_OK")
+          ' /tmp/state-reread.json >/dev/null
+
+          echo "PASS: production authenticated API, Vercel Queue, live Gemini, durable save and independent read-back all succeeded."
+          echo "Task: $TASK_ID"
+          echo "Command: $COMMAND_ID"
+
+      - name: Verify unauthenticated control request is rejected
+        shell: bash
+        run: |
+          set -euo pipefail
+          code="$(curl -sS --max-time 20 -o /tmp/unauth.json -w '%{http_code}' "$PRODUCTION_URL/api/state")"
+          if [[ "$code" != "401" ]]; then
+            echo "::error::Expected HTTP 401 for unauthenticated state access, got $code."
+            exit 1
+          fi
+          echo "PASS: unauthenticated state access rejected with HTTP 401."
