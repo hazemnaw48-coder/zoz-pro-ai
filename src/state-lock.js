@@ -5,7 +5,8 @@ import { normalizeBlobEtag } from "./blob-etag.js";
 
 const DEFAULT_LEASE_MS = 30000;
 const DEFAULT_HEARTBEAT_MS = 5000;
-const DEFAULT_WAIT_TIMEOUT_MS = 10000;
+// Wait longer than a full lease so an abandoned lock can expire before returning 409.
+const DEFAULT_WAIT_TIMEOUT_MS = DEFAULT_LEASE_MS + 5000;
 
 function shouldUseDistributedLock() {
   return process.env.VERCEL === "1"
