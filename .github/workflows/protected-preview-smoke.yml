@@ -22,7 +22,7 @@ jobs:
     env:
       PREVIEW_URL: https://zoz-pro-ai-git-fix-zp-018-serialized-st-44da59-hazemnaw48-coder.vercel.app
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-      ZOZ_CONTROL_TOKEN: ${{ secrets.ZOZ_PRO_PREVIEW_CONTROL_TOKEN }}
+      ZOZ_CONTROL_TOKEN: ${{ secrets.ZOZ_PRO_CONTROL_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -35,7 +35,7 @@ jobs:
             exit 1
           fi
           if [[ -z "$ZOZ_CONTROL_TOKEN" ]]; then
-            echo "::error::Add ZOZ_PRO_PREVIEW_CONTROL_TOKEN to the preview-smoke environment secrets and set it to the exact same Preview-only value as Vercel for this branch."
+            echo "::error::Add ZOZ_PRO_CONTROL_TOKEN to the preview-smoke environment secrets. Its value must match the branch-scoped ZOZ_PRO_CONTROL_TOKEN in the ZOZ Pro Vercel Preview environment."
             exit 1
           fi
           echo "Required secret names are present. Secret values will not be printed."
@@ -56,10 +56,21 @@ jobs:
           set -euo pipefail
           # Each run receives its own task. Never mutate the live ZP-006 engineering task.
           TASK_ID="ZP-SMOKE-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          curl -fsS --max-time 20 "$PREVIEW_URL/api/state" \
+          http_status="$(curl -sS --max-time 20 -w '%{http_code}' "$PREVIEW_URL/api/state" \
             -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
             -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
-            -o /tmp/state-before.json
+            -o /tmp/state-before.json)" || {
+              echo "::error::Preview state request could not reach the application."
+              exit 1
+            }
+          if [[ "$http_status" != "200" ]]; then
+            if [[ "$http_status" == "401" ]]; then
+              echo "::error::Preview rejected the GitHub ZOZ_PRO_CONTROL_TOKEN (HTTP 401). Confirm its value exactly matches the branch-scoped ZOZ_PRO_CONTROL_TOKEN in this Vercel Preview deployment; variable presence alone does not prove a match."
+            else
+              echo "::error::Preview state read returned HTTP $http_status."
+            fi
+            exit 1
+          fi
 
           # A concurrent Vercel Blob write may return retryable state_write_conflict (409).
           # Retry only that explicit conflict; never retry auth, validation, or other failures.
