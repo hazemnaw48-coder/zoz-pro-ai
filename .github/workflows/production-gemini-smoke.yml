@@ -20,7 +20,7 @@ jobs:
     environment: preview-smoke
     env:
       PRODUCTION_URL: https://zoz-pro-ai-ruddy.vercel.app
-      ZOZ_CONTROL_TOKEN: ${{ secrets.ZOZ_PRO_CONTROL_TOKEN }}
+      ZOZ_CONTROL_TOKEN: ${{ secrets.ZOZ_CONTROL_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,7 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "$ZOZ_CONTROL_TOKEN" ]]; then
-            echo "::error::Missing ZOZ_PRO_CONTROL_TOKEN in the preview-smoke GitHub environment."
+            echo "::error::Missing ZOZ_CONTROL_TOKEN in the preview-smoke GitHub environment; add the production token as a GitHub Actions environment secret."
             exit 1
           fi
           echo "Control token is configured; value will not be printed."
