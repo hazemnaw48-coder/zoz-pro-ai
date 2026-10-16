@@ -12,7 +12,8 @@ import {
   normalizeControlCommandInput,
   canExecuteControlCommand,
 } from "./control.js";
-import { createStateStore, StateWriteConflictError } from "./store.js";
+import { createStateStore, getStateBackendInfo, StateWriteConflictError } from "./store.js";
+import { withStateLock } from "./state-lock.js";
 import { isSupportedCloudInstruction } from "./cloud-worker.js";
 import { enqueueCloudCommand, isVercelRuntime } from "./cloud-queue.js";
 import { normalizeOpportunityInput, normalizeIntelligenceInput, OPPORTUNITY_STATUSES } from "./opportunities.js";
@@ -163,18 +164,29 @@ function createControlCommand(state, body) {
 
 async function handleApi(req, res, url) {
   const store = getStore();
-  const state = await store.load();
-
-  if (req.method === "GET" && url.pathname === "/api/health") {
-    return sendJson(res, 200, {
-      status: "ok",
-      project: state.project.repository,
-      controlPlane: "ready",
-      executionRuntime: isVercelRuntime() ? "vercel-queue" : "local-cli",
-      queuedCommands: state.controlCommands?.filter((c) => c.status === "queued").length ?? 0,
-    });
+  const backend = getStateBackendInfo();
+  if (req.method === "GET" && (url.pathname === "/api/health" || url.pathname === "/api/readiness")) {
+    try {
+      const state = await store.load();
+      return sendJson(res, 200, {
+        status: "ok", ready: true, project: state.project.repository,
+        stateBackend: backend.backend, concurrency: backend.concurrency,
+        persistence: { ready: true, backend: backend.backend },
+        controlPlane: "ready",
+        executionRuntime: isVercelRuntime() ? "vercel-queue" : "local-cli",
+        queuedCommands: state.controlCommands?.filter((c) => c.status === "queued").length ?? 0,
+      });
+    } catch (error) {
+      const allowed = new Set(["state_backend_invalid","supabase_configuration_missing","supabase_configuration_invalid","supabase_access_denied","supabase_schema_missing","supabase_state_not_initialized","supabase_state_invalid","supabase_version_invalid","supabase_state_version_missing","supabase_unavailable","supabase_rate_limited","supabase_request_failed","supabase_invalid_response","state_write_conflict"]);
+      return sendJson(res, 503, {
+        status: "degraded", ready: false, project: "hazemnaw48-coder/zoz-pro-ai",
+        stateBackend: backend.backend, concurrency: backend.concurrency,
+        persistence: { ready: false, backend: backend.backend, error: allowed.has(error?.code) ? error.code : "state_backend_unavailable" },
+        controlPlane: "not_ready", executionRuntime: isVercelRuntime() ? "vercel-queue" : "local-cli",
+      });
+    }
   }
-
+  const state = await store.load();
   if (!isAuthorized(req)) return sendUnauthorized(res);
 
   if (req.method === "GET" && url.pathname === "/api/content-factory/status") {
@@ -234,6 +246,7 @@ async function handleApi(req, res, url) {
       await store.save(state);
       return sendJson(res, 201, { publication, approval });
     } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error;
       if (error instanceof ContentPublisherError) {
         return sendJson(res, error.httpStatus, { error: error.code, message: error.message, details: error.details });
       }
@@ -273,6 +286,7 @@ async function handleApi(req, res, url) {
       await store.save(state);
       return sendJson(res, result.status === "published" ? 200 : 202, { publication, provider: result });
     } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error;
       publication.lastError = error.message || String(error);
       publication.updatedAt = new Date().toISOString();
       appendActivity(state, {
@@ -311,6 +325,7 @@ async function handleApi(req, res, url) {
         await store.save(state);
         return sendJson(res, 200, { publication, provider: result });
       } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error;
         if (error instanceof ContentPublisherError) {
           return sendJson(res, error.httpStatus, { error: error.code, message: error.message, publication });
         }
@@ -342,7 +357,8 @@ async function handleApi(req, res, url) {
       appendActivity(state, { type:"outreach_created", actor:"Owner", message:`Created outreach ${item.id} for ${item.contactId}; status remains ${item.status} until explicitly sent.` });
       await store.save(state);
       return sendJson(res, 201, item);
-    } catch (error) { return sendJson(res, 400, { error:error.message }); }
+    } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error; return sendJson(res, 400, { error:error.message }); }
   }
 
   const outreachMatch = url.pathname.match(/^\/api\/outreach\/([^/]+)\/status$/);
@@ -375,7 +391,8 @@ async function handleApi(req, res, url) {
       appendActivity(state, { type:"contact_created", actor:"Owner", message:`Created contact ${contact.id}: ${contact.name}` });
       await store.save(state);
       return sendJson(res, 201, contact);
-    } catch (error) { return sendJson(res, 400, { error:error.message }); }
+    } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error; return sendJson(res, 400, { error:error.message }); }
   }
 
   const contactMatch = url.pathname.match(/^\/api\/contacts\/([^/]+)\/status$/);
@@ -404,7 +421,8 @@ async function handleApi(req, res, url) {
       appendActivity(state, { type:"opportunity_created", actor:"Owner", message:`Created ${opportunity.id}: ${opportunity.title} (score ${opportunity.score})` });
       await store.save(state);
       return sendJson(res, 201, opportunity);
-    } catch (error) { return sendJson(res, 400, { error:error.message }); }
+    } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error; return sendJson(res, 400, { error:error.message }); }
   }
 
   const opportunityMatch = url.pathname.match(/^\/api\/opportunities\/([^/]+)\/status$/);
@@ -433,7 +451,8 @@ async function handleApi(req, res, url) {
       appendActivity(state, { type:"intelligence_added", actor:"Owner", message:`Added ${signal.type} intelligence signal.` });
       await store.save(state);
       return sendJson(res, 201, signal);
-    } catch (error) { return sendJson(res, 400, { error:error.message }); }
+    } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error; return sendJson(res, 400, { error:error.message }); }
   }
 
   if (req.method === "GET" && url.pathname === "/api/control/commands") {
@@ -513,6 +532,7 @@ async function handleApi(req, res, url) {
       }
       return sendJson(res, 201, command);
     } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error;
       if (error instanceof StateWriteConflictError) throw error;
       return sendJson(res, 400, { error: error.message });
     }
@@ -558,6 +578,7 @@ async function handleApi(req, res, url) {
     try {
       assertControlCommandTransition(command.status, target);
     } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error;
       return sendJson(res, 409, { error: error.message });
     }
 
@@ -645,6 +666,7 @@ async function handleApi(req, res, url) {
       await store.save(state);
       return sendJson(res, 200, task);
     } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error;
       if (error instanceof StateWriteConflictError) throw error;
       return sendJson(res, 409, { error: error.message });
     }
@@ -710,6 +732,7 @@ async function handleApi(req, res, url) {
     try {
       assertTaskTransition(task.status, body.status);
     } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error;
       return sendJson(res, 409, { error: error.message });
     }
     task.status = body.status;
@@ -849,6 +872,11 @@ export async function handleRequest(req, res) {
     const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
     if (url.pathname.startsWith("/api/")) {
       const retryableMutation = isRetryableStateMutation(req, url);
+      // Anonymous requests must not occupy the shared write lock.
+      const lockThisRequest = isAuthorized(req) && (
+        (req.method !== "GET" && req.method !== "HEAD")
+        || /^\/api\/content-factory\/publications\/[^/]+$/.test(url.pathname)
+      );
       if (retryableMutation) await bufferRequestBody(req);
 
       // Blob uses ETag conditional writes to prevent lost updates. On a conflict,
@@ -857,13 +885,28 @@ export async function handleRequest(req, res) {
       const maxRetries = retryableMutation ? 12 : 0;
       for (let attempt = 0; ; attempt += 1) {
         try {
-          await handleApi(req, res, url);
+          if (lockThisRequest) {
+            await withStateLock(() => handleApi(req, res, url));
+          } else {
+            await handleApi(req, res, url);
+          }
           return;
         } catch (error) {
-          if (!(error instanceof StateWriteConflictError) || attempt >= maxRetries) {
+          if (error?.lockBusy
+            || ((!(error instanceof StateWriteConflictError) && error?.code !== "state_write_conflict") || attempt >= maxRetries)) {
             throw error;
           }
-          console.warn(`Retryable state write conflict on ${url.pathname}; attempt ${attempt + 1}/${maxRetries}.`);
+          console.warn("Retryable state write conflict", {
+            path: url.pathname,
+            attempt: attempt + 1,
+            maxRetries,
+            errorName: error?.name ?? null,
+            errorCode: error?.code ?? null,
+            errorStatus: error?.status ?? error?.statusCode ?? error?.response?.status ?? null,
+            causeName: error?.cause?.name ?? null,
+            causeCode: error?.cause?.code ?? null,
+            causeStatus: error?.cause?.status ?? error?.cause?.statusCode ?? error?.cause?.response?.status ?? null,
+          });
           await waitForStateConflictRetry(attempt);
         }
       }
@@ -871,7 +914,7 @@ export async function handleRequest(req, res) {
       await serveStatic(req, res, url);
     }
   } catch (error) {
-    if (error instanceof StateWriteConflictError) {
+    if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") {
       return sendJson(res, 409, {
         error: "state_write_conflict",
         retryable: true,

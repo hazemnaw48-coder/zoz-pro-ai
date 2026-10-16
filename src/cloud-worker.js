@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { assertTaskTransition } from "./domain.js";
 import { evaluateExecutionGate } from "./orchestrator.js";
 import { createStateStore } from "./store.js";
+import { withStateLock } from "./state-lock.js";
 import { extractGeminiPrompt, generateGeminiText, GeminiAgentError } from "./gemini-agent.js";
 
 export const CLOUD_SAFE_INSTRUCTIONS = Object.freeze([
@@ -102,7 +103,7 @@ async function failCommand(store, state, command, taskId, reason, now) {
  * at-least-once delivery, so claims and finalization are idempotent. A stale
  * Blob ETag conflict deliberately propagates so Queue can retry the delivery.
  */
-export async function processCloudCommand(commandId, options = {}) {
+async function processCloudCommandLocked(commandId, options = {}) {
   if (typeof commandId !== "string" || !commandId.trim()) {
     throw new Error("commandId is required");
   }
@@ -240,4 +241,10 @@ export async function processCloudCommand(commandId, options = {}) {
     workerStatus: state.executor.status,
     heartbeat: state.executor.lastSeen,
   };
+}
+
+// Serialize the cloud worker lifecycle with API mutations. The lease is renewed
+// while the worker runs so long model responses cannot silently lose ownership.
+export async function processCloudCommand(commandId, options = {}) {
+  return withStateLock(() => processCloudCommandLocked(commandId, options));
 }

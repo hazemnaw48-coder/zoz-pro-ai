@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - feature/ZP-012-vercel-cloud-runtime
+      - fix/ZP-018-serialized-state-writes
 
 permissions:
   contents: read
@@ -19,9 +20,9 @@ jobs:
     timeout-minutes: 8
     environment: preview-smoke
     env:
-      PREVIEW_URL: https://zoz-pro-ai-git-feature-zp-012-vercel-cl-42791b-hazemnaw48-coder.vercel.app
+      PREVIEW_URL: https://zoz-pro-ai-git-fix-zp-018-serialized-st-44da59-hazemnaw48-coder.vercel.app
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-      ZOZ_CONTROL_TOKEN: ${{ secrets.ZOZ_PRO_CONTROL_TOKEN }}
+      ZOZ_CONTROL_TOKEN: ${{ secrets.ZOZ_PRO_PREVIEW_CONTROL_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -34,7 +35,7 @@ jobs:
             exit 1
           fi
           if [[ -z "$ZOZ_CONTROL_TOKEN" ]]; then
-            echo "::error::Add ZOZ_PRO_CONTROL_TOKEN to the preview-smoke environment secrets."
+            echo "::error::Add ZOZ_PRO_PREVIEW_CONTROL_TOKEN to the preview-smoke environment secrets and ensure it matches the dedicated ZOZ_PRO_PREVIEW_CONTROL_TOKEN in this ZOZ Pro Preview deployment."
             exit 1
           fi
           echo "Required secret names are present. Secret values will not be printed."
@@ -49,24 +50,32 @@ jobs:
           jq -e '.status == "ok" and .project == "hazemnaw48-coder/zoz-pro-ai" and .executionRuntime == "vercel-queue"' /tmp/health.json >/dev/null
           jq '{status,project,controlPlane,executionRuntime,queuedCommands}' /tmp/health.json
 
-      - name: Submit safe cloud health-check command against an isolated task
+      - name: Submit allowlisted system health-check against an isolated Preview task
         shell: bash
         run: |
           set -euo pipefail
-          # Each run receives its own task. Never mutate the live ZP-006 engineering task.
           TASK_ID="ZP-SMOKE-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          curl -fsS --max-time 20 "$PREVIEW_URL/api/state" \
+          http_status="$(curl -sS --max-time 20 -w '%{http_code}' "$PREVIEW_URL/api/state" \
             -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
             -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
-            -o /tmp/state-before.json
+            -o /tmp/state-before.json)" || {
+              echo "::error::Preview state request could not reach the application."
+              exit 1
+            }
+          if [[ "$http_status" != "200" ]]; then
+            if [[ "$http_status" == "401" ]]; then
+              echo "::error::Preview rejected the dedicated GitHub ZOZ_PRO_PREVIEW_CONTROL_TOKEN (HTTP 401). Confirm it matches the Preview-only token configured for this ZOZ Pro Preview deployment; variable presence alone does not prove a match."
+            else
+              echo "::error::Preview state read returned HTTP $http_status."
+            fi
+            exit 1
+          fi
 
-          # A concurrent Vercel Blob write may return retryable state_write_conflict (409).
-          # Retry only that explicit conflict; never retry auth, validation, or other failures.
           post_json_retry() {
             local url="$1" payload="$2" output="$3"
             local attempt error
             for attempt in $(seq 1 5); do
-              if curl --fail-with-body -sS --max-time 20 -X POST "$url" \
+              if curl --fail-with-body -sS --max-time 50 -X POST "$url" \
                 -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
                 -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
                 -H 'Content-Type: application/json' \
@@ -83,25 +92,28 @@ jobs:
             done
           }
 
-          # Create a fresh smoke task rather than relying on seeded/stale Preview tasks.
-          if ! post_json_retry "$PREVIEW_URL/api/tasks" "{\"id\":\"$TASK_ID\",\"title\":\"Isolated Preview smoke diagnostic\",\"owner\":\"Owner\",\"assignedAgent\":\"codex\",\"branch\":\"task/preview-smoke\",\"requiredChecks\":[\"build\",\"tests\"]}" /tmp/task-create.json; then
+          task_payload="$(jq -cn --arg id "$TASK_ID" '{id:$id,title:"Isolated Preview system health-check",owner:"Owner",assignedAgent:"codex",branch:"task/preview-smoke",requiredChecks:["build","tests"]}')"
+          if ! post_json_retry "$PREVIEW_URL/api/tasks" "$task_payload" /tmp/task-create.json; then
             echo "::error::Failed to create isolated smoke task."
             exit 1
           fi
           jq -e --arg task "$TASK_ID" '.id == $task and .status == "planned"' /tmp/task-create.json >/dev/null
+          jq '{id,status,assignedAgent}' /tmp/task-create.json
 
           if ! post_json_retry "$PREVIEW_URL/api/tasks/$TASK_ID/assign" '{"agent":"codex","actor":"Owner"}' /tmp/assignment.json; then
             echo "::error::Failed to assign isolated smoke task."
             exit 1
           fi
           jq -e --arg task "$TASK_ID" '.id == $task and .status == "assigned" and .assignedAgent == "codex"' /tmp/assignment.json >/dev/null
+          jq '{id,status,assignedAgent}' /tmp/assignment.json
 
-          if ! post_json_retry "$PREVIEW_URL/api/control/commands" "{\"instruction\":\"system:health-check\",\"taskId\":\"$TASK_ID\",\"requestedBy\":\"Owner\"}" /tmp/command.json; then
+          command_payload="$(jq -cn --arg task "$TASK_ID" '{instruction:"system:health-check",taskId:$task,requestedBy:"Owner"}')"
+          if ! post_json_retry "$PREVIEW_URL/api/control/commands" "$command_payload" /tmp/command.json; then
             echo "::error::Failed to queue isolated smoke health-check command."
             exit 1
           fi
           id="$(jq -er '.id' /tmp/command.json)"
-          echo "Submitted allowlisted read-only command $id for isolated task $TASK_ID."
+          echo "Submitted isolated system health-check command $id for task $TASK_ID."
 
           complete=false
           for attempt in $(seq 1 36); do
@@ -114,20 +126,35 @@ jobs:
             sleep 5
           done
           if [[ "$complete" != true ]]; then
-            echo "::error::Cloud command did not reach terminal state within 180 seconds."
+            echo "::error::Cloud system health-check did not reach terminal state within 180 seconds."
             exit 1
           fi
           if [[ "$status" != "completed" ]]; then
             jq --arg id "$id" '.controlCommands[] | select(.id==$id) | {id,status,error}' /tmp/state.json
-            echo "::error::Cloud worker did not complete the health-check command."
+            echo "::error::System health-check command did not complete successfully."
             exit 1
           fi
           jq -e --arg id "$id" --arg task "$TASK_ID" '
-            (.controlCommands | any(.id==$id and .taskId==$task and .status=="completed" and ((.result // "") | ascii_downcase | contains("cloud health check completed"))))
+            (.controlCommands | any(.id==$id and .taskId==$task and .status=="completed" and ((.result // "") | ascii_downcase | contains("zoz pro cloud health check completed"))))
             and (.tasks | any(.id==$task and .status=="verification"))
             and (.executor.mode=="vercel_queue" and (.executor.lastSeen | type=="string") and .executor.lastCompletedCommandId==$id)
             and (.activity | any(.type=="control_command_claimed" and .taskId==$task and (.message | contains($id))))
             and (.activity | any(.type=="executor_heartbeat" and .taskId==$task and (.message | contains($id))))
             and (.activity | any(.type=="control_command_completed" and .taskId==$task and (.message | contains($id))))
           ' /tmp/state.json >/dev/null
-          echo "PASS: worker completed command $id; task state, result, heartbeat, durable state and audit entries were read back."
+          curl -fsS --max-time 20 "$PREVIEW_URL/api/state" \
+            -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
+            -H "Authorization: Bearer $ZOZ_CONTROL_TOKEN" \
+            -o /tmp/state-reread.json
+          jq -e --arg id "$id" --arg task "$TASK_ID" '
+            .controlCommands | any(.id==$id and .taskId==$task and .status=="completed" and ((.result // "") | ascii_downcase | contains("zoz pro cloud health check completed")))
+          ' /tmp/state-reread.json >/dev/null
+          jq --arg id "$id" --arg task "$TASK_ID" '
+            {
+              task: ([.tasks[] | select(.id==$task) | {id,status,assignedAgent,result}][0]),
+              command: ([.controlCommands[] | select(.id==$id) | {id,taskId,status,result,error}][0]),
+              worker: (.executor | {mode,status,lastSeen,lastCompletedCommandId}),
+              activity: [.activity[] | select(.taskId==$task and (.type=="control_command_claimed" or .type=="executor_heartbeat" or .type=="control_command_completed")) | {type,taskId,message}]
+            }
+          ' /tmp/state-reread.json
+          echo "PASS: Preview Queue + system health-check + durable result + independent read-back succeeded for task $TASK_ID and command $id."
