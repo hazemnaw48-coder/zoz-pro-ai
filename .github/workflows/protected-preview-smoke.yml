@@ -22,7 +22,7 @@ jobs:
     env:
       PREVIEW_URL: https://zoz-pro-ai-git-fix-zp-018-serialized-st-44da59-hazemnaw48-coder.vercel.app
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-      ZOZ_CONTROL_TOKEN: ${{ secrets.ZOZ_PRO_CONTROL_TOKEN }}
+      ZOZ_CONTROL_TOKEN: ${{ secrets.ZOZ_PRO_PREVIEW_CONTROL_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -35,7 +35,7 @@ jobs:
             exit 1
           fi
           if [[ -z "$ZOZ_CONTROL_TOKEN" ]]; then
-            echo "::error::Add ZOZ_PRO_CONTROL_TOKEN to the preview-smoke environment secrets."
+            echo "::error::Add ZOZ_PRO_PREVIEW_CONTROL_TOKEN to the preview-smoke environment secrets; never reuse the production control token for Preview."
             exit 1
           fi
           echo "Required secret names are present. Secret values will not be printed."
