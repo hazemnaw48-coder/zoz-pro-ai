@@ -107,7 +107,7 @@ function createVercelBlobStore() {
       try {
         saved = await put(pathname, JSON.stringify(state, null, 2) + "\n", options);
       } catch (error) {
-        if (isStateWriteConflict(error)) throw new StateWriteConflictError();
+        if (isStateWriteConflict(error)) throw new StateWriteConflictError(undefined, { cause: error });
         throw error;
       }
       etag = saved.etag;
