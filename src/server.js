@@ -67,9 +67,27 @@ async function readJson(req) {
 
 function isRetryableStateMutation(req, url) {
   if (req.method !== "POST") return false;
-  return url.pathname === "/api/tasks"
-    || (url.pathname.startsWith("/api/tasks/") && url.pathname.endsWith("/assign") && url.pathname.split("/").length === 5)
-    || url.pathname === "/api/control/commands";
+  const pathname = url.pathname;
+
+  // These routes only perform local state mutations. Their request bodies are
+  // buffered so a Blob ETag conflict can safely replay the operation from a
+  // fresh state snapshot. Keep provider submission out of this list because it
+  // can perform an external side effect before the state write.
+  return pathname === "/api/content-factory/publications"
+    || pathname === "/api/outreach"
+    || /^\\/api\\/outreach\\/[^/]+\\/status$/.test(pathname)
+    || pathname === "/api/contacts"
+    || /^\\/api\\/contacts\\/[^/]+\\/status$/.test(pathname)
+    || pathname === "/api/opportunities"
+    || /^\\/api\\/opportunities\\/[^/]+\\/status$/.test(pathname)
+    || pathname === "/api/intelligence"
+    || pathname === "/api/executor/heartbeat"
+    || pathname === "/api/control/commands"
+    || /^\\/api\\/control\\/commands\\/[^/]+\\/(claim|complete|fail|cancel)$/.test(pathname)
+    || pathname === "/api/tasks"
+    || /^\\/api\\/tasks\\/[^/]+\\/(assign|verify|transition)$/.test(pathname)
+    || pathname === "/api/approvals"
+    || /^\\/api\\/approvals\\/[^/]+\\/(approve|reject)$/.test(pathname);
 }
 
 async function bufferRequestBody(req) {
@@ -79,7 +97,12 @@ async function bufferRequestBody(req) {
 }
 
 function waitForStateConflictRetry(attempt) {
-  return new Promise((resolve) => setTimeout(resolve, Math.min(800, 50 * (2 ** attempt))));
+  // Full jitter prevents concurrent serverless requests from retrying in lockstep.
+  // The capped window allows sustained but finite Blob writes to settle without
+  // exceeding the configured function duration.
+  const ceilingMs = Math.min(1600, 100 * (2 ** Math.min(attempt, 4)));
+  const delayMs = Math.floor(Math.random() * ceilingMs);
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
 function appendActivity(state, activity) {
@@ -831,7 +854,7 @@ export async function handleRequest(req, res) {
       // Blob uses ETag conditional writes to prevent lost updates. On a conflict,
       // replay only these deterministic, non-external mutation routes against a
       // newly loaded state. Never replay publish/send/financial/destructive routes.
-      const maxRetries = retryableMutation ? 5 : 0;
+      const maxRetries = retryableMutation ? 12 : 0;
       for (let attempt = 0; ; attempt += 1) {
         try {
           await handleApi(req, res, url);
