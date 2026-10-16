@@ -104,6 +104,27 @@ test("acquisition retries a GET/HEAD version race without failing or overwriting
   });
 });
 
+test("readLock retries multiple transient GET/HEAD version changes", async () => {
+  const client = makeBlobClient();
+  const lock = createTestLock(client);
+  let remainingRaces = 3;
+  const originalHead = client.head.bind(client);
+  client.head = async path => {
+    if (remainingRaces > 0) {
+      remainingRaces -= 1;
+      const current = client.inspectCurrent();
+      const record = JSON.parse(current.body);
+      client.replaceCurrent(JSON.stringify({ ...record, expiresAt: record.expiresAt + 1 }));
+    }
+    return originalHead(path);
+  };
+
+  await lock.withLock(async () => {
+    await lock.assertOwned();
+    assert.equal(remainingRaces, 0, "readLock should retry until GET and HEAD refer to one version");
+  });
+});
+
 test("release treats a concurrent owner change as a retryable state conflict", async () => {
   const client = makeBlobClient();
   const lock = createTestLock(client);
@@ -130,10 +151,7 @@ test("release treats a concurrent owner change as a retryable state conflict", a
   } finally {
     console.warn = originalWarn;
   }
-  assert.equal(warnings.length, 1);
-  assert.equal(warnings[0][0], "ZOZ Pro state-lock conditional release conflict");
-  assert.equal(warnings[0][1].stage, "read");
-  assert.equal(typeof warnings[0][1].safeMessage, "string");
+  assert.equal(warnings.length, 0, "a GET/HEAD race should be resolved internally");
   assert.equal(JSON.parse(client.inspectCurrent().body).owner, "intervening-owner");
 });
 
@@ -162,9 +180,7 @@ test("release retries a same-owner ETag race and expires the lock promptly", asy
   } finally {
     console.warn = originalWarn;
   }
-  assert.equal(warnings.length, 1);
-  assert.equal(warnings[0][0], "ZOZ Pro state-lock conditional release conflict");
-  assert.equal(warnings[0][1].stage, "read");
+  assert.equal(warnings.length, 0, "a same-owner ETag race should be resolved internally");
   assert.equal(JSON.parse(client.inspectCurrent().body).expiresAt, 0);
 });
 
