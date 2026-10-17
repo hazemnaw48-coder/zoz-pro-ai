@@ -36,8 +36,8 @@ export function getCloudRunWorkerStatus() {
 /**
  * Execute a command in the HTTP request lifecycle. The state row is first
  * durably claimed by processCloudCommand before any work begins. The in-process
- * guard prevents startup recovery from executing the same command twice in
- * one instance; the Cloud Run service should also use max-instances=1.
+ * guard prevents a manual sweep and direct request from executing the same
+ * command twice in one instance; Cloud Run should also use max-instances=1.
  */
 export async function executeCloudRunCommand(commandId, options = {}) {
   if (!isCloudRunSupabaseRuntime()) {
@@ -89,9 +89,9 @@ export async function executeCloudRunCommand(commandId, options = {}) {
  * eligible only when allowlisted and not approval-gated. Already-claimed
  * commands are recovered automatically only for deterministic system checks;
  * a claimed Gemini request is left for inspection to avoid duplicate model cost.
- * This sweep runs on the first API request after startup or via the authenticated
- * POST /api/worker/sweep endpoint. It does not poll continuously or keep an
- * instance alive while idle.
+ * This sweep runs only when the owner calls the authenticated POST
+ * /api/worker/sweep endpoint. It does not poll continuously, run automatically
+ * on health checks, or keep an instance alive while idle.
  */
 export async function sweepCloudRunQueueOnce(options = {}) {
   if (!isCloudRunSupabaseRuntime()) {
