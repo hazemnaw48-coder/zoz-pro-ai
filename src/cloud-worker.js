@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { isRenderPollRuntime } from "./cloud-queue.js";
+import { isCloudRunSupabaseRuntime } from "./cloud-queue.js";
 import { assertTaskTransition } from "./domain.js";
 import { evaluateExecutionGate } from "./orchestrator.js";
 import { createStateStore } from "./store.js";
@@ -41,13 +41,13 @@ function appendActivity(state, type, taskId, message, now) {
 function setExecutor(state, updates, now) {
   state.executor = {
     ...(state.executor ?? {}),
-    id: isRenderPollRuntime() ? "render-supabase-worker" : "vercel-queue-worker",
+    id: isCloudRunSupabaseRuntime() ? "cloud-run-supabase-worker" : "vercel-queue-worker",
     agent: CLOUD_WORKER,
-    mode: isRenderPollRuntime() ? "render_supabase_poll" : "vercel_queue",
+    mode: isCloudRunSupabaseRuntime() ? "cloud_run_supabase_inband" : "vercel_queue",
     protocol: "zoz-control-v1",
     capabilities: ["read-only-diagnostics", "gemini-text-generation"],
     lastSeen: timestamp(now),
-    hostname: isRenderPollRuntime() ? (process.env.RENDER_SERVICE_NAME || "render-worker") : "vercel-serverless",
+    hostname: isCloudRunSupabaseRuntime() ? (process.env.K_SERVICE || "cloud-run-service") : "vercel-serverless",
     ...updates,
   };
 }
@@ -63,8 +63,8 @@ function makeResult(instruction, state, task, command) {
   if (normalizeCloudInstruction(instruction) === "system:health-check") {
     return [
       "ZOZ Pro cloud health check completed.",
-      isRenderPollRuntime()
-        ? "Execution path: mobile control API -> durable Supabase state -> Render polling worker."
+      isCloudRunSupabaseRuntime()
+        ? "Execution path: mobile control API -> durable Supabase state -> Google Cloud Run in-band worker."
         : "Execution path: mobile control API -> durable state -> Vercel Queue -> cloud worker.",
       `Command ID: ${command.id}`,
       `Task ID: ${task.id}`,
@@ -150,7 +150,7 @@ async function processCloudCommandLocked(commandId, options = {}) {
     command.claimedBy = CLOUD_WORKER;
     command.deliveryCount = deliveryCount;
     task.status = "executing";
-    appendActivity(state, "control_command_claimed", task.id, `${command.id} claimed by the ${isRenderPollRuntime() ? "Render Supabase polling" : "Vercel Queue"} worker.`, now);
+    appendActivity(state, "control_command_claimed", task.id, `${command.id} claimed by the ${isCloudRunSupabaseRuntime() ? "Google Cloud Run in-band" : "Vercel Queue"} worker.`, now);
     appendActivity(state, "task_executing", task.id, `${task.id} entered executing after ${command.id} was claimed.`, now);
     appendActivity(state, "executor_heartbeat", task.id, `Cloud worker heartbeat recorded while processing ${command.id}.`, now);
     setExecutor(state, {
@@ -229,7 +229,7 @@ async function processCloudCommandLocked(commandId, options = {}) {
     lastCompletedCommandId: command.id,
     deliveryCount,
   }, now);
-  appendActivity(state, "control_command_completed", finalTask.id, `${command.id} completed by the ${isRenderPollRuntime() ? "Render Supabase polling" : "Vercel Queue"} worker.`, now);
+  appendActivity(state, "control_command_completed", finalTask.id, `${command.id} completed by the ${isCloudRunSupabaseRuntime() ? "Google Cloud Run in-band" : "Vercel Queue"} worker.`, now);
   appendActivity(state, "task_moved_to_verification", finalTask.id, `${finalTask.id} moved to verification; task-level checks remain required.`, now);
   appendActivity(state, "executor_heartbeat", finalTask.id, "Cloud worker completion heartbeat recorded.", now);
   await store.save(state);
