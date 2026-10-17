@@ -1,22 +1,16 @@
 import { server } from "./server.js";
-import { startRenderWorker } from "./render-worker.js";
 
-const PORT = Number(process.env.PORT ?? 3000);
-const worker = startRenderWorker();
+const PORT = Number(process.env.PORT ?? 8080);
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`ZOZ Pro listening on http://0.0.0.0:${PORT}`);
-  if (worker.status().enabled) {
-    console.log("ZOZ Pro Render polling worker started.");
-  }
+  console.log("ZOZ Pro Cloud Run service listening.");
 });
 
-function shutdown(signal) {
-  console.log(`ZOZ Pro received ${signal}; shutting down cleanly.`);
-  worker.stop();
+// Cloud Run request-based instances scale to zero. Commands are processed in-band
+// and pending safe work is swept once on the first API request, not continuously.
+process.once("SIGTERM", () => {
   server.close(() => process.exit(0));
-  setTimeout(() => process.exit(1), 10000).unref();
-}
-
-process.once("SIGTERM", () => shutdown("SIGTERM"));
-process.once("SIGINT", () => shutdown("SIGINT"));
+});
+process.once("SIGINT", () => {
+  server.close(() => process.exit(0));
+});
