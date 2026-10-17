@@ -180,6 +180,14 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "GET" && (url.pathname === "/api/health" || url.pathname === "/api/readiness")) {
+    if (isCloudRunRuntimeRequested() && !isCloudRunSupabaseRuntime()) {
+      return sendJson(res, 503, {
+        status: "degraded", ready: false, project: "hazemnaw48-coder/zoz-pro-ai",
+        stateBackend: backend.backend, concurrency: backend.concurrency,
+        persistence: { ready: false, backend: backend.backend, error: "cloud_run_misconfigured" },
+        controlPlane: "not_ready", executionRuntime: getExecutionRuntime(), worker: getCloudRunWorkerStatus(),
+      });
+    }
     try {
       const state = await store.load();
       return sendJson(res, 200, {
@@ -197,7 +205,7 @@ async function handleApi(req, res, url) {
         status: "degraded", ready: false, project: "hazemnaw48-coder/zoz-pro-ai",
         stateBackend: backend.backend, concurrency: backend.concurrency,
         persistence: { ready: false, backend: backend.backend, error: allowed.has(error?.code) ? error.code : "state_backend_unavailable" },
-        controlPlane: "not_ready", executionRuntime: getExecutionRuntime(), worker: getRenderWorkerStatus(),
+        controlPlane: "not_ready", executionRuntime: getExecutionRuntime(), worker: getCloudRunWorkerStatus(),
       });
     }
   }
@@ -904,26 +912,9 @@ async function serveStatic(req, res, url) {
   }
 }
 
-let cloudRunStartupRecovery = null;
-
-async function ensureCloudRunStartupRecovery() {
-  if (!isCloudRunSupabaseRuntime()) return null;
-  if (!cloudRunStartupRecovery) {
-    cloudRunStartupRecovery = sweepCloudRunQueueOnce().catch((error) => {
-      const code = /^[a-zA-Z0-9_-]{1,80}$/.test(String(error?.code ?? "")) ? error.code : "worker_recovery_failed";
-      console.error("ZOZ Pro Cloud Run startup recovery did not complete", { code });
-      return null;
-    });
-  }
-  return cloudRunStartupRecovery;
-}
-
 export async function handleRequest(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
-    if (url.pathname.startsWith("/api/") && url.pathname !== "/api/worker/sweep" && isCloudRunSupabaseRuntime()) {
-      await ensureCloudRunStartupRecovery();
-    }
     if (url.pathname.startsWith("/api/")) {
       const retryableMutation = isRetryableStateMutation(req, url);
       // Anonymous requests must not occupy the shared write lock.
