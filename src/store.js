@@ -1,6 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createInitialState, validateState } from "./domain.js";
+import { StateWriteConflictError } from "./state-errors.js";
+import { normalizeBlobEtag } from "./blob-etag.js";
+import { createSupabaseStateStore } from "./supabase-state-store.js";
+import { assertStateLockOwnership, withStateLock } from "./state-lock.js";
+export { StateWriteConflictError } from "./state-errors.js";
 
 export function getDefaultStateFile() {
   return path.resolve(
@@ -10,14 +15,6 @@ export function getDefaultStateFile() {
 }
 
 export const DEFAULT_STATE_FILE = getDefaultStateFile();
-
-export class StateWriteConflictError extends Error {
-  constructor() {
-    super("Persistent state changed during this request. Reload the latest state and retry.");
-    this.name = "StateWriteConflictError";
-    this.code = "state_write_conflict";
-  }
-}
 
 export function isStateWriteConflict(error) {
   const status = Number(error?.status ?? error?.statusCode ?? error?.response?.status);
@@ -66,7 +63,16 @@ function createVercelBlobStore() {
     const raw = await new Response(result.stream).text();
     const state = JSON.parse(raw);
     validateState(state);
-    etag = result.blob?.etag ?? result.etag ?? null;
+
+    // Keep the ETag paired with the exact body returned by GET. Normalize
+    // HTTP quoting before ifMatch so a separate HEAD cannot introduce a
+    // second-version race with concurrent writers.
+    const getEtag = result.blob?.etag ?? result.etag ?? null;
+    const normalizedEtag = normalizeBlobEtag(getEtag);
+    if (!normalizedEtag) {
+      throw new Error("Vercel Blob did not return a usable ETag for durable state.");
+    }
+    etag = normalizedEtag;
     return state;
   }
 
@@ -76,22 +82,29 @@ function createVercelBlobStore() {
       const existing = await parseCurrent(result);
       if (existing) return existing;
 
-      // First-writer wins on initialization. If two cold starts race, read back
-      // the state that was created first instead of overwriting it.
-      const initial = createInitialState();
-      try {
-        await this.save(initial);
-        return initial;
-      } catch (writeError) {
-        const raced = await readCurrent().catch(() => null);
-        const recovered = await parseCurrent(raced).catch(() => null);
+      // Initialization is a write too. Acquire the same distributed lock and
+      // re-read before creating the first state so concurrent cold starts agree.
+      return withStateLock(async () => {
+        const latest = await readCurrent();
+        const recovered = await parseCurrent(latest);
         if (recovered) return recovered;
-        throw writeError;
-      }
+
+        const initial = createInitialState();
+        try {
+          await this.save(initial);
+          return initial;
+        } catch (writeError) {
+          const raced = await readCurrent().catch(() => null);
+          const afterRace = await parseCurrent(raced).catch(() => null);
+          if (afterRace) return afterRace;
+          throw writeError;
+        }
+      });
     },
 
     async save(state) {
       validateState(state);
+      await assertStateLockOwnership();
       const { put } = await getSdk();
       const options = {
         access: "private",
@@ -105,7 +118,46 @@ function createVercelBlobStore() {
       try {
         saved = await put(pathname, JSON.stringify(state, null, 2) + "\n", options);
       } catch (error) {
-        if (isStateWriteConflict(error)) throw new StateWriteConflictError();
+        if (isStateWriteConflict(error)) {
+          // Diagnose the compare-and-swap without emitting blob ETags, payloads,
+          // request headers, or credentials. A second uncached read tells us
+          // whether state changed despite the distributed lock.
+          let latestEtag = null;
+          try {
+            const latest = await readCurrent();
+            latestEtag = latest?.blob?.etag ?? latest?.etag ?? null;
+          } catch {
+            // Keep the original precondition error as the primary failure.
+          }
+          const rawMessage = String(error?.message ?? "");
+          const message = rawMessage.toLowerCase();
+          const messageClass = /etag/.test(message) && /match|mismatch|changed|modified|precondition/.test(message)
+            ? "etag_condition"
+            : /etag/.test(message)
+              ? "etag_other"
+              : /precondition/.test(message)
+                ? "precondition"
+                : /already.?exists|overwrite/.test(message)
+                  ? "exists"
+                  : "other";
+          const safeMessage = rawMessage
+            .replace(/https?:\/\/[^\s"'\x60]+/gi, "[url]")
+            .replace(/\bBearer\s+\S+/gi, "Bearer [redacted]")
+            .replace(/(token|authorization)\s*[:=]\s*[^,\s]+/gi, "$1=[redacted]")
+            .slice(0, 180);
+          console.warn("ZOZ Pro durable state compare-and-swap conflict", {
+            path: pathname,
+            expectedEtagPresent: Boolean(etag),
+            latestEtagPresent: Boolean(latestEtag),
+            latestEtagMatchesExpected: etag && latestEtag ? latestEtag === etag : null,
+            messageClass,
+            safeMessage,
+            errorName: error?.name ?? null,
+            errorCode: error?.code ?? null,
+            errorStatus: error?.status ?? error?.statusCode ?? error?.response?.status ?? null,
+          });
+          throw new StateWriteConflictError(undefined, { cause: error });
+        }
         throw error;
       }
       etag = saved.etag;
@@ -139,23 +191,22 @@ function createFileStateStore(filePath) {
   };
 }
 
-export function createStateStore(filePath) {
-  // Explicit file paths are used by isolated tests and local tooling.
-  if (filePath !== undefined) return createFileStateStore(filePath);
-
-  // Never rely on optional Vercel system variables to choose durable storage.
+export function getStateBackendInfo() {
+  const configured = String(process.env.ZOZ_PRO_STATE_BACKEND ?? "").trim().toLowerCase();
   const vercelRuntime = process.env.VERCEL === "1" || Boolean(process.env.VERCEL_ENV);
-  if (vercelRuntime || process.env.ZOZ_PRO_STORAGE_MODE === "blob") {
-    return createVercelBlobStore();
-  }
+  const backend = configured || (vercelRuntime || process.env.ZOZ_PRO_STORAGE_MODE === "blob" ? "blob" : process.env.NODE_ENV === "production" ? "unconfigured" : "file");
+  return {
+    backend: ["supabase", "blob", "file"].includes(backend) ? backend : "invalid",
+    durable: backend === "supabase" || backend === "blob",
+    concurrency: backend === "supabase" ? "postgres-version-cas" : backend === "blob" ? "blob-etag-cas" : "local-file",
+  };
+}
 
-  // Local/test use defaults to files only outside production. A production
-  // deployment with missing runtime indicators must fail closed, not use disk.
-  if (process.env.NODE_ENV !== "production" && process.env.ZOZ_PRO_STORAGE_MODE !== "blob") {
-    return createFileStateStore(getDefaultStateFile());
-  }
-
-  throw new Error(
-    "ZOZ_PRO_STORAGE_MODE=blob is required for production state; ephemeral local storage is disabled.",
-  );
+export function createStateStore(filePath) {
+  if (filePath !== undefined) return createFileStateStore(filePath);
+  const info = getStateBackendInfo();
+  if (info.backend === "supabase") return createSupabaseStateStore();
+  if (info.backend === "blob") return createVercelBlobStore();
+  if (info.backend === "file" && process.env.NODE_ENV !== "production") return createFileStateStore(getDefaultStateFile());
+  throw new Error("ZOZ_PRO_STATE_BACKEND must explicitly select supabase or blob for production state.");
 }
