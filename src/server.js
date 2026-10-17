@@ -12,9 +12,11 @@ import {
   normalizeControlCommandInput,
   canExecuteControlCommand,
 } from "./control.js";
-import { createStateStore, StateWriteConflictError } from "./store.js";
+import { createStateStore, getStateBackendInfo, StateWriteConflictError } from "./store.js";
+import { withStateLock } from "./state-lock.js";
 import { isSupportedCloudInstruction } from "./cloud-worker.js";
-import { enqueueCloudCommand, isVercelRuntime } from "./cloud-queue.js";
+import { enqueueCloudCommand, getExecutionRuntime, isCloudRuntime, isCloudRunRuntimeRequested, isCloudRunSupabaseRuntime, isVercelRuntime } from "./cloud-queue.js";
+import { executeCloudRunCommand, getCloudRunWorkerStatus, sweepCloudRunQueueOnce } from "./cloud-run-worker.js";
 import { normalizeOpportunityInput, normalizeIntelligenceInput, OPPORTUNITY_STATUSES } from "./opportunities.js";
 import { normalizeContactInput, CONTACT_STATUSES } from "./crm.js";
 import { normalizeOutreachInput, OUTREACH_STATUSES } from "./outreach.js";
@@ -163,18 +165,54 @@ function createControlCommand(state, body) {
 
 async function handleApi(req, res, url) {
   const store = getStore();
-  const state = await store.load();
-
-  if (req.method === "GET" && url.pathname === "/api/health") {
-    return sendJson(res, 200, {
-      status: "ok",
-      project: state.project.repository,
-      controlPlane: "ready",
-      executionRuntime: isVercelRuntime() ? "vercel-queue" : "local-cli",
-      queuedCommands: state.controlCommands?.filter((c) => c.status === "queued").length ?? 0,
-    });
+  const backend = getStateBackendInfo();
+  if (req.method === "POST" && url.pathname === "/api/worker/sweep") {
+    if (!isAuthorized(req)) return sendUnauthorized(res);
+    if (!isCloudRunSupabaseRuntime()) {
+      return sendJson(res, 503, { error: "cloud_run_misconfigured", executionRuntime: getExecutionRuntime() });
+    }
+    try {
+      return sendJson(res, 200, await sweepCloudRunQueueOnce());
+    } catch (error) {
+      const code = /^[a-zA-Z0-9_-]{1,80}$/.test(String(error?.code ?? "")) ? error.code : "worker_sweep_failed";
+      return sendJson(res, 503, { error: code, worker: getCloudRunWorkerStatus() });
+    }
   }
 
+  if (req.method === "GET" && (url.pathname === "/api/health" || url.pathname === "/api/readiness")) {
+    if (isCloudRunRuntimeRequested() && !isCloudRunSupabaseRuntime()) {
+      return sendJson(res, 503, {
+        status: "degraded", ready: false, project: "hazemnaw48-coder/zoz-pro-ai",
+        stateBackend: backend.backend, concurrency: backend.concurrency,
+        persistence: { ready: false, backend: backend.backend, error: "cloud_run_misconfigured" },
+        controlPlane: "not_ready", executionRuntime: getExecutionRuntime(), worker: getCloudRunWorkerStatus(),
+      });
+    }
+    try {
+      const state = await store.load();
+      return sendJson(res, 200, {
+        status: "ok", ready: true, project: state.project.repository,
+        stateBackend: backend.backend, concurrency: backend.concurrency,
+        persistence: { ready: true, backend: backend.backend },
+        controlPlane: "ready",
+        executionRuntime: getExecutionRuntime(),
+        worker: getCloudRunWorkerStatus(),
+        queuedCommands: state.controlCommands?.filter((c) => c.status === "queued").length ?? 0,
+      });
+    } catch (error) {
+      const allowed = new Set(["state_backend_invalid","supabase_configuration_missing","supabase_configuration_invalid","supabase_access_denied","supabase_schema_missing","supabase_state_not_initialized","supabase_state_invalid","supabase_version_invalid","supabase_state_version_missing","supabase_unavailable","supabase_rate_limited","supabase_request_failed","supabase_invalid_response","state_write_conflict"]);
+      return sendJson(res, 503, {
+        status: "degraded", ready: false, project: "hazemnaw48-coder/zoz-pro-ai",
+        stateBackend: backend.backend, concurrency: backend.concurrency,
+        persistence: { ready: false, backend: backend.backend, error: allowed.has(error?.code) ? error.code : "state_backend_unavailable" },
+        controlPlane: "not_ready", executionRuntime: getExecutionRuntime(), worker: getCloudRunWorkerStatus(),
+      });
+    }
+  }
+  if (isCloudRunRuntimeRequested() && !isCloudRunSupabaseRuntime()) {
+    return sendJson(res, 503, { error: "cloud_run_misconfigured", executionRuntime: getExecutionRuntime() });
+  }
+  const state = await store.load();
   if (!isAuthorized(req)) return sendUnauthorized(res);
 
   if (req.method === "GET" && url.pathname === "/api/content-factory/status") {
@@ -234,6 +272,7 @@ async function handleApi(req, res, url) {
       await store.save(state);
       return sendJson(res, 201, { publication, approval });
     } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error;
       if (error instanceof ContentPublisherError) {
         return sendJson(res, error.httpStatus, { error: error.code, message: error.message, details: error.details });
       }
@@ -273,6 +312,7 @@ async function handleApi(req, res, url) {
       await store.save(state);
       return sendJson(res, result.status === "published" ? 200 : 202, { publication, provider: result });
     } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error;
       publication.lastError = error.message || String(error);
       publication.updatedAt = new Date().toISOString();
       appendActivity(state, {
@@ -311,6 +351,7 @@ async function handleApi(req, res, url) {
         await store.save(state);
         return sendJson(res, 200, { publication, provider: result });
       } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error;
         if (error instanceof ContentPublisherError) {
           return sendJson(res, error.httpStatus, { error: error.code, message: error.message, publication });
         }
@@ -342,7 +383,8 @@ async function handleApi(req, res, url) {
       appendActivity(state, { type:"outreach_created", actor:"Owner", message:`Created outreach ${item.id} for ${item.contactId}; status remains ${item.status} until explicitly sent.` });
       await store.save(state);
       return sendJson(res, 201, item);
-    } catch (error) { return sendJson(res, 400, { error:error.message }); }
+    } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error; return sendJson(res, 400, { error:error.message }); }
   }
 
   const outreachMatch = url.pathname.match(/^\/api\/outreach\/([^/]+)\/status$/);
@@ -375,7 +417,8 @@ async function handleApi(req, res, url) {
       appendActivity(state, { type:"contact_created", actor:"Owner", message:`Created contact ${contact.id}: ${contact.name}` });
       await store.save(state);
       return sendJson(res, 201, contact);
-    } catch (error) { return sendJson(res, 400, { error:error.message }); }
+    } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error; return sendJson(res, 400, { error:error.message }); }
   }
 
   const contactMatch = url.pathname.match(/^\/api\/contacts\/([^/]+)\/status$/);
@@ -404,7 +447,8 @@ async function handleApi(req, res, url) {
       appendActivity(state, { type:"opportunity_created", actor:"Owner", message:`Created ${opportunity.id}: ${opportunity.title} (score ${opportunity.score})` });
       await store.save(state);
       return sendJson(res, 201, opportunity);
-    } catch (error) { return sendJson(res, 400, { error:error.message }); }
+    } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error; return sendJson(res, 400, { error:error.message }); }
   }
 
   const opportunityMatch = url.pathname.match(/^\/api\/opportunities\/([^/]+)\/status$/);
@@ -433,7 +477,8 @@ async function handleApi(req, res, url) {
       appendActivity(state, { type:"intelligence_added", actor:"Owner", message:`Added ${signal.type} intelligence signal.` });
       await store.save(state);
       return sendJson(res, 201, signal);
-    } catch (error) { return sendJson(res, 400, { error:error.message }); }
+    } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error; return sendJson(res, 400, { error:error.message }); }
   }
 
   if (req.method === "GET" && url.pathname === "/api/control/commands") {
@@ -464,7 +509,7 @@ async function handleApi(req, res, url) {
   if (req.method === "POST" && url.pathname === "/api/control/commands") {
     try {
       const body = await readJson(req);
-      const cloudRuntime = isVercelRuntime();
+      const cloudRuntime = isCloudRuntime();
       if (cloudRuntime && body.actionType == null && !isSupportedCloudInstruction(body.instruction)) {
         return sendJson(res, 422, {
           error: "cloud_instruction_not_supported",
@@ -480,13 +525,32 @@ async function handleApi(req, res, url) {
         type: "control_command_created",
         actor: command.requestedBy,
         taskId: command.taskId,
-        message: `${command.id} queued for ${cloudRuntime ? "the Vercel Queue worker" : "Codex"}: ${command.instruction}`,
+        message: `${command.id} queued for ${cloudRuntime ? getExecutionRuntime() : "Codex"}: ${command.instruction}`,
       });
       await store.save(state);
 
-      // Only allowlisted, non-risky commands reach the cloud queue. Risky
-      // commands retain their owner-approval record and are never auto-dispatched.
-      if (cloudRuntime && command.status === "queued" && !command.actionType) {
+      // Cloud Run persists the command in Supabase and executes the safe command
+      // in-band. If execution is interrupted, the queued/claimed row is preserved
+      // for startup recovery or the authenticated /api/worker/sweep endpoint.
+      if (isCloudRunSupabaseRuntime() && command.status === "queued" && !command.actionType) {
+        try {
+          await executeCloudRunCommand(command.id);
+        } catch {
+          const latest = await getStore().load().catch(() => null);
+          const latestCommand = (latest?.controlCommands ?? []).find(item => item.id === command.id);
+          return sendJson(res, 202, latestCommand ?? {
+            ...command,
+            status: "queued",
+            recovery: "pending",
+          });
+        }
+        const latest = await getStore().load();
+        const latestCommand = (latest.controlCommands ?? []).find(item => item.id === command.id);
+        return sendJson(res, 201, latestCommand ?? command);
+      }
+
+      // Legacy Vercel queue dispatch remains dormant on the Cloud Run deployment.
+      if (isVercelRuntime() && command.status === "queued" && !command.actionType) {
         try {
           await enqueueCloudCommand(command.id);
         } catch {
@@ -500,7 +564,7 @@ async function handleApi(req, res, url) {
               type: "control_command_dispatch_failed",
               actor: "ZOZ Pro Cloud Worker",
               taskId: latestCommand.taskId,
-              message: `${latestCommand.id} was not confirmed queued with Vercel Queue; no execution was confirmed.`,
+              message: `${latestCommand.id} could not be dispatched to the legacy queue; no execution was confirmed.`,
             });
             await store.save(latest);
           }
@@ -513,6 +577,7 @@ async function handleApi(req, res, url) {
       }
       return sendJson(res, 201, command);
     } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error;
       if (error instanceof StateWriteConflictError) throw error;
       return sendJson(res, 400, { error: error.message });
     }
@@ -558,6 +623,7 @@ async function handleApi(req, res, url) {
     try {
       assertControlCommandTransition(command.status, target);
     } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error;
       return sendJson(res, 409, { error: error.message });
     }
 
@@ -645,6 +711,7 @@ async function handleApi(req, res, url) {
       await store.save(state);
       return sendJson(res, 200, task);
     } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error;
       if (error instanceof StateWriteConflictError) throw error;
       return sendJson(res, 409, { error: error.message });
     }
@@ -710,6 +777,7 @@ async function handleApi(req, res, url) {
     try {
       assertTaskTransition(task.status, body.status);
     } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error;
       return sendJson(res, 409, { error: error.message });
     }
     task.status = body.status;
@@ -788,7 +856,7 @@ async function handleApi(req, res, url) {
       });
     }
     if (command && approval.status === "approved") {
-      if (isVercelRuntime()) {
+      if (isCloudRuntime()) {
         command.status = "blocked";
         command.blockedAt = new Date().toISOString();
         command.error = "Approval recorded; this cloud worker does not execute financial or external actions.";
@@ -849,6 +917,11 @@ export async function handleRequest(req, res) {
     const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
     if (url.pathname.startsWith("/api/")) {
       const retryableMutation = isRetryableStateMutation(req, url);
+      // Anonymous requests must not occupy the shared write lock.
+      const lockThisRequest = isAuthorized(req) && (
+        (req.method !== "GET" && req.method !== "HEAD")
+        || /^\/api\/content-factory\/publications\/[^/]+$/.test(url.pathname)
+      );
       if (retryableMutation) await bufferRequestBody(req);
 
       // Blob uses ETag conditional writes to prevent lost updates. On a conflict,
@@ -857,13 +930,28 @@ export async function handleRequest(req, res) {
       const maxRetries = retryableMutation ? 12 : 0;
       for (let attempt = 0; ; attempt += 1) {
         try {
-          await handleApi(req, res, url);
+          if (lockThisRequest) {
+            await withStateLock(() => handleApi(req, res, url));
+          } else {
+            await handleApi(req, res, url);
+          }
           return;
         } catch (error) {
-          if (!(error instanceof StateWriteConflictError) || attempt >= maxRetries) {
+          if (error?.lockBusy
+            || ((!(error instanceof StateWriteConflictError) && error?.code !== "state_write_conflict") || attempt >= maxRetries)) {
             throw error;
           }
-          console.warn(`Retryable state write conflict on ${url.pathname}; attempt ${attempt + 1}/${maxRetries}.`);
+          console.warn("Retryable state write conflict", {
+            path: url.pathname,
+            attempt: attempt + 1,
+            maxRetries,
+            errorName: error?.name ?? null,
+            errorCode: error?.code ?? null,
+            errorStatus: error?.status ?? error?.statusCode ?? error?.response?.status ?? null,
+            causeName: error?.cause?.name ?? null,
+            causeCode: error?.cause?.code ?? null,
+            causeStatus: error?.cause?.status ?? error?.cause?.statusCode ?? error?.cause?.response?.status ?? null,
+          });
           await waitForStateConflictRetry(attempt);
         }
       }
@@ -871,7 +959,7 @@ export async function handleRequest(req, res) {
       await serveStatic(req, res, url);
     }
   } catch (error) {
-    if (error instanceof StateWriteConflictError) {
+    if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") {
       return sendJson(res, 409, {
         error: "state_write_conflict",
         retryable: true,
