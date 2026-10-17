@@ -15,8 +15,8 @@ import {
 import { createStateStore, getStateBackendInfo, StateWriteConflictError } from "./store.js";
 import { withStateLock } from "./state-lock.js";
 import { isSupportedCloudInstruction } from "./cloud-worker.js";
-import { enqueueCloudCommand, getExecutionRuntime, isCloudRuntime } from "./cloud-queue.js";
-import { getRenderWorkerStatus } from "./render-worker.js";
+import { enqueueCloudCommand, getExecutionRuntime, isCloudRuntime, isCloudRunRuntimeRequested, isCloudRunSupabaseRuntime, isVercelRuntime } from "./cloud-queue.js";
+import { executeCloudRunCommand, getCloudRunWorkerStatus, sweepCloudRunQueueOnce } from "./cloud-run-worker.js";
 import { normalizeOpportunityInput, normalizeIntelligenceInput, OPPORTUNITY_STATUSES } from "./opportunities.js";
 import { normalizeContactInput, CONTACT_STATUSES } from "./crm.js";
 import { normalizeOutreachInput, OUTREACH_STATUSES } from "./outreach.js";
@@ -166,6 +166,19 @@ function createControlCommand(state, body) {
 async function handleApi(req, res, url) {
   const store = getStore();
   const backend = getStateBackendInfo();
+  if (req.method === "POST" && url.pathname === "/api/worker/sweep") {
+    if (!isAuthorized(req)) return sendUnauthorized(res);
+    if (!isCloudRunSupabaseRuntime()) {
+      return sendJson(res, 503, { error: "cloud_run_misconfigured", executionRuntime: getExecutionRuntime() });
+    }
+    try {
+      return sendJson(res, 200, await sweepCloudRunQueueOnce());
+    } catch (error) {
+      const code = /^[a-zA-Z0-9_-]{1,80}$/.test(String(error?.code ?? "")) ? error.code : "worker_sweep_failed";
+      return sendJson(res, 503, { error: code, worker: getCloudRunWorkerStatus() });
+    }
+  }
+
   if (req.method === "GET" && (url.pathname === "/api/health" || url.pathname === "/api/readiness")) {
     try {
       const state = await store.load();
@@ -175,7 +188,7 @@ async function handleApi(req, res, url) {
         persistence: { ready: true, backend: backend.backend },
         controlPlane: "ready",
         executionRuntime: getExecutionRuntime(),
-        worker: getRenderWorkerStatus(),
+        worker: getCloudRunWorkerStatus(),
         queuedCommands: state.controlCommands?.filter((c) => c.status === "queued").length ?? 0,
       });
     } catch (error) {
@@ -187,6 +200,9 @@ async function handleApi(req, res, url) {
         controlPlane: "not_ready", executionRuntime: getExecutionRuntime(), worker: getRenderWorkerStatus(),
       });
     }
+  }
+  if (isCloudRunRuntimeRequested() && !isCloudRunSupabaseRuntime()) {
+    return sendJson(res, 503, { error: "cloud_run_misconfigured", executionRuntime: getExecutionRuntime() });
   }
   const state = await store.load();
   if (!isAuthorized(req)) return sendUnauthorized(res);
@@ -505,9 +521,28 @@ async function handleApi(req, res, url) {
       });
       await store.save(state);
 
-      // Only allowlisted, non-risky commands reach the cloud queue. Risky
-      // commands retain their owner-approval record and are never auto-dispatched.
-      if (cloudRuntime && command.status === "queued" && !command.actionType) {
+      // Cloud Run persists the command in Supabase and executes the safe command
+      // in-band. If execution is interrupted, the queued/claimed row is preserved
+      // for startup recovery or the authenticated /api/worker/sweep endpoint.
+      if (isCloudRunSupabaseRuntime() && command.status === "queued" && !command.actionType) {
+        try {
+          await executeCloudRunCommand(command.id);
+        } catch {
+          const latest = await getStore().load().catch(() => null);
+          const latestCommand = (latest?.controlCommands ?? []).find(item => item.id === command.id);
+          return sendJson(res, 202, latestCommand ?? {
+            ...command,
+            status: "queued",
+            recovery: "pending",
+          });
+        }
+        const latest = await getStore().load();
+        const latestCommand = (latest.controlCommands ?? []).find(item => item.id === command.id);
+        return sendJson(res, 201, latestCommand ?? command);
+      }
+
+      // Legacy Vercel queue dispatch remains dormant on the Cloud Run deployment.
+      if (isVercelRuntime() && command.status === "queued" && !command.actionType) {
         try {
           await enqueueCloudCommand(command.id);
         } catch {
@@ -521,7 +556,7 @@ async function handleApi(req, res, url) {
               type: "control_command_dispatch_failed",
               actor: "ZOZ Pro Cloud Worker",
               taskId: latestCommand.taskId,
-              message: `${latestCommand.id} was not confirmed queued with Vercel Queue; no execution was confirmed.`,
+              message: `${latestCommand.id} could not be dispatched to the legacy queue; no execution was confirmed.`,
             });
             await store.save(latest);
           }
@@ -869,9 +904,26 @@ async function serveStatic(req, res, url) {
   }
 }
 
+let cloudRunStartupRecovery = null;
+
+async function ensureCloudRunStartupRecovery() {
+  if (!isCloudRunSupabaseRuntime()) return null;
+  if (!cloudRunStartupRecovery) {
+    cloudRunStartupRecovery = sweepCloudRunQueueOnce().catch((error) => {
+      const code = /^[a-zA-Z0-9_-]{1,80}$/.test(String(error?.code ?? "")) ? error.code : "worker_recovery_failed";
+      console.error("ZOZ Pro Cloud Run startup recovery did not complete", { code });
+      return null;
+    });
+  }
+  return cloudRunStartupRecovery;
+}
+
 export async function handleRequest(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
+    if (url.pathname.startsWith("/api/") && url.pathname !== "/api/worker/sweep" && isCloudRunSupabaseRuntime()) {
+      await ensureCloudRunStartupRecovery();
+    }
     if (url.pathname.startsWith("/api/")) {
       const retryableMutation = isRetryableStateMutation(req, url);
       // Anonymous requests must not occupy the shared write lock.
