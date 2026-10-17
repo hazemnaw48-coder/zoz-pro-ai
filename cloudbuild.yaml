@@ -1,0 +1,41 @@
+# Optional template for deploying from a confirmed Google Cloud project.
+# Configure substitutions in Cloud Build; do not commit secret values.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$COMMIT_SHA
+      - .
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$COMMIT_SHA
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$COMMIT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --max=1
+      - --concurrency=1
+      - --port=8080
+      - --set-env-vars=ZOZ_PRO_EXECUTION_RUNTIME=cloud-run-inband,ZOZ_PRO_STATE_BACKEND=supabase
+      - --set-secrets=SUPABASE_URL=${_SUPABASE_URL_SECRET}:latest,SUPABASE_SECRET_KEY=${_SUPABASE_SECRET_KEY_SECRET}:latest,ZOZ_CONTROL_TOKEN=${_ZOZ_CONTROL_TOKEN_SECRET}:latest,GEMINI_API_KEY=${_GEMINI_API_KEY_SECRET}:latest
+      - --allow-unauthenticated
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$COMMIT_SHA
+options:
+  logging: CLOUD_LOGGING_ONLY
+substitutions:
+  _REGION: europe-west2
+  _AR_REPOSITORY: zoz-pro
+  _IMAGE_NAME: zoz-pro-ai
+  _SERVICE: zoz-pro-ai
+  _SUPABASE_URL_SECRET: zoz-pro-supabase-url
+  _SUPABASE_SECRET_KEY_SECRET: zoz-pro-supabase-secret-key
+  _ZOZ_CONTROL_TOKEN_SECRET: zoz-pro-control-token
+  _GEMINI_API_KEY_SECRET: zoz-pro-gemini-api-key
