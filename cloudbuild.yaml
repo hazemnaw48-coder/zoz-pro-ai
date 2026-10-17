@@ -24,8 +24,8 @@ steps:
       - --concurrency=1
       - --port=8080
       - --set-env-vars=ZOZ_PRO_EXECUTION_RUNTIME=cloud-run-inband,ZOZ_PRO_STATE_BACKEND=supabase
-      - --set-secrets=SUPABASE_URL=${_SUPABASE_URL_SECRET}:latest,SUPABASE_SECRET_KEY=${_SUPABASE_SECRET_KEY_SECRET}:latest,ZOZ_CONTROL_TOKEN=${_ZOZ_CONTROL_TOKEN_SECRET}:latest
-      - --no-allow-unauthenticated
+      - --set-secrets=SUPABASE_URL=${_SUPABASE_URL_SECRET}:latest,SUPABASE_SECRET_KEY=${_SUPABASE_SECRET_KEY_SECRET}:latest,ZOZ_CONTROL_TOKEN=${_ZOZ_CONTROL_TOKEN_SECRET}:latest,GEMINI_API_KEY=${_GEMINI_API_KEY_SECRET}:latest
+      - --allow-unauthenticated
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$COMMIT_SHA
 options:
@@ -38,3 +38,4 @@ substitutions:
   _SUPABASE_URL_SECRET: zoz-pro-supabase-url
   _SUPABASE_SECRET_KEY_SECRET: zoz-pro-supabase-secret-key
   _ZOZ_CONTROL_TOKEN_SECRET: zoz-pro-control-token
+  _GEMINI_API_KEY_SECRET: zoz-pro-gemini-api-key
