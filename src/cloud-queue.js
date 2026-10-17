@@ -5,25 +5,26 @@ export function isVercelRuntime() {
     || ["production", "preview", "development"].includes(process.env.VERCEL_ENV);
 }
 
-export function isRenderRuntimeRequested() {
-  return process.env.ZOZ_PRO_EXECUTION_RUNTIME === "render-poll"
-    || process.env.RENDER === "true"
-    || Boolean(process.env.RENDER_SERVICE_ID);
+export function isCloudRunRuntimeRequested() {
+  return process.env.ZOZ_PRO_EXECUTION_RUNTIME === "cloud-run-inband"
+    || Boolean(process.env.K_SERVICE);
 }
 
-export function isRenderPollRuntime() {
-  return process.env.ZOZ_PRO_EXECUTION_RUNTIME === "render-poll"
+export function isCloudRunSupabaseRuntime() {
+  return isCloudRunRuntimeRequested()
+    && process.env.ZOZ_PRO_EXECUTION_RUNTIME === "cloud-run-inband"
     && String(process.env.ZOZ_PRO_STATE_BACKEND ?? "").trim().toLowerCase() === "supabase";
 }
 
 export function isCloudRuntime() {
-  return isVercelRuntime() || isRenderPollRuntime();
+  return isVercelRuntime() || isCloudRunRuntimeRequested();
 }
 
 export function getExecutionRuntime() {
+  if (isCloudRunRuntimeRequested()) {
+    return isCloudRunSupabaseRuntime() ? "google-cloud-run-supabase-inband" : "cloud-run-misconfigured";
+  }
   if (isVercelRuntime()) return "vercel-queue";
-  if (isRenderPollRuntime()) return "render-supabase-poll";
-  if (isRenderRuntimeRequested()) return "render-misconfigured";
   return "local-cli";
 }
 
@@ -31,14 +32,16 @@ export async function enqueueCloudCommand(commandId) {
   if (typeof commandId !== "string" || !commandId.trim()) {
     throw new Error("commandId is required.");
   }
-  // On Render the command has already been committed to the Supabase state
-  // row before this method is called. The single-instance poller reads that
-  // durable command list; no Vercel service or second queue store is required.
-  if (isRenderPollRuntime()) {
-    return { commandId, accepted: true, transport: "supabase-state-poll" };
+  // Cloud Run persists commands in Supabase and executes them in-band in the
+  // authenticated API request. No separate queue service is used.
+  if (isCloudRunRuntimeRequested()) {
+    if (!isCloudRunSupabaseRuntime()) {
+      throw new Error("Cloud Run requires ZOZ_PRO_EXECUTION_RUNTIME=cloud-run-inband and ZOZ_PRO_STATE_BACKEND=supabase.");
+    }
+    return { commandId, accepted: true, transport: "supabase-inband" };
   }
   if (!isVercelRuntime()) {
-    throw new Error("Cloud queue dispatch requires Vercel Queue or Render polling with Supabase state.");
+    throw new Error("Cloud queue dispatch requires the configured Cloud Run runtime or the legacy Vercel queue runtime.");
   }
   const { send } = await import("@vercel/queue");
   return send(CLOUD_QUEUE_TOPIC, { commandId }, {
