@@ -73,11 +73,7 @@ export function createSupabaseStateStore(options = {}) {
       if (row) { loadedVersion = row.version; return row.state; }
       const allowPreviewInitialization = env.VERCEL_ENV === "preview"
         && env.ZOZ_PRO_SUPABASE_ALLOW_EMPTY_PREVIEW_INIT === "true";
-      const allowRenderInitialization = env.ZOZ_PRO_EXECUTION_RUNTIME === "render-poll"
-        && String(env.ZOZ_PRO_STATE_BACKEND ?? "").trim().toLowerCase() === "supabase"
-        && table === "zoz_pro_render_state"
-        && env.ZOZ_PRO_RENDER_ALLOW_EMPTY_INIT === "true";
-      if (!allowPreviewInitialization && !allowRenderInitialization) {
+      if (!allowPreviewInitialization) {
         throw new SupabaseStateStoreError("Supabase state is not initialized. No Blob data was migrated and production was not seeded.", "supabase_state_not_initialized");
       }
       const initial = createInitialState();
