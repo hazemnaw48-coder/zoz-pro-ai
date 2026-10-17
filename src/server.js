@@ -15,7 +15,8 @@ import {
 import { createStateStore, getStateBackendInfo, StateWriteConflictError } from "./store.js";
 import { withStateLock } from "./state-lock.js";
 import { isSupportedCloudInstruction } from "./cloud-worker.js";
-import { enqueueCloudCommand, isVercelRuntime } from "./cloud-queue.js";
+import { enqueueCloudCommand, getExecutionRuntime, isCloudRuntime } from "./cloud-queue.js";
+import { getRenderWorkerStatus } from "./render-worker.js";
 import { normalizeOpportunityInput, normalizeIntelligenceInput, OPPORTUNITY_STATUSES } from "./opportunities.js";
 import { normalizeContactInput, CONTACT_STATUSES } from "./crm.js";
 import { normalizeOutreachInput, OUTREACH_STATUSES } from "./outreach.js";
@@ -173,7 +174,8 @@ async function handleApi(req, res, url) {
         stateBackend: backend.backend, concurrency: backend.concurrency,
         persistence: { ready: true, backend: backend.backend },
         controlPlane: "ready",
-        executionRuntime: isVercelRuntime() ? "vercel-queue" : "local-cli",
+        executionRuntime: getExecutionRuntime(),
+        worker: getRenderWorkerStatus(),
         queuedCommands: state.controlCommands?.filter((c) => c.status === "queued").length ?? 0,
       });
     } catch (error) {
@@ -182,7 +184,7 @@ async function handleApi(req, res, url) {
         status: "degraded", ready: false, project: "hazemnaw48-coder/zoz-pro-ai",
         stateBackend: backend.backend, concurrency: backend.concurrency,
         persistence: { ready: false, backend: backend.backend, error: allowed.has(error?.code) ? error.code : "state_backend_unavailable" },
-        controlPlane: "not_ready", executionRuntime: isVercelRuntime() ? "vercel-queue" : "local-cli",
+        controlPlane: "not_ready", executionRuntime: getExecutionRuntime(), worker: getRenderWorkerStatus(),
       });
     }
   }
@@ -483,7 +485,7 @@ async function handleApi(req, res, url) {
   if (req.method === "POST" && url.pathname === "/api/control/commands") {
     try {
       const body = await readJson(req);
-      const cloudRuntime = isVercelRuntime();
+      const cloudRuntime = isCloudRuntime();
       if (cloudRuntime && body.actionType == null && !isSupportedCloudInstruction(body.instruction)) {
         return sendJson(res, 422, {
           error: "cloud_instruction_not_supported",
@@ -499,7 +501,7 @@ async function handleApi(req, res, url) {
         type: "control_command_created",
         actor: command.requestedBy,
         taskId: command.taskId,
-        message: `${command.id} queued for ${cloudRuntime ? "the Vercel Queue worker" : "Codex"}: ${command.instruction}`,
+        message: `${command.id} queued for ${cloudRuntime ? getExecutionRuntime() : "Codex"}: ${command.instruction}`,
       });
       await store.save(state);
 
@@ -811,7 +813,7 @@ async function handleApi(req, res, url) {
       });
     }
     if (command && approval.status === "approved") {
-      if (isVercelRuntime()) {
+      if (isCloudRuntime()) {
         command.status = "blocked";
         command.blockedAt = new Date().toISOString();
         command.error = "Approval recorded; this cloud worker does not execute financial or external actions.";
