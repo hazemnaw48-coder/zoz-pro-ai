@@ -41,6 +41,15 @@ jobs:
           fi
           echo "::add-mask::$token"
           echo "token=$token" >> "$GITHUB_OUTPUT"
+          TOKEN="$token" python - <<'PY'
+          import os, json, base64
+          token=os.environ["TOKEN"]
+          payload=token.split(".")[1]
+          payload += "=" * (-len(payload) % 4)
+          claims=json.loads(base64.urlsafe_b64decode(payload))
+          safe={k:claims.get(k) for k in ("iss","aud","repository","repository_id","repository_owner","ref","workflow_ref","event_name")}
+          print("OIDC claim diagnostics:", json.dumps(safe, sort_keys=True))
+          PY
 
       - name: Probe Floot runtime without paid services or state mutations
         shell: bash
