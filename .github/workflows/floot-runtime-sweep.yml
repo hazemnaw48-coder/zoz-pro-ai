@@ -25,18 +25,15 @@ jobs:
       - name: Request short-lived GitHub OIDC token
         id: oidc
         shell: bash
-        env:
-          OIDC_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
-          OIDC_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
         run: |
           set -euo pipefail
-          if [[ -z "${OIDC_REQUEST_URL:-}" || -z "${OIDC_REQUEST_TOKEN:-}" ]]; then
+          if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
             echo "GitHub OIDC is unavailable for this run." >&2
             exit 1
           fi
           response="$(curl --fail-with-body --silent --show-error \
-            -H "Authorization: bearer ${OIDC_REQUEST_TOKEN}" \
-            "${OIDC_REQUEST_URL}&audience=zoz-pro-floot-runtime-sweep")"
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=zoz-pro-floot-runtime-sweep")"
           token="$(printf '%s' "$response" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
           if [[ -z "$token" ]]; then
             echo "GitHub OIDC returned no token." >&2
