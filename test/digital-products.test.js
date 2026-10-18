@@ -1,0 +1,6 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {normalizeDigitalProductInput,updateDigitalProductStatus,DIGITAL_PRODUCT_STATUSES} from "../src/digital-products.js";
+test("digital product requires name, audience and customer problem",()=>{assert.throws(()=>normalizeDigitalProductInput({name:"",audience:"creators",problem:"save time"}),/required/);});
+test("digital product does not invent a price",()=>{const p=normalizeDigitalProductInput({name:"Creator Kit",audience:"new creators",problem:"don't know what to publish",format:"template"});assert.equal(p.price,null);assert.equal(p.currency,"EGP");assert.equal(p.status,"idea");assert.ok(DIGITAL_PRODUCT_STATUSES.includes(p.status));});
+test("price and status are validated",()=>{assert.throws(()=>normalizeDigitalProductInput({name:"Kit",audience:"creators",problem:"planning",price:-1}),/Price/);const p=normalizeDigitalProductInput({name:"Kit",audience:"creators",problem:"planning"});assert.throws(()=>updateDigitalProductStatus(p,"paid"),/Invalid digital product status/);updateDigitalProductStatus(p,"validation");assert.equal(p.status,"validation");});

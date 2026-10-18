@@ -207,3 +207,10 @@ h3 { font-size: 1rem; }
 #production-centers .tool-library-item { overflow-wrap:anywhere; }
 #production-centers .tool-library-item .meta strong { color:#374151; font-weight:650; }
 #production-centers-panel .section-heading { align-items:flex-start; }
+
+
+[data-view="digital-products"] label { display:block; margin:10px 0 5px; font-size:.84rem; font-weight:600; }
+[data-view="digital-products"] input { width:100%; border:1px solid #d1d5db; border-radius:10px; padding:10px; font:inherit; }
+[data-view="digital-products"] button { border:0; border-radius:10px; padding:10px 14px; background:#111827; color:#fff; margin-top:10px; }
+[data-view="digital-products"] .score-grid { margin-top:10px; }
+[data-view="digital-products"] .control-row select { flex:1; min-width:0; }
