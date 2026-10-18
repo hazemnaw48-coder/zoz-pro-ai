@@ -20,6 +20,7 @@ import { executeCloudRunCommand, getCloudRunWorkerStatus, sweepCloudRunQueueOnce
 import { normalizeOpportunityInput, normalizeIntelligenceInput, OPPORTUNITY_STATUSES } from "./opportunities.js";
 import { normalizeContactInput, CONTACT_STATUSES } from "./crm.js";
 import { normalizeOutreachInput, OUTREACH_STATUSES } from "./outreach.js";
+import { normalizeDigitalProductInput, updateDigitalProductStatus } from "./digital-products.js";
 import { isAuthorized, sendUnauthorized } from "./auth.js";
 import { assertTaskCanReceiveCommand, normalizeTaskVerificationInput } from "./workflow.js";
 import { assignTask, evaluateExecutionGate } from "./orchestrator.js";
@@ -77,6 +78,8 @@ function isRetryableStateMutation(req, url) {
   // can perform an external side effect before the state write.
   return pathname === "/api/content-factory/publications"
     || pathname === "/api/outreach"
+    || pathname === "/api/digital-products"
+    || /^\/api\/digital-products\/[^/]+\/status$/.test(pathname)
     || /^\/api\/outreach\/[^/]+\/status$/.test(pathname)
     || pathname === "/api/contacts"
     || /^\/api\/contacts\/[^/]+\/status$/.test(pathname)
@@ -363,6 +366,41 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/state") {
     return sendJson(res, 200, state);
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/digital-products") {
+    return sendJson(res, 200, { digitalProducts: state.digitalProducts ?? [] });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/digital-products") {
+    try {
+      const product = normalizeDigitalProductInput(await readJson(req));
+      state.digitalProducts ??= [];
+      state.digitalProducts.unshift(product);
+      appendActivity(state, { type: "digital_product_created", actor: "Owner", message: "Created digital product " + product.id + ": " + product.name });
+      await store.save(state);
+      return sendJson(res, 201, product);
+    } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error;
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  const digitalProductStatusMatch = url.pathname.match(/^\/api\/digital-products\/([^/]+)\/status$/);
+  if (req.method === "POST" && digitalProductStatusMatch) {
+    const id = decodeURIComponent(digitalProductStatusMatch[1]);
+    const product = (state.digitalProducts ?? []).find((item) => item.id === id);
+    if (!product) return sendJson(res, 404, { error: "digital product not found" });
+    try {
+      const body = await readJson(req);
+      updateDigitalProductStatus(product, body.status);
+      appendActivity(state, { type: "digital_product_status_changed", actor: "Owner", message: id + ": " + product.status });
+      await store.save(state);
+      return sendJson(res, 200, product);
+    } catch (error) {
+      if (error instanceof StateWriteConflictError || error?.code === "state_write_conflict") throw error;
+      return sendJson(res, 400, { error: error.message });
+    }
   }
 
   if (req.method === "GET" && url.pathname === "/api/outreach") {
