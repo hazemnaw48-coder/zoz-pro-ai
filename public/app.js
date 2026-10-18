@@ -268,10 +268,42 @@ function renderContentFactory(status, publisherStatus) {
     escapeHtml(item.detail) + '</div><div class="meta">التحقق الحي: ' +
     (item.verified ? "تم" : "لم يتم") + '</div></article>'
   ).join("");
+  renderContentToolLibrary(status.toolLibrary ?? []);
   $("#factory-next-steps").textContent = (publisherStatus && !publisherStatus.configured)
     ? "إعداد موصل الاستوديو وUpload-Post في أسرار الخادم، ثم التحقق من رابط الفيديو قبل طلب الموافقة."
     : (status.nextSteps[0] ?? "لا توجد خطوات إضافية.");
   renderPublicationQueue();
+}
+
+function renderContentToolLibrary(tools) {
+  const container = $("#content-tool-library");
+  const count = $("#content-tool-library-count");
+  if (!container || !count) return;
+  count.textContent = tools.length + " أداة مسجلة";
+  if (!tools.length) {
+    container.innerHTML = '<div class="list-item muted-text">تعذر تحميل المكتبة من حالة مركز المحتوى.</div>';
+    return;
+  }
+  container.innerHTML = tools.map((item) => {
+    const links = (item.links ?? []).map((link) =>
+      '<a class="tool-library-link" href="' + escapeHtml(link.url) + '" target="_blank" rel="noopener noreferrer">' +
+      escapeHtml(link.label) + '</a>'
+    ).join("");
+    const flags = [
+      item.ownerReportedConnected ? "المالك أفاد بالربط" : "",
+      item.connectionVerified ? "اتصال/موصل متحقق في نطاقه" : "الاتصال المباشر داخل ZOZ Pro غير متحقق",
+      item.generationVerified ? "نجاح توليد فعلي مثبت" : "لا يوجد توليد فعلي مثبت داخل ZOZ Pro",
+    ].filter(Boolean).join(" · ");
+    return '<article class="list-item tool-library-item" data-tool-category="' + escapeHtml(item.category) + '">' +
+      '<div class="section-heading"><div><div class="list-title">' + escapeHtml(item.name) + '</div>' +
+      '<div class="meta">' + escapeHtml(item.category) + '</div></div><span class="status">' +
+      escapeHtml(item.statusLabel ?? item.status) + '</span></div>' +
+      '<div class="meta">' + escapeHtml(item.capabilities) + '</div>' +
+      '<p class="meta tool-library-note">' + escapeHtml(item.note) + '</p>' +
+      '<div class="meta tool-library-verification">' + escapeHtml(flags) + '</div>' +
+      (links ? '<div class="tool-library-links">' + links + '</div>' : '') +
+      '</article>';
+  }).join("");
 }
 
 function renderPublicationQueue() {
