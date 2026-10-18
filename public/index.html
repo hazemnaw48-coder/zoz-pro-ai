@@ -17,6 +17,22 @@
 <section class="view" data-view="approvals"><div class="section-heading"><h2>Approvals</h2></div><div id="approvals-list" class="stack"></div></section>
 <section class="view" data-view="activity"><div class="section-heading"><h2>Activity Log</h2></div><div id="activity-list" class="stack"></div></section>
 <section class="view" data-view="agents"><div class="section-heading"><h2>Agents</h2></div><div id="agents-list" class="stack"></div></section>
+<section class="view" data-view="digital-products">
+  <div class="section-heading"><div><div class="eyebrow">Product operations</div><h2>صناعة المنتج الرقمي</h2><div class="meta">من الفكرة والتحقق من الطلب إلى البناء والمراجعة والتسليم.</div></div><span id="digital-product-count" class="badge">0 منتجات</span></div>
+  <div class="panel">
+    <h3>تسجيل فكرة منتج رقمي</h3><p class="meta">ابدأ بمشكلة عميل واضحة. لا نعتبر الفكرة منتجًا جاهزًا ولا ننشئ دفعًا أو متجرًا قبل التحقق من الطلب والتسليم.</p>
+    <label for="digital-product-name">اسم مبدئي</label><input id="digital-product-name" maxlength="160" placeholder="مثال: حزمة إطلاق صانع المحتوى">
+    <label for="digital-product-audience">العميل المستهدف</label><input id="digital-product-audience" maxlength="500" placeholder="لمن هذا المنتج؟">
+    <label for="digital-product-problem">المشكلة التي يحلها</label><textarea id="digital-product-problem" rows="2" maxlength="1000" placeholder="ما المشكلة المحددة التي سيحلها؟"></textarea>
+    <label for="digital-product-promise">النتيجة الأساسية</label><textarea id="digital-product-promise" rows="2" maxlength="1000" placeholder="ما النتيجة الواقعية للعميل؟"></textarea>
+    <div class="score-grid"><label>النوع<select id="digital-product-format"><option value="ebook">كتاب إلكتروني</option><option value="course">دورة</option><option value="template">قوالب</option><option value="toolkit">حزمة أدوات</option><option value="software">برنامج/أداة</option><option value="other">أخرى</option></select></label><label>السعر المبدئي<input id="digital-product-price" type="number" min="0" step="0.01" placeholder="اتركه فارغًا حتى التحقق"></label><label>العملة<select id="digital-product-currency"><option value="EGP">جنيه مصري</option><option value="USD">دولار أمريكي</option></select></label></div>
+    <label for="digital-product-validation">خطة اختبار الطلب وملاحظات العملاء</label><textarea id="digital-product-validation" rows="2" maxlength="3000" placeholder="مقابلات، عينة مجانية، صفحة انتظار، أو نتائج اختبار"></textarea>
+    <label for="digital-product-outline">مخطط المحتوى</label><textarea id="digital-product-outline" rows="3" maxlength="6000" placeholder="الأقسام أو الوحدات أو الملفات التي سيتضمنها"></textarea>
+    <label for="digital-product-delivery">طريقة التسليم المقترحة</label><input id="digital-product-delivery" maxlength="2000" placeholder="PDF، قوالب، منصة دورة، أو تنزيل آمن">
+    <button id="create-digital-product" type="button">حفظ الفكرة في سجل الإنتاج</button><p id="digital-product-form-status" class="meta"></p>
+  </div>
+  <div class="panel"><div class="section-heading"><h3>خط إنتاج المنتجات الرقمية</h3><span class="meta">الفكرة ← التحقق ← المخطط ← الإنتاج ← المراجعة ← جاهز ← إطلاق</span></div><div id="digital-products-list" class="stack"></div></div>
+</section>
 <section class="view" data-view="content-factory">
   <div class="section-heading"><div><div class="eyebrow">Media operations</div><h2>Content Factory</h2><div class="meta">حالة التكاملات والتحكم الآمن من ZOZ Pro</div></div><button id="refresh-content-factory" type="button">تحديث الحالة</button></div>
   <div class="panel"><div class="panel-header"><h3 id="factory-overall">جارٍ فحص الحالة…</h3><span id="factory-phase" class="badge">Checking</span></div><p id="factory-checked-at" class="meta">لم يتم الفحص بعد.</p><p id="factory-safety" class="meta"></p></div>
@@ -55,7 +71,7 @@
 <section class="view" data-view="settings"><div class="section-heading"><h2>Settings</h2></div><div class="panel" id="settings-panel"></div><div class="panel"><div class="list-title">Owner Control Token</div><input id="control-token" type="password" autocomplete="off" placeholder="Paste token here"><button id="save-control-token">Save on this device</button><div class="meta">Stored only in this browser localStorage. Never commit the token.</div></div></section>
 </main>
 <nav class="bottom-nav" aria-label="Primary navigation">
-<button data-nav="dashboard" class="nav-item active">Dashboard</button><button data-nav="control" class="nav-item">Codex</button><button data-nav="projects" class="nav-item">Projects</button><button data-nav="opportunities" class="nav-item">Opportunities</button><button data-nav="contacts" class="nav-item">CRM</button><button data-nav="tasks" class="nav-item">Tasks</button><button data-nav="approvals" class="nav-item">Approvals</button><button data-nav="activity" class="nav-item">Activity</button><button data-nav="agents" class="nav-item">Agents</button><button data-nav="content-factory" class="nav-item">Content Factory</button><button data-nav="settings" class="nav-item">Settings</button>
+<button data-nav="dashboard" class="nav-item active">Dashboard</button><button data-nav="control" class="nav-item">Codex</button><button data-nav="projects" class="nav-item">Projects</button><button data-nav="opportunities" class="nav-item">Opportunities</button><button data-nav="contacts" class="nav-item">CRM</button><button data-nav="tasks" class="nav-item">Tasks</button><button data-nav="approvals" class="nav-item">Approvals</button><button data-nav="activity" class="nav-item">Activity</button><button data-nav="agents" class="nav-item">Agents</button><button data-nav="content-factory" class="nav-item">Content Factory</button><button data-nav="digital-products" class="nav-item">المنتج الرقمي</button><button data-nav="settings" class="nav-item">Settings</button>
 </nav></div>
 <script type="module" src="/app.js"></script>
 </body></html>
