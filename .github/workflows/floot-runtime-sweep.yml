@@ -1,4 +1,4 @@
-name: ZOZ Pro Free Runtime Probe
+name: ZOZ Pro Free Runtime Health Check
 
 on:
   workflow_dispatch:
@@ -10,65 +10,36 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
-  group: zoz-pro-free-runtime-probe
+  group: zoz-pro-free-runtime-health
   cancel-in-progress: false
 
 jobs:
-  probe:
-    name: Verify free runtime and durable database
+  health:
+    name: Verify published free runtime
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 2
     steps:
-      - name: Request short-lived GitHub OIDC token
-        id: oidc
+      - name: Check live app and persistent database health
         shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
-            echo "GitHub OIDC is unavailable for this run." >&2
-            exit 1
-          fi
-          response="$(curl --fail-with-body --silent --show-error \
-            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=zoz-pro-floot-runtime-sweep")"
-          token="$(printf '%s' "$response" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
-          if [[ -z "$token" ]]; then
-            echo "GitHub OIDC returned no token." >&2
-            exit 1
-          fi
-          echo "::add-mask::$token"
-          echo "token=$token" >> "$GITHUB_OUTPUT"
-
-      - name: Probe Floot runtime without paid services or state mutations
-        shell: bash
-        env:
-          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
         run: |
           set -euo pipefail
           response="$(curl --fail-with-body --silent --show-error \
             --connect-timeout 10 --max-time 30 \
-            -X POST \
-            -H "Authorization: Bearer ${OIDC_TOKEN}" \
-            -H "Content-Type: application/json" \
-            --data '{"mode":"probe"}' \
-            "https://zoz-pro-cloud-runtime.floot.app/_api/worker/sweep")"
+            "https://zoz-pro-cloud-runtime.floot.app/_api/health")"
           printf '%s' "$response" | python -c '
           import json,sys
           data=json.load(sys.stdin)
-          print(json.dumps({
+          summary={
             "ok": data.get("ok"),
-            "mode": data.get("mode"),
             "runtime": data.get("runtime"),
-            "execution": data.get("execution"),
-            "paidFallback": data.get("paidFallback"),
-            "checkedAt": data.get("checkedAt"),
-            "tasks": data.get("tasks"),
-            "approvals": data.get("approvals"),
-            "note": data.get("note")
-          }, ensure_ascii=False))
-          if data.get("ok") is not True or data.get("execution") != "disabled" or data.get("paidFallback") is not False:
+            "persistent": data.get("persistent"),
+            "database": data.get("database"),
+            "automation": data.get("automation"),
+            "scheduled_jobs_enabled": data.get("scheduled_jobs_enabled")
+          }
+          print(json.dumps(summary, ensure_ascii=False))
+          if data.get("ok") is not True or data.get("persistent") is not True or data.get("database") != "healthy":
               sys.exit(1)
           '
