@@ -1,120 +1,141 @@
-# ZOZ Pro — Digital Product Opportunity & Validation Plan
+# ZOZ Pro — Global Digital Product Opportunity: Evidence Review & Test Plan
 
-**Status:** Discovery hypothesis; no product selected as validated and no production launch authorized.  
-**Date:** 2026-10-18  
-**Target market:** Global, English-first research with room for multilingual support later.  
-**Constraints:** Continue on the existing Cloud Run + Supabase workstream. No new application, no Vercel repair path, no checkout/payment integration, no paid ads, no credit purchases, and no paid provider use without explicit owner approval.
+**Research snapshot:** 2026-10-18  
+**Decision status:** Recommended low-cost prototype hypothesis; demand and willingness to pay are NOT validated. No product launch or full software investment approved.  
+**Target:** Global, English-first, independent UGC creators who already receive paid brand collaborations.  
+**Project boundary:** Existing ZOZ Pro repository and Cloud Run + Supabase path. No new project, Vercel repair path, payment activation, paid ads, external outreach, or paid provider usage without explicit owner approval.
 
-## Executive recommendation
+## Executive decision
 
-Investigate a **Creator Publishing Operations Kit** first: a practical system for independent video creators and small creator teams to move from idea/brief to script/assets, review, platform-specific publishing checklist, and a reliable per-platform outcome log. Start as a downloadable/template-based product with a concise implementation guide; only consider a maintained subscription or small software layer if repeated usage and willingness to pay are demonstrated.
+**Do not build another generic content planner or broad creator operating system first.** Marketplace evidence shows many content calendars and UGC deal trackers, with a wide range of low prices and near-identical feature lists. The better first hypothesis to test is a narrower, one-time downloadable **Creator Rights & Revenue Kit**: a practical workbook and action guide to record what usage rights were granted for each UGC asset, track invoice due dates and rights expiry, document public evidence of continuing ad use when it is visible, and prepare a disciplined renewal or payment follow-up.
 
-This is a research hypothesis, not a claim that demand is validated. It is adjacent to the owner's existing ZOZ Pro content-production workflow, which can help create a credible prototype, but the global buyer problem must be confirmed independently. Avoid competing as another generic AI script generator or generic planner.
+This is the best *prototype candidate* from this research, not a validated winner. It should be tested against real creator experiences before building a polished bundle or any software. The differentiator must be the end-to-end evidence and next-action process—not simply adding another rights-expiry column to an existing spreadsheet.
 
-## Market evidence and limits
+## Why this problem merits testing
 
-1. **Adobe, Creators' Toolkit Report 2026** (published 2026-06-16; survey of 16,000+ creators across eight markets): among creators using creative AI, 87% said it accelerated business or audience growth; 75% described it as integrated or essential. 85% said the final creative decision should remain theirs. This supports the relevance of creator workflows and human review, not demand for this specific product.  
-   Source: https://news.adobe.com/news/2026/06/creators-toolkit-report-2026
-2. **EMARKETER, Creator Economy 2026** (2026-03-12): brands' increased use of creators expands opportunity while competition and influencer measurement remain challenges. This suggests testing workflow visibility and tracking, not assuming buyers will pay.  
-   Source: https://www.emarketer.com/content/creator-economy-2026
-3. **Kit, The State of AI in the Creator Economy** (updated 2026-08-04; survey of 550 creators): 57.3% reported daily AI use; 89.2% said they always review/edit AI output. This supports a hypothesis around review, process consistency, and human control. It is a vendor survey and not proof of willingness to pay for this kit.  
-   Source: https://kit.com/resources/blog/ai-creator-economy-report
-4. **Opportunity quality principle:** current digital-product guidance consistently favors a narrow buyer/problem over generic downloadable templates. Treat this as directional editorial evidence, not audited sales data.  
-   Sources: https://bigideasdb.com/online-business-ideas/digital-products and https://ideaproof.io/guides/digital-product-ideas
+1. **CreatorIQ, State of Creator Compensation (2026-01-21):** reports $32.6B estimated global creator-marketing market value for 2025; aggregate creator payments grew 59% year over year, but the top 10% of creators received 62% of payments in 2025. The same report describes deal revenue as episodic and unpredictable. This supports a commercially significant market but also warns against targeting hobbyists or assuming a typical creator has budget.  
+   Source: https://www.creatoriq.com/press/releases/state-of-creator-compensation-
+2. **CreatorIQ, Creator-Powered Funnel (2026-06-10):** among 100 US/UK brand and agency marketing leaders surveyed, 92% used creator content in paid media, creator content represented 44% of paid-media creative assets on average, and 54% named securing usage rights as a barrier to scaling creator content. This is a direct signal that rights administration matters in paid-media workflows, although it is a brand/agency survey—not proof that creators will buy this kit.  
+   Source: https://www.creatoriq.com/press/releases/creator-powered-funnel-report-2026
+3. **CreatorIQ, State of Creator Marketing 2026–2027 (2026-09-30):** identifies integration of workflows and systems as a major operating challenge while creator marketing budgets continue to grow. This adds context for process-control products; it still does not validate the proposed consumer product.  
+   Source: https://www.creatoriq.com/white-papers/state-of-creator-marketing-trends-2027
+4. **Recent creator discussions:** several public UGC community posts describe confusion about unlimited/paid usage, expired ads, and late invoices. These are qualitative, self-selected community anecdotes with small vote counts—not representative survey evidence. They are useful for drafting interview questions, not for estimating market size.  
+   Examples: https://www.reddit.com/r/UGCcreators/comments/1wcgl7p/how_i_stopped_letting_brands_run_my_ugc_ads_past/ ; https://www.reddit.com/r/UGCcreators/comments/1sfqqky/help_add_usage_outside_the_agreed_timeframe/ ; https://www.reddit.com/r/UGCcreators/comments/1wq5jyf/ugc_unlimited_usage_rights_question/
 
-### What remains unknown
+## Competitor evidence (observed listings, 2026-10-18)
 
-- How often independent video creators or small teams lose time or miss steps coordinating drafts, assets, review, rights, and publishing across platforms.
-- Whether the problem is painful enough to buy a separate product when existing tools are available.
-- Which buyer segment and workflow has the highest willingness to pay.
-- Whether a one-time kit is sufficient or recurring updates/software are needed.
-- Current competitors, exact prices, actual sales, search volumes, and conversion rates. The cited reports do not establish these for the proposed product.
+| Alternative observed | Public price / signal | What is already covered | Implication |
+|---|---|---|---|
+| FounderStudios, UGC Creator Brand Deal Tracker (Etsy, UK edition) | Regionalized price shown around US$25.29 at observation; 12 tabs; listing itself had no reviews; shop had 2.3K sales and 280 shop reviews overall | Deal and pitch pipelines, deliverables, invoice/payment tracking, rights/exclusivity, rate calculator, CRM, expenses | Serious direct competition; shop-wide sales are not proof the individual listing sells |
+| UGC Creator Airtable Template (Etsy) | US$7.99 | Brand deals, payments, content planning | Low-price substitute |
+| UGC Creator Notion Template (Etsy) | US$11.14, listing reported 1 sale/no reviews at observation | Deals, invoices, income, pitch templates | New listings exist, but exact demand is unclear |
+| UGC Creator Notion Tracker (Etsy) | US$21.29 listing; 4.5-star listing rating displayed in search | Deals, deadlines, income, pitching | Similar positioning already present |
+| Creator tracker spreadsheets on Etsy | Search results included several listings around US$3–$12; others were higher | Follow-ups, rates, deal and income tracking | Basic tracking is highly commoditized |
+| Fayedtion, Brand Deal Tracker for UGC Creators (Gumroad) | US$39+; one rating on the product at observation | Lead-to-paid deal pipeline, samples, content, invoices, creator profile | Shows sellers test higher price points, but public product-level purchase evidence is weak |
+| Proofspringdigital, UGC Creator Brand Deal Operating System (Gumroad) | A$119 one-time was shown in the listing copy | Deal flow, scopes, rights, pricing and creator operations | Premium positioning exists; the page did not establish meaningful sales volume |
+| sproutUGC usage-rights feature | Public SaaS offering | Licence terms, rights windows, renewal prompts | Direct software substitute; a spreadsheet-only rights alert is not unique |
+| UGC Rights Tracker | Public SaaS offering with a no-card trial and licence-expiry alerts | Rights permission and expiry tracking, including paid ad/whitelisting workflows | Another direct substitute; a new product must avoid copying basic functionality only |
+| TheGoodiesLab general social-content planner (Etsy) | US$10 sale price at observation, 24 product reviews; shop had 1.6K sales overall | Multi-platform calendar, content ideas, assets, analytics | General creator planning is already well supplied; shop-wide sales must not be attributed to this one product |
 
-## Opportunity shortlist
+Representative source links:
+- https://www.etsy.com/listing/4518943446/ugc-creator-brand-deal-tracker-uk
+- https://www.etsy.com/listing/1837749623/ugc-creator-airtable-template-brand-deal
+- https://www.etsy.com/listing/4504409384/ugc-creator-notion-template-content
+- https://www.etsy.com/listing/4494833551/ugc-creator-notion-template-brand-deals
+- https://fayedinua.gumroad.com/l/brand-deal-tracker-ugc-creator-os
+- https://proofspringdigital.gumroad.com/l/ugc-creator-brand-deal-operating-system
+- https://www.sproutugc.com/software/usage-rights-tracker
+- https://www.ugcrightstracker.com/
+- https://www.etsy.com/listing/1607881109/social-media-content-planner-template
 
-Scores below are **initial hypotheses only**, 1 (weak) to 5 (strong); they must be revised after interviews and competitor checks. Weights: pain/frequency 25%, buyer accessibility 20%, differentiation 20%, repeat-use/recurring potential 20%, low-cost validation 15%.
+**Conclusion from the competition review:** there is a visible market category and strong feature overlap, but no public evidence here establishes sales velocity for the specific proposed product. The generic “creator OS” and generic “UGC brand deal tracker” should be treated as saturated/price-competitive. A focused Rights & Revenue Kit is worth a small validation test only if interviewees confirm that existing trackers and tools do not solve the *evidence-to-action* workflow they need.
 
-| Candidate | Pain/frequency | Reach | Differentiation | Repeat use | Cheap test | Weighted score / 5 | Initial decision |
+## Shortlist and hypothesis scores
+
+Scores are 1–5, with weights: pain/frequency 25%, buyer accessibility 20%, differentiation 20%, repeat use 20%, low-cost testability 15%. Scores are hypotheses to guide tests, not observed sales or demand.
+
+| Candidate | Pain | Reach | Differentiation | Repeat use | Low-cost test | Weighted score | Decision |
 |---|---:|---:|---:|---:|---:|---:|---|
-| Creator Publishing Operations Kit: cross-platform production checklist, asset/rights log, review gates, per-platform result tracker | 4 | 4 | 3 | 4 | 5 | 3.95 | Test first |
-| Brand-deal pipeline, deliverables, and invoice tracker for small creators | 4 | 3 | 3 | 4 | 4 | 3.60 | Interview alternative |
-| Generic AI prompt/script template pack | 3 | 5 | 1 | 2 | 5 | 3.10 | Deprioritize: crowded and easy to copy |
+| **Creator Rights & Revenue Kit** — per-asset rights register, invoice tracking, evidence log and renewal/follow-up workflow | 5 | 3 | 3 | 4 | 5 | **4.00** | Prototype only after interviews; validate evidence-to-action gap |
+| Full UGC Brand Deal OS / CRM spreadsheet | 5 | 3 | 2 | 5 | 4 | 3.85 | Crowded; do not clone existing listings |
+| General Creator Publishing Operations Kit | 4 | 4 | 1 | 3 | 5 | 3.35 | Deprioritize due commoditization |
+| Generic AI prompt/script pack | 3 | 5 | 1 | 2 | 5 | 3.10 | Deprioritize: easy to copy and price pressure |
 
-Scores are directional, not observed market data.
+## Recommended product concept
 
-## Ideal first customer hypothesis
+**Provisional name:** Creator Rights & Revenue Kit — UGC Usage & Payment Control Workbook.  
+**Ideal buyer hypothesis:** an English-speaking UGC creator who has completed at least 2–3 paid collaborations, has licensed or been asked to license content for brand use, and is responsible for their own invoices and follow-ups. Target active creators, not casual hobbyists.
 
-A solo YouTube/TikTok/short-video creator or a small creator team publishing at least 8–12 pieces per month, using several tools, and personally responsible for tracking revisions, assets, publication status, and results. Exclude hobbyists who publish rarely from the initial validation cohort. Test both solo creators and small teams rather than assuming they are the same segment.
+**Customer job:** know what use was agreed for each asset, when the rights window ends, whether an invoice is overdue, what evidence exists, and what specific next step to take—without paying for a new SaaS subscription.
 
-## Proposed minimum viable product (MVP)
+The product must not promise guaranteed fees, takedowns, legal protection or income. It is an administrative and evidence-organizing aid, not legal advice.
 
-A focused, usable downloadable kit—not a platform rebuild:
-- A production board with one canonical content/task ID.
-- A content brief and script-review checklist.
-- Asset/source/usage-rights log.
-- Platform-specific preflight checklist.
-- Separate per-platform status, publication URL, timestamp, and failure/retry notes.
-- A weekly review sheet with a small number of outcome metrics.
-- A short setup guide and one realistic sample workflow.
-- A clear statement that the kit does not publish automatically or guarantee views/revenue.
+## MVP scope (deliverable digital files, not a SaaS rebuild)
 
-Build only enough to test the workflow. Reuse the existing product section in ZOZ Pro for idea tracking; do not build a payment system or a new SaaS backend as part of validation.
+- Editable Excel/Google Sheets workbook with fictional sample data; no private/customer data.
+- Asset/rights register with explicit source fields from the agreement: asset, brand/campaign, channels, organic vs paid use, whitelisting/partnership/Spark Ads if applicable, licence start/end date, territory, exclusivity, raw footage/derivatives, evidence/document link, renewal owner and status.
+- Invoice and cash-collection sheet with due dates, terms as entered by the creator, amount, received date and follow-up state.
+- Public-evidence log: public ad/library link or ad ID, observation date, screenshot/location link, and a neutral status (not checked / observed / needs review). No automated scraping or unsolicited contact.
+- Next-action playbook: verify the written agreement, check the relevant public ad library when available, record observations, ask for a clarification/renewal, and seek qualified advice for a dispute. Expiry of a licence does not itself stop an ad from running.
+- Configurable quote worksheet: users enter their own base rate and add-ons; no universal “standard rates” are hard-coded.
+- Four editable communication templates: scope clarification, approaching expiry, overdue invoice, and asking about observed use after a documented licence window.
+- Quick-start PDF and one worked fictional example. State clearly: not legal, tax, or accounting advice; no guaranteed collection or enforcement outcome.
 
-## Test plan (no paid services required)
+Do NOT build email-alert software, monitoring automation, contracts, payments, or a subscription before validation. Existing ZOZ Pro's product tracker is the place to record the idea and its status; reuse it and the current Cloud Run + Supabase architecture only if later engineering is justified.
 
-### Phase A — problem interviews (7–10 days)
-1. Recruit 15 qualified global creators/teams through existing communities and public outreach only if the owner approves the outreach channel and message.
-2. Ask about their last 3 published pieces, handoffs, missed steps, time spent, tools used, current workaround, and consequences.
-3. Do not lead with the proposed solution; record exact phrases and observable examples.
-4. Pass gate: at least 8/15 report the same recurring workflow problem; at least 5/15 show an existing workaround or measurable consequence; at least 3/15 volunteer to test a prototype. Otherwise revise segment/problem before building.
+## Test gates before investment
 
-### Phase B — competitor and search-intent check (3–5 days)
-1. Compare at least 8 alternatives: creator project-management templates, social media calendars, asset/rights trackers, and publishing/analytics tools.
-2. Record buyer segment, core job, workflow coverage, per-platform status support, export/data ownership, support, pricing model, recurring cost, and obvious gaps.
-3. Inspect keyword/search suggestions and public community questions; record source URL/date and whether evidence is search interest, user complaint, or sales claim.
-4. Pass gate: identify one specific underserved workflow gap that appears in interview evidence and is not already solved well by a low-cost default tool. No scraped/private data or fake accounts.
+### Gate A — problem interviews (15 qualified people)
+Recruit UGC creators with paid deals and rights-based usage, if/when the owner approves outreach. Ask about a real recent deal, where the licence term lives, how they distinguish delivery date from rights-start date, how they learn an ad is still live, invoice follow-up, existing tools and consequences. Do not start with “Would you buy my kit?”
+- Pass to prototype if at least 8/15 experienced a recent rights-scope/expiry/payment follow-up problem, at least 5/15 currently use a manual workaround or can show a consequence, and at least 3/15 volunteer to test a prototype.
+- If not, stop or change the target problem.
 
-### Phase C — no-payment landing page / prototype (7 days)
-1. Create a single-page description and 3–5 screenshots or a clickable/mock template. Use a waitlist or interview request only; do not collect payments.
-2. Test two clear positioning messages with the same audience.
-3. Aim for 100 qualified visits from organic/approved outreach. Treat >=8% qualified waitlist/interview conversion as a provisional signal, not a universal benchmark. If traffic is too small, report inconclusive rather than failure.
-4. Ask qualified prospects which price band they would seriously consider (for example $19–$39 one-time kit, or $9–$19/month only if recurring value is evidenced). These are research probes, not final prices or a payment offer.
-5. Pass gate: at least 8 qualified signups or interview requests, plus at least 5 follow-up conversations and 3 explicit statements of willingness to pay or join a paid pilot when eventually offered. No charge is collected.
+### Gate B — competitive gap interviews
+Show the competitor feature matrix above. Ask what users already have and what remains unresolved. Pass only if at least 5/15 independently identify the same evidence-to-action gap and at least 3 can explain how solving it changes their workflow. If existing tools solve it satisfactorily, do not build a clone.
 
-### Phase D — prototype usage (7–14 days)
-1. Give the kit to 5–8 volunteer testers at no charge.
-2. Observe whether they set it up and use it for at least 3 real content items.
-3. Track setup time, repeat use, missed steps prevented, confusing fields, and requests for ongoing features.
-4. Pass gate: at least 4/5 testers complete the workflow, at least 3 use it repeatedly, and at least 3 independently request the same improvement or ongoing support. Otherwise simplify/re-scope.
+### Gate C — no-payment prototype
+Make one spreadsheet prototype with three fictional deal records and a short setup guide. Give it to 5–8 volunteer testers, at no charge.
+- Pass if at least 4 of 5 testers complete a real workflow, at least 3 use it on multiple live assets/deals, and at least 3 independently point to the evidence-to-action distinction as useful.
+- Capture setup time, missed or unclear fields, use of evidence log, and whether the tool changes the next action taken.
+
+### Gate D — no-payment purchase-intent test
+Only after the earlier gates pass, create a simple landing page with a waitlist or interview-request CTA—not checkout. Target 100 qualified visits through owner-approved organic channels. An 8% qualified response is a provisional signal only; low traffic means inconclusive. Seek at least 5 follow-up conversations and 3 explicit, reasoned indications of willingness to pay US$19–$29 for a useful v1. Stated intention alone is not a sale.
+
+## Price and unit-economics hypothesis
+
+- Test US$19 beta pricing against US$29 proposed standard price after validation. Do not activate a sale now. A US$39+ bundle is not justified until user evidence and a real differentiator support it.
+- Gumroad's current official direct-sale pricing is 10% + $0.50 per transaction, plus card processing listed as 2.9% + $0.30; Discover sales are 30%. At a $29 direct card sale, the simple estimated remainder is about $24.46 before refunds, FX, taxes outside the platform's handling, support and acquisition time. Approximately 41 such sales would yield ~$1,000 before those other costs; this is arithmetic, not a forecast.
+- Gumroad's payout help page lists Egypt for local EGP bank payouts, but requires identity/account verification and a $100 minimum payout. Direct sales require us to find qualified buyers; do not rely on Discover initially, as it has eligibility requirements and a 30% fee.
+- Etsy offers marketplace discovery, but Egyptian shops require Payoneer for Etsy Payments; the official fee page lists a $0.20 listing fee, a 6.5% transaction fee, and Egypt payment-processing at 6.5% + $0.30 USD, with a possible shop setup fee depending on onboarding. Do not open, configure, or pay for either store until validation and owner approval.
+- Official sources: https://gumroad.com/pricing ; https://gumroad.com/help/article/13-getting-paid ; https://gumroad.com/help/article/79-gumroad-discover ; https://help.etsy.com/hc/en-us/articles/115015710408-Countries-Eligible-for-Etsy-Payments ; https://help.etsy.com/hc/en-us/articles/115014483627-What-are-the-Fees-and-Taxes-for-Selling-on-Etsy ; https://help.etsy.com/hc/en-gb/articles/115015628847-What-are-Payment-Processing-Fees-for-Selling-on-Etsy
+
+## Go-to-market reality
+
+The main risk is not file production; it is access to qualified buyers and differentiation. ZOZ Pro's existing Egyptology channel is not evidence of an audience of English-speaking UGC creators, so do not assume that channel is a viable sales funnel. Use creator communities, creator educators, or organic content only after the owner approves outreach and channel choices. No paid ads or external outreach has been activated.
 
 ## Decision rules
 
-- **Proceed with template kit:** interview and prototype gates pass, but recurring need is not demonstrated.
-- **Explore recurring membership/software:** repeated use plus specific ongoing job, at least 3 independent requests for continued updates/automation, and clear cost-to-serve estimate.
-- **Change niche:** the problem appears real but interviewers consistently prefer another workflow, such as brand-deal tracking.
-- **Stop/pause:** no repeated pain, no current workaround, or no credible willingness-to-pay signal after two positioning/segment iterations.
-- Do not infer demand from market size, likes, free signups alone, or AI enthusiasm statistics.
-
-## Measurement and evidence log
-
-For each interview or test, record date, broad segment, source/recruitment channel, problem frequency, existing workaround, consequence, quote with permission, product interest, price response, next action, and consent to follow up. Minimize personal data; never store private messages without permission.
-
-Core metrics: qualified interview completion; recurring-pain share; existing-workaround share; prototype activation; repeat usage; waitlist/interview conversion; stated willingness to pay; and reasons for rejection. Distinguish observed behavior from stated preference.
+- **Proceed to paid productization:** gates A–D pass and the product solves a gap not adequately covered by the competing sheets/software.
+- **Revise the offer:** rights tracking matters but interviewees prefer a different deliverable (for example an ad-usage evidence playbook or invoice follow-up kit).
+- **Stop:** existing tools solve the problem, respondents do not use the prototype repeatedly, or buyers have no credible willingness-to-pay signal after two positioning iterations.
+- **Consider recurring software only later:** repeated use and ongoing need are observed, with users explicitly asking for automation; estimate support and operating costs before scoping.
+- Do not infer sales from market size, general AI usage, listings, favourites, likes or hypothetical interest.
 
 ## Execution backlog
 
-1. [ ] Create an interview guide and recruit criteria.
-2. [ ] Conduct 15 interviews and save anonymized findings.
-3. [ ] Complete the competitor matrix with dated source links.
-4. [ ] Revise weighted opportunity scores using evidence.
-5. [ ] Build a no-payment mock/landing page only after the problem gate passes.
-6. [ ] Run prototype test and record evidence.
-7. [ ] Make a documented go / revise / stop decision.
-8. [ ] Only after validation, scope production, accessibility, support, licensing, and a monetization approach for owner approval.
+1. [ ] Mark Creator Rights & Revenue Kit as the leading test hypothesis in ZOZ Pro's digital-product tracker (do not mark validated).
+2. [ ] Complete the 15-interview guide and owner-approved recruitment plan.
+3. [ ] Interview qualified creators and record anonymized findings.
+4. [ ] Review at least 8 direct substitutes using the competitive gap questions.
+5. [ ] Build the fictional-data workbook only if Gates A and B pass.
+6. [ ] Run the no-payment user prototype test.
+7. [ ] Run the no-payment waitlist/intent test and log conversion source.
+8. [ ] Make a documented go/revise/stop decision.
+9. [ ] Only after the owner approves a paid launch, verify payout onboarding and fee economics, then prepare the sale listing; no payment has been activated yet.
 
-## Project integration and release boundaries
+## Release and project boundary
 
-- Current product workflow is in the existing ZOZ Pro repository and uses the current application state/store; verify persistence in the actual Cloud Run + Supabase deployment before relying on it.
-- Save this plan and the scorecard in GitHub and the Notion operations log.
-- No production deploy has been performed by this plan. No payment integration, checkout, billing, paid ads, credit top-up, or external outreach has been activated.
-- Section status: **research plan prepared; market hypothesis unvalidated; product build not yet authorized beyond the existing tracker.**
+- Repository: hazemnaw48-coder/zoz-pro-ai.
+- Target architecture remains Cloud Run + Supabase; no new project, no Vercel repair path.
+- No production deploy, checkout, billing, external outreach, paid ads, purchase or paid provider usage was activated by this research.
+- **Final status:** public evidence supports a problem worth testing and a market with existing spend, but direct demand for this exact kit is not proven. Recommendation: small, no-payment validation first; do not invest in full software or inventory yet.
