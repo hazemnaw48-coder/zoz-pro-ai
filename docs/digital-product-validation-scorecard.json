@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 2,
+  "updatedAt": "2026-10-18",
+  "project": "ZOZ Pro",
+  "section": "Digital product opportunity validation",
+  "market": "global; English-first",
+  "status": "research-supported-hypothesis-not-validated",
+  "selectedProduct": null,
+  "leadingHypothesis": {
+    "name": "Creator Rights & Revenue Kit — UGC Usage & Payment Control Workbook",
+    "format": "downloadable Excel/Google Sheets workbook + PDF playbook + editable communication templates",
+    "buyer": "UGC creators with 2-3 or more paid collaborations who manage their own usage rights, invoices and follow-ups",
+    "job": "record per-asset usage terms and expiry; log public evidence when relevant; track invoice due dates; support clear renewal/payment follow-up",
+    "differentiatorHypothesis": "evidence-to-action workflow, not only a generic deal tracker: written-scope fields, public ad-evidence log, rights-window review, invoice follow-up workflow, and no-subscription spreadsheet",
+    "priceTestUSD": [19, 29],
+    "recurringModel": "not selected; only explore software/membership if repeated use and explicit ongoing demand are demonstrated",
+    "confidence": "medium evidence for problem category; low evidence for specific product willingness to pay"
+  },
+  "alternatives": [
+    {"name":"Creator Rights & Revenue Kit","weightedScore":4.0,"confidence":"hypothesis only","decision":"prototype after interviews"},
+    {"name":"Full UGC Brand Deal OS / CRM spreadsheet","weightedScore":3.85,"confidence":"hypothesis only","decision":"deprioritize: direct competing listings"},
+    {"name":"General Creator Publishing Operations Kit","weightedScore":3.35,"confidence":"hypothesis only","decision":"deprioritize: crowded category"},
+    {"name":"Generic AI prompt/script pack","weightedScore":3.1,"confidence":"hypothesis only","decision":"deprioritize: low differentiation"}
+  ],
+  "competitorEvidence": [
+    {"name":"FounderStudios UGC Creator Brand Deal Tracker (Etsy UK edition)","observedPrice":"about US$25.29 displayed on page","signal":"12 tabs include rights, payment, deal pipeline and pricing; individual listing had no reviews; shop-wide 2.3K sales do not prove this listing sells","url":"https://www.etsy.com/listing/4518943446/ugc-creator-brand-deal-tracker-uk"},
+    {"name":"UGC Creator Airtable Template","observedPriceUSD":7.99,"signal":"low-price substitute","url":"https://www.etsy.com/listing/1837749623/ugc-creator-airtable-template-brand-deal"},
+    {"name":"UGC Creator Notion Template","observedPriceUSD":11.14,"signal":"listing showed one sale and no reviews at observation","url":"https://www.etsy.com/listing/4504409384/ugc-creator-notion-template-content"},
+    {"name":"UGC Creator Notion Tracker","observedPriceUSD":21.29,"signal":"existing deal, invoice, income and pitch workflow; 4.5-star rating visible","url":"https://www.etsy.com/listing/4494833551/ugc-creator-notion-template-brand-deals"},
+    {"name":"Fayedtion Brand Deal Tracker","observedPriceUSD":"39+","signal":"Gumroad listing; one product rating at observation; creator's reviews across other products are not this product's sales","url":"https://fayedinua.gumroad.com/l/brand-deal-tracker-ugc-creator-os"},
+    {"name":"sproutUGC usage-rights tracking","observedPrice":"SaaS, check current plans before any future choice","signal":"direct software substitute has licence tracking and renewal alerts","url":"https://www.sproutugc.com/software/usage-rights-tracker"},
+    {"name":"UGC Rights Tracker","observedPrice":"SaaS; current plan details not assessed","signal":"direct software substitute with rights expiry alerts","url":"https://www.ugcrightstracker.com/"}
+  ],
+  "macroEvidence": [
+    {"source":"CreatorIQ State of Creator Compensation","date":"2026-01-21","url":"https://www.creatoriq.com/press/releases/state-of-creator-compensation-","signal":"$32.6B estimated global creator-marketing market in 2025; creator payouts rose but were concentrated at the top; revenue often episodic","supportsSpecificProductDemand":false},
+    {"source":"CreatorIQ Creator-Powered Funnel","date":"2026-06-10","url":"https://www.creatoriq.com/press/releases/creator-powered-funnel-report-2026","signal":"92% of 100 surveyed US/UK marketing leaders used creator content in paid media; 54% cited securing rights as a scaling barrier","supportsSpecificProductDemand":false},
+    {"source":"Reddit UGC creator discussion — rights beyond agreed timeframe","date":"2026-04-08","url":"https://www.reddit.com/r/UGCcreators/comments/1sfqqky/help_add_usage_outside_the_agreed_timeframe/","signal":"qualitative anecdote about continuing ads and unpaid extended usage; low-sample evidence only","supportsSpecificProductDemand":false},
+    {"source":"Reddit UGC creator discussion — expired ads and unpaid invoices","date":"2026-09-10","url":"https://www.reddit.com/r/UGCcreators/comments/1wcgl7p/how_i_stopped_letting_brands_run_my_ugc_ads_past/","signal":"qualitative report of a creator building own tracker to cover overdue invoices and rights expiry; low-sample evidence only","supportsSpecificProductDemand":false}
+  ],
+  "validationGates": {
+    "interviews": {"targetQualifiedInterviews":15,"minRecentRightsOrPaymentPain":8,"minExistingWorkaroundsOrConsequences":5,"minPrototypeVolunteers":3,"status":"not-started"},
+    "competitiveGap": {"minimumDirectSubstitutesReviewed":8,"minIndependentReportsOfSameGap":5,"minPotentialTesters":3,"status":"partial-public-scan; interview validation pending"},
+    "prototype": {"targetTesters":5,"maxTesters":8,"minWorkflowCompletions":4,"minRepeatUsers":3,"status":"not-started"},
+    "noPaymentIntent": {"targetQualifiedVisits":100,"provisionalConversionRate":0.08,"minFollowUpConversations":5,"minExplicitPriceInterest":3,"paymentsEnabled":false,"status":"not-started"}
+  },
+  "pricingAndChannels": {
+    "testPriceUSD": [19,29],
+    "gumroadDirect": {"countryPayout":"Egypt local-bank EGP payout is listed in official help","fee":"10% + $0.50 plus card processing 2.9% + $0.30","payoutMinimumUSD":100,"activation":"not enabled"},
+    "gumroadDiscover": {"fee":"30% per transaction","eligibility":"payout settings, $100 balance from genuine sales and review; do not rely on initial discovery","activation":"not enabled"},
+    "etsyEgypt": {"payout":"Etsy Payments via Payoneer for Egyptian sellers","fees":"US$0.20 listing; 6.5% transaction; Egypt processing 6.5% + $0.30, plus possible shop setup and other applicable fees","activation":"not enabled"},
+    "note":"All channels are research only. No seller account, checkout or payment settings have been activated."
+  },
+  "constraints": {
+    "existingRepositoryOnly": true,
+    "runtimeTarget": "Cloud Run + Supabase",
+    "vercelRepair": false,
+    "newProject": false,
+    "paymentIntegration": false,
+    "paidAds": false,
+    "paidProviderUsageWithoutApproval": false,
+    "externalOutreachActivated": false,
+    "productionDeployment": false
+  },
+  "decision": "Build only a fictional-data prototype after interview and competitor-gap gates pass. Do not build the full software or launch payments based on public evidence alone."
+}

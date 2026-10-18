@@ -460,12 +460,65 @@ function showView(name) {
   if (name === "digital-products") renderDigitalProducts();
 }
 
-const DIGITAL_PRODUCT_STATUS_LABELS={idea:"فكرة",validation:"التحقق من الطلب",outline:"مخطط المنتج",production:"قيد الإنتاج",review:"مراجعة الجودة",ready:"جاهز للبيع",launched:"تم الإطلاق",paused:"متوقف مؤقتًا"};
+const DIGITAL_PRODUCT_STATUS_LABELS={idea:"فكرة",validation:"التحقق من الطلب",outline:"مخطط المنتج",production:"قيد الإنتاج",review:"مراجعة الجودة",ready:"جاهز بعد التحقق",launched:"تم الإطلاق",paused:"متوقف مؤقتًا"};
+const DIGITAL_PRODUCT_VALIDATION_FIELDS=[
+ ["interviewsCompleted","مقابلات مكتملة",15],["recentPainCount","واجهوا المشكلة مؤخرًا",8],
+ ["workaroundCount","لديهم حل يدوي أو أثر واضح",5],["prototypeVolunteers","متطوعون للنموذج الأولي",3],
+ ["substitutesReviewed","بدائل منافسة تمت مراجعتها",8],["gapReports","ذكروا الفجوة نفسها",5],
+ ["gapExplainers","شرحوا أثر الفجوة",3],["prototypeTesters","مختبرو النموذج (المستهدف 5–8)",5],
+ ["workflowCompletions","أكملوا مسار الاستخدام",4],["repeatUsers","استخدموه أكثر من مرة",3],
+ ["gapUsefulCount","أكدوا فائدة الفرق",3],["qualifiedVisits","زيارات مؤهلة",100],
+ ["qualifiedResponses","استجابات مؤهلة (8%+)",8],["followUpConversations","محادثات متابعة",5],
+ ["priceInterestCount","اهتمام مبرر بالسعر",3]
+];
+function getDigitalProductValidationGates(v={}){
+ const interviews=(Number(v.interviewsCompleted)||0)>=15&&(Number(v.recentPainCount)||0)>=8&&(Number(v.workaroundCount)||0)>=5&&(Number(v.prototypeVolunteers)||0)>=3;
+ const competitor=(Number(v.substitutesReviewed)||0)>=8&&(Number(v.gapReports)||0)>=5&&(Number(v.gapExplainers)||0)>=3;
+ const prototype=(Number(v.prototypeTesters)||0)>=5&&(Number(v.workflowCompletions)||0)>=4&&(Number(v.repeatUsers)||0)>=3&&(Number(v.gapUsefulCount)||0)>=3;
+ const visits=Number(v.qualifiedVisits)||0,responses=Number(v.qualifiedResponses)||0;
+ const intent=visits>=100&&(visits>0?responses/visits:0)>=0.08&&(Number(v.followUpConversations)||0)>=5&&(Number(v.priceInterestCount)||0)>=3;
+ return [{key:"interviews",label:"المقابلات",passed:interviews},{key:"competitor",label:"فجوة المنافسين",passed:competitor},{key:"prototype",label:"اختبار النموذج",passed:prototype},{key:"intent",label:"اهتمام الشراء دون دفع",passed:intent}];
+}
+function renderDigitalProductValidationEditor(p){
+ const v=p.validation||{};
+ const fields=DIGITAL_PRODUCT_VALIDATION_FIELDS.map(field=>'<label class="validation-field">'+escapeHtml(field[1])+' <span class="meta">هدف '+field[2]+'</span><input type="number" min="0" max="1000000" step="1" data-validation-product="'+escapeHtml(p.id)+'" data-validation-field="'+field[0]+'" value="'+escapeHtml(v[field[0]]??0)+'"></label>').join("");
+ return '<details class="validation-editor"><summary>تحديث دليل التحقق وأعداد المستخدمين</summary><p class="meta">أدخل أعدادًا إجمالية مجهولة الهوية فقط. لا تسجل أي نتيجة إلا إذا كان لديك دليل حقيقي عليها.</p><div class="validation-grid">'+fields+'</div><label>ملاحظات دليل مجهول الهوية</label><textarea rows="2" maxlength="4000" data-validation-notes-product="'+escapeHtml(p.id)+'">'+escapeHtml(v.evidenceNotes||"")+'</textarea><button type="button" data-save-digital-product-validation="'+escapeHtml(p.id)+'">حفظ تقدم التحقق</button><p class="meta" data-validation-status="'+escapeHtml(p.id)+'"></p></details>';
+}
 function renderDigitalProducts(){
  const products=state?.digitalProducts??[],list=$("#digital-products-list"),count=$("#digital-product-count");if(!list||!count)return;
  count.textContent=products.length+" منتجات";
- list.innerHTML=products.length?products.map(p=>`<article class="list-item"><div class="section-heading"><div><div class="list-title">${escapeHtml(p.name)}</div><div class="meta">${escapeHtml(p.audience)} · ${escapeHtml(p.format)}</div></div><span class="status">${escapeHtml(DIGITAL_PRODUCT_STATUS_LABELS[p.status]??p.status)}</span></div><div class="meta"><strong>المشكلة:</strong> ${escapeHtml(p.problem)}</div>${p.promise?`<div class="meta"><strong>النتيجة:</strong> ${escapeHtml(p.promise)}</div>`:""}<div class="meta"><strong>السعر المبدئي:</strong> ${p.price==null?"لم يحدد":escapeHtml(p.price+" "+p.currency)} · <strong>التسليم:</strong> ${escapeHtml(p.deliveryPlan||"لم يحدد")}</div>${p.validationNotes?`<div class="meta"><strong>التحقق:</strong> ${escapeHtml(p.validationNotes)}</div>`:""}${p.outline?`<div class="meta"><strong>المخطط:</strong> ${escapeHtml(p.outline)}</div>`:""}<div class="meta">المعرّف: ${escapeHtml(p.id)} · آخر تحديث: ${escapeHtml(p.updatedAt)}</div><label>تحديث المرحلة</label><div class="control-row"><select data-digital-product-status-select="${escapeHtml(p.id)}">${Object.entries(DIGITAL_PRODUCT_STATUS_LABELS).map(([key,label])=>`<option value="${key}" ${p.status===key?"selected":""}>${escapeHtml(label)}</option>`).join("")}</select><button data-save-digital-product-status="${escapeHtml(p.id)}">حفظ المرحلة</button></div></article>`).join(""):'<div class="list-item muted-text">لا توجد أفكار محفوظة بعد. سجّل أول فكرة، ثم اختبر الطلب قبل بناء المنتج كاملًا.</div>';
+ list.innerHTML=products.length?products.map(p=>{
+   const v=p.validation||{},gates=getDigitalProductValidationGates(v),allPassed=gates.every(g=>g.passed);
+   const gateBadges=gates.map(g=>'<span class="badge '+(g.passed?'gate-passed':'gate-pending')+'">'+escapeHtml(g.label)+': '+(g.passed?'اجتاز':'غير مكتمل')+'</span>').join(" ");
+   const price=p.price==null?"لم يحدد":p.price+" "+p.currency;
+   return '<article class="list-item"><div class="section-heading"><div><div class="list-title">'+escapeHtml(p.name)+'</div><div class="meta">'+escapeHtml(p.audience)+' · '+escapeHtml(p.format)+'</div></div><span class="status">'+escapeHtml(DIGITAL_PRODUCT_STATUS_LABELS[p.status]??p.status)+'</span></div><div class="meta"><strong>المشكلة:</strong> '+escapeHtml(p.problem)+'</div>'+(p.promise?'<div class="meta"><strong>النتيجة:</strong> '+escapeHtml(p.promise)+'</div>':"")+'<div class="meta"><strong>السعر المبدئي:</strong> '+escapeHtml(price)+' · <strong>التسليم:</strong> '+escapeHtml(p.deliveryPlan||"لم يحدد")+'</div>'+(p.validationNotes?'<div class="meta"><strong>خطة التحقق:</strong> '+escapeHtml(p.validationNotes)+'</div>':"")+(p.outline?'<div class="meta"><strong>المخطط:</strong> '+escapeHtml(p.outline)+'</div>':"")+'<div class="gate-list">'+gateBadges+'</div><div class="meta">'+(allPassed?'اكتملت بوابات التحقق وفق الأرقام المسجلة؛ تبقى موافقة المالك على أي إطلاق مدفوع.':'لا يجوز اعتبار المنتج جاهزًا للبيع حتى تكتمل البوابات وتتوفر الأدلة.')+'</div><div class="meta">المعرّف: '+escapeHtml(p.id)+' · آخر تحديث: '+escapeHtml(p.updatedAt)+'</div>'+renderDigitalProductValidationEditor(p)+'<label>تحديث المرحلة</label><div class="control-row"><select data-digital-product-status-select="'+escapeHtml(p.id)+'">'+Object.entries(DIGITAL_PRODUCT_STATUS_LABELS).map(([key,label])=>'<option value="'+key+'" '+(p.status===key?"selected":"")+'>'+escapeHtml(label)+'</option>').join("")+'</select><button data-save-digital-product-status="'+escapeHtml(p.id)+'">حفظ المرحلة</button></div></article>';
+ }).join(""):'<div class="list-item muted-text">لا توجد أفكار محفوظة بعد. حمّل فرضية المنتج الحالية أو سجّل فكرة، ثم اختبر الطلب قبل اعتمادها.</div>';
  document.querySelectorAll("[data-save-digital-product-status]").forEach(button=>button.addEventListener("click",async()=>{button.disabled=true;try{const id=button.dataset.saveDigitalProductStatus,select=[...document.querySelectorAll("[data-digital-product-status-select]")].find(el=>el.dataset.digitalProductStatusSelect===id);await fetchJson("/api/digital-products/"+encodeURIComponent(id)+"/status",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({status:select.value})});await loadState();}catch(error){alert(error.message);}finally{button.disabled=false;}}));
+ document.querySelectorAll("[data-save-digital-product-validation]").forEach(button=>button.addEventListener("click",()=>saveDigitalProductValidation(button.dataset.saveDigitalProductValidation,button)));
+}
+async function saveDigitalProductValidation(id,button){
+ const status=document.querySelector('[data-validation-status="'+id+'"]');
+ button.disabled=true;if(status)status.textContent="جارٍ حفظ تقدم التحقق…";
+ try{
+   const body={};
+   DIGITAL_PRODUCT_VALIDATION_FIELDS.forEach(field=>{const input=document.querySelector('[data-validation-product="'+id+'"][data-validation-field="'+field[0]+'"]');body[field[0]]=input?Number(input.value||0):0;});
+   const notes=document.querySelector('[data-validation-notes-product="'+id+'"]');body.evidenceNotes=notes?notes.value.trim():"";
+   const result=await fetchJson("/api/digital-products/"+encodeURIComponent(id)+"/validation",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+   if(status)status.textContent=result.gates?.allPassed?"تم حفظ الأرقام؛ اجتازت جميع البوابات المعلنة.":"تم حفظ الأرقام؛ بعض البوابات لا تزال مفتوحة.";
+   await loadState();
+ }catch(error){if(status)status.textContent=error.message;}finally{button.disabled=false;}
+}
+function loadLeadingDigitalProductHypothesis(){
+ const set=(id,value)=>{const el=$("#"+id);if(el)el.value=value;};
+ set("digital-product-name","Creator Rights & Revenue Kit — UGC Usage & Payment Control Workbook");
+ set("digital-product-audience","English-speaking UGC creators with at least 2–3 paid brand collaborations who manage their own usage terms, invoices and follow-ups.");
+ set("digital-product-problem","Creators may struggle to connect written content-usage terms, licence review dates, evidence of public use and invoice follow-up in one clear next-action workflow. This is a hypothesis, not yet validated.");
+ set("digital-product-promise","Organize each asset's written usage scope, review date, public observation notes, invoice status and next action in a no-subscription workbook.");
+ set("digital-product-format","toolkit");set("digital-product-price","");set("digital-product-currency","USD");
+ set("digital-product-validation","LEADING HYPOTHESIS — NOT VALIDATED. Target 15 qualified interviews, review at least 8 substitutes, then test a free workbook with 5–8 volunteers. No paid launch until the evidence gates pass.");
+ set("digital-product-outline","Workbook tabs: Start Here; Asset Register; Usage Observation Log; Invoice Tracker; Quote Builder; Next Actions; Message Templates. Companion quick-start guide and neutral editable communication templates.");
+ set("digital-product-delivery","Downloadable Excel/Google Sheets workbook + quick-start guide + editable message templates. No SaaS subscription, store or payments in this validation stage.");
+ const status=$("#digital-product-form-status");if(status)status.textContent="تم تحميل الفرضية الحالية في النموذج فقط. راجع الحقول واضغط حفظ الفكرة عندما تكون جاهزًا؛ لم يُحفظ أي سجل بعد.";
 }
 async function createDigitalProduct(){
  const status=$("#digital-product-form-status"),button=$("#create-digital-product"),name=$("#digital-product-name").value.trim(),audience=$("#digital-product-audience").value.trim(),problem=$("#digital-product-problem").value.trim();
@@ -554,6 +607,8 @@ if (saveTokenButton) saveTokenButton.addEventListener("click", () => {
   location.reload();
 });
 
+const loadLeadingHypothesisButton = document.querySelector("#load-leading-digital-product-hypothesis");
+if (loadLeadingHypothesisButton) loadLeadingHypothesisButton.addEventListener("click", loadLeadingDigitalProductHypothesis);
 const createDigitalProductButton = document.querySelector("#create-digital-product");
 if (createDigitalProductButton) createDigitalProductButton.addEventListener("click", () => createDigitalProduct().catch((e) => alert(e.message)));
 

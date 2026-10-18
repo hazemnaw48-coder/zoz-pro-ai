@@ -214,3 +214,14 @@ h3 { font-size: 1rem; }
 [data-view="digital-products"] button { border:0; border-radius:10px; padding:10px 14px; background:#111827; color:#fff; margin-top:10px; }
 [data-view="digital-products"] .score-grid { margin-top:10px; }
 [data-view="digital-products"] .control-row select { flex:1; min-width:0; }
+
+
+[data-view="digital-products"] .secondary-action { background:#475569; margin:8px 0 2px; }
+[data-view="digital-products"] .validation-editor { margin-top:14px; border-top:1px solid #e5e7eb; padding-top:10px; }
+[data-view="digital-products"] .validation-editor summary { cursor:pointer; font-weight:650; padding:6px 0; }
+[data-view="digital-products"] .validation-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(175px,1fr)); gap:10px; margin:10px 0; }
+[data-view="digital-products"] .validation-field { margin:0; font-size:.8rem; }
+[data-view="digital-products"] .validation-field input { margin-top:4px; }
+[data-view="digital-products"] .gate-list { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0 4px; }
+[data-view="digital-products"] .gate-passed { background:#e2f5e9; color:#166534; }
+[data-view="digital-products"] .gate-pending { background:#f3f4f6; color:#4b5563; }
