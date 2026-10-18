@@ -1,0 +1,68 @@
+{
+  "title": "لماذا تظهر العين أمامية والوجه جانبيًا في الفن المصري القديم؟",
+  "slug": "egyptian-art-eye-profile-60s",
+  "duration_seconds": 60,
+  "resolution": [1080, 1920],
+  "voice_model": "ar_JO-kareem-medium",
+  "source_object_ids": [590603, 590354, 577165, 590353, 590605, 577172, 590360, 577165],
+  "historical_sources": [
+    {
+      "title": "Conventions of Egyptian art",
+      "url": "https://www.open.edu/openlearn/history-the-arts/art-and-life-ancient-egypt/content-section-8"
+    },
+    {
+      "title": "The Art of Ancient Egypt — The Metropolitan Museum of Art",
+      "url": "https://www.metmuseum.org/-/media/files/learn/for-educators/publications-for-educators/the-art-of-ancient-egypt.pdf"
+    }
+  ],
+  "scenes": [
+    {
+      "narration": "تخيّل رسماً مصرياً قديماً: الوجه جانبي، لكن العين تنظر إليك مباشرة! لماذا؟",
+      "caption": "الوجه جانبي… لكن العين أمامية!",
+      "heading": "سرّ العين في الفن المصري القديم",
+      "visual_note": "Start with a tight crop of a painted relief; slow push-in."
+    },
+    {
+      "narration": "هل كانت هذه غلطة من الفنان؟ لا. إنها قاعدة فنية مقصودة، وليست ضعفاً في الرسم.",
+      "caption": "هل هي غلطة؟ لا… بل قاعدة مقصودة.",
+      "heading": "ليست غلطة في الرسم",
+      "visual_note": "Show a full painted tomb relief with a restrained gold frame."
+    },
+    {
+      "narration": "كان الفنان يختار لكل جزء الزاوية التي تُظهر شكله بأوضح صورة، بدلاً من تقليد لقطة واحدة.",
+      "caption": "كل جزء يُرسم من الزاوية الأوضح له.",
+      "heading": "كل جزء من زاويته",
+      "visual_note": "Slow pan across the figures and decorative details."
+    },
+    {
+      "narration": "لذلك يظهر الأنف والشفتان من الجانب، بينما تُرسم العين من الأمام كي تظهر كاملة.",
+      "caption": "الأنف جانبي… والعين كاملة.",
+      "heading": "الأنف جانبياً والعين أمامياً",
+      "visual_note": "Move into a detailed crop of a human profile on the artifact."
+    },
+    {
+      "narration": "والكتفان غالباً من الأمام، لكن الذراعين والساقين قد يظهران من الجانب ليبدو وضعهما مفهوماً.",
+      "caption": "الكتفان أمامياً، والأطراف غالباً جانبياً.",
+      "heading": "أكثر من زاوية في جسم واحد",
+      "visual_note": "Reveal a wider relief area showing posture and limbs."
+    },
+    {
+      "narration": "بهذا الأسلوب جمع الفنان أكثر من زاوية في صورة واحدة؛ وهذا ما نسميه المنظور المركّب.",
+      "caption": "صورة واحدة… وزوايا متعددة.",
+      "heading": "منظور مركّب",
+      "visual_note": "Pull back to a broader scene; add subtle grid-like framing."
+    },
+    {
+      "narration": "إنها طريقة لتنظيم الصورة وإبراز ملامح الجسم، وليست رسماً عشوائياً أو خطأً تشريحياً.",
+      "caption": "أسلوب بصري منظم، لا رسم عشوائي.",
+      "heading": "نظام بصري له قواعد",
+      "visual_note": "Show another verified public-domain relief with a gentle crossfade."
+    },
+    {
+      "narration": "في المرة القادمة، راقب العين والكتفين والقدمين. ما اللغز التالي؟ اكتب اقتراحك وتابع مصر القديمة.",
+      "caption": "ما اللغز التالي؟ اكتب اقتراحك وتابع مصر القديمة.",
+      "heading": "اكتشف حكاية أخرى",
+      "visual_note": "Final branded card with source note; no auto-publishing."
+    }
+  ]
+}
