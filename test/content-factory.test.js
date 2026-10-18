@@ -51,7 +51,7 @@ test("content factory exposes the complete catalog without overstating integrati
   assert.equal(tools["luma-dream-machine"].generationVerified, false);
   assert.equal(tools.runway.status, "connected_video_unavailable");
   assert.equal(tools.canva.generationVerified, false);
-  assert.ok(tools["zoz-pro-publisher"].note.includes("YouTube وTikTok"));
+  assert.ok(tools["zoz-pro-publisher"].capabilities.includes("YouTube وTikTok"));
   assert.ok(result.toolLibrary.every((item) => Array.isArray(item.links) && item.statusLabel));
   assert.equal(JSON.stringify(result).includes("API_KEY="), false);
 });
