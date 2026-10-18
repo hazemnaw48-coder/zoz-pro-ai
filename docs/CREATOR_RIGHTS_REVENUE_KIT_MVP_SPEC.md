@@ -77,3 +77,7 @@ If interviews reveal no unmet gap compared with current trackers or rights-track
 ## Release boundary
 
 No storefront, payment processor, collection account, paid ad, external outreach or production deployment is included in this specification. Paid launch requires a new explicit owner decision after the validation gates pass.
+
+
+## Current artifact and validation status — 2026-10-18
+A working beta workbook and quick-start guide have been created in the active ChatGPT work session for free usability validation. They are not yet a paid release and have not been validated with customers. Outreach research and an English opt-in invitation are documented in `docs/PRODUCT_CUSTOMER_OUTREACH_LOG.md`. WhatsApp Business connection authorization is pending; no message has been sent and no customer response is claimed.
