@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-18",
+  "project": "ZOZ Pro",
+  "section": "Digital product opportunity validation",
+  "market": "global",
+  "status": "hypothesis-not-validated",
+  "selectedProduct": null,
+  "leadingHypothesis": {
+    "name": "Creator Publishing Operations Kit",
+    "format": "template-kit-first",
+    "buyer": "solo video creators and small creator teams publishing 8-12+ pieces per month",
+    "job": "coordinate briefs, scripts, assets and usage rights, review, platform-specific preflight, and independent publication outcomes",
+    "recurringModel": "not selected; consider only if repeated use and ongoing need are evidenced",
+    "priceTest": {
+      "oneTimeUSD": [19, 39],
+      "recurringUSDPerMonth": [9, 19],
+      "note": "research prompts only; no offer, checkout, or payment enabled"
+    }
+  },
+  "alternatives": [
+    {"name":"Creator Publishing Operations Kit","weightedScore":3.95,"confidence":"low-hypothesis"},
+    {"name":"Brand-deal and deliverables tracker","weightedScore":3.6,"confidence":"low-hypothesis"},
+    {"name":"Generic AI prompt/script pack","weightedScore":3.1,"confidence":"low-hypothesis"}
+  ],
+  "gates": {
+    "interviews": {"targetQualifiedInterviews":15,"minRecurringPainReports":8,"minExistingWorkarounds":5,"minPrototypeVolunteers":3,"status":"not-started"},
+    "competitors": {"minimumAlternatives":8,"status":"not-started"},
+    "landingPage": {"targetQualifiedVisits":100,"provisionalConversionRate":0.08,"minQualifiedSignups":8,"minFollowUpConversations":5,"minExplicitWillingnessToPaySignals":3,"paymentsEnabled":false,"status":"not-started"},
+    "prototype": {"targetTesters":5,"maxTesters":8,"minWorkflowCompletions":4,"minRepeatUsers":3,"minRepeatedImprovementRequests":3,"status":"not-started"}
+  },
+  "evidence": [
+    {"source":"Adobe Creators' Toolkit Report 2026","date":"2026-06-16","url":"https://news.adobe.com/news/2026/06/creators-toolkit-report-2026","signal":"AI use is widespread; creators value retaining final creative control","supportsSpecificProductDemand":false},
+    {"source":"EMARKETER Creator Economy 2026","date":"2026-03-12","url":"https://www.emarketer.com/content/creator-economy-2026","signal":"Creator marketing growth alongside competition and measurement challenges","supportsSpecificProductDemand":false},
+    {"source":"Kit creator AI survey","date":"2026-08-04","url":"https://kit.com/resources/blog/ai-creator-economy-report","signal":"AI is common in creator workflows and output is reviewed by humans","supportsSpecificProductDemand":false}
+  ],
+  "constraints": {
+    "existingRepositoryOnly": true,
+    "runtimeTarget": "Cloud Run + Supabase",
+    "vercelRepair": false,
+    "newProject": false,
+    "paymentIntegration": false,
+    "paidAds": false,
+    "paidProviderUsageWithoutApproval": false,
+    "externalOutreachActivated": false
+  },
+  "decision": "Do not build the full product until interview and competitor gates provide evidence."
+}
