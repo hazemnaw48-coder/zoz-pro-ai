@@ -43,3 +43,16 @@ Use the existing ZOZ Pro Cloud Run + Supabase alternative. Do not switch the rep
 For each tool maintain: access mode, current account/session status, credits before and after the test, estimated and actual cost, task ID, final media URL, successful download/playback, duration, dimensions/orientation, Arabic text/voice quality, watermark, and commercial-use rights.
 
 A tool may be presented as “ready for production” only after a real output file has been verified. A listing, public pricing page, MCP server, or owner's connection report is not sufficient by itself.
+
+
+## Production centers (added 2026-10-18)
+
+The Content Factory has a distinct production-center inventory in addition to the tool catalog. Never combine quota units:
+- **Google AI Studio / Video Queue (M4)** — existing primary generation workflow for the Egyptology channel; continue existing tasks and do not regenerate an already published clip. Direct ZOZ Pro automation is not yet proven.
+- **Google Flow / Veo** — separate manual video generation center. Google documents 50 Flow credits per day for eligible free users, but these are credits, not GPU hours; peak-hour generation may be unavailable. Check the logged-in account and per-model cost before generating.
+- **Floot Alternate Video Production Center** — existing project \`894a0e3a-85c4-43de-b8f7-205db24685b9\`; direct Floot check on 2026-10-18 says unpublished and Free plan. Keep it; do not recreate it.
+- **Floot Cloud Runtime** — separate existing project \`e63d1fa8-d477-4708-bed1-e3f539ef224e\`; direct Floot check on 2026-10-18 says published at https://zoz-pro-cloud-runtime.floot.app and Free plan. Published status does not prove all generation/publishing connectors work.
+- **Kaggle GPU** — official docs describe up to 30 GPU hours per week, subject to resource availability and account quota. This is compute time, not ready-made video time or Google Flow credits. Before GPU use: verify actual account quota/accelerator, prepare notebook and inputs first, run a short batch, save checkpoints and output files to persistent storage, and stop the session when idle. The previously owner-created Kaggle API token was not verified connected to ZOZ Pro; never paste it into source code or Notion.
+- **ZOZ Pro Content Factory** — orchestration and audit record for selecting the right center, task IDs, statuses, cost, output artifact and separate destination outcomes. The catalog itself is not proof of provider authentication or successful generation.
+
+For every center, preserve: current project/account identity, quota unit and reset time, estimated/actual cost, task ID, status, output file URL, download/playback verification, duration/dimensions, watermark, and license. Do not spend credits or enable paid usage without explicit owner approval. The Cloud Run + Supabase alternative remains the target; do not switch back to Vercel, start over, or rebuild the existing Floot projects.
