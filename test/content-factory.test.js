@@ -44,6 +44,14 @@ test("content factory exposes the complete catalog without overstating integrati
   const tools = Object.fromEntries(result.toolLibrary.map((item) => [item.id, item]));
 
   assert.ok(result.toolLibrary.length >= 15);
+  const centers = Object.fromEntries(result.productionCenters.map((center) => [center.id, center]));
+  assert.equal(result.productionCenters.length, 6);
+  assert.equal(centers["google-flow"].quota.includes("50 Google Flow credits يوميًا"), true);
+  assert.equal(centers["kaggle-gpu"].quota.includes("30 ساعة GPU في الأسبوع"), true);
+  assert.equal(centers["kaggle-gpu"].generationVerified, false);
+  assert.equal(centers["floot-alternate-video-center"].status, "existing_unpublished_free_plan");
+  assert.equal(centers["floot-cloud-runtime"].liveUrl, "https://zoz-pro-cloud-runtime.floot.app");
+  assert.ok(centers["zoz-pro-coordinator"].quota.includes("رصيد توليد مشتركًا"));
   assert.equal(tools["google-flow"].generationVerified, false);
   assert.equal(tools["kling-ai"].ownerReportedConnected, true);
   assert.equal(tools["kling-ai"].connectionVerified, false);
