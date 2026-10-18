@@ -268,11 +268,46 @@ function renderContentFactory(status, publisherStatus) {
     escapeHtml(item.detail) + '</div><div class="meta">التحقق الحي: ' +
     (item.verified ? "تم" : "لم يتم") + '</div></article>'
   ).join("");
+  renderProductionCenters(status.productionCenters ?? []);
   renderContentToolLibrary(status.toolLibrary ?? []);
   $("#factory-next-steps").textContent = (publisherStatus && !publisherStatus.configured)
     ? "إعداد موصل الاستوديو وUpload-Post في أسرار الخادم، ثم التحقق من رابط الفيديو قبل طلب الموافقة."
     : (status.nextSteps[0] ?? "لا توجد خطوات إضافية.");
   renderPublicationQueue();
+}
+
+function renderProductionCenters(centers) {
+  const container = $("#production-centers");
+  const count = $("#production-centers-count");
+  if (!container || !count) return;
+  count.textContent = centers.length + " مراكز محفوظة";
+  if (!centers.length) {
+    container.innerHTML = '<div class="list-item muted-text">تعذر تحميل سجل مراكز الإنتاج.</div>';
+    return;
+  }
+  container.innerHTML = centers.map((center) => {
+    const links = (center.links ?? []).map((link) =>
+      '<a class="tool-library-link" href="' + escapeHtml(link.url) + '" target="_blank" rel="noopener noreferrer">' +
+      escapeHtml(link.label) + '</a>'
+    ).join("");
+    const flags = [
+      center.ownerReportedConnected ? "ورد أنه مستخدم/مربوط من المالك" : "",
+      center.connectionVerified ? "تم التحقق من حالة محددة" : "الربط الكامل غير متحقق",
+      center.generationVerified ? "توليد فعلي مثبت" : "لا يوجد توليد فعلي مثبت من هذا المركز عبر ZOZ Pro",
+    ].filter(Boolean).join(" · ");
+    return '<article class="list-item tool-library-item">' +
+      '<div class="section-heading"><div><div class="list-title">' + escapeHtml(center.name) + '</div>' +
+      '<div class="meta">' + escapeHtml(center.type) + '</div></div><span class="status">' +
+      escapeHtml(center.statusLabel ?? center.status) + '</span></div>' +
+      '<div class="meta"><strong>الدور:</strong> ' + escapeHtml(center.projectRole) + '</div>' +
+      '<div class="meta"><strong>طريقة الاستفادة:</strong> ' + escapeHtml(center.availableUse) + '</div>' +
+      '<div class="meta tool-library-note"><strong>الحصة/الحد:</strong> ' + escapeHtml(center.quota) + '</div>' +
+      '<div class="meta tool-library-note"><strong>الخطوة التالية:</strong> ' + escapeHtml(center.nextStep) + '</div>' +
+      '<p class="meta tool-library-note">' + escapeHtml(center.verification) + '</p>' +
+      '<div class="meta tool-library-verification">' + escapeHtml(flags) + '</div>' +
+      (links ? '<div class="tool-library-links">' + links + '</div>' : '') +
+      '</article>';
+  }).join("");
 }
 
 function renderContentToolLibrary(tools) {
