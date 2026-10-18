@@ -457,6 +457,23 @@ function showView(name) {
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view === target));
   history.replaceState(null, "", `#${name}`);
   if (name === "content-factory") refreshContentFactory();
+  if (name === "digital-products") renderDigitalProducts();
+}
+
+const DIGITAL_PRODUCT_STATUS_LABELS={idea:"فكرة",validation:"التحقق من الطلب",outline:"مخطط المنتج",production:"قيد الإنتاج",review:"مراجعة الجودة",ready:"جاهز للبيع",launched:"تم الإطلاق",paused:"متوقف مؤقتًا"};
+function renderDigitalProducts(){
+ const products=state?.digitalProducts??[],list=$("#digital-products-list"),count=$("#digital-product-count");if(!list||!count)return;
+ count.textContent=products.length+" منتجات";
+ list.innerHTML=products.length?products.map(p=>`<article class="list-item"><div class="section-heading"><div><div class="list-title">${escapeHtml(p.name)}</div><div class="meta">${escapeHtml(p.audience)} · ${escapeHtml(p.format)}</div></div><span class="status">${escapeHtml(DIGITAL_PRODUCT_STATUS_LABELS[p.status]??p.status)}</span></div><div class="meta"><strong>المشكلة:</strong> ${escapeHtml(p.problem)}</div>${p.promise?`<div class="meta"><strong>النتيجة:</strong> ${escapeHtml(p.promise)}</div>`:""}<div class="meta"><strong>السعر المبدئي:</strong> ${p.price==null?"لم يحدد":escapeHtml(p.price+" "+p.currency)} · <strong>التسليم:</strong> ${escapeHtml(p.deliveryPlan||"لم يحدد")}</div>${p.validationNotes?`<div class="meta"><strong>التحقق:</strong> ${escapeHtml(p.validationNotes)}</div>`:""}${p.outline?`<div class="meta"><strong>المخطط:</strong> ${escapeHtml(p.outline)}</div>`:""}<div class="meta">المعرّف: ${escapeHtml(p.id)} · آخر تحديث: ${escapeHtml(p.updatedAt)}</div><label>تحديث المرحلة</label><div class="control-row"><select data-digital-product-status-select="${escapeHtml(p.id)}">${Object.entries(DIGITAL_PRODUCT_STATUS_LABELS).map(([key,label])=>`<option value="${key}" ${p.status===key?"selected":""}>${escapeHtml(label)}</option>`).join("")}</select><button data-save-digital-product-status="${escapeHtml(p.id)}">حفظ المرحلة</button></div></article>`).join(""):'<div class="list-item muted-text">لا توجد أفكار محفوظة بعد. سجّل أول فكرة، ثم اختبر الطلب قبل بناء المنتج كاملًا.</div>';
+ document.querySelectorAll("[data-save-digital-product-status]").forEach(button=>button.addEventListener("click",async()=>{button.disabled=true;try{const id=button.dataset.saveDigitalProductStatus,select=[...document.querySelectorAll("[data-digital-product-status-select]")].find(el=>el.dataset.digitalProductStatusSelect===id);await fetchJson("/api/digital-products/"+encodeURIComponent(id)+"/status",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({status:select.value})});await loadState();}catch(error){alert(error.message);}finally{button.disabled=false;}}));
+}
+async function createDigitalProduct(){
+ const status=$("#digital-product-form-status"),button=$("#create-digital-product"),name=$("#digital-product-name").value.trim(),audience=$("#digital-product-audience").value.trim(),problem=$("#digital-product-problem").value.trim();
+ if(!name||!audience||!problem){status.textContent="أدخل اسم المنتج والعميل المستهدف والمشكلة التي يحلها.";return;}
+ const rawPrice=$("#digital-product-price").value.trim();button.disabled=true;status.textContent="جارٍ حفظ الفكرة…";
+ try{const product=await fetchJson("/api/digital-products",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({name,audience,problem,promise:$("#digital-product-promise").value.trim(),format:$("#digital-product-format").value,price:rawPrice===""?null:Number(rawPrice),currency:$("#digital-product-currency").value,validationNotes:$("#digital-product-validation").value.trim(),outline:$("#digital-product-outline").value.trim(),deliveryPlan:$("#digital-product-delivery").value.trim()})});
+ ["digital-product-name","digital-product-audience","digital-product-problem","digital-product-promise","digital-product-price","digital-product-validation","digital-product-outline","digital-product-delivery"].forEach(id=>$("#"+id).value="");status.textContent="تم حفظ الفكرة "+product.id+"؛ لم يتم تسعيرها نهائيًا أو نشرها أو بيعها.";await loadState();
+ }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
 }
 
 function renderSettings() {
@@ -475,7 +492,7 @@ function bindControlActions() {
 
 async function loadState() {
   state = await fetchJson("/api/state");
-  renderDashboard(); renderProjects(); renderTasks(); renderControl(); renderApprovals(); renderActivity(); renderAgents(); renderSettings(); renderOpportunities(); renderIntelligence(); renderContacts(); bindControlActions();
+  renderDashboard(); renderProjects(); renderTasks(); renderControl(); renderApprovals(); renderActivity(); renderAgents(); renderSettings(); renderOpportunities(); renderIntelligence(); renderContacts(); renderDigitalProducts(); bindControlActions();
 }
 
 async function checkHealth() {
@@ -536,6 +553,9 @@ if (saveTokenButton) saveTokenButton.addEventListener("click", () => {
   localStorage.setItem("zoz_control_token", value);
   location.reload();
 });
+
+const createDigitalProductButton = document.querySelector("#create-digital-product");
+if (createDigitalProductButton) createDigitalProductButton.addEventListener("click", () => createDigitalProduct().catch((e) => alert(e.message)));
 
 const requestPublicationButton = document.querySelector("#request-publication-approval");
 if (requestPublicationButton) requestPublicationButton.addEventListener("click", requestPublicationApproval);
