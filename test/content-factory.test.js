@@ -38,6 +38,24 @@ test("configured values never imply a verified live integration", () => {
   assert.equal(JSON.stringify(result).includes("https://studio.invalid"), false);
 });
 
+
+test("content factory exposes the complete catalog without overstating integration readiness", () => {
+  const result = getContentFactoryStatus({ state: { executor: { status: "offline" } }, env: {} });
+  const tools = Object.fromEntries(result.toolLibrary.map((item) => [item.id, item]));
+
+  assert.ok(result.toolLibrary.length >= 15);
+  assert.equal(tools["google-flow"].generationVerified, false);
+  assert.equal(tools["kling-ai"].ownerReportedConnected, true);
+  assert.equal(tools["kling-ai"].connectionVerified, false);
+  assert.equal(tools["luma-dream-machine"].ownerReportedConnected, true);
+  assert.equal(tools["luma-dream-machine"].generationVerified, false);
+  assert.equal(tools.runway.status, "connected_video_unavailable");
+  assert.equal(tools.canva.generationVerified, false);
+  assert.ok(tools["zoz-pro-publisher"].note.includes("YouTube وTikTok"));
+  assert.ok(result.toolLibrary.every((item) => Array.isArray(item.links) && item.statusLabel));
+  assert.equal(JSON.stringify(result).includes("API_KEY="), false);
+});
+
 test("legacy ZOZ AI stays out of scope and publishing remains disabled", () => {
   const result = getContentFactoryStatus({ state: { executor: { status: "online" } }, env: {} });
 
