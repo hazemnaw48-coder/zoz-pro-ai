@@ -1,3 +1,5 @@
+import { getContentToolLibrary, getProductionCenters } from "./content-tool-library.js";
+
 const hasValue = (value) => typeof value === "string" && value.trim().length > 0;
 
 /**
@@ -101,6 +103,8 @@ export function getContentFactoryStatus({ state = null, env = process.env } = {}
       ownerApprovalRequiredForExternalSendOrProductionChanges: true,
     },
     connectors,
+    productionCenters: getProductionCenters(),
+    toolLibrary: getContentToolLibrary(),
     nextSteps: [
       "Keep ZOZ Pro as the task, approval and audit control plane.",
       "Confirm the actual Content Studio API contract before setting ZOZ_CONTENT_STUDIO_URL.",

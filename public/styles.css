@@ -196,3 +196,14 @@ h3 { font-size: 1rem; }
 #refresh-content-factory:disabled { opacity: .55; cursor: wait; }
 #factory-safety { margin-top: 8px; }
 #factory-connectors .list-item { overflow-wrap: anywhere; }
+
+#content-tool-library .tool-library-item { overflow-wrap: anywhere; }
+#content-tool-library .tool-library-note { margin-top: 6px; }
+#content-tool-library .tool-library-verification { margin-top: 6px; }
+.tool-library-links { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
+.tool-library-link { color:#1d4ed8; text-decoration:underline; font-size:.84rem; padding:2px 0; }
+#content-tool-library-panel .section-heading { align-items:flex-start; }
+
+#production-centers .tool-library-item { overflow-wrap:anywhere; }
+#production-centers .tool-library-item .meta strong { color:#374151; font-weight:650; }
+#production-centers-panel .section-heading { align-items:flex-start; }
