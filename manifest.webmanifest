@@ -1,0 +1,23 @@
+{
+  "id": "./",
+  "name": "ZOZ Pro — مركز الإنتاج والتحكم",
+  "short_name": "ZOZ Pro",
+  "description": "مركز إدارة إنتاج المحتوى والقنوات",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "./zoz-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
