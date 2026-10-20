@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: zoz-pro-supabase-worker
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: feature/ZP-019-render-supabase-runtime
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ZOZ_PRO_EXECUTION_RUNTIME
+        value: render-poll
+      - key: ZOZ_PRO_STATE_BACKEND
+        value: supabase
+      - key: SUPABASE_URL
+        value: https://vjnwojrqduoxhetutxrs.supabase.co
+      - key: SUPABASE_STATE_TABLE
+        value: zoz_pro_render_state
+      - key: ZOZ_PRO_RENDER_ALLOW_EMPTY_INIT
+        value: "true"
+      - key: ZOZ_PRO_WORKER_POLL_MS
+        value: "2500"
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ZOZ_PRO_CONTROL_TOKEN
+        sync: false

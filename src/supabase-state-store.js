@@ -11,13 +11,17 @@ export class SupabaseStateStoreError extends Error {
 function config(env) {
   const url = String(env.SUPABASE_URL ?? "").trim();
   const key = String(env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim();
+  const table = String(env.SUPABASE_STATE_TABLE ?? "zoz_pro_state").trim();
   if (!url || !key) throw new SupabaseStateStoreError("Supabase state requires SUPABASE_URL and a server-only secret key.", "supabase_configuration_missing");
+  if (!/^[a-z_][a-z0-9_]{0,62}$/.test(table)) {
+    throw new SupabaseStateStoreError("SUPABASE_STATE_TABLE is invalid.", "supabase_configuration_invalid");
+  }
   let parsed;
   try { parsed = new URL(url); } catch { throw new SupabaseStateStoreError("SUPABASE_URL is invalid.", "supabase_configuration_invalid"); }
   if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.search || parsed.hash || (parsed.pathname !== "/" && parsed.pathname !== "")) {
     throw new SupabaseStateStoreError("SUPABASE_URL must be a project HTTPS origin.", "supabase_configuration_invalid");
   }
-  return { origin: parsed.origin, key };
+  return { origin: parsed.origin, key, table };
 }
 function statusError(status) {
   if (status === 401 || status === 403) return new SupabaseStateStoreError("Supabase denied state access.", "supabase_access_denied", status);
@@ -56,20 +60,28 @@ export function createSupabaseStateStore(options = {}) {
     return { version: String(row.version), state: row.state };
   }
   async function readRow() {
-    const rows = await request("zoz_pro_state?singleton=eq.true&select=singleton,version,state,updated_at&limit=1");
+    const table = config(env).table;
+    const rows = await request(table + "?singleton=eq.true&select=singleton,version,state,updated_at&limit=1");
     if (!Array.isArray(rows) || rows.length > 1) throw new SupabaseStateStoreError("Supabase state query returned an invalid row set.", "supabase_invalid_response");
     return rows.length ? validateRow(rows[0]) : null;
   }
   return {
     async load() {
       config(env);
+      const table = config(env).table;
       let row = await readRow();
       if (row) { loadedVersion = row.version; return row.state; }
-      if (env.VERCEL_ENV !== "preview" || env.ZOZ_PRO_SUPABASE_ALLOW_EMPTY_PREVIEW_INIT !== "true") {
+      const allowPreviewInitialization = env.VERCEL_ENV === "preview"
+        && env.ZOZ_PRO_SUPABASE_ALLOW_EMPTY_PREVIEW_INIT === "true";
+      const allowRenderInitialization = env.ZOZ_PRO_EXECUTION_RUNTIME === "render-poll"
+        && String(env.ZOZ_PRO_STATE_BACKEND ?? "").trim().toLowerCase() === "supabase"
+        && table === "zoz_pro_render_state"
+        && env.ZOZ_PRO_RENDER_ALLOW_EMPTY_INIT === "true";
+      if (!allowPreviewInitialization && !allowRenderInitialization) {
         throw new SupabaseStateStoreError("Supabase state is not initialized. No Blob data was migrated and production was not seeded.", "supabase_state_not_initialized");
       }
       const initial = createInitialState();
-      const inserted = await request("zoz_pro_state?on_conflict=singleton", {
+      const inserted = await request(table + "?on_conflict=singleton", {
         method: "POST", body: { singleton: true, version: 1, state: initial },
         prefer: "resolution=ignore-duplicates,return=representation",
       });
@@ -81,7 +93,8 @@ export function createSupabaseStateStore(options = {}) {
       validateState(state);
       if (loadedVersion === null) throw new SupabaseStateStoreError("Load state before saving.", "supabase_state_version_missing");
       const expected = loadedVersion, next = (BigInt(expected) + 1n).toString();
-      const rows = await request("zoz_pro_state?singleton=eq.true&version=eq." + encodeURIComponent(expected), {
+      const table = config(env).table;
+      const rows = await request(table + "?singleton=eq.true&version=eq." + encodeURIComponent(expected), {
         method: "PATCH", body: { state, version: next, updated_at: new Date().toISOString() }, prefer: "return=representation",
       });
       if (!Array.isArray(rows) || rows.length !== 1) {
