@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "17 */6 * * *"
+  push:
+    paths:
+      - ".github/workflows/floot-runtime-sweep.yml"
 
 permissions:
   contents: read
