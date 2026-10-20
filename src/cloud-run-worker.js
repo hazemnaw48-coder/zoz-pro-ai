@@ -105,11 +105,22 @@ export async function sweepCloudRunQueueOnce(options = {}) {
   const snapshot = await store.load();
   const rawLimit = Number(options.limit ?? process.env.ZOZ_PRO_WORKER_SWEEP_LIMIT ?? MAX_SWEEP_COMMANDS);
   const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(MAX_SWEEP_COMMANDS, Math.floor(rawLimit))) : MAX_SWEEP_COMMANDS;
+  const nowOption = options.now ?? (() => new Date());
+  const nowValue = typeof nowOption === "function" ? nowOption() : nowOption;
+  const nowMs = new Date(nowValue).getTime();
   const candidates = (snapshot.controlCommands ?? []).filter((command) => {
     const instruction = normalizeCloudInstruction(command.instruction);
     if (command.actionType != null || command.requiresApproval === true || command.status === "awaiting_approval") return false;
     if (!isSupportedCloudInstruction(command.instruction)) return false;
-    if (command.status === "queued") return true;
+    if (command.status === "queued") {
+      // A persisted retry timestamp is a hard eligibility gate. Missing timestamps
+      // preserve legacy queued-command behavior; malformed timestamps fail closed.
+      if (command.nextRetryAt != null && command.nextRetryAt !== "") {
+        const retryAt = Date.parse(command.nextRetryAt);
+        if (!Number.isFinite(retryAt) || !Number.isFinite(nowMs) || retryAt > nowMs) return false;
+      }
+      return true;
+    }
     return command.status === "claimed"
       && command.claimedBy === CLOUD_WORKER
       && deterministicInstructions.has(instruction);
