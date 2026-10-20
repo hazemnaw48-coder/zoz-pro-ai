@@ -176,7 +176,12 @@ async function handleApi(req, res, url) {
       return sendJson(res, 503, { error: "cloud_run_misconfigured", executionRuntime: getExecutionRuntime() });
     }
     try {
-      return sendJson(res, 200, await sweepCloudRunQueueOnce());
+      const body = await readJson(req);
+      const limit = body.limit === undefined ? undefined : Number(body.limit);
+      if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 10)) {
+        return sendJson(res, 400, { error: "invalid_sweep_limit", message: "limit must be an integer between 1 and 10." });
+      }
+      return sendJson(res, 200, await sweepCloudRunQueueOnce({ ...(limit === undefined ? {} : { limit }) }));
     } catch (error) {
       const code = /^[a-zA-Z0-9_-]{1,80}$/.test(String(error?.code ?? "")) ? error.code : "worker_sweep_failed";
       return sendJson(res, 503, { error: code, worker: getCloudRunWorkerStatus() });
