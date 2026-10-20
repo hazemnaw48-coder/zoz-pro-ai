@@ -11,7 +11,7 @@ permissions:
   pages: write
   id-token: write
 concurrency:
-  group: github-pages
+  group: pages
   cancel-in-progress: true
 jobs:
   build:
@@ -22,6 +22,7 @@ jobs:
         run: |
           mkdir -p _site
           cp studio.html _site/index.html
+          cp studio.css studio.js _site/
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:
