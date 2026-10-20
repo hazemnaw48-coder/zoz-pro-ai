@@ -1,45 +1,49 @@
-name: ZOZ Pro Free Runtime Health Check
+name: ZOZ Pro Scheduled Safe Sweep
 
 on:
   workflow_dispatch:
   schedule:
     - cron: "17 */6 * * *"
-  push:
-    paths:
-      - ".github/workflows/floot-runtime-sweep.yml"
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
-  group: zoz-pro-free-runtime-health
+  group: zoz-pro-scheduled-safe-sweep
   cancel-in-progress: false
 
 jobs:
-  health:
-    name: Verify published free runtime
+  safe-sweep:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 3
     steps:
-      - name: Check live app and persistent database health
+      - name: Check ZOZ Pro health and run one safe task
         shell: bash
         run: |
           set -euo pipefail
-          response="$(curl --fail-with-body --silent --show-error \
-            --connect-timeout 10 --max-time 30 \
-            "https://zoz-pro-cloud-runtime.floot.app/_api/health")"
-          printf '%s' "$response" | python -c '
+          health="$(curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 "https://zoz-pro-cloud-runtime.floot.app/_api/health")"
+          printf '%s' "$health" | python -c 'import json,sys; d=json.load(sys.stdin); print(json.dumps({k:d.get(k) for k in ("ok","runtime","persistent","database","automation","scheduled_jobs_enabled")})); sys.exit(0 if d.get("ok") is True and d.get("persistent") is True and d.get("database") == "healthy" else 1)'
+          token_response="$(curl --fail-with-body --silent --show-error -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=zoz-pro-cloud-runtime")"
+          token="$(printf '%s' "$token_response" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
+          test -n "$token"
+          echo "::add-mask::$token"
+          response_file="$(mktemp)"
+          status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' --connect-timeout 10 --max-time 90 -X POST "https://zoz-pro-cloud-runtime.floot.app/_api/automation/sweep" -H "Authorization: Bearer $token" -H "Content-Type: application/json" --data '{"limit":1}')"
+          unset token token_response
+          cat "$response_file"
+          echo
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "ZOZ Pro sweep failed with HTTP $status" >&2
+            rm -f "$response_file"
+            exit 1
+          fi
+          python - "$response_file" <<'PY'
           import json,sys
-          data=json.load(sys.stdin)
-          summary={
-            "ok": data.get("ok"),
-            "runtime": data.get("runtime"),
-            "persistent": data.get("persistent"),
-            "database": data.get("database"),
-            "automation": data.get("automation"),
-            "scheduled_jobs_enabled": data.get("scheduled_jobs_enabled")
-          }
-          print(json.dumps(summary, ensure_ascii=False))
-          if data.get("ok") is not True or data.get("persistent") is not True or data.get("database") != "healthy":
-              sys.exit(1)
-          '
+          with open(sys.argv[1]) as f: data=json.load(f)
+          if data.get("ok") is not True: raise SystemExit("Sweep did not confirm success")
+          print("Outcome:",data.get("outcome","unknown"))
+          print("Processed:",data.get("processed",1 if data.get("taskId") else 0))
+          print("Owner verification required:",data.get("ownerVerificationRequired",False))
+          PY
+          rm -f "$response_file"
