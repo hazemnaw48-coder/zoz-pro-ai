@@ -71,3 +71,28 @@ test("Cloud Run sweep caps work and never executes approval-gated commands", asy
     assert.equal(result.processed, 10);
   });
 });
+
+
+test("Cloud Run sweep honors nextRetryAt and fails closed for malformed retry timestamps", async () => {
+  await withCloudRunEnv(async () => {
+    const snapshot = {
+      controlCommands: [
+        { id: "CMD-READY", status: "queued", instruction: "system:health-check", actionType: null, requiresApproval: false },
+        { id: "CMD-FUTURE", status: "queued", instruction: "system:project-summary", actionType: null, requiresApproval: false, nextRetryAt: "2026-10-21T00:00:00.000Z" },
+        { id: "CMD-MALFORMED", status: "queued", instruction: "system:health-check", actionType: null, requiresApproval: false, nextRetryAt: "not-a-date" },
+      ],
+    };
+    const executed = [];
+    const result = await sweepCloudRunQueueOnce({
+      createStore: () => ({ load: async () => snapshot }),
+      processCommand: async (id) => {
+        executed.push(id);
+        return { outcome: "completed", commandId: id };
+      },
+      now: () => new Date("2026-10-20T00:00:00.000Z"),
+    });
+    assert.deepEqual(executed, ["CMD-READY"]);
+    assert.equal(result.checked, 1);
+    assert.equal(result.processed, 1);
+  });
+});
