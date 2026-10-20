@@ -1,7 +1,7 @@
 # ZOZ Pro Supabase-owned studio
 
 ## Architecture
-- Static Arabic UI: studio.html, studio.css, studio.js. GitHub Pages deployment uses GitHub Actions; no Render, no Vercel runtime, no Floot daily build quota.
+- Static Arabic UI source: studio.html, studio.css, studio.js in GitHub. Live delivery: Supabase Edge Function `zoz-pro-studio-ui` serves HTML/CSS/JS from the Supabase project; no Render, no Vercel runtime, no GitHub Pages setting, and no Floot daily build quota.
 - Supabase project: vjnwojrqduoxhetutxrs. Edge functions: zoz-pro-studio (owner status, OAuth, integration tests and direct upload), zoz-pro-content-center (content jobs and scripts), zoz-pro-video-engine (video generation request).
 - Make and Runway are optional only.
 
