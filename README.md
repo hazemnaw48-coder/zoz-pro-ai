@@ -2,7 +2,18 @@
 
 Independent Business Operating System. This repository does not depend on the legacy ZOZ AI project.
 
-## Cloud runtime
+## Current production studio (2026-10-20)
+
+- The primary ZOZ Pro studio is served directly by the Supabase Edge Function at https://vjnwojrqduoxhetutxrs.supabase.co/functions/v1/zoz-pro-studio-ui.
+- Supabase owns the content jobs, media storage, integration registry, channel OAuth token store, and direct publishing adapter.
+- The studio source of truth is studio.html, studio.css, and studio.js in this GitHub repository; the live UI is hosted by Supabase, not GitHub Pages, Render, Vercel, or Floot.
+- Make and Runway are optional providers only. They are not required for normal operation.
+- Direct YouTube/TikTok OAuth still requires provider-issued client credentials and platform scope approval. Claude requires an Anthropic API key stored as a Supabase secret. Do not put any secret in GitHub or the browser.
+- Video generation is configured through the Supabase video engine, but a successful paid video generation and direct channel publishing must be verified before claiming end-to-end production is complete.
+
+## Legacy runtime notes
+
+The following Vercel-specific worker documentation is retained as historical implementation context and is not the primary studio runtime.
 
 - Vercel Functions serve the control interface and authenticated API.
 - Private Vercel Blob is the durable state store. Hosted execution fails closed if `BLOB_READ_WRITE_TOKEN` is unavailable; there is no ephemeral file fallback.
