@@ -38,7 +38,9 @@ jobs:
           mkdir -p _site
           cp index.html studio.html studio.css studio.js pwa.js sw.js manifest.webmanifest zoz-icon.svg _site/
           mkdir -p _site/production
-          cp studio/index.html studio/style.css studio/app.js _site/production/
+          cp studio/index.html studio/style.css _site/production/
+          git fetch origin supabase-studio-pages
+          git show origin/supabase-studio-pages:studio/app.js > _site/production/app.js
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
