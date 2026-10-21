@@ -37,6 +37,8 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html studio.html studio.css studio.js pwa.js sw.js manifest.webmanifest zoz-icon.svg _site/
+          mkdir -p _site/production
+          cp studio/index.html studio/style.css studio/app.js _site/production/
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
