@@ -7,7 +7,7 @@ const URL0="https://vjnwojrqduoxhetutxrs.supabase.co",KEY="eyJhbGciOiJIUzI1NiIsI
  e.preventDefault();
  const button=$("#intake-submit"),file=$("#intake-file").files[0],topic=$("#intake-topic").value.trim(),source=$("#intake-source").value,prompt=$("#intake-prompt").value,notes=$("#intake-notes").value,duration=Number($("#intake-duration").value)||60;
  if(!file){msg("#intake-message","اختر ملف MP4 أو WebM أولًا.","bad");return}
- if(!["video/mp4","video/webm"].includes(file.type)){msg("#intake-message","الملف يجب أن يكون MP4 أو WebM معروف النوع.","bad");return}
+ if(file.type!=="video/mp4"&&!file.name.toLowerCase().endsWith(".mp4")){msg("#intake-message","اختر ملف فيديو MP4 فقط.","bad");return}
  if(file.size<1||file.size>50*1024*1024){msg("#intake-message","حجم الملف يجب ألا يتجاوز 50 ميجابايت.","bad");return}
  button.disabled=true;$("#intake-result").classList.add("hidden");
  let jobId=$("#intake-job").value;
