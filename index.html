@@ -451,7 +451,7 @@
         if (!window.__ZOZ_FFMPEG_SCRIPT_PROMISE) {
           window.__ZOZ_FFMPEG_SCRIPT_PROMISE = new Promise((resolve, reject) => {
             const script = document.createElement("script");
-            script.src = "./ffmpeg-wasm/ffmpeg.js?v=20261022-2";
+            script.src = "./ffmpeg.js?v=20261022-3";
             script.async = true;
             script.onload = () => window.FFmpegWASM?.FFmpeg ? resolve() : reject(new Error("تعذّر تحميل محرك الدمج المحلي."));
             script.onerror = () => reject(new Error("تعذّر تحميل مكتبة الدمج. تحقق من الإنترنت ثم أعد المحاولة."));
