@@ -182,6 +182,19 @@
     ctx.direction = "rtl"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
     ctx.fillStyle = "#f2d19b"; ctx.font = "bold 21px sans-serif";
     ctx.fillText("ZOZ NOW  •  وثائقي تاريخي", W - 42, 63);
+    if (scene?.closing && p > 0.76) {
+      ctx.fillStyle = "rgba(4,9,15,.82)"; ctx.fillRect(0, 0, W, H);
+      ctx.textAlign = "center"; ctx.direction = "rtl";
+      ctx.fillStyle = "#f2d19b"; ctx.font = "bold 22px sans-serif";
+      ctx.fillText("ZOZ NOW  •  تاريخ مصر", W / 2, 440);
+      ctx.fillStyle = "#fffaf2"; ctx.font = "bold 39px sans-serif";
+      wrap(ctx, String(scene.closing.title || "الحضارة صنعها الناس أيضًا"), W - 100, 3)
+        .forEach((line, n) => ctx.fillText(line, W / 2, 510 + n * 52));
+      ctx.fillStyle = "#e9edf5"; ctx.font = "24px sans-serif";
+      wrap(ctx, String(scene.closing.narration || "تابعونا لاكتشاف المزيد من تاريخ مصر."), W - 110, 3)
+        .forEach((line, n) => ctx.fillText(line, W / 2, 700 + n * 42));
+      return;
+    }
     const heading = String(scene?.on_screen_text || scene?.heading || projectTitle || ("مشهد " + (index + 1))).slice(0, 90);
     ctx.fillStyle = "#fffaf2"; ctx.font = "bold 32px sans-serif";
     wrap(ctx, heading, W - 100, 2).forEach((line, n) => ctx.fillText(line, W - 50, 119 + n * 42));
@@ -322,6 +335,8 @@
           video.pause();
           try { video.currentTime = 0; } catch (_) {}
           video.playbackRate = speed;
+          for (const candidate of clips) if (candidate.audioGain) candidate.audioGain.gain.value = 0;
+          if (clip.audioGain) clip.audioGain.gain.value = 1;
           const clipStart = performance.now();
           await video.play();
           if (!audioStarted && audioSource) { audioSource.start(0); audioStarted = true; }
@@ -344,6 +359,7 @@
           });
           elapsedBefore += segmentDuration;
           video.pause();
+          if (clip.audioGain) clip.audioGain.gain.value = 0;
         }
         if (audioSource && !audioStarted) throw new Error("تعذّر بدء التعليق الصوتي.");
         try { if (recorder.state !== "inactive") recorder.stop(); } catch (_) {}
@@ -402,39 +418,73 @@
       }
       const realFiles = (videoFiles || []).filter(Boolean).slice(0, 6);
       if (realFiles.length) {
-        if (realFiles.length !== scenes.length) {
-          throw new Error("للحفاظ على ترتيب القصة، ارفع عدد مقاطع الفيديو نفسه لعدد المشاهد المحفوظة (" + scenes.length + " مقاطع لهذا المشروع).");
+        if (realFiles.length > scenes.length) {
+          throw new Error("عدد المقاطع أكبر من عدد المشاهد المحفوظة. استخدم ستة مقاطع كحد أقصى.");
         }
-        if (!audioBuffer) {
-          throw new Error("لضمان وجود كلام عربي وعدم خروج فيديو صامت، أرفق ملف تعليق صوتي عربي WAV أو MP3 أو M4A قبل التجميع.");
+        const renderScenes = scenes.slice(0, realFiles.length).map(scene => ({ ...(scene || {}) }));
+        if (realFiles.length < scenes.length) {
+          const outro = scenes[scenes.length - 1] || {};
+          renderScenes[renderScenes.length - 1].closing = {
+            title: outro.on_screen_text || "الحضارة صنعها الناس أيضًا",
+            narration: outro.narration || "تابعونا لاكتشاف المزيد من تاريخ مصر."
+          };
         }
-        if (audioBuffer.duration < 10 || audioBuffer.duration > 120) {
-          throw new Error("مدة التعليق الصوتي يجب أن تكون بين 10 و120 ثانية.");
-        }
-        let sumSquares = 0, sampleCount = 0;
-        for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
-          const data = audioBuffer.getChannelData(channel);
-          const stride = Math.max(1, Math.floor(data.length / 20000));
-          for (let i = 0; i < data.length; i += stride) { sumSquares += data[i] * data[i]; sampleCount++; }
-        }
-        if (!sampleCount || Math.sqrt(sumSquares / sampleCount) < 0.0015) {
-          throw new Error("ملف التعليق الصوتي شبه صامت. استخدم تسجيلًا أو تعليقًا عربيًا واضحًا.");
+        if (audioBuffer) {
+          if (audioBuffer.duration < 10 || audioBuffer.duration > 120) {
+            throw new Error("مدة التعليق الصوتي يجب أن تكون بين 10 و120 ثانية.");
+          }
+          let sumSquares = 0, sampleCount = 0;
+          for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+            const data = audioBuffer.getChannelData(channel);
+            const stride = Math.max(1, Math.floor(data.length / 20000));
+            for (let i = 0; i < data.length; i += stride) { sumSquares += data[i] * data[i]; sampleCount++; }
+          }
+          if (!sampleCount || Math.sqrt(sumSquares / sampleCount) < 0.0015) {
+            throw new Error("ملف التعليق الصوتي شبه صامت. استخدم تسجيلًا أو تعليقًا عربيًا واضحًا.");
+          }
         }
         const loaded = await loadVideoClips(realFiles);
         videoUrls = loaded.urls;
         const clips = loaded.clips;
         const sourceDuration = clips.reduce((sum, clip) => sum + clip.duration, 0);
-        const speed = sourceDuration / audioBuffer.duration;
-        if (speed < 0.65 || speed > 1.35) {
-          throw new Error("مجموع مدة المقاطع (" + Math.round(sourceDuration) + " ث) بعيد عن مدة التعليق (" + Math.round(audioBuffer.duration) + " ث). قصّ المقاطع أو عدّل التعليق بحيث تكون النسبة بين 0.65 و1.35.");
+        let speed = 1;
+        let total = sourceDuration;
+        let audioDestination;
+        if (audioBuffer) {
+          speed = sourceDuration / audioBuffer.duration;
+          if (speed < 0.65 || speed > 1.35) {
+            throw new Error("مجموع مدة المقاطع (" + Math.round(sourceDuration) + " ث) بعيد عن مدة التعليق (" + Math.round(audioBuffer.duration) + " ث). قصّ المقاطع أو عدّل التعليق بحيث تكون النسبة بين 0.65 و1.35.");
+          }
+          total = audioBuffer.duration;
+          audioDestination = audioContext.createMediaStreamDestination();
+          audioSource = audioContext.createBufferSource(); audioSource.buffer = audioBuffer;
+          audioSource.connect(audioDestination);
+        } else {
+          audioContext = new AudioContext(); await audioContext.resume();
+          audioDestination = audioContext.createMediaStreamDestination();
+          let routedTracks = 0;
+          for (const clip of clips) {
+            const video = clip.video;
+            video.muted = false; video.volume = 1;
+            try {
+              const source = audioContext.createMediaElementSource(video);
+              const gain = audioContext.createGain(); gain.gain.value = 0;
+              source.connect(gain); gain.connect(audioDestination);
+              clip.audioGain = gain; routedTracks++;
+            } catch (_) {
+              clip.audioGain = null;
+            }
+          }
+          if (!routedTracks) {
+            throw new Error("تعذّر قراءة الصوت الأصلي من مقاطع الفيديو. أرفق تعليقًا صوتيًا عربيًا WAV أو MP3 أو M4A ثم أعد التجميع.");
+          }
         }
-        const audioDestination = audioContext.createMediaStreamDestination();
-        audioSource = audioContext.createBufferSource(); audioSource.buffer = audioBuffer;
-        audioSource.connect(audioDestination);
         stream = canvas.captureStream(FPS);
-        stream.addTrack(audioDestination.stream.getAudioTracks()[0]);
+        const capturedAudio = audioDestination.stream.getAudioTracks()[0];
+        if (!capturedAudio) throw new Error("لم يتمكن المتصفح من تجهيز مسار الصوت للفيديو النهائي.");
+        stream.addTrack(capturedAudio);
         if (onProgress) onProgress(1);
-        const webm = await recordRealVideoClips(canvas, stream, audioBuffer.duration, clips, scenes, job.topic || job.script_json.title || "ZOZ Pro", audioSource, speed, onProgress);
+        const webm = await recordRealVideoClips(canvas, stream, total, clips, renderScenes, job.topic || job.script_json.title || "ZOZ Pro", audioSource, speed, onProgress);
         if (onProgress) onProgress(70);
         return await toMp4(webm, job.topic || job.script_json.title || "ZOZ-Pro-video", true, onProgress);
       }
@@ -448,4 +498,4 @@
   }
   window.ZOZLocalRenderer = { render };
 })();
-</script><script src="./studio.js?v=20261022-5"></script><script src="./pwa.js?v=20261022-4"></script></body></html>
+</script><script src="./studio.js?v=20261022-6"></script><script src="./pwa.js?v=20261022-4"></script></body></html>
