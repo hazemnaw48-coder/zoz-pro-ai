@@ -1,11 +1,10 @@
-const CACHE_NAME = "zoz-pro-shell-v7";
+const CACHE_NAME = "zoz-pro-shell-v8";
 const APP_FILES = [
   "./",
   "./index.html",
-  "./studio.css?v=20261022-1",
-  "./local-renderer.js?v=20261022-1",
-  "./studio.js?v=20261022-1",
-  "./pwa.js?v=20261022-1",
+  "./studio.css?v=20261022-2",
+  "./studio.js?v=20261022-2",
+  "./pwa.js?v=20261022-2",
   "./manifest.webmanifest",
   "./zoz-icon.svg"
 ];
