@@ -3,7 +3,10 @@ async function renderLocalMp4(id,target,button){
  const card=button?.closest(".item");
  const job=(state?.jobs||[]).find(x=>x.id===id);
  const imageInput=card?.querySelector("[data-scene-images]");
+ const videoInput=card?.querySelector("[data-scene-videos]");
  const audioInput=card?.querySelector("[data-render-audio]");
+ const videoSource=card?.querySelector("[data-render-source]")?.value||"google-flow";
+ const sourceTool=(videoInput?.files?.length?videoSource:"zoz-pro-local-renderer");
  if(!button){msg(target,"تعذر تحديد زر إنتاج الفيديو. حدّث الصفحة وأعد المحاولة.","bad");return}
  if(!job?.script_json?.scenes?.length){msg(target,"لا توجد مشاهد محفوظة. اضغط «توليد النص والمشاهد» أولًا.","bad");return}
  if(!window.ZOZLocalRenderer?.render){msg(target,"ملف محرك الإنتاج لم يُحمّل. افتح المركز في Chrome ثم أعد تحميل الصفحة.","bad");return}
@@ -15,6 +18,7 @@ async function renderLocalMp4(id,target,button){
    const file=await window.ZOZLocalRenderer.render({
      job,
      imageFiles:[...(imageInput?.files||[])].slice(0,6),
+     videoFiles:[...(videoInput?.files||[])].slice(0,6),
      audioFile:audioInput?.files?.[0]||null,
      onProgress:p=>msg(target,"إنتاج الفيديو وتحويله إلى MP4: "+p+"% — أبقِ الصفحة مفتوحة","warn")
    });
@@ -22,16 +26,16 @@ async function renderLocalMp4(id,target,button){
    if(file.size>50*1024*1024)throw Error("حجم MP4 الناتج "+(file.size/1024/1024).toFixed(1)+" ميجابايت ويتجاوز حد التخزين 50 ميجابايت. أعد الإنتاج بمدة أقصر.");
    msg(target,"2/5 حفظ البرومبت ومصدر الإنتاج مع المهمة…","warn");
    const savedPrompt=job.script_json.original_prompt||job.script_json.script||job.topic;
-   await call(MEDIA,{action:"save_prompt",job_id:id,prompt:savedPrompt,source_tool:"zoz-pro-local-renderer",notes:"تم إنشاء MP4 محليًا من المشاهد المحفوظة. "+(imageInput?.files?.length?"تم استخدام صور مشاهد مرفوعة.":"استخدمت مشاهد توضيحية مولدة محليًا.")+(audioInput?.files?.length?" تم دمج ملف تعليق صوتي مرفوع.":" لا يوجد تعليق صوتي مرفوع.")});
+   await call(MEDIA,{action:"save_prompt",job_id:id,prompt:savedPrompt,source_tool:sourceTool,notes:"تم تجميع MP4 داخل مركز الإنتاج. "+(videoInput?.files?.length?("تم استخدام "+videoInput.files.length+" مقاطع فيديو حقيقية من "+videoSource+"."):(imageInput?.files?.length?"تم رفع صور مرجعية فقط.":"لم تُرفع مقاطع فيديو حقيقية."))+(audioInput?.files?.length?" تم دمج ملف تعليق صوتي عربي مرفوع.":" لا يوجد تعليق صوتي مرفوع.")});
    msg(target,"3/5 طلب مسار رفع آمن إلى التخزين الخاص…","warn");
-   const prepared=await call(MEDIA,{action:"prepare_upload",job_id:id,filename:file.name,mime_type:"video/mp4",size:file.size,source_tool:"zoz-pro-local-renderer"});
+   const prepared=await call(MEDIA,{action:"prepare_upload",job_id:id,filename:file.name,mime_type:"video/mp4",size:file.size,source_tool:sourceTool});
    const encodedPath=prepared.path.split("/").map(encodeURIComponent).join("/");
    const uploadUrl=URL0+"/storage/v1/object/upload/sign/zoz-pro-media/"+encodedPath+"?token="+encodeURIComponent(prepared.token);
    msg(target,"4/5 رفع ملف MP4 ("+(file.size/1024/1024).toFixed(1)+" MB)…","warn");
    const uploaded=await fetch(uploadUrl,{method:"PUT",headers:{"content-type":"video/mp4","x-upsert":"true"},body:file});
    if(!uploaded.ok)throw Error("فشل رفع MP4 إلى Supabase ("+uploaded.status+"): "+(await uploaded.text().catch(()=> "")).slice(0,160));
    msg(target,"5/5 التحقق من الملف وربطه بالمهمة…","warn");
-   const final=await call(MEDIA,{action:"finalize_upload",job_id:id,path:prepared.path,mime_type:"video/mp4",size:file.size,filename:file.name,source_tool:"zoz-pro-local-renderer"});
+   const final=await call(MEDIA,{action:"finalize_upload",job_id:id,path:prepared.path,mime_type:"video/mp4",size:file.size,filename:file.name,source_tool:sourceTool});
    if(!final.verified_in_storage||!final.job?.video_url)throw Error("رُفع الملف لكن لم ينجح التحقق النهائي من ربطه بالمهمة.");
    msg(target,"نجح الإنتاج: تم حفظ MP4 والتحقق منه وربطه بالمهمة. افتح المعاينة أدناه.","good");
    await refresh();
@@ -43,38 +47,46 @@ async function refresh(){try{state=await call(STUDIO);render()}catch(e){msg("#lo
  const sj=j.script_json;const hasVideoAsset=(a.assets||[]).some(x=>x.job_id===j.id&&x.asset_type==="video"&&x.status==="ready");const promptHtml=sj&&sj.original_prompt?'<details><summary>البرومبت الأصلي المحفوظ · '+esc(sj.prompt_source||"")+'</summary><pre>'+esc(sj.original_prompt)+'</pre><p>'+esc(sj.intake_notes||"")+'</p></details>':"";
  const scriptHtml=sj?'<section class="script-preview"><h4>'+esc(sj.title||"النص المنتج")+'</h4><p>'+esc(sj.script||"")+'</p>'+promptHtml+'<details><summary>عرض المشاهد ('+((sj.scenes||[]).length)+')</summary>'+((sj.scenes||[]).map((sc,i)=>'<article class="scene"><b>مشهد '+(i+1)+'</b><p>'+esc(sc.narration||"")+'</p><p>'+esc(sc.visual||"")+'</p><p>'+esc(sc.on_screen_text||"")+'</p></article>').join(""))+'</details><p>'+esc(sj.caption||"")+'</p><p>'+esc((sj.hashtags||[]).join(" "))+'</p></section>':'';
  const videoHtml=j.video_url?'<video class="video-preview" controls playsinline preload="metadata" src="'+esc(j.video_url)+'"></video>':'<p>لم يُحفظ MP4 بعد.</p>';
- return '<article class="item"><div class="healthtop"><h3>'+esc(j.topic)+'</h3>'+pill(j.status)+'</div><p>معرّف المهمة: '+esc(j.id)+'</p><p>محرك النص: '+esc(j.generation_provider||"لم يُولّد بعد")+(j.generation_error?' · ملاحظة: '+esc(j.generation_error):'')+'</p>'+scriptHtml+videoHtml+'<div class="actions"><select data-provider="'+esc(j.id)+'"><option value="local" selected>قالب محلي بلا API</option><option value="gemini">Gemini API — تحقق من التكلفة</option><option value="claude">Claude API — تحقق من التكلفة</option></select><button data-script="'+esc(j.id)+'">توليد النص والمشاهد</button><div class="local-render-box"><p><b>إنتاج MP4 داخل المركز — دون API مدفوع</b></p><label>صور المشاهد (اختياري، حتى 6 صور)<input type="file" accept="image/*" multiple data-scene-images="'+esc(j.id)+'"></label><label>تعليق صوتي WAV/MP3/M4A (اختياري)<input type="file" accept="audio/*" data-render-audio="'+esc(j.id)+'"></label><p class="hint">عند عدم رفع صور، تُرسم مشاهد توضيحية محلية؛ هذا ليس توليدًا سينمائيًا بالذكاء الاصطناعي.</p><button data-render-video="'+esc(j.id)+'">إنشاء MP4 وحفظه في المهمة</button></div><button data-download-video="'+esc(j.id)+'" '+(hasVideoAsset?"":"disabled title=\"لا يوجد ملف فيديو محفوظ لهذه المهمة بعد\"")+'>تنزيل MP4</button><button data-export="txt" data-job="'+esc(j.id)+'">تنزيل النص TXT</button><button data-export="json" data-job="'+esc(j.id)+'">تنزيل الحزمة JSON</button><select data-channel="'+esc(j.id)+'">'+(a.channels||[]).filter(c=>c.connection_status==="connected"&&c.can_publish_direct).map(c=>'<option value="'+esc(c.platform+"|"+c.channel_id)+'">'+esc(c.display_name)+'</option>').join("")+'</select><button data-publish="'+esc(j.id)+'">رفع خاص للمراجعة</button></div><p id="m-'+esc(j.id)+'" class="msg"></p></article>';
+ return '<article class="item"><div class="healthtop"><h3>'+esc(j.topic)+'</h3>'+pill(j.status)+'</div><p>معرّف المهمة: '+esc(j.id)+'</p><p>محرك النص: '+esc(j.generation_provider||"لم يُولّد بعد")+(j.generation_error?' · ملاحظة: '+esc(j.generation_error):'')+'</p>'+scriptHtml+videoHtml+'<div class="actions"><select data-provider="'+esc(j.id)+'"><option value="local" selected>قالب محلي بلا API</option><option value="gemini">Gemini API — تحقق من التكلفة</option><option value="claude">Claude API — تحقق من التكلفة</option></select><button data-script="'+esc(j.id)+'">توليد النص والمشاهد</button><div class="local-render-box"><p><b>إنتاج MP4 داخل المركز — دون API مدفوع</b></p><label>مقاطع فيديو حقيقية من Flow أو أداة أخرى (حتى 6 مقاطع)<input type="file" accept="video/mp4,video/webm,.mp4,.webm" multiple data-scene-videos="'+esc(j.id)+'"></label><label>مصدر المقاطع<select data-render-source="'+esc(j.id)+'"><option value="google-flow">Google Flow / ZOZ NOW</option><option value="gemini">Gemini</option><option value="kling">Kling</option><option value="luma">Luma</option><option value="runway">Runway</option><option value="pixverse">PixVerse</option><option value="vidu">Vidu</option><option value="qwen">Qwen / Alibaba</option><option value="other">أداة أخرى</option></select></label><label>تعليق صوتي عربي WAV/MP3/M4A (مطلوب للمقاطع الحقيقية)<input type="file" accept="audio/*" data-render-audio="'+esc(j.id)+'"></label><p class="hint">لدمج فيديو واقعي: ارفع مقطعًا لكل مشهد محفوظ وتعليقًا عربيًا واضحًا. لن يستبدل المركز المقاطع الحقيقية برسومات كرتونية.</p><button data-render-video="'+esc(j.id)+'">إنشاء MP4 وحفظه في المهمة</button></div><button data-download-video="'+esc(j.id)+'" '+(hasVideoAsset?"":"disabled title=\"لا يوجد ملف فيديو محفوظ لهذه المهمة بعد\"")+'>تنزيل MP4</button><button data-export="txt" data-job="'+esc(j.id)+'">تنزيل النص TXT</button><button data-export="json" data-job="'+esc(j.id)+'">تنزيل الحزمة JSON</button><select data-channel="'+esc(j.id)+'">'+(a.channels||[]).filter(c=>c.connection_status==="connected"&&c.can_publish_direct).map(c=>'<option value="'+esc(c.platform+"|"+c.channel_id)+'">'+esc(c.display_name)+'</option>').join("")+'</select><button data-publish="'+esc(j.id)+'">رفع خاص للمراجعة</button></div><p id="m-'+esc(j.id)+'" class="msg"></p></article>';
 }).join("")||'<article class="item">لا توجد مهام؛ أنشئ مهمة من قسم إنتاج المحتوى.</article>';$("#publications").innerHTML=(a.publications||[]).map(p=>'<article class="item"><h3>'+esc(p.platform)+' · '+pill(p.status)+'</h3><p>'+esc(p.remote_post_id||p.error_message||p.result_url||"لا توجد نتيجة نهائية بعد")+"</p></article>").join("")||'<article class="item">لا توجد سجلات نشر.</article>';$("#assets").innerHTML=(a.assets||[]).map(x=>'<article class="item"><h3>'+esc(x.asset_type)+' · '+pill(x.status)+'</h3><p>'+esc(x.storage_path||x.source_url||"لا يوجد مسار")+"</p></article>").join("")||'<article class="item">لا توجد ملفات.</article>';for(const p of ["gemini","claude"]){const x=(a.integrations||[]).find(y=>y.provider_key===p);msg("#"+p+"-result",x?x.status+(x.last_error?" · "+x.last_error:""):"غير مسجل")}}$("#login-form").addEventListener("submit",async e=>{e.preventDefault();try{const {data,error}=await sb.auth.signInWithPassword({email:$("#email").value.trim(),password:$("#password").value});if(error)throw error;const {data:{user}}=await sb.auth.getUser();if((user?.email||"").toLowerCase()!=="hazemnaw48@gmail.com"||!user.email_confirmed_at){await sb.auth.signOut();throw Error("هذا ليس حساب المالك المؤكد.")}auth(true);await refresh()}catch(e){msg("#login-message",e.message,"bad")}});$("#logout").onclick=async()=>{await sb.auth.signOut();auth(false)};$$("[data-tab]").forEach(b=>b.onclick=()=>{$$(".tab").forEach(x=>x.classList.toggle("active",x===b));["home","content","channels","tools","jobs"].forEach(t=>$("#tab-"+t).classList.toggle("hidden",t!==b.dataset.tab))});$("#refresh").onclick=$("#refresh-jobs").onclick=refresh;$$("[data-oauth]").forEach(b=>b.onclick=async()=>{try{const d=await call(STUDIO,{action:"oauth_start",platform:b.dataset.oauth});location.href=d.url}catch(e){alert(e.message)}});$("#test-gemini").onclick=async()=>{msg("#gemini-result","جارٍ الاختبار");try{const d=await call(STUDIO,{action:"gemini_test"});msg("#gemini-result","نجح: "+d.model,"good");await refresh()}catch(e){msg("#gemini-result",e.message,"bad")}};$("#test-claude").onclick=async()=>{msg("#claude-result","جارٍ الاختبار");try{const d=await call(STUDIO,{action:"claude_test"});msg("#claude-result","نجح: "+d.model,"good");await refresh()}catch(e){msg("#claude-result",e.message,"bad")}};$("#intake-job").onchange=()=>{const id=$("#intake-job").value;const job=(state?.jobs||[]).find(x=>x.id===id);if(job){$("#intake-topic").value=job.topic||"";$("#intake-duration").value=String(job.duration_seconds||60);if(!$("#intake-prompt").value.trim()&&job.script_json?.original_prompt)$("#intake-prompt").value=job.script_json.original_prompt;}else{$("#intake-topic").value="";}};
 $("#intake-form").onsubmit=async e=>{
- e.preventDefault();
- const button=$("#intake-submit"),file=$("#intake-file").files[0],topic=$("#intake-topic").value.trim(),source=$("#intake-source").value,prompt=$("#intake-prompt").value,notes=$("#intake-notes").value,duration=Number($("#intake-duration").value)||60,mime=(file?.type==="video/mp4"||file?.type==="video/webm")?file.type:"video/mp4";
- if(!file){msg("#intake-message","اختر ملف MP4 أو WebM أولًا.","bad");return}
- if(file.type!=="video/mp4"&&!file.name.toLowerCase().endsWith(".mp4")){msg("#intake-message","اختر ملف فيديو MP4 فقط.","bad");return}
- if(file.size<1||file.size>50*1024*1024){msg("#intake-message","حجم الملف يجب ألا يتجاوز 50 ميجابايت.","bad");return}
- button.disabled=true;$("#intake-result").classList.add("hidden");
- let jobId=$("#intake-job").value;
- try{
-   if(!jobId){
-     msg("#intake-message","1/4 إنشاء مهمة الاستلام وحفظ الموضوع…");
-     const created=await call(CONTENT,{action:"create",topic,audience:$("#audience").value||"جمهور عربي عام",language:$("#language").value||"ar",duration_seconds:duration});
-     jobId=created.job.id;
-   }
-   msg("#intake-message","2/4 حفظ البرومبت ومصدر الأداة داخل المهمة…");
-   await call(MEDIA,{action:"save_prompt",job_id:jobId,prompt,source_tool:source,notes});
-   msg("#intake-message","3/4 رفع الملف إلى التخزين الخاص…");
-   const prepared=await call(MEDIA,{action:"prepare_upload",job_id:jobId,filename:file.name,mime_type:mime,size:file.size});
-   const encodedPath=prepared.path.split("/").map(encodeURIComponent).join("/");
-   const uploadUrl=URL0+"/storage/v1/object/upload/sign/zoz-pro-media/"+encodedPath+"?token="+encodeURIComponent(prepared.token);
-   const uploaded=await fetch(uploadUrl,{method:"PUT",headers:{"content-type":mime,"x-upsert":"true"},body:file});
-   if(!uploaded.ok){const err=await uploaded.text().catch(()=>"");throw Error("فشل رفع الملف إلى التخزين ("+uploaded.status+"). "+err.slice(0,180))}
-   msg("#intake-message","4/4 التحقق من الملف وربطه بالمهمة…");
-   const final=await call(MEDIA,{action:"finalize_upload",job_id:jobId,path:prepared.path,mime_type:mime,size:file.size,filename:file.name,source_tool:source});
-   $("#intake-result").classList.remove("hidden");
-   $("#intake-result").innerHTML='<article class="item"><h3>تم استلام الملف وحفظه للمراجعة</h3><p>المهمة: '+esc(final.job?.topic||topic)+'</p><p>المعرّف: '+esc(jobId)+'</p><p>المصدر: '+esc(source)+'</p><p><a href="'+esc(final.review_url||"")+'" target="_blank" rel="noopener">فتح / تشغيل الفيديو المحفوظ</a></p><p>البرومبت محفوظ مع المهمة. لم يتم النشر العام.</p></article>';
-   msg("#intake-message","نجح الاستلام: تم التحقق من الملف وربطه بالمهمة نفسها. لم يُنشر الفيديو.","good");
-   $("#intake-file").value="";await refresh();
- }catch(err){msg("#intake-message","توقف الاستلام مع بقاء المهمة/البرومبت المحفوظين إن تم إنشاؤهما. يمكنك إعادة المحاولة. "+(err.message||err),"bad")}
- finally{button.disabled=false}
+  e.preventDefault();
+  const button=$("#intake-submit"),files=[...$("#intake-file").files],topic=$("#intake-topic").value.trim(),source=$("#intake-source").value,prompt=$("#intake-prompt").value,notes=$("#intake-notes").value,duration=Number($("#intake-duration").value)||60;
+  if(!files.length){msg("#intake-message","اختر فيديو واحدًا أو أكثر من Google Flow أو أداة الفيديو أولًا.","bad");return}
+  if(files.length>10){msg("#intake-message","الحد الأقصى 10 فيديوهات في الدفعة الواحدة. أرسل الباقي في دفعة ثانية للمهمة نفسها.","bad");return}
+  for(const file of files){
+    const isMp4=file.type==="video/mp4"||file.name.toLowerCase().endsWith(".mp4");
+    if(!isMp4){msg("#intake-message","الملف «"+file.name+"» ليس MP4. نزّله من Flow بصيغة MP4 ثم أعد المحاولة.","bad");return}
+    if(file.size<1||file.size>50*1024*1024){msg("#intake-message","حجم الملف «"+file.name+"» يجب ألا يتجاوز 50 ميجابايت.","bad");return}
+  }
+  button.disabled=true;$("#intake-result").classList.add("hidden");
+  let jobId=$("#intake-job").value;
+  const saved=[];
+  try{
+    if(!jobId){
+      msg("#intake-message","1/3 إنشاء مهمة استقبال واحدة للملفات…");
+      const created=await call(CONTENT,{action:"create",topic,audience:$("#audience").value||"جمهور عربي عام",language:$("#language").value||"ar",duration_seconds:duration});
+      jobId=created.job.id;
+    }
+    msg("#intake-message","2/3 حفظ مصدر الأداة والبرومبت…");
+    await call(MEDIA,{action:"save_prompt",job_id:jobId,prompt,source_tool:source,notes:(notes?notes+"\n":"")+"الملفات المستلمة من "+source+": "+files.map(f=>f.name).join(", ")});
+    for(let i=0;i<files.length;i++){
+      const file=files[i],mime="video/mp4";
+      msg("#intake-message","رفع الفيديو "+(i+1)+"/"+files.length+": "+file.name+"…");
+      const prepared=await call(MEDIA,{action:"prepare_upload",job_id:jobId,filename:file.name,mime_type:mime,size:file.size,source_tool:source});
+      const encodedPath=prepared.path.split("/").map(encodeURIComponent).join("/");
+      const uploadUrl=URL0+"/storage/v1/object/upload/sign/zoz-pro-media/"+encodedPath+"?token="+encodeURIComponent(prepared.token);
+      const uploaded=await fetch(uploadUrl,{method:"PUT",headers:{"content-type":mime,"x-upsert":"true"},body:file});
+      if(!uploaded.ok){const err=await uploaded.text().catch(()=>"");throw Error("فشل رفع "+file.name+" ("+uploaded.status+"). "+err.slice(0,150))}
+      const final=await call(MEDIA,{action:"finalize_upload",job_id:jobId,path:prepared.path,mime_type:mime,size:file.size,filename:file.name,source_tool:source});
+      saved.push({name:file.name,url:final.review_url||"",path:prepared.path});
+    }
+    $("#intake-result").classList.remove("hidden");
+    $("#intake-result").innerHTML='<article class="item"><h3>تم نقل '+saved.length+' فيديو إلى مركز الإنتاج وحفظها للمراجعة</h3><p>المهمة: '+esc((state?.jobs||[]).find(j=>j.id===jobId)?.topic||topic)+'</p><p>معرّف المهمة: '+esc(jobId)+'</p><p>المصدر: '+esc(source)+'</p>'+saved.map((v,i)=>'<p>'+(i+1)+'. '+esc(v.name)+' — <a href="'+esc(v.url)+'" target="_blank" rel="noopener">فتح الفيديو المحفوظ</a></p>').join("")+'<p>حُفظت الملفات داخل التخزين الخاص وربطت بالمهمة نفسها. لم يتم النشر العام.</p></article>';
+    msg("#intake-message","نجح النقل: تم التحقق من "+saved.length+" ملفات MP4 وربطها بالمهمة نفسها. لم يُنشر أي فيديو.","good");
+    $("#intake-file").value="";await refresh();
+  }catch(err){msg("#intake-message","توقف النقل بعد "+saved.length+" ملفات محفوظة. الملفات التي تمت بنجاح بقيت في المركز، ويمكن إعادة إرسال الملفات غير المكتملة. "+(err.message||err),"bad")}
+  finally{button.disabled=false}
 };
 $("#create-form").onsubmit=async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;try{const d=await call(CONTENT,{action:"create",topic:$("#topic").value.trim(),audience:$("#audience").value,language:$("#language").value,duration_seconds:Number($("#duration").value)});msg("#create-message","تم حفظ المهمة "+d.job.id,"good");$("#new-job").classList.remove("hidden");$("#new-job").innerHTML='<h3>'+esc(d.job.topic)+'</h3><button id="new-script" class="primary">توليد النص والمشاهد</button><p id="new-script-msg" class="msg"></p>';$("#new-script").onclick=()=>script(d.job.id,"#new-script-msg","local");$("#topic").value="";await refresh()}catch(e){msg("#create-message",e.message,"bad")}finally{b.disabled=false}};async function script(id,target,provider="local"){if(provider!=="local"&&!confirm("هذا الاختيار يستدعي API خارجيًا وقد يفرض رسومًا أو يستهلك رصيدًا. هل راجعت شروط الحساب وتوافق على المتابعة؟"))return;msg(target,provider==="local"?"جارٍ إعداد نص محلي دون API خارجي":"جارٍ طلب التوليد من "+provider);try{const d=await call(CONTENT,{action:"generate",job_id:id,provider});const g=d.generation||{};msg(target,"حُفظ النص عبر "+g.provider+(g.warning?" — "+g.warning:""),g.used_fallback?"warn":"good");await refresh()}catch(e){msg(target,e.message,"bad")}}async function video(id,target){msg(target,"جارٍ طلب الفيديو");try{const d=await call(VIDEO,{action:"generate_video",job_id:id});msg(target,"حُفظ في التخزين الخاص: "+d.review_url,"good");await refresh()}catch(e){msg(target,e.message,"bad")}}async function publish(id,target){const v=$('[data-channel="'+CSS.escape(id)+'"]')?.value||"";if(!v.includes("|")){msg(target,"اربط قناة مباشرةً أولًا.","warn");return}if(!confirm("سيتم الرفع بوضع خاص للمراجعة، ولن يصبح عامًا تلقائيًا. متابعة؟"))return;const [platform,channel_id]=v.split("|");try{msg(target,"جارٍ الرفع بوضع خاص");const d=await call(STUDIO,{action:"publish",job_id:id,platform,channel_id});msg(target,"قبلت المنصة الطلب: "+d.status+" · "+(d.remote_post_id||""),"good");await refresh()}catch(e){msg(target,e.message,"bad")}}function downloadText(name,text,mime){const blob=new Blob([text],{type:mime+";charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 async function downloadVideo(id,target){msg(target,"جارٍ تجهيز رابط MP4 الخاص");try{const d=await call(STUDIO,{action:"video_download",job_id:id});const a=document.createElement("a");a.href=d.url;a.download=d.filename||("ZOZ-Pro-"+id+".mp4");a.target="_blank";a.rel="noopener";document.body.appendChild(a);a.click();a.remove();msg(target,"تم تجهيز رابط التنزيل الخاص (صالح لمدة ساعة).","good")}catch(e){msg(target,e.message,"bad")}}
