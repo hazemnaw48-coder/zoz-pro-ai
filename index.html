@@ -449,13 +449,46 @@
       if (window.__ZOZ_FFMPEG_INSTANCE?.loaded) return window.__ZOZ_FFMPEG_INSTANCE;
       if (!window.FFmpegWASM?.FFmpeg) {
         if (!window.__ZOZ_FFMPEG_SCRIPT_PROMISE) {
-          window.__ZOZ_FFMPEG_SCRIPT_PROMISE = new Promise((resolve, reject) => {
-            const script = document.createElement("script");
-            script.src = "./ffmpeg.js?v=20261022-3";
-            script.async = true;
-            script.onload = () => window.FFmpegWASM?.FFmpeg ? resolve() : reject(new Error("تعذّر تحميل محرك الدمج المحلي."));
-            script.onerror = () => reject(new Error("تعذّر تحميل مكتبة الدمج. تحقق من الإنترنت ثم أعد المحاولة."));
-            document.head.appendChild(script);
+          window.__ZOZ_FFMPEG_SCRIPT_PROMISE = (async () => {
+            // GitHub Pages is currently returning 404 for the repository-local wrapper files.
+            // Load the official matching UMD wrapper/worker from jsDelivr and pin the worker
+            // to a same-origin Blob URL so browser Worker origin restrictions do not break concat.
+            const wrapperBase = "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd";
+            const [wrapperResponse, workerResponse] = await Promise.all([
+              fetch(wrapperBase + "/ffmpeg.js", { cache: "force-cache" }),
+              fetch(wrapperBase + "/814.ffmpeg.js", { cache: "force-cache" })
+            ]);
+            if (!wrapperResponse.ok || !workerResponse.ok) {
+              throw new Error("تعذّر تحميل مكتبة الدمج المجانية من المصدر الرسمي. لم يتم تعديل المقاطع.");
+            }
+            const [wrapperSource, workerSource] = await Promise.all([
+              wrapperResponse.text(), workerResponse.text()
+            ]);
+            const workerNeedle = "new Worker(new URL(e.p+e.u(814),e.b),{type:void 0})";
+            if (!wrapperSource.includes(workerNeedle)) {
+              throw new Error("نسخة محرك الدمج غير متوافقة مع إعداد المركز. لم يبدأ الدمج.");
+            }
+            const workerURL = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
+            const patchedWrapper = wrapperSource.replace(
+              workerNeedle,
+              'new Worker("' + workerURL + '",{type:void 0})'
+            );
+            const wrapperURL = URL.createObjectURL(new Blob([patchedWrapper], { type: "text/javascript" }));
+            window.__ZOZ_FFMPEG_WORKER_URL = workerURL;
+            window.__ZOZ_FFMPEG_WRAPPER_URL = wrapperURL;
+            await new Promise((resolve, reject) => {
+              const script = document.createElement("script");
+              script.src = wrapperURL;
+              script.async = true;
+              script.onload = () => window.FFmpegWASM?.FFmpeg
+                ? resolve()
+                : reject(new Error("تعذّر تهيئة محرك الدمج المحلي."));
+              script.onerror = () => reject(new Error("تعذّر تشغيل مكتبة الدمج. تحقق من الإنترنت ثم أعد المحاولة."));
+              document.head.appendChild(script);
+            });
+          })().catch(error => {
+            window.__ZOZ_FFMPEG_SCRIPT_PROMISE = null;
+            throw error;
           });
         }
         await window.__ZOZ_FFMPEG_SCRIPT_PROMISE;
