@@ -45,11 +45,10 @@ async function renderLocalMp4(id,target,button){
    await call(MEDIA,{action:"save_prompt",job_id:id,prompt:savedPrompt,source_tool:sourceTool,notes:"تم تجميع MP4 داخل مركز الإنتاج من "+videoFiles.length+" مقاطع حقيقية من "+videoSource+". "+(videoInput?.files?.length?"المقاطع مختارة من الهاتف.":"المقاطع مسترجعة من التخزين الخاص للمهمة.")+" تم استخدام الدمج دون إعادة ترميز أو إضافة نصوص أو شعارات أو موسيقى؛ افحص الصوت في المعاينة قبل النشر."});
    msg(target,"3/5 طلب مسار رفع آمن إلى التخزين الخاص…","warn");
    const prepared=await call(MEDIA,{action:"prepare_upload",job_id:id,filename:file.name,mime_type:"video/mp4",size:file.size,source_tool:sourceTool});
-   const encodedPath=prepared.path.split("/").map(encodeURIComponent).join("/");
-   const uploadUrl=URL0+"/storage/v1/object/upload/sign/zoz-pro-media/"+encodedPath+"?token="+encodeURIComponent(prepared.token);
-   msg(target,"4/5 رفع ملف MP4 ("+(file.size/1024/1024).toFixed(1)+" MB)…","warn");
-   const uploaded=await fetch(uploadUrl,{method:"PUT",headers:{"content-type":"video/mp4","x-upsert":"true"},body:file});
-   if(!uploaded.ok)throw Error("فشل رفع MP4 إلى Supabase ("+uploaded.status+"): "+(await uploaded.text().catch(()=> "")).slice(0,160));
+   msg(target,"4/5 رفع ملف MP4 إلى التخزين الخاص ("+(file.size/1024/1024).toFixed(1)+" MB)…","warn");
+   const {data:uploadData,error:uploadError}=await sb.storage.from("zoz-pro-media").uploadToSignedUrl(prepared.path,prepared.token,file,{contentType:"video/mp4"});
+   if(uploadError)throw Error("فشل رفع MP4 إلى Supabase Storage: "+(uploadError.message||"خطأ في الرفع"));
+   if(!uploadData)throw Error("لم يؤكد Supabase اكتمال رفع الملف.");
    msg(target,"5/5 التحقق من الملف وربطه بالمهمة…","warn");
    const final=await call(MEDIA,{action:"finalize_upload",job_id:id,path:prepared.path,mime_type:"video/mp4",size:file.size,filename:file.name,source_tool:sourceTool});
    if(!final.verified_in_storage||!final.job?.video_url)throw Error("رُفع الملف لكن لم ينجح التحقق النهائي من ربطه بالمهمة.");
