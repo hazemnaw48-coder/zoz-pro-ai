@@ -220,7 +220,7 @@
 
   async function loadVideoClips(files) {
     const urls = [], clips = [];
-    const candidates = (files || []).slice(0, 6);
+    const candidates = (files || []).slice(0, 9);
     for (const file of candidates) {
       if (!file) continue;
       const name = String(file.name || "").toLowerCase();
@@ -402,7 +402,7 @@
 
   async function render({ job, imageFiles = [], videoFiles = [], audioFile = null, onProgress = null }) {
     if (!job || !job.id || !job.script_json) throw new Error("اختر مهمة محفوظة تحتوي على النص والمشاهد أولًا.");
-    const scenes = Array.isArray(job.script_json.scenes) ? job.script_json.scenes.slice(0, 6) : [];
+    const scenes = Array.isArray(job.script_json.scenes) ? job.script_json.scenes.slice(0, 9) : [];
     if (!scenes.length) throw new Error("المهمة لا تحتوي على مشاهد محفوظة؛ ولّد النص والمشاهد أولًا.");
     if (typeof MediaRecorder === "undefined") throw new Error("المتصفح لا يدعم تسجيل الفيديو المحلي. استخدم Chrome حديثًا.");
     const canvas = document.createElement("canvas"); canvas.width = W; canvas.height = H;
@@ -416,10 +416,10 @@
         try { audioBuffer = await audioContext.decodeAudioData(await audioFile.arrayBuffer()); }
         catch (_) { throw new Error("تعذّر قراءة ملف الصوت. استخدم WAV أو MP3 أو M4A صالحًا."); }
       }
-      const realFiles = (videoFiles || []).filter(Boolean).slice(0, 6);
+      const realFiles = (videoFiles || []).filter(Boolean).slice(0, 9);
       if (realFiles.length) {
         if (realFiles.length > scenes.length) {
-          throw new Error("عدد المقاطع أكبر من عدد المشاهد المحفوظة. استخدم ستة مقاطع كحد أقصى.");
+          throw new Error("عدد المقاطع أكبر من عدد المشاهد المحفوظة. استخدم تسعة مقاطع كحد أقصى.");
         }
         const renderScenes = scenes.slice(0, realFiles.length).map(scene => ({ ...(scene || {}) }));
         if (realFiles.length < scenes.length) {
@@ -498,4 +498,4 @@
   }
   window.ZOZLocalRenderer = { render };
 })();
-</script><script src="./studio.js?v=20261022-6"></script><script src="./pwa.js?v=20261022-4"></script></body></html>
+</script><script src="./studio.js?v=20261022-9"></script><script src="./pwa.js?v=20261022-4"></script></body></html>
