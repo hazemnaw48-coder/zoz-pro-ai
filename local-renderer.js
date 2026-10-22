@@ -162,6 +162,35 @@
     ctx.fillStyle = "rgba(255,255,255,.32)"; ctx.fillRect(36, 1200, W - 72, 5);
     ctx.fillStyle = "#e4ba77"; ctx.fillRect(36, 1200, (W - 72) * clamp((index + p) / 6, 0, 1), 5);
   }
+
+  function drawRealVideoScene(ctx, video, index, p, scene, projectTitle) {
+    const zoom = 1.015 + p * .045;
+    const scale = Math.max(W / video.videoWidth, H / video.videoHeight) * zoom;
+    const dw = video.videoWidth * scale, dh = video.videoHeight * scale;
+    const sway = Math.sin(p * Math.PI) * 8;
+    ctx.fillStyle = "#05080d"; ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(video, (W - dw) / 2 + sway, (H - dh) / 2, dw, dh);
+    const shade = ctx.createLinearGradient(0, 0, 0, H);
+    shade.addColorStop(0, "rgba(5,9,15,.76)");
+    shade.addColorStop(.28, "rgba(5,9,15,.08)");
+    shade.addColorStop(.58, "rgba(5,9,15,.04)");
+    shade.addColorStop(.76, "rgba(5,9,15,.48)");
+    shade.addColorStop(1, "rgba(5,9,15,.92)");
+    ctx.fillStyle = shade; ctx.fillRect(0, 0, W, H);
+    ctx.direction = "rtl"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#f2d19b"; ctx.font = "bold 21px sans-serif";
+    ctx.fillText("ZOZ NOW  •  وثائقي تاريخي", W - 42, 63);
+    const heading = String(scene?.on_screen_text || scene?.heading || projectTitle || ("مشهد " + (index + 1))).slice(0, 90);
+    ctx.fillStyle = "#fffaf2"; ctx.font = "bold 32px sans-serif";
+    wrap(ctx, heading, W - 100, 2).forEach((line, n) => ctx.fillText(line, W - 50, 119 + n * 42));
+    const caption = String(scene?.narration || scene?.text || "").slice(0, 400);
+    ctx.fillStyle = "rgba(4,9,15,.80)";
+    ctx.beginPath(); ctx.roundRect(32, 954, W - 64, 226, 22); ctx.fill();
+    ctx.fillStyle = "#fffaf2"; ctx.font = "600 25px sans-serif";
+    wrap(ctx, caption, W - 108, 4).forEach((line, n) => ctx.fillText(line, W - 54, 1003 + n * 38));
+    ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.fillRect(36, 1207, W - 72, 5);
+    ctx.fillStyle = "#e5b96f"; ctx.fillRect(36, 1207, (W - 72) * clamp((index + p) / 6, 0, 1), 5);
+  }
   async function loadImages(files) {
     const urls = [], images = [];
     for (const file of (files || []).slice(0, 6)) {
@@ -173,7 +202,49 @@
     }
     return { images, urls };
   }
-  function recordCanvas(canvas, stream, total, scenes, images, onProgress) {
+
+  async function loadVideoClips(files) {
+    const urls = [], clips = [];
+    const candidates = (files || []).slice(0, 6);
+    for (const file of candidates) {
+      if (!file) continue;
+      const name = String(file.name || "").toLowerCase();
+      if (!(file.type.startsWith("video/") || /\\.(mp4|webm|mov|m4v)$/i.test(name))) {
+        throw new Error("أحد الملفات ليس فيديو. ارفع مقاطع MP4 أو WebM صالحة.");
+      }
+      const url = URL.createObjectURL(file);
+      urls.push(url);
+      const video = document.createElement("video");
+      video.preload = "auto";
+      video.playsInline = true;
+      video.muted = true;
+      video.src = url;
+      await new Promise((resolve, reject) => {
+        if (video.readyState >= 1 && Number.isFinite(video.duration)) return resolve();
+        const ok = () => { clean(); resolve(); };
+        const bad = () => { clean(); reject(new Error("تعذّر فتح أحد مقاطع الفيديو. أعد تنزيله من أداة التوليد بصيغة MP4 أو WebM.")); };
+        const clean = () => { video.removeEventListener("loadedmetadata", ok); video.removeEventListener("error", bad); };
+        video.addEventListener("loadedmetadata", ok, {once:true});
+        video.addEventListener("error", bad, {once:true});
+        video.load();
+      });
+      if (!Number.isFinite(video.duration) || video.duration < 3 || !video.videoWidth || !video.videoHeight) {
+        throw new Error("أحد مقاطع الفيديو أقصر من 3 ثوانٍ أو لا يحتوي على صورة قابلة للقراءة.");
+      }
+      await new Promise((resolve, reject) => {
+        if (video.readyState >= 2) return resolve();
+        const ok = () => { clean(); resolve(); };
+        const bad = () => { clean(); reject(new Error("تعذّر فك ترميز أحد مقاطع الفيديو.")); };
+        const clean = () => { video.removeEventListener("loadeddata", ok); video.removeEventListener("error", bad); };
+        video.addEventListener("loadeddata", ok, {once:true});
+        video.addEventListener("error", bad, {once:true});
+      });
+      clips.push({ video, duration: video.duration });
+    }
+    if (!clips.length) throw new Error("ارفع مقاطع فيديو حقيقية مولدة بالذكاء الاصطناعي أولًا.");
+    return { clips, urls };
+  }
+  function recordCanvas(canvas, stream, total, scenes, images, onProgress, audioSource = null) {
     return new Promise((resolve, reject) => {
       const preferred = "video/webm;codecs=vp9,opus";
       const mime = MediaRecorder.isTypeSupported(preferred) ? preferred :
@@ -191,6 +262,7 @@
         else resolve(blob);
       };
       recorder.start(500);
+      if (audioSource) { try { audioSource.start(0); } catch (_) {} }
       const start = performance.now();
       const frame = () => {
         if (stopped) return;
@@ -208,6 +280,72 @@
         requestAnimationFrame(frame);
       };
       requestAnimationFrame(frame);
+    });
+  }
+
+  async function recordRealVideoClips(canvas, stream, total, clips, scenes, projectTitle, audioSource, speed, onProgress) {
+    const preferred = "video/webm;codecs=vp9,opus";
+    const mime = MediaRecorder.isTypeSupported(preferred) ? preferred :
+      (MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus") ? "video/webm;codecs=vp8,opus" : "video/webm");
+    let recorder;
+    try { recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: BITRATE }); }
+    catch (_) { throw new Error("هذا المتصفح لا يتيح تسجيل الفيديو المركب. افتح مركز الإنتاج في Chrome حديث."); }
+    const chunks = [];
+    return await new Promise((resolve, reject) => {
+      let settled = false, lastProgress = -5, audioStarted = false;
+      const fail = (error) => {
+        if (settled) return;
+        settled = true;
+        try { if (recorder.state !== "inactive") recorder.stop(); } catch (_) {}
+        reject(error instanceof Error ? error : new Error(String(error)));
+      };
+      recorder.ondataavailable = event => { if (event.data && event.data.size) chunks.push(event.data); };
+      recorder.onerror = () => fail(new Error("أوقف المتصفح تسجيل المقاطع. أبقِ الصفحة مفتوحة وأعد المحاولة بملفات أصغر."));
+      recorder.onstop = () => {
+        if (settled) return;
+        settled = true;
+        const blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
+        if (blob.size < 1024) reject(new Error("لم ينتج التسجيل ملف فيديو صالحًا."));
+        else resolve(blob);
+      };
+      (async () => {
+        recorder.start(500);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("تعذّر الرسم على لوحة الفيديو.");
+        const sourceTotal = clips.reduce((sum, clip) => sum + clip.duration, 0);
+        let elapsedBefore = 0;
+        for (let i = 0; i < clips.length; i++) {
+          const clip = clips[i], video = clip.video, scene = scenes[i] || {};
+          const segmentDuration = total * (clip.duration / sourceTotal);
+          video.pause();
+          try { video.currentTime = 0; } catch (_) {}
+          video.playbackRate = speed;
+          const clipStart = performance.now();
+          await video.play();
+          if (!audioStarted && audioSource) { audioSource.start(0); audioStarted = true; }
+          await new Promise((done, frameReject) => {
+            const frame = () => {
+              try {
+                const elapsed = Math.min(segmentDuration, Math.max(0, (performance.now() - clipStart) / 1000));
+                const p = segmentDuration > 0 ? elapsed / segmentDuration : 1;
+                drawRealVideoScene(ctx, video, i, p, scene, projectTitle);
+                const overall = (elapsedBefore + elapsed) / total;
+                const percent = Math.min(68, Math.floor(overall * 68));
+                if (onProgress && percent - lastProgress >= 2) { lastProgress = percent; onProgress(percent); }
+                if (elapsed >= segmentDuration || (video.ended && p > .96)) {
+                  video.pause();
+                  done();
+                } else requestAnimationFrame(frame);
+              } catch (error) { frameReject(error); }
+            };
+            requestAnimationFrame(frame);
+          });
+          elapsedBefore += segmentDuration;
+          video.pause();
+        }
+        if (audioSource && !audioStarted) throw new Error("تعذّر بدء التعليق الصوتي.");
+        try { if (recorder.state !== "inactive") recorder.stop(); } catch (_) {}
+      })().catch(fail);
     });
   }
   async function toMp4(webm, title, hasAudio, onProgress) {
@@ -243,14 +381,16 @@
       return new File([buffer], fileName, { type: "video/mp4" });
     } finally { input.dispose(); if (output) { try { output.dispose(); } catch (_) {} } }
   }
-  async function render({ job, imageFiles = [], audioFile = null, onProgress = null }) {
+
+  async function render({ job, imageFiles = [], videoFiles = [], audioFile = null, onProgress = null }) {
     if (!job || !job.id || !job.script_json) throw new Error("اختر مهمة محفوظة تحتوي على النص والمشاهد أولًا.");
     const scenes = Array.isArray(job.script_json.scenes) ? job.script_json.scenes.slice(0, 6) : [];
     if (!scenes.length) throw new Error("المهمة لا تحتوي على مشاهد محفوظة؛ ولّد النص والمشاهد أولًا.");
     if (typeof MediaRecorder === "undefined") throw new Error("المتصفح لا يدعم تسجيل الفيديو المحلي. استخدم Chrome حديثًا.");
-    const { images, urls } = await loadImages(imageFiles);
     const canvas = document.createElement("canvas"); canvas.width = W; canvas.height = H;
     let audioContext = null, audioSource = null, stream = null;
+    const { images, urls: imageUrls } = await loadImages(imageFiles);
+    let videoUrls = [];
     try {
       let audioBuffer = null;
       if (audioFile) {
@@ -258,22 +398,50 @@
         try { audioBuffer = await audioContext.decodeAudioData(await audioFile.arrayBuffer()); }
         catch (_) { throw new Error("تعذّر قراءة ملف الصوت. استخدم WAV أو MP3 أو M4A صالحًا."); }
       }
-      const total = audioBuffer ? audioBuffer.duration : clamp(Number(job.duration_seconds || job.script_json.target_duration_seconds || 60), 8, 120);
-      if (total > 120) throw new Error("مدة المشروع الصوتية تتجاوز دقيقتين؛ قصّ التعليق إلى مقطعين أقصر.");
-      stream = canvas.captureStream(FPS);
-      if (audioBuffer && audioContext) {
-        const destination = audioContext.createMediaStreamDestination();
+      const realFiles = (videoFiles || []).filter(Boolean).slice(0, 6);
+      if (realFiles.length) {
+        if (realFiles.length !== scenes.length) {
+          throw new Error("للحفاظ على ترتيب القصة، ارفع عدد مقاطع الفيديو نفسه لعدد المشاهد المحفوظة (" + scenes.length + " مقاطع لهذا المشروع).");
+        }
+        if (!audioBuffer) {
+          throw new Error("لضمان وجود كلام عربي وعدم خروج فيديو صامت، أرفق ملف تعليق صوتي عربي WAV أو MP3 أو M4A قبل التجميع.");
+        }
+        if (audioBuffer.duration < 10 || audioBuffer.duration > 120) {
+          throw new Error("مدة التعليق الصوتي يجب أن تكون بين 10 و120 ثانية.");
+        }
+        let sumSquares = 0, sampleCount = 0;
+        for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+          const data = audioBuffer.getChannelData(channel);
+          const stride = Math.max(1, Math.floor(data.length / 20000));
+          for (let i = 0; i < data.length; i += stride) { sumSquares += data[i] * data[i]; sampleCount++; }
+        }
+        if (!sampleCount || Math.sqrt(sumSquares / sampleCount) < 0.0015) {
+          throw new Error("ملف التعليق الصوتي شبه صامت. استخدم تسجيلًا أو تعليقًا عربيًا واضحًا.");
+        }
+        const loaded = await loadVideoClips(realFiles);
+        videoUrls = loaded.urls;
+        const clips = loaded.clips;
+        const sourceDuration = clips.reduce((sum, clip) => sum + clip.duration, 0);
+        const speed = sourceDuration / audioBuffer.duration;
+        if (speed < 0.65 || speed > 1.35) {
+          throw new Error("مجموع مدة المقاطع (" + Math.round(sourceDuration) + " ث) بعيد عن مدة التعليق (" + Math.round(audioBuffer.duration) + " ث). قصّ المقاطع أو عدّل التعليق بحيث تكون النسبة بين 0.65 و1.35.");
+        }
+        const audioDestination = audioContext.createMediaStreamDestination();
         audioSource = audioContext.createBufferSource(); audioSource.buffer = audioBuffer;
-        audioSource.connect(destination); stream.addTrack(destination.stream.getAudioTracks()[0]);
+        audioSource.connect(audioDestination);
+        stream = canvas.captureStream(FPS);
+        stream.addTrack(audioDestination.stream.getAudioTracks()[0]);
+        if (onProgress) onProgress(1);
+        const webm = await recordRealVideoClips(canvas, stream, audioBuffer.duration, clips, scenes, job.topic || job.script_json.title || "ZOZ Pro", audioSource, speed, onProgress);
+        if (onProgress) onProgress(70);
+        return await toMp4(webm, job.topic || job.script_json.title || "ZOZ-Pro-video", true, onProgress);
       }
-      const webm = await recordCanvas(canvas, stream, total, scenes, images, onProgress);
-      if (onProgress) onProgress(70);
-      return await toMp4(webm, job.topic || job.script_json.title || "ZOZ-Pro-video", Boolean(audioBuffer), onProgress);
+      throw new Error("لإنتاج فيديو واقعي قابل للنشر، ارفع مقطعًا مولّدًا بالذكاء الاصطناعي لكل مشهد، مع تعليق صوتي عربي. لن يستبدل المركز ذلك برسوم توضيحية محلية.");
     } finally {
-      if (audioSource) { try { audioSource.stop(); } catch (_) {} }
-      if (stream) stream.getTracks().forEach(t => t.stop());
+      if (audioSource) { try { if (audioSource.context.state === "running") audioSource.stop(); } catch (_) {} }
+      if (stream) stream.getTracks().forEach(track => track.stop());
       if (audioContext) { try { await audioContext.close(); } catch (_) {} }
-      urls.forEach(url => URL.revokeObjectURL(url));
+      for (const url of [...imageUrls, ...videoUrls]) URL.revokeObjectURL(url);
     }
   }
   window.ZOZLocalRenderer = { render };
