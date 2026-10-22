@@ -220,7 +220,7 @@
 
   async function loadVideoClips(files) {
     const urls = [], clips = [];
-    const candidates = (files || []).slice(0, 9);
+    const candidates = (files || []).slice(0, 8);
     for (const file of candidates) {
       if (!file) continue;
       const name = String(file.name || "").toLowerCase();
@@ -403,9 +403,9 @@
   async function render({ job, videoFiles = [], onProgress = null }) {
     if (!job || !job.id || !job.script_json) throw new Error("اختر مهمة محفوظة أولًا.");
     const scenes = Array.isArray(job.script_json.scenes) ? job.script_json.scenes : [];
-    if (scenes.length < 9) throw new Error("المهمة الحالية ليست مجهزة لتسعة مشاهد. لم يبدأ الدمج.");
+    if (scenes.length < 8) throw new Error("المهمة الحالية تحتاج إلى 8 مشاهد على الأقل لدمج 8 مقاطع. لم يبدأ الدمج.");
     const files = Array.from(videoFiles || []).filter(Boolean);
-    if (files.length !== 9) throw new Error("لمنع إنتاج فيديو ناقص، اختر/ارفع 9 مقاطع بالضبط وبالترتيب المطلوب. الموجود الآن: " + files.length + ".");
+    if (files.length !== 8) throw new Error("لمنع إنتاج فيديو ناقص، اختر/ارفع 8 مقاطع بالضبط وبالترتيب المطلوب. الموجود الآن: " + files.length + ".");
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
       if (!(f.type === "video/mp4" || /\.mp4$/i.test(f.name || ""))) {
@@ -526,7 +526,7 @@
       ]);
       if (exitCode !== 0) {
         const detail = (window.__ZOZ_FFMPEG_LOGS || []).slice(-10).join(" ").slice(-500);
-        throw new Error("تعذّر دمج المقاطع دون إعادة ضغط لأن إعدادات الفيديو/الصوت بين المقاطع قد لا تتطابق. لم يُنشأ ملف ناقص ولم تُخفّض الجودة. أعد رفع المقاطع التسعة الأصلية من نفس أداة التوليد. " + detail);
+        throw new Error("تعذّر دمج المقاطع دون إعادة ضغط لأن إعدادات الفيديو/الصوت بين المقاطع قد لا تتطابق. لم يُنشأ ملف ناقص ولم تُخفّض الجودة. أعد رفع المقاطع الثمانية الأصلية من نفس أداة التوليد. " + detail);
       }
       temporaryFiles.push(outputName);
       const outputBytes = await ffmpeg.readFile(outputName);
@@ -537,10 +537,10 @@
       progress(92);
       const finalDuration = await durationOf(outputFile);
       if (finalDuration < expectedDuration * 0.85) {
-        throw new Error("فشل التحقق من مدة الفيديو النهائي: المتوقع قرابة " + Math.round(expectedDuration) + " ثانية، والناتج " + Math.round(finalDuration) + " ثانية. لن أحفظ ملفًا ناقصًا. أعد المحاولة بالمقاطع التسعة.");
+        throw new Error("فشل التحقق من مدة الفيديو النهائي: المتوقع قرابة " + Math.round(expectedDuration) + " ثانية، والناتج " + Math.round(finalDuration) + " ثانية. لن أحفظ ملفًا ناقصًا. أعد المحاولة بالمقاطع الثمانية.");
       }
       if (Math.abs(finalDuration - expectedDuration) > Math.max(4, expectedDuration * 0.15)) {
-        throw new Error("مدة الناتج لا تطابق مجموع مدد المقاطع الأصلية. لم يتم حفظ الناتج؛ تأكد من أن المقاطع التسعة كاملة وصالحة.");
+        throw new Error("مدة الناتج لا تطابق مجموع مدد المقاطع الأصلية. لم يتم حفظ الناتج؛ تأكد من أن المقاطع الثمانية كاملة وصالحة.");
       }
       progress(99);
       return outputFile;
@@ -552,4 +552,4 @@
   }
   window.ZOZLocalRenderer = { render };
 })();
-</script><script src="./studio.js?v=20261022-14"></script><script src="./pwa.js?v=20261022-4"></script></body></html>
+</script><script src="./studio.js?v=20261022-15"></script><script src="./pwa.js?v=20261022-4"></script></body></html>
