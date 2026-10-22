@@ -6,7 +6,7 @@ async function renderLocalMp4(id,target,button){
  const videoInput=card?.querySelector("[data-scene-videos]");
  const audioInput=card?.querySelector("[data-render-audio]");
  const videoSource=card?.querySelector("[data-render-source]")?.value||"google-flow";
- let videoFiles=[...(videoInput?.files||[])].slice(0,9);
+ let videoFiles=[...(videoInput?.files||[])];
  let sourceTool=(videoFiles.length?videoSource:"zoz-pro-local-renderer");
  if(!button){msg(target,"تعذر تحديد زر إنتاج الفيديو. حدّث الصفحة وأعد المحاولة.","bad");return}
  if(!job?.script_json?.scenes?.length){msg(target,"لا توجد مشاهد محفوظة. اضغط «توليد النص والمشاهد» أولًا.","bad");return}
@@ -19,9 +19,8 @@ async function renderLocalMp4(id,target,button){
    if(!videoFiles.length){
      const stored=(state?.assets||[])
        .filter(x=>x.job_id===id&&x.asset_type==="video"&&x.status==="ready"&&x.provider_key===videoSource&&x.source_url)
-       .sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0))
-       .slice(0,9);
-     if(!stored.length) throw Error("لم أعثر على مقاطع محفوظة من المصدر المحدد لهذه المهمة. اختر ملفات الفيديو من الهاتف أو غيّر المصدر.");
+       .sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0));
+     if(stored.length!==9) throw Error("لن يبدأ الدمج من ملفات التخزين لأن العدد ليس 9 بالضبط. وجدت "+stored.length+" مقاطع محفوظة لهذا المصدر والمهمة. ارفع المقاطع التسعة الأصلية معًا في اختيار الملفات؛ لن أخلط مهامًا أو أُنتج فيديو ناقصًا.");
      msg(target,"جارٍ جلب "+stored.length+" مقاطع محفوظة من مركز الإنتاج لتجميعها…","warn");
      videoFiles=[];
      for(let i=0;i<stored.length;i++){
@@ -34,19 +33,17 @@ async function renderLocalMp4(id,target,button){
      }
      sourceTool=videoSource;
    }
-   if(!videoFiles.length) throw Error("لا توجد مقاطع فيديو متاحة للتجميع.");
+   if(videoFiles.length!==9) throw Error("إيقاف آمن: يلزم 9 مقاطع MP4 أصلية بالضبط، والموجود "+videoFiles.length+". لم يبدأ الدمج ولم يُرفع أي ناتج.");
    const file=await window.ZOZLocalRenderer.render({
      job,
-     imageFiles:[...(imageInput?.files||[])].slice(0,6),
      videoFiles,
-     audioFile:audioInput?.files?.[0]||null,
      onProgress:p=>msg(target,"تجميع المشاهد وحفظ MP4 النهائي: "+p+"% — أبقِ الصفحة مفتوحة","warn")
    });
    if(file.type!=="video/mp4"||!file.size)throw Error("لم ينتج محرك الإنتاج ملف MP4 صالحًا.");
-   if(file.size>50*1024*1024)throw Error("حجم MP4 الناتج "+(file.size/1024/1024).toFixed(1)+" ميجابايت ويتجاوز حد التخزين 50 ميجابايت. أعد الإنتاج بمدة أقصر.");
+   if(file.size>50*1024*1024)throw Error("حجم MP4 الناتج "+(file.size/1024/1024).toFixed(1)+" ميجابايت ويتجاوز حد التخزين الحالي 50 ميجابايت. أوقفت الرفع للحفاظ على الجودة الأصلية؛ لم أضغط الفيديو أو أقلل دقته. يلزم رفع حد التخزين في إعدادات Supabase قبل حفظه داخل المركز.");
    msg(target,"2/5 حفظ البرومبت ومصدر الإنتاج مع المهمة…","warn");
    const savedPrompt=job.script_json.original_prompt||job.script_json.script||job.topic;
-   await call(MEDIA,{action:"save_prompt",job_id:id,prompt:savedPrompt,source_tool:sourceTool,notes:"تم تجميع MP4 داخل مركز الإنتاج من "+videoFiles.length+" مقاطع حقيقية من "+videoSource+". "+(videoInput?.files?.length?"المقاطع مختارة من الهاتف.":"المقاطع مسترجعة من التخزين الخاص للمهمة.")+(audioInput?.files?.length?" تم دمج ملف تعليق صوتي عربي مرفوع.":" تم الاحتفاظ بالصوت الأصلي للمقاطع إن وُجد؛ يلزم فحص المعاينة قبل النشر.")});
+   await call(MEDIA,{action:"save_prompt",job_id:id,prompt:savedPrompt,source_tool:sourceTool,notes:"تم تجميع MP4 داخل مركز الإنتاج من "+videoFiles.length+" مقاطع حقيقية من "+videoSource+". "+(videoInput?.files?.length?"المقاطع مختارة من الهاتف.":"المقاطع مسترجعة من التخزين الخاص للمهمة.")+" تم استخدام الدمج دون إعادة ترميز أو إضافة نصوص أو شعارات أو موسيقى؛ افحص الصوت في المعاينة قبل النشر."});
    msg(target,"3/5 طلب مسار رفع آمن إلى التخزين الخاص…","warn");
    const prepared=await call(MEDIA,{action:"prepare_upload",job_id:id,filename:file.name,mime_type:"video/mp4",size:file.size,source_tool:sourceTool});
    const encodedPath=prepared.path.split("/").map(encodeURIComponent).join("/");
