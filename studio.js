@@ -50,7 +50,7 @@ async function renderLocalMp4(id,target,button){
    if(uploadError)throw Error("فشل رفع MP4 إلى Supabase Storage: "+(uploadError.message||"خطأ في الرفع"));
    if(!uploadData)throw Error("لم يؤكد Supabase اكتمال رفع الملف.");
    msg(target,"5/5 التحقق من الملف وربطه بالمهمة…","warn");
-   const final=await call(MEDIA,{action:"finalize_upload",job_id:id,path:prepared.path,mime_type:"video/mp4",size:file.size,filename:file.name,source_tool:sourceTool});
+   const final=await call(MEDIA,{action:"finalize_upload",job_id:id,path:prepared.path,mime_type:"video/mp4",size:file.size,filename:file.name,source_tool:sourceTool,is_final_video:true});
    if(!final.verified_in_storage||!final.job?.video_url)throw Error("رُفع الملف لكن لم ينجح التحقق النهائي من ربطه بالمهمة.");
    msg(target,"نجح الإنتاج: تم حفظ MP4 والتحقق منه وربطه بالمهمة. افتح المعاينة أدناه.","good");
    await refresh();
@@ -89,11 +89,10 @@ $("#intake-form").onsubmit=async e=>{
       const file=files[i],mime="video/mp4";
       msg("#intake-message","رفع الفيديو "+(i+1)+"/"+files.length+": "+file.name+"…");
       const prepared=await call(MEDIA,{action:"prepare_upload",job_id:jobId,filename:file.name,mime_type:mime,size:file.size,source_tool:source});
-      const encodedPath=prepared.path.split("/").map(encodeURIComponent).join("/");
-      const uploadUrl=URL0+"/storage/v1/object/upload/sign/zoz-pro-media/"+encodedPath+"?token="+encodeURIComponent(prepared.token);
-      const uploaded=await fetch(uploadUrl,{method:"PUT",headers:{"content-type":mime,"x-upsert":"true"},body:file});
-      if(!uploaded.ok){const err=await uploaded.text().catch(()=>"");throw Error("فشل رفع "+file.name+" ("+uploaded.status+"). "+err.slice(0,150))}
-      const final=await call(MEDIA,{action:"finalize_upload",job_id:jobId,path:prepared.path,mime_type:mime,size:file.size,filename:file.name,source_tool:source});
+      const {data:uploadData,error:uploadError}=await sb.storage.from("zoz-pro-media").uploadToSignedUrl(prepared.path,prepared.token,file,{contentType:mime});
+      if(uploadError)throw Error("فشل رفع "+file.name+" إلى Supabase Storage: "+uploadError.message);
+      if(!uploadData)throw Error("لم يؤكد Supabase اكتمال رفع الملف "+file.name+".");
+      const final=await call(MEDIA,{action:"finalize_upload",job_id:jobId,path:prepared.path,mime_type:mime,size:file.size,filename:file.name,source_tool:source,is_final_video:false});
       saved.push({name:file.name,url:final.review_url||"",path:prepared.path});
     }
     $("#intake-result").classList.remove("hidden");
