@@ -398,100 +398,154 @@
     } finally { input.dispose(); if (output) { try { output.dispose(); } catch (_) {} } }
   }
 
-  async function render({ job, imageFiles = [], videoFiles = [], audioFile = null, onProgress = null }) {
-    if (!job || !job.id || !job.script_json) throw new Error("اختر مهمة محفوظة تحتوي على النص والمشاهد أولًا.");
-    const scenes = Array.isArray(job.script_json.scenes) ? job.script_json.scenes.slice(0, 9) : [];
-    if (!scenes.length) throw new Error("المهمة لا تحتوي على مشاهد محفوظة؛ ولّد النص والمشاهد أولًا.");
-    if (typeof MediaRecorder === "undefined") throw new Error("المتصفح لا يدعم تسجيل الفيديو المحلي. استخدم Chrome حديثًا.");
-    const canvas = document.createElement("canvas"); canvas.width = W; canvas.height = H;
-    let audioContext = null, audioSource = null, stream = null;
-    const { images, urls: imageUrls } = await loadImages(imageFiles);
-    let videoUrls = [];
+  async function render({ job, videoFiles = [], onProgress = null }) {
+    if (!job || !job.id || !job.script_json) throw new Error("اختر مهمة محفوظة أولًا.");
+    const scenes = Array.isArray(job.script_json.scenes) ? job.script_json.scenes : [];
+    if (scenes.length < 9) throw new Error("المهمة الحالية ليست مجهزة لتسعة مشاهد. لم يبدأ الدمج.");
+    const files = Array.from(videoFiles || []).filter(Boolean);
+    if (files.length !== 9) throw new Error("لمنع إنتاج فيديو ناقص، اختر/ارفع 9 مقاطع بالضبط وبالترتيب المطلوب. الموجود الآن: " + files.length + ".");
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if (!(f.type === "video/mp4" || /\.mp4$/i.test(f.name || ""))) {
+        throw new Error("المقطع رقم " + (i + 1) + " ليس MP4. لم يتم تحويله أو ضغطه.");
+      }
+      if (!f.size) throw new Error("المقطع رقم " + (i + 1) + " فارغ.");
+    }
+    const progress = p => { if (onProgress) onProgress(Math.max(0, Math.min(99, Math.round(p)))); };
+    const durationOf = file => new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const video = document.createElement("video");
+      video.preload = "metadata";
+      video.muted = true;
+      let settled = false;
+      const finish = (ok, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        video.onloadedmetadata = null;
+        video.onerror = null;
+        video.removeAttribute("src");
+        try { video.load(); } catch (_) {}
+        URL.revokeObjectURL(url);
+        ok ? resolve(value) : reject(new Error(value));
+      };
+      const timer = setTimeout(() => finish(false, "انتهت مهلة قراءة مدة أحد المقاطع؛ أعد رفع ملفات MP4 الأصلية."), 20000);
+      video.onloadedmetadata = () => {
+        if (!Number.isFinite(video.duration) || video.duration <= 0) finish(false, "تعذّرت قراءة مدة أحد المقاطع.");
+        else finish(true, video.duration);
+      };
+      video.onerror = () => finish(false, "تعذّر فتح أحد المقاطع للتحقق من المدة.");
+      video.src = url;
+      video.load();
+    });
+    const durations = await Promise.all(files.map(durationOf));
+    const expectedDuration = durations.reduce((sum, d) => sum + d, 0);
+    if (expectedDuration < 20) throw new Error("المدة الإجمالية للمقاطع قصيرة بصورة غير متوقعة؛ لم يبدأ الدمج.");
+    progress(3);
+
+    async function ensureFFmpeg() {
+      if (window.__ZOZ_FFMPEG_INSTANCE?.loaded) return window.__ZOZ_FFMPEG_INSTANCE;
+      if (!window.FFmpegWASM?.FFmpeg) {
+        if (!window.__ZOZ_FFMPEG_SCRIPT_PROMISE) {
+          window.__ZOZ_FFMPEG_SCRIPT_PROMISE = new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = "./ffmpeg-wasm/ffmpeg.js?v=20261022-1";
+            script.async = true;
+            script.onload = () => window.FFmpegWASM?.FFmpeg ? resolve() : reject(new Error("تعذّر تحميل محرك الدمج المحلي."));
+            script.onerror = () => reject(new Error("تعذّر تحميل مكتبة الدمج. تحقق من الإنترنت ثم أعد المحاولة."));
+            document.head.appendChild(script);
+          });
+        }
+        await window.__ZOZ_FFMPEG_SCRIPT_PROMISE;
+      }
+      if (window.__ZOZ_FFMPEG_LOAD_PROMISE) return window.__ZOZ_FFMPEG_LOAD_PROMISE;
+      window.__ZOZ_FFMPEG_LOAD_PROMISE = (async () => {
+        const base = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
+        progress(5);
+        const responses = await Promise.all([
+          fetch(base + "/ffmpeg-core.js", { cache: "force-cache" }),
+          fetch(base + "/ffmpeg-core.wasm", { cache: "force-cache" })
+        ]);
+        if (!responses[0].ok || !responses[1].ok) throw new Error("تعذّر تنزيل محرك الدمج المجاني. لم يتم تعديل المقاطع الأصلية.");
+        const coreBytes = await responses[0].arrayBuffer();
+        progress(8);
+        const wasmBytes = await responses[1].arrayBuffer();
+        const coreURL = URL.createObjectURL(new Blob([coreBytes], { type: "text/javascript" }));
+        const wasmURL = URL.createObjectURL(new Blob([wasmBytes], { type: "application/wasm" }));
+        const instance = new window.FFmpegWASM.FFmpeg();
+        const logs = [];
+        instance.on("log", ({ message }) => {
+          if (message) {
+            logs.push(String(message));
+            if (logs.length > 80) logs.shift();
+          }
+        });
+        instance.on("progress", ({ progress: part }) => progress(12 + (Number(part) || 0) * 76));
+        try {
+          await instance.load({ coreURL, wasmURL });
+        } catch (error) {
+          URL.revokeObjectURL(coreURL);
+          URL.revokeObjectURL(wasmURL);
+          throw new Error("لم يبدأ محرك الدمج على هذا المتصفح. جرّب فتح المركز في Chrome وتأكد من وجود مساحة ذاكرة كافية.");
+        }
+        window.__ZOZ_FFMPEG_LOGS = logs;
+        window.__ZOZ_FFMPEG_RESOURCES = { coreURL, wasmURL };
+        window.__ZOZ_FFMPEG_INSTANCE = instance;
+        progress(12);
+        return instance;
+      })();
+      try {
+        return await window.__ZOZ_FFMPEG_LOAD_PROMISE;
+      } finally {
+        window.__ZOZ_FFMPEG_LOAD_PROMISE = null;
+      }
+    }
+
+    const ffmpeg = await ensureFFmpeg();
+    const temporaryFiles = [];
     try {
-      let audioBuffer = null;
-      if (audioFile) {
-        audioContext = new AudioContext(); await audioContext.resume();
-        try { audioBuffer = await audioContext.decodeAudioData(await audioFile.arrayBuffer()); }
-        catch (_) { throw new Error("تعذّر قراءة ملف الصوت. استخدم WAV أو MP3 أو M4A صالحًا."); }
+      const names = [];
+      for (let i = 0; i < files.length; i++) {
+        const name = "zoz_scene_" + String(i + 1).padStart(2, "0") + ".mp4";
+        progress(14 + ((i + 1) / files.length) * 18);
+        await ffmpeg.writeFile(name, new Uint8Array(await files[i].arrayBuffer()));
+        names.push(name);
+        temporaryFiles.push(name);
       }
-      const realFiles = (videoFiles || []).filter(Boolean).slice(0, 9);
-      if (realFiles.length) {
-        if (realFiles.length > scenes.length) {
-          throw new Error("عدد المقاطع أكبر من عدد المشاهد المحفوظة. استخدم تسعة مقاطع كحد أقصى.");
-        }
-        const renderScenes = scenes.slice(0, realFiles.length).map(scene => ({ ...(scene || {}) }));
-        if (realFiles.length < scenes.length) {
-          const outro = scenes[scenes.length - 1] || {};
-          renderScenes[renderScenes.length - 1].closing = {
-            title: outro.on_screen_text || "الحضارة صنعها الناس أيضًا",
-            narration: outro.narration || "تابعونا لاكتشاف المزيد من تاريخ مصر."
-          };
-        }
-        if (audioBuffer) {
-          if (audioBuffer.duration < 10 || audioBuffer.duration > 120) {
-            throw new Error("مدة التعليق الصوتي يجب أن تكون بين 10 و120 ثانية.");
-          }
-          let sumSquares = 0, sampleCount = 0;
-          for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
-            const data = audioBuffer.getChannelData(channel);
-            const stride = Math.max(1, Math.floor(data.length / 20000));
-            for (let i = 0; i < data.length; i += stride) { sumSquares += data[i] * data[i]; sampleCount++; }
-          }
-          if (!sampleCount || Math.sqrt(sumSquares / sampleCount) < 0.0015) {
-            throw new Error("ملف التعليق الصوتي شبه صامت. استخدم تسجيلًا أو تعليقًا عربيًا واضحًا.");
-          }
-        }
-        const loaded = await loadVideoClips(realFiles);
-        videoUrls = loaded.urls;
-        const clips = loaded.clips;
-        const sourceDuration = clips.reduce((sum, clip) => sum + clip.duration, 0);
-        let speed = 1;
-        let total = sourceDuration;
-        let audioDestination;
-        if (audioBuffer) {
-          speed = sourceDuration / audioBuffer.duration;
-          if (speed < 0.65 || speed > 1.35) {
-            throw new Error("مجموع مدة المقاطع (" + Math.round(sourceDuration) + " ث) بعيد عن مدة التعليق (" + Math.round(audioBuffer.duration) + " ث). قصّ المقاطع أو عدّل التعليق بحيث تكون النسبة بين 0.65 و1.35.");
-          }
-          total = audioBuffer.duration;
-          audioDestination = audioContext.createMediaStreamDestination();
-          audioSource = audioContext.createBufferSource(); audioSource.buffer = audioBuffer;
-          audioSource.connect(audioDestination);
-        } else {
-          audioContext = new AudioContext(); await audioContext.resume();
-          audioDestination = audioContext.createMediaStreamDestination();
-          let routedTracks = 0;
-          for (const clip of clips) {
-            const video = clip.video;
-            video.muted = false; video.volume = 1;
-            try {
-              const source = audioContext.createMediaElementSource(video);
-              const gain = audioContext.createGain(); gain.gain.value = 0;
-              source.connect(gain); gain.connect(audioDestination);
-              clip.audioGain = gain; routedTracks++;
-            } catch (_) {
-              clip.audioGain = null;
-            }
-          }
-          if (!routedTracks) {
-            throw new Error("تعذّر قراءة الصوت الأصلي من مقاطع الفيديو. أرفق تعليقًا صوتيًا عربيًا WAV أو MP3 أو M4A ثم أعد التجميع.");
-          }
-        }
-        stream = canvas.captureStream(FPS);
-        const capturedAudio = audioDestination.stream.getAudioTracks()[0];
-        if (!capturedAudio) throw new Error("لم يتمكن المتصفح من تجهيز مسار الصوت للفيديو النهائي.");
-        stream.addTrack(capturedAudio);
-        if (onProgress) onProgress(1);
-        const webm = await recordRealVideoClips(canvas, stream, total, clips, renderScenes, job.topic || job.script_json.title || "ZOZ Pro", audioSource, speed, onProgress);
-        if (onProgress) onProgress(70);
-        return await toMp4(webm, job.topic || job.script_json.title || "ZOZ-Pro-video", true, onProgress);
+      const listName = "zoz_concat_list.txt";
+      const listContent = names.map(name => "file '" + name + "'").join("\n") + "\n";
+      await ffmpeg.writeFile(listName, new TextEncoder().encode(listContent));
+      temporaryFiles.push(listName);
+      progress(36);
+      const outputName = "zoz_ancient_egypt_final.mp4";
+      const exitCode = await ffmpeg.exec([
+        "-f", "concat", "-safe", "0", "-i", listName,
+        "-map", "0", "-c", "copy", "-movflags", "+faststart", outputName
+      ]);
+      if (exitCode !== 0) {
+        const detail = (window.__ZOZ_FFMPEG_LOGS || []).slice(-10).join(" ").slice(-500);
+        throw new Error("تعذّر دمج المقاطع دون إعادة ضغط لأن إعدادات الفيديو/الصوت بين المقاطع قد لا تتطابق. لم يُنشأ ملف ناقص ولم تُخفّض الجودة. أعد رفع المقاطع التسعة الأصلية من نفس أداة التوليد. " + detail);
       }
-      throw new Error("لإنتاج فيديو واقعي قابل للنشر، ارفع مقطعًا مولّدًا بالذكاء الاصطناعي لكل مشهد، مع تعليق صوتي عربي. لن يستبدل المركز ذلك برسوم توضيحية محلية.");
+      temporaryFiles.push(outputName);
+      const outputBytes = await ffmpeg.readFile(outputName);
+      if (!outputBytes || outputBytes.length < 1024) throw new Error("لم ينتج محرك الدمج ملفًا صالحًا.");
+      const safeTitle = String(job.topic || job.script_json.title || "ZOZ-Pro-video")
+        .replace(/[^\p{L}\p{N}_-]+/gu, "-").slice(0, 48) || "ZOZ-Pro-video";
+      const outputFile = new File([outputBytes], safeTitle + ".mp4", { type: "video/mp4" });
+      progress(92);
+      const finalDuration = await durationOf(outputFile);
+      if (finalDuration < expectedDuration * 0.85) {
+        throw new Error("فشل التحقق من مدة الفيديو النهائي: المتوقع قرابة " + Math.round(expectedDuration) + " ثانية، والناتج " + Math.round(finalDuration) + " ثانية. لن أحفظ ملفًا ناقصًا. أعد المحاولة بالمقاطع التسعة.");
+      }
+      if (Math.abs(finalDuration - expectedDuration) > Math.max(4, expectedDuration * 0.15)) {
+        throw new Error("مدة الناتج لا تطابق مجموع مدد المقاطع الأصلية. لم يتم حفظ الناتج؛ تأكد من أن المقاطع التسعة كاملة وصالحة.");
+      }
+      progress(99);
+      return outputFile;
     } finally {
-      if (audioSource) { try { if (audioSource.context.state === "running") audioSource.stop(); } catch (_) {} }
-      if (stream) stream.getTracks().forEach(track => track.stop());
-      if (audioContext) { try { await audioContext.close(); } catch (_) {} }
-      for (const url of [...imageUrls, ...videoUrls]) URL.revokeObjectURL(url);
+      for (const name of temporaryFiles) {
+        try { await ffmpeg.deleteFile(name); } catch (_) {}
+      }
     }
   }
   window.ZOZLocalRenderer = { render };
