@@ -1,8 +1,24 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SECRET_KEY") || "";
-const PUBLISHABLE_KEY = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || "";
+function defaultKey(envName: string): string {
+  try {
+    const parsed = JSON.parse(Deno.env.get(envName) || "{}");
+    return typeof parsed?.default === "string" ? parsed.default : "";
+  } catch {
+    return "";
+  }
+}
+const SERVICE_KEY =
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+  defaultKey("SUPABASE_SECRET_KEYS") ||
+  Deno.env.get("SUPABASE_SECRET_KEY") ||
+  "";
+const PUBLISHABLE_KEY =
+  Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ||
+  defaultKey("SUPABASE_PUBLISHABLE_KEYS") ||
+  Deno.env.get("SUPABASE_ANON_KEY") ||
+  "";
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
 const OWNER_EMAIL = "hazemnaw48@gmail.com";
@@ -53,7 +69,7 @@ async function connect(u: any) {
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: SELF,
     response_type: "code",
-    scope: "openid email https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly",
+    scope: "https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly",
     access_type: "offline",
     prompt: "consent",
     state,
@@ -84,12 +100,22 @@ async function callback(url: URL) {
   if (!tr.ok || !token.access_token) return fail("Google token exchange failed (" + tr.status + "). Check OAuth redirect URI configuration.", 502);
   // Verify the channel owned/managed by the account that actually consented.
   // A public lookup with an explicit channel id proves existence, not account ownership.
-  const ch = await fetch("https://www.googleapis.com/youtube/v3/channels?part=id,snippet&mine=true&maxResults=50", {
-    headers: { authorization: "Bearer " + token.access_token },
-  });
-  const channel = await ch.json().catch(() => ({}));
-  if (!ch.ok) return fail("Could not verify the YouTube channel for the authorized Google account (HTTP " + ch.status + "). No channel token was saved.", 403);
-  const managedChannel = (channel.items || []).find((x: any) => x.id === CHANNEL_ID);
+  // Verify channel ownership/management by traversing the channels returned for
+  // the consented account. Public id lookup alone is not proof of ownership.
+  let pageToken = "";
+  let managedChannel: any = null;
+  for (let page = 0; page < 20; page++) {
+    const params = new URLSearchParams({ part: "id,snippet", mine: "true", maxResults: "50" });
+    if (pageToken) params.set("pageToken", pageToken);
+    const ch = await fetch("https://www.googleapis.com/youtube/v3/channels?" + params.toString(), {
+      headers: { authorization: "Bearer " + token.access_token },
+    });
+    const channel = await ch.json().catch(() => ({}));
+    if (!ch.ok) return fail("Could not verify the YouTube channel for the authorized Google account (HTTP " + ch.status + "). No channel token was saved.", 403);
+    managedChannel = (channel.items || []).find((x: any) => x.id === CHANNEL_ID) || null;
+    if (managedChannel || !channel.nextPageToken) break;
+    pageToken = String(channel.nextPageToken);
+  }
   if (!managedChannel) return fail("The authorized Google account does not manage the required Hazem Ahmed channel. No channel token was saved.", 403);
   const scopeList = String(token.scope || "").split(" ").filter(Boolean);
   const needed = ["https://www.googleapis.com/auth/youtube.readonly", "https://www.googleapis.com/auth/yt-analytics.readonly"];
