@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <title>ZOZ Pro — تحليلات يوتيوب</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{color-scheme:light;--ink:#142033;--muted:#64748b;--line:#dbe3ef;--blue:#214fd3;--bg:#f2f5fa;--green:#0f7b54;--red:#b42318}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink)}
+    main{max-width:850px;margin:0 auto;padding:18px}.brand{display:flex;align-items:center;gap:12px;margin:4px 0 18px}.logo{width:44px;height:44px;border-radius:13px;background:#101827;color:#fff;display:grid;place-items:center;font-weight:900;font-size:22px}.brand small{display:block;color:var(--muted);margin-top:3px}
+    h1{font-size:25px;margin:8px 0}h2{font-size:19px;margin:0 0 12px}p{line-height:1.8;color:#4b5b73}.card{background:#fff;border:1px solid var(--line);border-radius:17px;padding:18px;margin:14px 0;box-shadow:0 6px 22px #1020390a}
+    label{display:block;font-weight:650;margin:13px 0 7px}input{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;background:#fff;color:var(--ink)}
+    button{width:100%;border:0;border-radius:11px;background:var(--blue);color:white;font:inherit;font-weight:750;padding:13px;margin-top:13px;cursor:pointer}button.secondary{background:#e8eefc;color:#2448a5}button:disabled{opacity:.5;cursor:not-allowed}
+    .status{padding:12px;border-radius:11px;background:#eff4ff;color:#263b61;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:12px}.status.success{background:#eaf8f0;color:var(--green)}.status.error{background:#fff0ef;color:var(--red)}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.metric{border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}.metric small{display:block;color:var(--muted)}.number{font-size:24px;font-weight:850;margin-top:4px}
+    .dates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}table{border-collapse:collapse;width:100%;font-size:13px;min-width:520px}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}th{background:#f7f9fc} .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:11px;margin-top:12px}
+    .hidden{display:none!important}.fine{font-size:12px;color:var(--muted)}a{color:#234bb8}.pill{display:inline-block;font-size:12px;background:#e9eef7;border-radius:999px;padding:5px 9px}
+    @media(max-width:520px){main{padding:12px}.card{padding:15px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.number{font-size:20px}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="brand"><div class="logo">Z</div><div><strong>ZOZ Pro</strong><small>ربط YouTube Analytics — قناة Hazem Ahmed</small></div></div>
+  <h1>لوحة تحليلات يوتيوب</h1>
+  <p>تسجيل دخول آمن عبر Supabase ثم ربط Google لجلب إحصاءات القناة مباشرة. هذه الصفحة للقراءة فقط؛ لا تنشر ولا تعدّل فيديوهات أو إعدادات القناة.</p>
+
+  <section class="card" id="loginCard">
+    <h2>١. تسجيل دخول مالك ZOZ Pro</h2>
+    <label for="email">البريد الإلكتروني</label>
+    <input id="email" type="email" autocomplete="username" value="hazemnaw48@gmail.com" required>
+    <label for="password">كلمة المرور</label>
+    <input id="password" type="password" autocomplete="current-password" placeholder="كلمة مرور حساب ZOZ Pro في Supabase" required>
+    <button id="loginBtn">دخول آمن</button>
+    <div id="loginStatus" class="status">أدخل بيانات حساب المالك المؤكد في Supabase.</div>
+    <button id="logoutBtn" class="secondary hidden">تسجيل الخروج</button>
+  </section>
+
+  <section class="card">
+    <h2>٢. ربط قناة يوتيوب</h2>
+    <p>بعد تسجيل الدخول، اضغط ربط حساب Google ووافق على صلاحيتي القراءة فقط. اختر حساب Google الذي يدير قناة Hazem Ahmed (@hazemelzoz7281).</p>
+    <button id="connectBtn" disabled>ربط حساب Google</button>
+    <div id="connectStatus" class="status">سجّل الدخول أولًا.</div>
+  </section>
+
+  <section class="card">
+    <h2>٣. جلب التحليلات الفعلية</h2>
+    <div class="dates">
+      <div><label for="startDate">من تاريخ</label><input id="startDate" type="date" value="2026-09-27"></div>
+      <div><label for="endDate">إلى تاريخ</label><input id="endDate" type="date" value="2026-10-24"></div>
+    </div>
+    <button id="analyticsBtn" disabled>جلب البيانات المباشرة</button>
+    <div id="analyticsStatus" class="status">يتطلب تسجيل الدخول وموافقة Google أولًا.</div>
+    <div id="metrics" class="grid hidden" style="margin-top:14px"></div>
+    <h2 style="margin-top:18px">البيانات اليومية</h2>
+    <div id="dailyWrap" class="table-wrap hidden"></div>
+    <h2 style="margin-top:18px">مصادر الزيارات اليومية</h2>
+    <div id="trafficWrap" class="table-wrap hidden"></div>
+    <div id="missingWrap" class="status hidden"></div>
+  </section>
+  <p class="fine">المفاتيح السرية لا تُعرض في هذه الصفحة. يتم حفظ رموز Google في جداول خاصة بالخادم بعد التحقق من القناة وصلاحيات القراءة فقط.</p>
+</main>
+<script>
+(function(){
+  "use strict";
+  var SUPABASE_URL = "https://oxyzxbkwhafzaztraowc.supabase.co";
+  var SUPABASE_PUBLISHABLE_KEY = "sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm";
+  var FUNCTION_URL = SUPABASE_URL + "/functions/v1/zoz-pro-youtube-analytics";
+  var CHANNEL_ID = "UCIael48cvwPG3gKj--c7HKw";
+  var OWNER_EMAIL = "hazemnaw48@gmail.com";
+  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: {persistSession:true, autoRefreshToken:true, detectSessionInUrl:true}
+  });
+  function byId(id){return document.getElementById(id);}
+  function status(id,text,kind){var el=byId(id);el.textContent=text;el.className="status"+(kind?" "+kind:"");}
+  function fmt(value){return Number(value||0).toLocaleString("en-US",{maximumFractionDigits:2});}
+  function renderAuth(isOn){
+    byId("connectBtn").disabled=!isOn;
+    byId("analyticsBtn").disabled=!isOn;
+    byId("logoutBtn").classList.toggle("hidden",!isOn);
+    byId("loginBtn").textContent=isOn?"تم تسجيل الدخول":"دخول آمن";
+    byId("password").disabled=isOn;
+    byId("email").disabled=isOn;
+  }
+  async function verifyOwner(session){
+    if(!session||!session.access_token)return false;
+    var userResult=await sb.auth.getUser(session.access_token);
+    var user=userResult.data&&userResult.data.user;
+    if(user && String(user.email||"").toLowerCase()===OWNER_EMAIL && user.email_confirmed_at){return true;}
+    await sb.auth.signOut();
+    throw new Error("هذا الحساب ليس حساب مالك ZOZ Pro المؤكد.");
+  }
+  async function init(){
+    try{
+      var result=await sb.auth.getSession();
+      if(result.data.session && await verifyOwner(result.data.session)){
+        renderAuth(true);status("loginStatus","تم تسجيل الدخول بحساب المالك.", "success");
+      }else{renderAuth(false);}
+    }catch(err){renderAuth(false);status("loginStatus",err.message||"تعذر التحقق من الجلسة.","error");}
+  }
+  byId("loginBtn").addEventListener("click",async function(){
+    var email=byId("email").value.trim(),password=byId("password").value;
+    if(!email||!password){status("loginStatus","أدخل البريد الإلكتروني وكلمة المرور.");return;}
+    byId("loginBtn").disabled=true;status("loginStatus","جارٍ التحقق من الحساب…");
+    try{
+      var result=await sb.auth.signInWithPassword({email:email,password:password});
+      if(result.error)throw result.error;
+      if(!await verifyOwner(result.data.session))throw new Error("تعذر تأكيد حساب المالك.");
+      byId("password").value="";renderAuth(true);status("loginStatus","تم تسجيل الدخول بنجاح.", "success");
+    }catch(err){status("loginStatus",err.message||"فشل تسجيل الدخول. تحقق من كلمة المرور وتأكيد البريد.","error");}
+    finally{byId("loginBtn").disabled=false;}
+  });
+  byId("logoutBtn").addEventListener("click",async function(){
+    await sb.auth.signOut();renderAuth(false);status("loginStatus","تم تسجيل الخروج.");
+    status("connectStatus","سجّل الدخول أولًا.");status("analyticsStatus","يتطلب تسجيل الدخول وموافقة Google أولًا.");
+  });
+  byId("connectBtn").addEventListener("click",async function(){
+    byId("connectBtn").disabled=true;status("connectStatus","جارٍ إنشاء رابط موافقة Google…");
+    try{
+      var sessionResult=await sb.auth.getSession(),session=sessionResult.data.session;
+      if(!session||!await verifyOwner(session))throw new Error("انتهت جلسة الدخول؛ سجّل الدخول مجددًا.");
+      var response=await fetch(FUNCTION_URL+"?action=connect",{method:"POST",headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},body:"{}"});
+      var data=await response.json();
+      if(!response.ok||!data.ok||!data.authorization_url)throw new Error(data.error||"لم يتم إنشاء رابط موافقة Google.");
+      status("connectStatus","سيتم فتح Google للموافقة على القراءة فقط. بعد العودة، اضغط جلب البيانات.","success");
+      window.location.assign(data.authorization_url);
+    }catch(err){status("connectStatus",err.message||"تعذر بدء الربط.","error");byId("connectBtn").disabled=false;}
+  });
+  function makeTable(headers,rows){
+    var table=document.createElement("table"),thead=document.createElement("thead"),tr=document.createElement("tr");
+    headers.forEach(function(h){var th=document.createElement("th");th.textContent=h;tr.appendChild(th);});thead.appendChild(tr);table.appendChild(thead);
+    var tbody=document.createElement("tbody");
+    rows.forEach(function(row){var line=document.createElement("tr");row.forEach(function(cell){var td=document.createElement("td");td.textContent=cell==null?"":String(cell);line.appendChild(td);});tbody.appendChild(line);});
+    table.appendChild(tbody);return table;
+  }
+  byId("analyticsBtn").addEventListener("click",async function(){
+    var start=byId("startDate").value,end=byId("endDate").value;
+    if(!start||!end||start>end){status("analyticsStatus","تحقق من تاريخ البداية والنهاية.","error");return;}
+    byId("analyticsBtn").disabled=true;status("analyticsStatus","جارٍ جلب البيانات المباشرة من YouTube Analytics…");
+    byId("metrics").classList.add("hidden");byId("dailyWrap").classList.add("hidden");byId("trafficWrap").classList.add("hidden");byId("missingWrap").classList.add("hidden");
+    try{
+      var sessionResult=await sb.auth.getSession(),session=sessionResult.data.session;
+      if(!session||!await verifyOwner(session))throw new Error("انتهت الجلسة. سجّل الدخول مجددًا.");
+      var response=await fetch(FUNCTION_URL+"?action=analytics",{method:"POST",headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},body:JSON.stringify({channel_id:CHANNEL_ID,start_date:start,end_date:end})});
+      var data=await response.json();
+      if(!response.ok||!data.ok)throw new Error(data.error||"فشل جلب التحليلات.");
+      var metrics=data.metrics||{},items=[["المشاهدات",metrics.views],["وقت المشاهدة بالساعات",metrics.watch_time_hours],["مشتركون جدد",metrics.subscribers_gained],["مشتركون مفقودون",metrics.subscribers_lost],["صافي المشتركين",metrics.subscribers_net],["متوسط مدة المشاهدة بالثواني",metrics.average_view_duration_seconds_weighted]];
+      var mbox=byId("metrics");mbox.innerHTML="";
+      items.forEach(function(item){var card=document.createElement("div");card.className="metric";var label=document.createElement("small");label.textContent=item[0];var num=document.createElement("div");num.className="number";num.textContent=fmt(item[1]);card.append(label,num);mbox.appendChild(card);});mbox.classList.remove("hidden");
+      var daily=(data.daily||[]).map(function(r){return [r.date,fmt(r.views),fmt(r.estimated_minutes_watched),fmt(r.average_view_duration_seconds),fmt(r.subscribers_gained),fmt(r.subscribers_lost)];});
+      byId("dailyWrap").replaceChildren(makeTable(["التاريخ","المشاهدات","دقائق المشاهدة","متوسط مدة المشاهدة (ث)","مشتركون جدد","مشتركون مفقودون"],daily));byId("dailyWrap").classList.remove("hidden");
+      var traffic=(data.traffic_sources_daily||[]).map(function(r){return [r.date,r.source,fmt(r.views)];});
+      byId("trafficWrap").replaceChildren(makeTable(["التاريخ","مصدر الزيارة","المشاهدات"],traffic));byId("trafficWrap").classList.remove("hidden");
+      var missing=data.missing_dates||[];status("analyticsStatus","نجح جلب بيانات YouTube Analytics مباشرة. الأيام بلا صف يومي: "+missing.length,"success");
+      if(missing.length){byId("missingWrap").textContent="الأيام التي لم يُرجع لها API صفًا يوميًا: "+missing.join("، ");byId("missingWrap").classList.remove("hidden");}
+    }catch(err){status("analyticsStatus",err.message||"تعذر جلب البيانات.","error");}
+    finally{byId("analyticsBtn").disabled=false;}
+  });
+  var params=new URLSearchParams(window.location.search);
+  if(params.get("connected")==="1")status("connectStatus","عاد Google إلى صفحة الربط. جرّب جلب البيانات.","success");
+  if(params.get("oauth_error"))status("connectStatus","لم يكتمل ربط Google: "+params.get("oauth_error"),"error");
+  init();
+})();
+</script>
+</body>
+</html>
