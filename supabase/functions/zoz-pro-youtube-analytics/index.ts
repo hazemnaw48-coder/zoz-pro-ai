@@ -23,12 +23,19 @@ const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
 const OWNER_EMAIL = "hazemnaw48@gmail.com";
 const SELF = SUPABASE_URL + "/functions/v1/zoz-pro-youtube-analytics";
+const CALLBACK_URL = SUPABASE_URL + "/functions/v1/zoz-pro-youtube-oauth-callback";
 const CHANNEL_ID = "UCIael48cvwPG3gKj--c7HKw";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "authorization, apikey, content-type, x-client-info",
+      "access-control-allow-methods": "POST, OPTIONS",
+    },
   });
 }
 function fail(error: string, status = 400) { return json({ ok: false, error }, status); }
@@ -67,80 +74,14 @@ async function connect(u: any) {
   });
   const p = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
-    redirect_uri: SELF,
+    redirect_uri: CALLBACK_URL,
     response_type: "code",
     scope: "https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly",
     access_type: "offline",
     prompt: "consent",
     state,
   });
-  return json({ ok: true, authorization_url: "https://accounts.google.com/o/oauth2/v2/auth?" + p.toString(), redirect_uri: SELF, channel_id_expected: CHANNEL_ID, scopes: ["https://www.googleapis.com/auth/youtube.readonly", "https://www.googleapis.com/auth/yt-analytics.readonly"] });
-}
-async function callback(url: URL) {
-  const state = url.searchParams.get("state") || "";
-  const code = url.searchParams.get("code") || "";
-  const error = url.searchParams.get("error") || "";
-  if (!state) return fail("OAuth state is missing.", 400);
-  const rows = await db("zoz_pro_youtube_oauth_states?state_hash=eq." + await sha(state) + "&consumed_at=is.null&expires_at=gt." + encodeURIComponent(new Date().toISOString()) + "&select=*&limit=1");
-  const st = rows?.[0];
-  if (!st) return fail("OAuth state expired or invalid. Return to ZOZ Pro and reconnect.", 400);
-  // Atomically consume the one-time state to prevent callback replay races.
-  const consumed = await db(
-    "zoz_pro_youtube_oauth_states?state_hash=eq." + st.state_hash + "&consumed_at=is.null&expires_at=gt." + encodeURIComponent(new Date().toISOString()),
-    { method: "PATCH", headers: { prefer: "return=representation" }, body: JSON.stringify({ consumed_at: new Date().toISOString() }) },
-  );
-  if (!Array.isArray(consumed) || consumed.length !== 1) return fail("OAuth state was already consumed or expired. Reconnect from ZOZ Pro.", 400);
-  if (error || !code) return fail("Google authorization was cancelled or denied.", 400);
-  const tr = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ code, client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET, redirect_uri: SELF, grant_type: "authorization_code" }),
-  });
-  const token = await tr.json().catch(() => ({}));
-  if (!tr.ok || !token.access_token) return fail("Google token exchange failed (" + tr.status + "). Check OAuth redirect URI configuration.", 502);
-  // Verify the channel owned/managed by the account that actually consented.
-  // A public lookup with an explicit channel id proves existence, not account ownership.
-  // Verify channel ownership/management by traversing the channels returned for
-  // the consented account. Public id lookup alone is not proof of ownership.
-  let pageToken = "";
-  let managedChannel: any = null;
-  for (let page = 0; page < 20; page++) {
-    const params = new URLSearchParams({ part: "id,snippet", mine: "true", maxResults: "50" });
-    if (pageToken) params.set("pageToken", pageToken);
-    const ch = await fetch("https://www.googleapis.com/youtube/v3/channels?" + params.toString(), {
-      headers: { authorization: "Bearer " + token.access_token },
-    });
-    const channel = await ch.json().catch(() => ({}));
-    if (!ch.ok) return fail("Could not verify the YouTube channel for the authorized Google account (HTTP " + ch.status + "). No channel token was saved.", 403);
-    managedChannel = (channel.items || []).find((x: any) => x.id === CHANNEL_ID) || null;
-    if (managedChannel || !channel.nextPageToken) break;
-    pageToken = String(channel.nextPageToken);
-  }
-  if (!managedChannel) return fail("The authorized Google account does not manage the required Hazem Ahmed channel. No channel token was saved.", 403);
-  const scopeList = String(token.scope || "").split(" ").filter(Boolean);
-  const needed = ["https://www.googleapis.com/auth/youtube.readonly", "https://www.googleapis.com/auth/yt-analytics.readonly"];
-  const youtubeScopes = scopeList.filter((s: string) => s.startsWith("https://www.googleapis.com/auth/youtube") || s.startsWith("https://www.googleapis.com/auth/yt-analytics"));
-  if (!needed.every(s => scopeList.includes(s)) || youtubeScopes.some((s: string) => !needed.includes(s))) {
-    return fail("Google did not grant exactly the required YouTube read-only scopes. No channel token was saved.", 403);
-  }
-  // Preserve a previously stored refresh token if Google omits it on re-consent.
-  const existing = await db("zoz_pro_youtube_analytics_tokens?channel_id=eq." + encodeURIComponent(CHANNEL_ID) + "&owner_id=eq." + encodeURIComponent(st.owner_id) + "&select=refresh_token&limit=1");
-  const refreshToken = token.refresh_token || existing?.[0]?.refresh_token || null;
-  await db("zoz_pro_youtube_analytics_tokens?on_conflict=channel_id", {
-    method: "POST",
-    headers: { prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify({
-      channel_id: CHANNEL_ID,
-      owner_id: st.owner_id,
-      access_token: token.access_token,
-      refresh_token: refreshToken,
-      token_expires_at: new Date(Date.now() + Number(token.expires_in || 3600) * 1000).toISOString(),
-      scopes: scopeList,
-      status: "active",
-      updated_at: new Date().toISOString(),
-    }),
-  });
-  return new Response("<!doctype html><meta charset=utf-8><title>ZOZ Pro</title><main style='font:18px system-ui;max-width:600px;margin:10vh auto;padding:24px'><h2>YouTube read-only authorization complete</h2><p>Return to ZOZ Pro. No video or channel data was changed.</p></main>", { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+  return json({ ok: true, authorization_url: "https://accounts.google.com/o/oauth2/v2/auth?" + p.toString(), redirect_uri: CALLBACK_URL, channel_id_expected: CHANNEL_ID, scopes: ["https://www.googleapis.com/auth/youtube.readonly", "https://www.googleapis.com/auth/yt-analytics.readonly"] });
 }
 async function refreshAccessToken(saved: any) {
   const expiresAt = Date.parse(String(saved.token_expires_at || ""));
@@ -244,10 +185,9 @@ async function report(req: Request) {
   }
 }
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204 });
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "authorization, apikey, content-type, x-client-info", "access-control-allow-methods": "POST, OPTIONS" } });
   const url = new URL(req.url);
-  if (req.method === "GET" && (url.searchParams.has("code") || url.searchParams.has("state") || url.searchParams.has("error"))) return await callback(url);
-  if (req.method !== "POST") return fail("Use POST. OAuth callback is handled by GET.", 405);
+  if (req.method !== "POST") return fail("Use POST. OAuth callback is handled by the separate callback function.", 405);
   const u = await owner(req);
   if (!u) return fail("Owner authentication required.", 401);
   if (url.searchParams.get("action") === "connect") return await connect(u);
