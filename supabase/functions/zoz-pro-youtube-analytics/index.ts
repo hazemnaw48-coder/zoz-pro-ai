@@ -56,7 +56,6 @@ async function connect(u: any) {
     scope: "openid email https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly",
     access_type: "offline",
     prompt: "consent",
-    include_granted_scopes: "true",
     state,
   });
   return json({ ok: true, authorization_url: "https://accounts.google.com/o/oauth2/v2/auth?" + p.toString(), redirect_uri: SELF, channel_id_expected: CHANNEL_ID, scopes: ["https://www.googleapis.com/auth/youtube.readonly", "https://www.googleapis.com/auth/yt-analytics.readonly"] });
@@ -69,7 +68,12 @@ async function callback(url: URL) {
   const rows = await db("zoz_pro_youtube_oauth_states?state_hash=eq." + await sha(state) + "&consumed_at=is.null&expires_at=gt." + encodeURIComponent(new Date().toISOString()) + "&select=*&limit=1");
   const st = rows?.[0];
   if (!st) return fail("OAuth state expired or invalid. Return to ZOZ Pro and reconnect.", 400);
-  await db("zoz_pro_youtube_oauth_states?state_hash=eq." + st.state_hash, { method: "PATCH", headers: { prefer: "return=minimal" }, body: JSON.stringify({ consumed_at: new Date().toISOString() }) });
+  // Atomically consume the one-time state to prevent callback replay races.
+  const consumed = await db(
+    "zoz_pro_youtube_oauth_states?state_hash=eq." + st.state_hash + "&consumed_at=is.null&expires_at=gt." + encodeURIComponent(new Date().toISOString()),
+    { method: "PATCH", headers: { prefer: "return=representation" }, body: JSON.stringify({ consumed_at: new Date().toISOString() }) },
+  );
+  if (!Array.isArray(consumed) || consumed.length !== 1) return fail("OAuth state was already consumed or expired. Reconnect from ZOZ Pro.", 400);
   if (error || !code) return fail("Google authorization was cancelled or denied.", 400);
   const tr = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -78,12 +82,24 @@ async function callback(url: URL) {
   });
   const token = await tr.json().catch(() => ({}));
   if (!tr.ok || !token.access_token) return fail("Google token exchange failed (" + tr.status + "). Check OAuth redirect URI configuration.", 502);
-  const ch = await fetch("https://www.googleapis.com/youtube/v3/channels?part=snippet&id=" + encodeURIComponent(CHANNEL_ID), { headers: { authorization: "Bearer " + token.access_token } });
+  // Verify the channel owned/managed by the account that actually consented.
+  // A public lookup with an explicit channel id proves existence, not account ownership.
+  const ch = await fetch("https://www.googleapis.com/youtube/v3/channels?part=id,snippet&mine=true", {
+    headers: { authorization: "Bearer " + token.access_token },
+  });
   const channel = await ch.json().catch(() => ({}));
-  if (!ch.ok || !channel.items?.some((x: any) => x.id === CHANNEL_ID)) return fail("The authorized Google account did not return the required Hazem Ahmed channel. No channel token was saved.", 403);
+  if (!ch.ok) return fail("Could not verify the YouTube channel for the authorized Google account (HTTP " + ch.status + "). No channel token was saved.", 403);
+  const managedChannel = (channel.items || []).find((x: any) => x.id === CHANNEL_ID);
+  if (!managedChannel) return fail("The authorized Google account does not manage the required Hazem Ahmed channel. No channel token was saved.", 403);
   const scopeList = String(token.scope || "").split(" ").filter(Boolean);
   const needed = ["https://www.googleapis.com/auth/youtube.readonly", "https://www.googleapis.com/auth/yt-analytics.readonly"];
-  if (!needed.every(s => scopeList.includes(s))) return fail("Google did not grant both required read-only scopes. No channel token was saved.", 403);
+  const youtubeScopes = scopeList.filter((s: string) => s.startsWith("https://www.googleapis.com/auth/youtube") || s.startsWith("https://www.googleapis.com/auth/yt-analytics"));
+  if (!needed.every(s => scopeList.includes(s)) || youtubeScopes.some((s: string) => !needed.includes(s))) {
+    return fail("Google did not grant exactly the required YouTube read-only scopes. No channel token was saved.", 403);
+  }
+  // Preserve a previously stored refresh token if Google omits it on re-consent.
+  const existing = await db("zoz_pro_youtube_analytics_tokens?channel_id=eq." + encodeURIComponent(CHANNEL_ID) + "&owner_id=eq." + encodeURIComponent(st.owner_id) + "&select=refresh_token&limit=1");
+  const refreshToken = token.refresh_token || existing?.[0]?.refresh_token || null;
   await db("zoz_pro_youtube_analytics_tokens?on_conflict=channel_id", {
     method: "POST",
     headers: { prefer: "resolution=merge-duplicates,return=minimal" },
@@ -91,7 +107,7 @@ async function callback(url: URL) {
       channel_id: CHANNEL_ID,
       owner_id: st.owner_id,
       access_token: token.access_token,
-      refresh_token: token.refresh_token || null,
+      refresh_token: refreshToken,
       token_expires_at: new Date(Date.now() + Number(token.expires_in || 3600) * 1000).toISOString(),
       scopes: scopeList,
       status: "active",
@@ -99,6 +115,43 @@ async function callback(url: URL) {
     }),
   });
   return new Response("<!doctype html><meta charset=utf-8><title>ZOZ Pro</title><main style='font:18px system-ui;max-width:600px;margin:10vh auto;padding:24px'><h2>YouTube read-only authorization complete</h2><p>Return to ZOZ Pro. No video or channel data was changed.</p></main>", { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+}
+async function refreshAccessToken(saved: any) {
+  const expiresAt = Date.parse(String(saved.token_expires_at || ""));
+  if (Number.isFinite(expiresAt) && expiresAt > Date.now() + 90_000) return saved;
+  if (!saved.refresh_token) throw new Error("Access token expired and no refresh token is available; reconnect through Google consent.");
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) throw new Error("Google OAuth server configuration is incomplete; reconnect is currently unavailable.");
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
+      refresh_token: saved.refresh_token,
+      grant_type: "refresh_token",
+    }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.access_token) {
+    // Do not relay Google's token endpoint body; it can include sensitive details.
+    throw new Error("Google could not refresh the access token (HTTP " + response.status + "); reconnect through the official consent flow.");
+  }
+  const tokenExpiresAt = new Date(Date.now() + Number(result.expires_in || 3600) * 1000).toISOString();
+  const nextRefreshToken = result.refresh_token || saved.refresh_token;
+  await db(
+    "zoz_pro_youtube_analytics_tokens?channel_id=eq." + encodeURIComponent(CHANNEL_ID) + "&owner_id=eq." + encodeURIComponent(saved.owner_id),
+    {
+      method: "PATCH",
+      headers: { prefer: "return=minimal" },
+      body: JSON.stringify({
+        access_token: result.access_token,
+        refresh_token: nextRefreshToken,
+        token_expires_at: tokenExpiresAt,
+        updated_at: new Date().toISOString(),
+      }),
+    },
+  );
+  return { ...saved, access_token: result.access_token, refresh_token: nextRefreshToken, token_expires_at: tokenExpiresAt };
 }
 async function report(req: Request) {
   const u = await owner(req);
@@ -109,12 +162,17 @@ async function report(req: Request) {
   const channelId = String(body.channel_id || CHANNEL_ID);
   if (channelId !== CHANNEL_ID) return fail("This endpoint is restricted to the configured Hazem Ahmed channel.", 403);
   if (!validDate(start) || !validDate(end) || start > end || end > new Date().toISOString().slice(0, 10)) return fail("Provide valid start_date and end_date; end_date cannot be in the future.", 400);
-  const rows = await db("zoz_pro_youtube_analytics_tokens?channel_id=eq." + encodeURIComponent(CHANNEL_ID) + "&owner_id=eq." + encodeURIComponent(u.id) + "&status=eq.active&select=access_token,token_expires_at,scopes&limit=1");
+  const rows = await db("zoz_pro_youtube_analytics_tokens?channel_id=eq." + encodeURIComponent(CHANNEL_ID) + "&owner_id=eq." + encodeURIComponent(u.id) + "&status=eq.active&select=owner_id,access_token,refresh_token,token_expires_at,scopes&limit=1");
   const saved = rows?.[0];
   if (!saved) return fail("ZOZ Pro has no independent OAuth authorization for this channel. Connect YouTube first.", 409);
-  if (Date.parse(saved.token_expires_at) < Date.now() + 60000) return fail("Access token is expired or near expiry. Reconnect through the official Google consent flow; this read endpoint does not refresh or write tokens.", 409);
-  if (!saved.scopes?.includes("https://www.googleapis.com/auth/yt-analytics.readonly")) return fail("The saved authorization lacks YouTube Analytics read-only scope.", 403);
-  const access = saved.access_token;
+  if (!Array.isArray(saved.scopes) || !saved.scopes.includes("https://www.googleapis.com/auth/yt-analytics.readonly") || !saved.scopes.includes("https://www.googleapis.com/auth/youtube.readonly")) return fail("The saved authorization lacks the required YouTube read-only scopes.", 403);
+  let usable;
+  try {
+    usable = await refreshAccessToken(saved);
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : "Token refresh failed; reconnect through Google consent.", 409);
+  }
+  const access = usable.access_token;
   const base = new URL("https://youtubeanalytics.googleapis.com/v2/reports");
   const query = async (metrics: string, dimensions: string) => {
     const p = new URLSearchParams({ ids: "channel==MINE", startDate: start, endDate: end, metrics, dimensions, sort: dimensions === "day" ? "day" : "day,insightTrafficSourceType" });
@@ -137,6 +195,12 @@ async function report(req: Request) {
       return a;
     }, { views: 0, watch_time_minutes: 0, subscribers_gained: 0, subscribers_lost: 0 });
     const avgSeconds = rows.length ? rows.reduce((s: number, r: any[]) => s + Number(r[3] || 0) * Number(r[1] || 0), 0) / Math.max(1, totals.views) : 0;
+    const returnedDays = new Set(rows.map((r: any[]) => String(r[0])));
+    const missingDates: string[] = [];
+    for (let day = Date.parse(start + "T00:00:00Z"), last = Date.parse(end + "T00:00:00Z"); day <= last; day += 86_400_000) {
+      const date = new Date(day).toISOString().slice(0, 10);
+      if (!returnedDays.has(date)) missingDates.push(date);
+    }
     return json({
       ok: true,
       source: "youtube-analytics-api",
@@ -146,8 +210,8 @@ async function report(req: Request) {
       metrics: { ...totals, watch_time_hours: totals.watch_time_minutes / 60, average_view_duration_seconds_weighted: avgSeconds, subscribers_net: totals.subscribers_gained - totals.subscribers_lost },
       daily: rows.map((r: any[]) => ({ date: r[0], views: r[1], estimated_minutes_watched: r[2], average_view_duration_seconds: r[3], subscribers_gained: r[4], subscribers_lost: r[5] })),
       traffic_sources_daily: (traffic.rows || []).map((r: any[]) => ({ date: r[0], source: r[1], views: r[2] })),
-      missing_dates: [],
-      note: "A date absent from daily rows means the API returned no row for that date; no values are synthesized. This endpoint does not write analytics snapshots or refresh tokens.",
+      missing_dates: missingDates,
+      note: "missing_dates identifies dates for which the API returned no daily row; no values are synthesized. Refresh-token rotation may update only the private credential record. No analytics snapshots are written.",
     });
   } catch (e) {
     return fail(e instanceof Error ? e.message : "YouTube Analytics request failed.", 502);
