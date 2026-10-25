@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101827">
+<title>ZOZ Pro — إدارة قناة Hazem Ahmed</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{color-scheme:dark;--bg:#0c1422;--panel:#121f31;--line:#2b3c53;--text:#eef4ff;--muted:#a9bad0;--accent:#80a9ff;--good:#50d5a0;--warn:#ffca70;--bad:#ff8989}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#0b1422,#101c2d);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:1000px;margin:auto;padding:16px}header{padding:12px 0 20px}h1{font-size:clamp(25px,5vw,36px);margin:0 0 6px}h2{font-size:21px;margin:0 0 12px}h3{font-size:17px;margin:0 0 8px}p{color:var(--muted);margin:6px 0 12px}.small{font-size:13px;color:var(--muted)}.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}.row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#26364c;color:var(--muted);font-size:13px}.pill.good{background:#153f35;color:var(--good)}.pill.warn{background:#49371d;color:var(--warn)}.pill.bad{background:#4b252a;color:var(--bad)}label{display:block;font-weight:650;margin:12px 0 5px}input,textarea,select{width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:12px;font:inherit}textarea{min-height:105px;resize:vertical}button,.linkbtn{display:inline-block;border:0;border-radius:10px;background:#416fe0;color:white;padding:11px 15px;font:inherit;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;margin:4px 0}button.secondary,.linkbtn.secondary{background:#263954;color:#eaf1ff}button:disabled{opacity:.5;cursor:not-allowed}.notice{padding:12px;border-radius:10px;background:#182a43;border:1px solid #314762;white-space:pre-wrap;overflow-wrap:anywhere}.notice.good{border-color:#27745d;color:var(--good)}.notice.warn{border-color:#806031;color:var(--warn)}.notice.bad{border-color:#84434b;color:var(--bad)}.hidden{display:none!important}.tabs{display:flex;gap:6px;overflow-x:auto;padding:6px 0}.tabs button{white-space:nowrap}.tabs button.active{background:#80a9ff;color:#091321}.video{display:grid;grid-template-columns:125px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.video:last-child{border-bottom:0}.video img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:#25364b}.video h3{overflow-wrap:anywhere}.stats{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:13px}.tablewrap{overflow:auto;max-width:100%}table{border-collapse:collapse;width:100%;min-width:530px;font-size:14px}th,td{padding:9px;border:1px solid var(--line);text-align:right;white-space:nowrap}th{background:#1a2b42}a{color:var(--accent)}.footer{padding:16px 0 30px;color:var(--muted);font-size:13px}@media(max-width:450px){main{padding:10px}.card{padding:12px}.video{grid-template-columns:95px 1fr}.video h3{font-size:15px}}
+</style>
+</head>
+<body><main>
+<header>
+  <div class="row"><div><div class="pill">ZOZ Pro · تحكم مباشر عبر Supabase</div><h1>إدارة قناة Hazem Ahmed</h1><p>ربط القناة، قراءة التحليلات، ومراجعة العناوين والأوصاف. لا يتم النشر العام تلقائيًا.</p></div><a class="linkbtn secondary" href="./index.html">العودة إلى مركز الإنتاج</a></div>
+</header>
+<section class="card" id="login-card">
+  <h2>1. تسجيل دخول المالك</h2>
+  <p>استخدم حساب مالك ZOZ Pro المؤكد. كلمة المرور تدخل في نموذج Supabase الآمن ولا تُرسل إلى المحادثة.</p>
+  <label for="email">البريد الإلكتروني</label><input id="email" type="email" autocomplete="username" value="hazemnaw48@gmail.com">
+  <label for="password">كلمة المرور</label><input id="password" type="password" autocomplete="current-password">
+  <div class="row"><button id="login">تسجيل الدخول</button><button id="logout" class="secondary hidden">تسجيل الخروج</button><span id="login-pill" class="pill">غير متصل</span></div>
+  <div id="login-msg" class="notice">سجّل الدخول لبدء فحص الربط.</div>
+</section>
+<div id="workspace" class="hidden">
+  <section class="card">
+    <div class="row"><h2>2. حالة الربط</h2><button id="refresh" class="secondary">تحديث الحالة</button></div>
+    <div id="channel-status" class="notice">جارٍ فحص الحالة…</div>
+    <p class="small">القناة المستهدفة محددة بمعرّفها لمنع تعديل قناة أخرى عن طريق الخطأ: <b dir="ltr">UCIael48cvwPG3gKj--c7HKw</b></p>
+    <button id="connect-youtube">ربط قناة Hazem Ahmed عبر Google</button>
+    <details><summary>إعداد الربط لأول مرة</summary>
+      <p>إذا ظهر أن بيانات OAuth غير موجودة، أضف في Supabase → Edge Functions → Secrets القيمتين <b dir="ltr">GOOGLE_CLIENT_ID</b> و<b dir="ltr">GOOGLE_CLIENT_SECRET</b> اللتين تنشئهما في مشروع OAuth الخاص بك. لا تضع السر في هذه الصفحة أو في GitHub.</p>
+      <p>عنوان إعادة التوجيه الذي يجب تسجيله حرفيًا في إعداد عميل OAuth:</p>
+      <div class="notice" dir="ltr">https://vjnwojrqduoxhetutxrs.supabase.co/functions/v1/zoz-pro-studio</div>
+      <p class="small">لا تفعّل الفوترة أو تضف بطاقة من أجل هذا الإعداد. إذا طُلبت منك الفوترة، توقّف ولا تتابع. يلزم وجود إعداد OAuth صالح قبل اكتمال الربط المباشر.</p>
+      <p><a href="https://supabase.com/dashboard/project/vjnwojrqduoxhetutxrs/functions/secrets" target="_blank" rel="noreferrer">فتح أسرار وظائف Supabase ↗</a></p>
+    </details>
+  </section>
+  <nav class="tabs" aria-label="أقسام الإدارة">
+    <button class="active" data-view="videos">الفيديوهات</button>
+    <button data-view="analytics">التحليلات</button>
+    <button data-view="edit">تحرير البيانات</button>
+  </nav>
+  <section class="card" id="view-videos">
+    <div class="row"><h2>3. فيديوهات القناة</h2><button id="load-videos">تحميل أحدث الفيديوهات</button></div>
+    <p>يعرض الفيديوهات المرتبطة بالقناة المتصلة مباشرة بـ Supabase. الإحصاءات الظاهرة على مستوى الفيديو تعتمد على ما تسمح به واجهة YouTube.</p>
+    <div id="videos-msg" class="notice">اربط القناة المباشرة ثم حمّل الفيديوهات.</div>
+    <div id="videos-list"></div>
+  </section>
+  <section class="card hidden" id="view-analytics">
+    <h2>4. تحليلات القناة</h2>
+    <div class="grid">
+      <div><label for="start-date">من تاريخ</label><input id="start-date" type="date"></div>
+      <div><label for="end-date">إلى تاريخ</label><input id="end-date" type="date"></div>
+    </div>
+    <button id="load-analytics">جلب التحليلات</button>
+    <div id="analytics-msg" class="notice">اختر الفترة ثم اطلب التقرير.</div>
+    <div id="analytics-results"></div>
+    <div id="revenue-results"></div>
+  </section>
+  <section class="card hidden" id="view-edit">
+    <h2>5. تحرير عنوان ووصف الفيديو</h2>
+    <p>اختر فيديو من القائمة. لن يُحفظ أي تعديل قبل الضغط على زر الحفظ وتأكيد المراجعة.</p>
+    <div id="selected-video" class="notice">اختر «تحرير» بجوار فيديو أولًا.</div>
+    <form id="edit-form">
+      <input id="video-id" type="hidden">
+      <label for="video-title">العنوان (حتى 100 حرف)</label><input id="video-title" maxlength="100" required>
+      <label for="video-description">الوصف (حتى 5000 حرف)</label><textarea id="video-description" maxlength="5000"></textarea>
+      <label for="video-tags">الوسوم — افصل بينها بفاصلة</label><input id="video-tags" placeholder="مصر القديمة، تاريخ مصر، الحضارة المصرية">
+      <label for="category">فئة YouTube</label><select id="category"><option value="27">تعليم</option><option value="22">أشخاص ومدونات</option><option value="24">ترفيه</option><option value="28">علوم وتقنية</option></select>
+      <button id="save-video" type="submit">مراجعة وحفظ التعديلات</button>
+    </form>
+    <div id="edit-msg" class="notice">لم يتم تغيير أي فيديو حتى الآن.</div>
+  </section>
+</div>
+<div class="footer">مركز الإدارة لا يضمن زيادة المشاهدات أو الأرباح تلقائيًا. تستخدم التحليلات لتحديد ما يحتاج إلى تحسين؛ جميع التعديلات والنشر تظل خاضعة لمراجعتك.</div>
+</main>
+<script>
+(function(){
+'use strict';
+var URL='https://vjnwojrqduoxhetutxrs.supabase.co';
+var KEY='sb_publishable_h0eas8ulCa_7zdrt3OvFGA_6aeAuxSw';
+var API=URL+'/functions/v1/zoz-pro-studio';
+var OWNER='hazemnaw48@gmail.com';
+var TARGET='UCIael48cvwPG3gKj--c7HKw';
+var sb=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+var $=function(id){return document.getElementById(id);};
+var allChannels=[],videos=[],selected=null;
+function note(id,text,kind){var el=$(id);if(!el)return;el.textContent=text;el.className='notice'+(kind?' '+kind:'');}
+function escapeHtml(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('logout').classList.toggle('hidden',!on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'متصل':'غير متصل';$('login-pill').className='pill '+(on?'good':'');}
+async function verifyOwner(){
+ var r=await sb.auth.getSession(),s=r.data&&r.data.session;
+ if(!s||!s.access_token)throw new Error('انتهت الجلسة. سجّل الدخول من جديد.');
+ var u=await sb.auth.getUser(s.access_token),user=u.data&&u.data.user;
+ if(!user||String(user.email||'').toLowerCase()!==OWNER||!user.email_confirmed_at){await sb.auth.signOut();throw new Error('يلزم تسجيل الدخول بحساب مالك ZOZ Pro المؤكد.');}
+ return s;
+}
+async function request(action,body,method){
+ var s=await verifyOwner(),m=method||'POST',headers={apikey:KEY,Authorization:'Bearer '+s.access_token};
+ if(m!=='GET')headers['Content-Type']='application/json';
+ var r=await fetch(API+(action?'?action='+encodeURIComponent(action):''),{method:m,headers:headers,body:m==='GET'?undefined:JSON.stringify(Object.assign({action:action},body||{})),cache:'no-store'});
+ var d=await r.json().catch(function(){return {};});
+ if(!r.ok||d.ok===false)throw new Error(d.error||d.message||('فشل الطلب HTTP '+r.status));
+ return d;
+}
+function activeChannel(){return allChannels.find(function(c){return c.platform==='youtube'&&c.channel_id===TARGET&&c.direct_supabase_oauth===true;})||null;}
+function renderChannelStatus(data){
+ allChannels=data.channels||[];
+ var c=activeChannel();
+ var integrations=data.integrations||[],oauth=integrations.find(function(x){return x.provider_key==='youtube';});
+ if(c){
+   note('channel-status','تم العثور على ربط مباشر للقناة المطلوبة.\nالقناة: '+(c.display_name||'Hazem Ahmed')+' · '+(c.handle||TARGET)+'\nالحالة: '+(c.connection_status||'connected')+'\nصلاحيات ممنوحة: '+((c.scopes||[]).join(', ')||'غير معروضة'), 'good');
+   $('load-videos').disabled=false;$('load-analytics').disabled=false;
+ }else{
+   var reason=oauth&&oauth.last_error?oauth.last_error:'لم يُعثر على رمز OAuth مباشر لهذه القناة في Supabase.';
+   note('channel-status','الربط المباشر غير مكتمل.\n'+reason+'\nالقنوات المسجلة من vidIQ لا تكفي وحدها للتحكم المباشر عبر Supabase. اضغط ربط Google بعد إعداد أسرار OAuth.', 'warn');
+   $('load-videos').disabled=true;$('load-analytics').disabled=true;
+ }
+}
+async function refreshStatus(){
+ note('channel-status','جارٍ فحص القنوات والتفويض…');
+ try{var d=await request('status',{},'GET');renderChannelStatus(d);}
+ catch(e){note('channel-status',e.message,'bad');}
+}
+function pickVideo(id){
+ var v=videos.find(function(x){return x.id===id;});if(!v)return;selected=v;
+ $('video-id').value=v.id;$('video-title').value=v.title||'';$('video-description').value=v.description||'';$('video-tags').value=(v.tags||[]).join(', ');$('category').value=String(v.categoryId||'27');
+ $('selected-video').textContent='الفيديو المحدد: '+v.title+'\nمعرّف الفيديو: '+v.id;
+ document.querySelectorAll('[data-view]').forEach(function(b){b.classList.toggle('active',b.dataset.view==='edit');});
+ ['videos','analytics','edit'].forEach(function(k){$('view-'+k).classList.toggle('hidden',k!=='edit');});
+ note('edit-msg','راجع العنوان والوصف والوسوم قبل الحفظ.');
+}
+function renderVideos(){
+ var list=$('videos-list');
+ if(!videos.length){list.innerHTML='';note('videos-msg','لم يُرجع YouTube فيديوهات لهذه القناة في الطلب الحالي.','warn');return;}
+ note('videos-msg','تم تحميل '+videos.length+' فيديو. اختر «تحرير البيانات» عند الفيديو المطلوب.','good');
+ list.innerHTML=videos.map(function(v){
+  var thumb=v.thumbnailUrl||'';
+  return '<article class="video"><div>'+(thumb?'<img src="'+escapeHtml(thumb)+'" alt="">':'<div class="notice">بدون صورة</div>')+'</div><div><h3>'+escapeHtml(v.title)+'</h3><div class="stats"><span>المشاهدات: '+Number(v.viewCount||0).toLocaleString('ar-EG')+'</span><span>الإعجابات: '+Number(v.likeCount||0).toLocaleString('ar-EG')+'</span><span>التعليقات: '+Number(v.commentCount||0).toLocaleString('ar-EG')+'</span></div><p class="small">الخصوصية: '+escapeHtml(v.privacyStatus||'غير معروف')+' · '+escapeHtml(v.publishedAt||'')+'</p><a href="https://www.youtube.com/watch?v='+encodeURIComponent(v.id)+'" target="_blank" rel="noreferrer">فتح الفيديو</a> · <button class="secondary" data-edit="'+escapeHtml(v.id)+'">تحرير البيانات</button></div></article>';
+ }).join('');
+ list.querySelectorAll('[data-edit]').forEach(function(b){b.addEventListener('click',function(){pickVideo(b.dataset.edit);});});
+}
+function tableHtml(headers,rows){
+ if(!headers||!headers.length||!rows||!rows.length)return '<p class="small">لا توجد صفوف متاحة لهذا التقرير.</p>';
+ return '<div class="tablewrap"><table><thead><tr>'+headers.map(function(h){return '<th>'+escapeHtml(h.name||h)+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(row){return '<tr>'+row.map(function(cell){return '<td>'+escapeHtml(cell==null?'—':cell)+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table></div>';
+}
+$('login').addEventListener('click',async function(){
+ $('login').disabled=true;note('login-msg','جارٍ التحقق من الحساب…');
+ try{
+  var r=await sb.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});
+  if(r.error)throw r.error;
+  await verifyOwner();$('password').value='';setSigned(true);note('login-msg','تم تسجيل الدخول بحساب المالك.','good');await refreshStatus();
+ }catch(e){note('login-msg',e.message||'تعذر تسجيل الدخول.','bad');}
+ finally{$('login').disabled=false;}
+});
+$('logout').addEventListener('click',async function(){await sb.auth.signOut();setSigned(false);note('login-msg','تم تسجيل الخروج.');});
+$('connect-youtube').addEventListener('click',async function(){
+ $('connect-youtube').disabled=true;note('channel-status','جارٍ إعداد رابط موافقة Google…');
+ try{var d=await request('oauth_start',{platform:'youtube'});if(!d.url)throw new Error('لم يرجع رابط OAuth.');window.location.href=d.url;}
+ catch(e){note('channel-status',e.message,'bad');$('connect-youtube').disabled=false;}
+});
+$('refresh').addEventListener('click',refreshStatus);
+$('load-videos').addEventListener('click',async function(){
+ var c=activeChannel();if(!c){note('videos-msg','اربط قناة Hazem Ahmed مباشرة أولًا.','warn');return;}
+ $('load-videos').disabled=true;note('videos-msg','جارٍ تحميل أحدث الفيديوهات…');
+ try{var d=await request('youtube_videos',{channel_id:c.channel_id});videos=d.videos||[];renderVideos();}
+ catch(e){note('videos-msg',e.message,'bad');}
+ finally{$('load-videos').disabled=false;}
+});
+$('load-analytics').addEventListener('click',async function(){
+ var c=activeChannel();if(!c){note('analytics-msg','اربط قناة Hazem Ahmed مباشرة أولًا.','warn');return;}
+ var start=$('start-date').value,end=$('end-date').value;if(!start||!end||start>end){note('analytics-msg','اختر تاريخ بداية ونهاية صحيحين.','bad');return;}
+ $('load-analytics').disabled=true;note('analytics-msg','جارٍ طلب بيانات YouTube Analytics…');$('analytics-results').innerHTML='';$('revenue-results').innerHTML='';
+ try{
+  var d=await request('youtube_analytics',{channel_id:c.channel_id,start_date:start,end_date:end});
+  var a=d.activity||{},rv=d.revenue||{};
+  $('analytics-results').innerHTML='<h3>المشاهدات ووقت المشاهدة</h3>'+tableHtml(a.columnHeaders,a.rows);
+  $('revenue-results').innerHTML='<h3>الإيرادات (إذا كانت القناة مؤهلة وتسمح الصلاحيات)</h3>'+(rv.columnHeaders?tableHtml(rv.columnHeaders,rv.rows):'<p>'+escapeHtml(d.revenue_note||'بيانات الإيرادات غير متاحة لهذا الحساب.')+'</p>');
+  note('analytics-msg','اكتمل طلب التحليلات للفترة '+start+' إلى '+end+'.','good');
+ }catch(e){note('analytics-msg',e.message,'bad');}
+ finally{$('load-analytics').disabled=false;}
+});
+$('edit-form').addEventListener('submit',async function(e){
+ e.preventDefault();var c=activeChannel(),id=$('video-id').value,title=$('video-title').value.trim(),description=$('video-description').value,tags=$('video-tags').value.split(',').map(function(x){return x.trim();}).filter(Boolean),categoryId=$('category').value;
+ if(!c){note('edit-msg','اربط قناة Hazem Ahmed مباشرة أولًا.','warn');return;}
+ if(!id||!title){note('edit-msg','اختر فيديو وأدخل عنوانًا صالحًا.','bad');return;}
+ if(!window.confirm('تأكيد حفظ العنوان والوصف والوسوم للفيديو المحدد؟ لن يتغير ملف الفيديو نفسه.'))return;
+ $('save-video').disabled=true;note('edit-msg','جارٍ التحقق من الصلاحيات وحفظ التعديلات…');
+ try{
+  var d=await request('youtube_update_metadata',{channel_id:c.channel_id,video_id:id,title:title,description:description,tags:tags,categoryId:categoryId});
+  var updated=d.video||{};videos=videos.map(function(v){return v.id===id?Object.assign({},v,{title:updated.title||title,description:updated.description||description,tags:updated.tags||tags,categoryId:categoryId}):v;});
+  renderVideos();note('edit-msg','تم حفظ بيانات الفيديو فقط. لم يتم رفع فيديو جديد أو تغيير الخصوصية أو النشر العام.','good');
+ }catch(err){note('edit-msg',err.message,'bad');}
+ finally{$('save-video').disabled=false;}
+});
+document.querySelectorAll('[data-view]').forEach(function(b){b.addEventListener('click',function(){
+ var k=b.dataset.view;document.querySelectorAll('[data-view]').forEach(function(x){x.classList.toggle('active',x===b);});
+ ['videos','analytics','edit'].forEach(function(x){$('view-'+x).classList.toggle('hidden',x!==k);});
+});});
+function dateStr(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+var today=new Date();$('end-date').value=dateStr(today);var first=new Date(today);first.setDate(first.getDate()-27);$('start-date').value=dateStr(first);
+(async function init(){
+ try{var r=await sb.auth.getSession();if(r.data&&r.data.session){await verifyOwner();setSigned(true);note('login-msg','استعيدت جلسة المالك بأمان.','good');await refreshStatus();}else{setSigned(false);}}
+ catch(e){await sb.auth.signOut();setSigned(false);note('login-msg',e.message,'bad');}
+})();
+})();
+</script>
+</body></html>
