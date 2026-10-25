@@ -1,38 +1,47 @@
-# ZOZ Pro YouTube Analytics — isolated draft
+# ZOZ Pro YouTube Analytics — isolated read-only bridge
 
-This branch contains an un-deployed, read-only integration draft for the single owned channel
+This branch contains an isolated integration for the single managed channel
 `UCIael48cvwPG3gKj--c7HKw` (Hazem Ahmed / `@hazemelzoz7281`).
 
 ## Files
-- `supabase/functions/zoz-pro-youtube-analytics/index.ts`: independent OAuth and analytics read endpoint.
-- `supabase/migrations/20261025120000_zoz_pro_youtube_analytics_oauth.sql`: isolated token/state schema proposal.
+- `supabase/functions/zoz-pro-youtube-analytics/index.ts`: owner-authenticated OAuth connect and date-scoped Analytics read endpoint.
+- `supabase/migrations/20261025120000_zoz_pro_youtube_analytics_oauth.sql`: isolated private token/state schema.
+- This document: deployment and verification checklist.
 
-## Not deployed
-No production or preview function, database schema, secret, or token was changed by this branch. The function cannot work until the migration is reviewed/applied and the Google OAuth client is configured in the *production ZOZ Pro* Supabase project.
+## Deployment status
+This branch is not deployed. No production or preview database schema, function, secret, token, video, or analytics snapshot was changed as part of the code review. Production must be inspected again immediately before any migration or deployment.
 
-## Required server-side Supabase Edge Function secrets
+## Required server-side secrets in the production Supabase project
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
-- existing `SUPABASE_URL`
-- `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`)
-- `SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_ANON_KEY`)
+- `SUPABASE_URL`
+- `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_PUBLISHABLE_KEY` or `SUPABASE_ANON_KEY`
 
-Do not copy any ZOZ AI token or secret into ZOZ Pro. Deploy the function with JWT verification disabled at the platform gateway so Google's callback can reach it; the function itself validates the owner JWT on both POST actions. Register the exact callback URI
+Never copy ZOZ AI / Upload-Post credentials into ZOZ Pro. Never expose these values in browser code or logs.
+
+## Google OAuth client setup
+Register this exact authorized redirect URI on the Google OAuth client used by ZOZ Pro:
 `https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-youtube-analytics`
-in the Google OAuth client. Use only the scopes `youtube.readonly` and `yt-analytics.readonly`.
-Do not add the monetary scope unless the owner explicitly requests revenue analytics.
+
+Request only:
+- `https://www.googleapis.com/auth/youtube.readonly`
+- `https://www.googleapis.com/auth/yt-analytics.readonly`
+
+The handler requests `openid email` only to support Google consent metadata; it does not treat email identity or a public channel lookup as proof of channel ownership. The OAuth callback checks `channels.list(mine=true)` using the newly granted access token and requires the target channel ID to be in the managed-channel response before saving credentials.
 
 ## Request flow
-1. Authenticated owner sends POST to `?action=connect`; response contains the official Google consent URL.
-2. User grants consent to the read-only scopes.
-3. Google returns to the function callback; code verifies the requested channel ID and granted scopes before storing a token.
-4. Authenticated owner sends POST JSON to `?action=analytics` with `channel_id`, `start_date`, and `end_date`.
-5. Function queries YouTube Analytics API and returns daily rows, period totals, and traffic sources by date. The analytics request does not refresh or write tokens or snapshots.
+1. The confirmed ZOZ Pro owner sends authenticated POST to `?action=connect`; response contains Google's official consent URL.
+2. The owner completes Google consent in the browser.
+3. The callback consumes a short-lived one-time state, exchanges the code, verifies the target channel through `mine=true`, verifies the read-only scopes, and then stores the credential in the private table.
+4. The owner sends authenticated POST to `?action=analytics` with `channel_id`, `start_date`, and `end_date`.
+5. The handler returns daily metrics and traffic-source rows directly from YouTube Analytics API, with dates absent from returned daily rows listed in `missing_dates`. It does not store analytics snapshots or invoke video-write/publishing APIs.
 
-## Security/limitations before deployment
-- This is a draft and has not been type-checked, deployed, or live-tested.
-- Verify Supabase project secrets and owner auth configuration before use.
-- The function stores a refresh token if Google returns one, but deliberately does not refresh tokens during an analytics request. If the access token expires, reconnect through the consent flow.
-- Validate Google OAuth consent-screen configuration and redirect URI exactly.
-- The endpoint intentionally refuses other channel IDs and does not call YouTube Data API write methods.
-- Do not apply this migration to production or deploy this function without reviewing the diff and confirming the owner approves the configuration change.
+## Security review notes
+- The function must be deployed with gateway JWT verification disabled so Google's GET callback can reach it; the function itself validates the confirmed ZOZ Pro owner JWT on both POST actions. The OAuth state is hashed, short-lived, bound to the initiating owner, and consumed atomically.
+- The OAuth callback checks managed-channel ownership and exact YouTube/Analytics read-only scopes before persisting tokens. No channel token is saved if the target channel or required scopes are missing.
+- If Google omits a new refresh token during re-consent, the callback preserves the existing refresh token for the same channel and owner.
+- Analytics requests refresh the access token when near expiry, update only the private credential record, and never return credentials. If refresh fails, reconnect through the official consent flow.
+- The SQL migration enables RLS and revokes table access from anon/authenticated roles; only the server-side privileged function should access these tables.
+- This draft has not been type-checked, deployed, or live-tested. Review database permissions, secrets, OAuth consent-screen configuration, callback URI, and the exact deployed function version before calling the integration production-ready.
+- No PR merge, production migration, deployment, secret configuration, or live Analytics request is implied by this source review.
