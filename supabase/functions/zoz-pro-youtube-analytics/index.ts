@@ -84,7 +84,7 @@ async function callback(url: URL) {
   if (!tr.ok || !token.access_token) return fail("Google token exchange failed (" + tr.status + "). Check OAuth redirect URI configuration.", 502);
   // Verify the channel owned/managed by the account that actually consented.
   // A public lookup with an explicit channel id proves existence, not account ownership.
-  const ch = await fetch("https://www.googleapis.com/youtube/v3/channels?part=id,snippet&mine=true", {
+  const ch = await fetch("https://www.googleapis.com/youtube/v3/channels?part=id,snippet&mine=true&maxResults=50", {
     headers: { authorization: "Bearer " + token.access_token },
   });
   const channel = await ch.json().catch(() => ({}));
