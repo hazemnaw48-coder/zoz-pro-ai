@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-const SERVICE_KEY = Deno.env.get("SUPABASE_SECRET_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SECRET_KEY") || "";
 const PUBLISHABLE_KEY = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || "";
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
@@ -17,7 +17,9 @@ function json(data: unknown, status = 200) {
 }
 function fail(error: string, status = 400) { return json({ ok: false, error }, status); }
 function dbHeaders() {
-  return { apikey: SERVICE_KEY, authorization: "Bearer " + SERVICE_KEY, "content-type": "application/json" };
+  const h: Record<string, string> = { apikey: SERVICE_KEY, "content-type": "application/json" };
+  if (!SERVICE_KEY.startsWith("sb_secret_")) h.authorization = "Bearer " + SERVICE_KEY;
+  return h;
 }
 async function db(path: string, init: RequestInit = {}) {
   const r = await fetch(SUPABASE_URL + "/rest/v1/" + path, { ...init, headers: { ...dbHeaders(), ...(init.headers as Record<string, string> || {}) } });
