@@ -17,7 +17,7 @@ No production or preview function, database schema, secret, or token was changed
 - `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`)
 - `SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_ANON_KEY`)
 
-Do not copy any ZOZ AI token or secret into ZOZ Pro. Register the exact callback URI
+Do not copy any ZOZ AI token or secret into ZOZ Pro. Deploy the function with JWT verification disabled at the platform gateway so Google's callback can reach it; the function itself validates the owner JWT on both POST actions. Register the exact callback URI
 `https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-youtube-analytics`
 in the Google OAuth client. Use only the scopes `youtube.readonly` and `yt-analytics.readonly`.
 Do not add the monetary scope unless the owner explicitly requests revenue analytics.
@@ -32,7 +32,7 @@ Do not add the monetary scope unless the owner explicitly requests revenue analy
 ## Security/limitations before deployment
 - This is a draft and has not been type-checked, deployed, or live-tested.
 - Verify Supabase project secrets and owner auth configuration before use.
-- The callback currently requires Google to return a refresh token; if it does not, a re-consent flow may be needed before saving durable access.
+- The function stores a refresh token if Google returns one, but deliberately does not refresh tokens during an analytics request. If the access token expires, reconnect through the consent flow.
 - Validate Google OAuth consent-screen configuration and redirect URI exactly.
 - The endpoint intentionally refuses other channel IDs and does not call YouTube Data API write methods.
 - Do not apply this migration to production or deploy this function without reviewing the diff and confirming the owner approves the configuration change.
