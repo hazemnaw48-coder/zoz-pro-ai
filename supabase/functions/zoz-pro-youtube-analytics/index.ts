@@ -39,7 +39,7 @@ async function sha(s: string) {
   const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
 }
-function validDate(s: string) { return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + "T00:00:00Z")); }
+function validDate(s: string) { if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(s)) return false; const d = new Date(s + "T00:00:00Z"); return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s; }
 
 async function connect(u: any) {
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) return fail("Google OAuth client secrets are not configured in this Supabase project.", 503);
@@ -156,7 +156,7 @@ async function report(req: Request) {
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204 });
   const url = new URL(req.url);
-  if (req.method === "GET" && url.searchParams.has("code")) return await callback(url);
+  if (req.method === "GET" && (url.searchParams.has("code") || url.searchParams.has("state") || url.searchParams.has("error"))) return await callback(url);
   if (req.method !== "POST") return fail("Use POST. OAuth callback is handled by GET.", 405);
   const u = await owner(req);
   if (!u) return fail("Owner authentication required.", 401);
