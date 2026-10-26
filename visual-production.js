@@ -185,7 +185,7 @@
     say(id, "تحميل محرك التعليق الصوتي العربي المجاني إلى المتصفح (أول مرة نحو 30 ميجابايت)…");
     let mod;
     try {
-      mod = await import("https://esm.sh/nabra-tts@latest");
+      mod = await import("https://cdn.jsdelivr.net/npm/nabra-tts@0/+esm");
     } catch (error) {
       throw new Error("تعذر تحميل محرك الصوت العربي المجاني. افتح الصفحة في Chrome مع إنترنت ثم أعد المحاولة. لم يتم إنشاء فيديو صامت.");
     }
@@ -348,7 +348,8 @@
     const finalized = await call(MEDIA, {
       action: "finalize_upload", job_id: id, path: prepared.path, mime_type: mime,
       size: blob.size, filename, source_tool: "zoz-pro-free-image-audio",
-      source_metadata: sourceMetadata
+      source_metadata: sourceMetadata,
+      is_final_video: Boolean(sourceMetadata.final_video)
     });
     if (!finalized.verified_in_storage) throw new Error("لم يؤكد المركز حفظ الملف " + filename + ".");
     return finalized;
