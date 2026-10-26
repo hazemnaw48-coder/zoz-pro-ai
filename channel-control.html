@@ -322,26 +322,49 @@ async function uploadIntakeFile(){
  const file=$('intake-file').files&&$('intake-file').files[0];
  if(!file)throw new Error('اختر ملف فيديو أولًا.');
  if(!file.size)throw new Error('الملف فارغ.');
+ if(file.size>850*1024*1024)throw new Error('حجم الملف أكبر من 850 ميجابايت؛ احذف الملفات المؤقتة المنشورة أو اختر ملفًا أصغر ضمن سعة التخزين المتاحة.');
  const kids=$('intake-kids').value,synthetic=$('intake-synthetic').value;
  if(kids===''||synthetic==='')throw new Error('اختر إجابة واضحة لسؤال الجمهور وإفصاح المشاهد الاصطناعية.');
- const b=$('intake-upload');b.disabled=true;
+ const button=$('intake-upload');button.disabled=true;
+ const resumeKey='zoz-pro-intake-resume-v1';
  try{
-  notice('intake-progress','جارٍ إنشاء جلسة استقبال آمنة…');
-  const created=await intakeApi('intake_create',{filename:file.name,total_bytes:file.size,content_type:file.type||'application/octet-stream',title:$('intake-title').value.trim()||file.name.replace(/\.[^.]+$/,''),description:$('intake-description').value,tags:$('intake-tags').value.split(',').map(x=>x.trim()).filter(Boolean),made_for_kids:kids==='true',contains_synthetic_media:synthetic==='true',target_privacy_status:$('intake-privacy').value});
-  const a=created.asset,chunk=a.chunk_size;
-  for(let part=0;part<a.chunk_count;part++){
-   const blob=file.slice(part*chunk,Math.min(file.size,(part+1)*chunk));
-   const signed=await intakeApi('intake_signed_part',{asset_id:a.id,part_index:part});
-   const uploaded=await fetch(signed.upload_url,{method:'POST',headers:{'content-type':'application/octet-stream','x-upsert':'false'},body:blob});
-   if(!uploaded.ok)throw new Error('فشل رفع الجزء '+(part+1)+' من '+a.chunk_count+' (HTTP '+uploaded.status+'). يمكنك المحاولة مجددًا من قائمة الاستقبال.');
-   const progress=await intakeApi('intake_part_done',{asset_id:a.id,part_index:part});
-   notice('intake-progress','تم رفع '+(part+1)+' / '+a.chunk_count+' جزءًا — '+fmt(progress.uploaded_bytes)+' من '+fmt(progress.total_bytes)+' بايت.');
+  let active=null;
+  try{active=JSON.parse(localStorage.getItem(resumeKey)||'null')}catch(e){}
+  let asset=null;
+  if(active&&active.filename===file.name&&Number(active.total_bytes)===file.size&&active.asset_id){
+   const listing=await intakeApi('intake_list',{});
+   asset=(listing.assets||[]).find(x=>x.id===active.asset_id)||null;
+   if(asset&&asset.status!=='uploading'){
+    localStorage.removeItem(resumeKey);
+    if(asset.status==='ready_for_review'){notice('intake-progress','هذا الملف اكتمل استقباله بالفعل وينتظر مراجعة المالك.','good');await loadIntakeAssets();return;}
+    asset=null;
+   }
   }
-  await intakeApi('intake_finalize',{asset_id:a.id});
+  if(!asset){
+   notice('intake-progress','جارٍ إنشاء جلسة استقبال آمنة…');
+   const created=await intakeApi('intake_create',{filename:file.name,total_bytes:file.size,content_type:file.type||'application/octet-stream',title:$('intake-title').value.trim()||file.name.replace(/\.[^.]+$/,''),description:$('intake-description').value,tags:$('intake-tags').value.split(',').map(x=>x.trim()).filter(Boolean),made_for_kids:kids==='true',contains_synthetic_media:synthetic==='true',target_privacy_status:$('intake-privacy').value});
+   asset=created.asset;
+   localStorage.setItem(resumeKey,JSON.stringify({asset_id:asset.id,filename:file.name,total_bytes:file.size}));
+   asset.uploaded_parts=[];
+  }
+  const completed=new Set(Array.isArray(asset.uploaded_parts)?asset.uploaded_parts.map(Number):[]);
+  const chunk=Number(asset.chunk_size||8388608),count=Number(asset.chunk_count);
+  for(let part=0;part<count;part++){
+   if(completed.has(part))continue;
+   const blob=file.slice(part*chunk,Math.min(file.size,(part+1)*chunk));
+   const signed=await intakeApi('intake_signed_part',{asset_id:asset.id,part_index:part});
+   const uploaded=await fetch(signed.upload_url,{method:'POST',headers:{'content-type':'application/octet-stream','x-upsert':'true'},body:blob});
+   if(!uploaded.ok)throw new Error('فشل رفع الجزء '+(part+1)+' من '+count+' (HTTP '+uploaded.status+'). أعد اختيار الملف نفسه لاستكمال الرفع.');
+   const progress=await intakeApi('intake_part_done',{asset_id:asset.id,part_index:part});
+   completed.add(part);
+   notice('intake-progress','تم رفع '+completed.size+' / '+count+' جزءًا — '+fmt(progress.uploaded_bytes)+' من '+fmt(progress.total_bytes)+' بايت.');
+  }
+  await intakeApi('intake_finalize',{asset_id:asset.id});
+  localStorage.removeItem(resumeKey);
   notice('intake-progress','اكتمل الاستقبال. الملف محفوظ في طابور المراجعة ولم يُنشر.','good');
   notice('intake-msg','تم استقبال الفيديو بنجاح داخل قاعدة الإنتاج. راجعه في قائمة الاستقبال.','good');
   $('intake-file').value='';await loadIntakeAssets();
- }finally{b.disabled=false;}
+ }finally{button.disabled=false;}
 }
 function intakeStatusLabel(s){return ({uploading:'جارٍ الاستقبال',ready_for_review:'ينتظر مراجعة المالك',approved:'موافق عليه للرفع الخاص',rejected:'مرفوض',uploading_to_youtube:'جارٍ الرفع إلى YouTube',processing:'YouTube يعالج الفيديو',ready_to_publish:'جاهز للنشر بعد تأكيدك',published:'منشور',archived:'أُرشف وحُذفت أجزاؤه المؤقتة',failed:'فشل — يحتاج مراجعة'}[s]||s);}
 async function loadIntakeAssets(){
