@@ -1,0 +1,588 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b1220"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="ZOZ Pro"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./zoz-icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="./zoz-icon.svg"><title>ZOZ Pro — مركز الإنتاج</title><link rel="stylesheet" href="./studio.css?v=20261022-4"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head><body><header><div class="brand"><b>Z</b><div><strong>ZOZ Pro</strong><small>مركز الإنتاج والتحكم المستقل</small></div></div><div><span id="connection" class="pill">غير متصل</span> <button id="install-app" type="button">تثبيت التطبيق</button> <button id="logout" class="hidden">خروج</button></div></header><main><section id="login" class="panel login"><small>دخول المالك</small><h1>إدارة المحتوى والقنوات</h1><p>سجّل الدخول بحساب المالك المؤكد في Supabase.</p><form id="login-form"><label>البريد<input id="email" type="email" autocomplete="username" required value="hazemnaw48@gmail.com"></label><label>كلمة المرور<input id="password" type="password" autocomplete="current-password" required></label><button class="primary">دخول آمن</button></form><p id="login-message" class="msg"></p></section><div id="app" class="hidden"><nav><button class="tab active" data-tab="home">الرئيسية</button><button class="tab" data-tab="content">إنتاج المحتوى</button><button class="tab" data-tab="channels">القنوات</button><button class="tab" data-tab="tools">الأدوات</button><button class="tab" data-tab="jobs">المهام والملفات والنشر</button></nav><section id="tab-home"><div class="hero"><div><small>SUPABASE FIRST</small><h1>مركز التحكم</h1><p>Supabase للبيانات والتشغيل. الواجهة تُعرض مجانًا عبر GitHub Pages، وتبقى البيانات والتشغيل في Supabase. Make وRunway اختياريان.</p></div><button id="refresh" class="primary">تحديث الحالة</button></div><div id="stats" class="stats"></div><h2>حالة التكاملات</h2><div id="health" class="grid"></div></section><section id="tab-content" class="hidden"><h2>إنشاء محتوى</h2><form id="create-form" class="panel form"><label class="wide">موضوع المحتوى<input id="topic" minlength="3" maxlength="1000" required placeholder="مثال: الحياة اليومية في مصر القديمة"></label><label>الجمهور<input id="audience" value="جمهور عربي عام"></label><label>اللغة<select id="language"><option value="ar">العربية</option><option value="en">English</option></select></label><label>المدة بالثواني<input id="duration" type="number" min="10" max="600" value="60"></label><button class="primary wide">إنشاء مهمة إنتاج</button></form><p id="create-message" class="msg"></p><div id="new-job" class="panel hidden"></div>
+</section><section id="tab-channels" class="hidden"><h2>القنوات والتفويض المباشر</h2><p class="muted">يُحفظ التفويض داخل Supabase، وليس Make. يجب تسجيل Redirect URI في لوحة كل مطور.</p><div class="grid"><article class="panel"><h3>YouTube</h3><p>ربط القناة ومنح صلاحية الرفع.</p><button data-oauth="youtube" class="primary">ربط YouTube</button><p class="hint">يلزم GOOGLE_CLIENT_ID وGOOGLE_CLIENT_SECRET في Supabase Secrets.</p></article><article class="panel"><h3>TikTok</h3><p>ربط الحساب عبر تطبيق مطور مصرح.</p><button data-oauth="tiktok" class="primary">ربط TikTok</button><p class="hint">يلزم TIKTOK_CLIENT_KEY وTIKTOK_CLIENT_SECRET وموافقة صلاحيات النشر.</p></article></div><h2>الحسابات المسجلة</h2><div id="channels" class="grid"></div></section><section id="tab-tools" class="hidden"><h2>الأدوات والاتصالات</h2><div class="grid"><article class="panel"><h3>Gemini</h3><p>اختبار اتصال API الفعلي.</p><button id="test-gemini">اختبار Gemini</button><p id="gemini-result" class="msg"></p></article><article class="panel"><h3>Claude</h3><p>يحتاج ANTHROPIC_API_KEY في Supabase Secrets.</p><button id="test-claude">اختبار Claude</button><p id="claude-result" class="msg"></p></article><article class="panel"><h3>Google AI Studio</h3><p>أنشئ أو راجع مفتاح Gemini، ثم خزّنه في أسرار Supabase. لا تضعه هنا.</p><a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">فتح AI Studio ↗</a></article><article class="panel"><h3>Make وRunway</h3><p>أدوات احتياطية فقط عند توفر حد أو رصيد؛ ليست شرطًا للتشغيل.</p></article></div></section><section id="tab-jobs" class="hidden"><div class="row"><h2>مهام الإنتاج</h2><button id="refresh-jobs">تحديث</button></div><div class="panel intake-panel"><small class="eyebrow">VIDEO INTAKE GATEWAY</small><h2>استقبال فيديو وملفات من أي أداة</h2><p class="muted">ارفع MP4 من الهاتف أو استقبل مخرجات Flow أو Kling أو Luma أو Runway أو أي مركز آخر. احفظ البرومبت والمصدر مع الملف، ثم راجعه قبل النشر.</p><aside class="panel"><h3>Google Flow — طريقة الربط الحالية</h3><p>لا يوجد في وثائق Flow الرسمية موصل تصدير مباشر لكل فيديو إلى Webhook خاص بـ ZOZ Pro. لذلك لا نستخدم محاكاة غير موثوقة أو نطلب بيانات Google السرية. داخل Flow: افتح المشروع، اختر الفيديو ثم More (⋮) ← Download، ثم ارفع MP4 هنا. ولتنزيل مشروع كامل مع الفيديوهات والـ prompts استخدم Download project. يمكن لـ Google Takeout تصدير بيانات Flow بشكل دوري، لكنه ليس تسليمًا فوريًا بعد كل فيديو.</p><p><a href="https://labs.google/fx/tools/flow" target="_blank" rel="noopener">فتح Google Flow</a> · <a href="https://support.google.com/flow/answer/16935308?hl=en" target="_blank" rel="noopener">تعليمات تنزيل الفيديوهات والمشروعات</a> · <a href="https://support.google.com/labs/answer/17571126?hl=en" target="_blank" rel="noopener">تصدير Flow عبر Google Takeout</a></p><p class="hint">عند اكتمال MP4 داخل ZOZ Pro، يتم تصديره تلقائيًا إلى مركز النشر للمراجعة؛ يبقى النشر العام بموافقتك.</p></aside><form id="intake-form" class="form"><label class="wide">ربط بمهمة موجودة (اختياري)<select id="intake-job"><option value="">إنشاء مهمة استلام جديدة</option></select><small class="hint">اختر مهمة سابقة إذا كان هذا الفيديو تابعًا لها؛ سيُحفظ البرومبت والملف عليها بدل تكرار المهمة.</small></label><label class="wide">عنوان الفيديو / موضوعه<input id="intake-topic" required minlength="3" maxlength="1000" placeholder="مثال: الحياة اليومية في مصر القديمة"></label><label>مصدر الفيديو<select id="intake-source"><option value="manual-upload">رفع يدوي من الهاتف</option><option value="google-flow">Google Flow</option><option value="gemini">Gemini</option><option value="claude">Claude</option><option value="runway">Runway</option><option value="kling">Kling</option><option value="luma">Luma</option><option value="pixverse">PixVerse</option><option value="vidu">Vidu</option><option value="qwen">Qwen / Alibaba</option><option value="other">أداة أخرى</option></select></label><label>مدة الفيديو المتوقعة (ثانية)<input id="intake-duration" type="number" min="10" max="600" value="60"></label><label class="wide">البرومبت الأصلي / تعليمات Claude أو الأداة<textarea id="intake-prompt" rows="5" placeholder="الصق هنا البرومبت الكامل حتى لا يضيع، مع تعليمات المشاهد والصوت والأسلوب..."></textarea></label><label class="wide">ملاحظات ومعلومات النشر<textarea id="intake-notes" rows="3" placeholder="اسم القناة، وصف الفيديو، ملاحظات الصوت أو المقاسات..."></textarea></label><label class="wide">ملف الفيديو MP4<input id="intake-file" type="file" accept="video/mp4,.mp4" multiple required><small class="hint">حد الرفع الحالي 50 ميجابايت لكل ملف. لا يتم النشر تلقائيًا.</small></label><button class="primary wide" id="intake-submit">حفظ المهمة ورفع الفيديو للمراجعة</button></form><p id="intake-message" class="msg"></p><div id="intake-result" class="hidden"></div></div><div id="jobs" class="stack"></div><h2>نتائج النشر</h2><div id="publications" class="stack"></div><h2>الملفات</h2><div id="assets" class="stack"></div></section></div></main><footer>ZOZ Pro · Supabase backend · GitHub Pages UI · لا يعتمد على حد بناء يومي</footer><script id="zoz-local-renderer">
+/* ZOZ Pro local renderer — browser-only, no paid generation calls.
+   Produces a real WebM recording, converts it to MP4 with MediaBunny/H.264,
+   and returns the resulting File to the authenticated studio for private upload. */
+(() => {
+  const W = 720, H = 1280, FPS = 24, BITRATE = 2400000;
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  function wrap(ctx, text, maxWidth, maxLines = 3) {
+    const words = String(text || "").split(/\s+/).filter(Boolean);
+    const lines = []; let line = "";
+    for (const word of words) {
+      const candidate = line ? line + " " + word : word;
+      if (line && ctx.measureText(candidate).width > maxWidth) {
+        lines.push(line); line = word;
+      } else line = candidate;
+    }
+    if (line) lines.push(line);
+    if (lines.length > maxLines) {
+      const kept = lines.slice(0, maxLines);
+      kept[maxLines - 1] = kept[maxLines - 1].replace(/[.,،؛:!?؟]*$/, "") + "…";
+      return kept;
+    }
+    return lines;
+  }
+  function drawPalm(ctx, x, y, scale, sway) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale);
+    ctx.strokeStyle = "#473c2b"; ctx.lineWidth = 13; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(-10, -95, sway * 8, -180); ctx.stroke();
+    ctx.strokeStyle = "#2f5440"; ctx.lineWidth = 8;
+    for (let n = 0; n < 7; n++) {
+      const a = -Math.PI + n * Math.PI / 6;
+      ctx.beginPath(); ctx.moveTo(sway * 8, -180);
+      ctx.quadraticCurveTo(Math.cos(a) * 70, -205 + Math.sin(a) * 45, Math.cos(a) * 118, -170 + Math.sin(a) * 88);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function drawPerson(ctx, x, y, scale, robe, motion) {
+    ctx.save(); ctx.translate(x, y + Math.sin(motion * 5) * 2); ctx.scale(scale, scale);
+    ctx.fillStyle = "#442e23"; ctx.beginPath(); ctx.arc(0, -45, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = robe; ctx.beginPath(); ctx.moveTo(-17, -27); ctx.lineTo(18, -27); ctx.lineTo(28, 26); ctx.lineTo(-26, 26); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#442e23"; ctx.lineWidth = 9; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(-10, 24); ctx.lineTo(-14 + Math.sin(motion * 5) * 5, 52); ctx.moveTo(12, 24); ctx.lineTo(17 - Math.sin(motion * 5) * 5, 52); ctx.stroke();
+    ctx.restore();
+  }
+  function drawAncientScene(ctx, index, p, scene) {
+    const palettes = [
+      ["#402b3d", "#da805e", "#f4c48b", "#b8a078"],
+      ["#7e9caa", "#e4c59c", "#f0d4a5", "#bc9a6b"],
+      ["#96b7b5", "#e1d4a6", "#61a1a0", "#b5aa73"],
+      ["#d8a078", "#f0d5ad", "#b87749", "#e4bd7d"],
+      ["#ad9880", "#dec5a1", "#b78b58", "#8d9a76"],
+      ["#35435b", "#d78e6d", "#dbb17d", "#5e8c88"]
+    ][index % 6];
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, palettes[0]); sky.addColorStop(.52, palettes[1]); sky.addColorStop(1, palettes[3]);
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+    const sunY = 180 + index * 13;
+    ctx.fillStyle = "rgba(255,229,174,.86)"; ctx.beginPath(); ctx.arc(W * (.74 - p * .08), sunY, 70 + Math.sin(p * Math.PI) * 9, 0, Math.PI * 2); ctx.fill();
+    // distant desert ridge and warm hills
+    ctx.fillStyle = "rgba(100,64,48,.35)"; ctx.beginPath(); ctx.moveTo(0, 520);
+    for (let x = 0; x <= W; x += 90) ctx.lineTo(x, 470 + Math.sin(x * .013 + index) * 54);
+    ctx.lineTo(W, 690); ctx.lineTo(0, 690); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = palettes[3]; ctx.beginPath(); ctx.moveTo(0, 625);
+    for (let x = 0; x <= W; x += 80) ctx.lineTo(x, 610 + Math.sin(x * .01 + index * 1.3) * 35);
+    ctx.lineTo(W, 880); ctx.lineTo(0, 880); ctx.closePath(); ctx.fill();
+    // Nile strip and moving highlights
+    ctx.fillStyle = index === 5 ? "#356f79" : "#3d9293";
+    ctx.beginPath(); ctx.moveTo(0, 740); ctx.bezierCurveTo(180, 690, 470, 790, W, 725); ctx.lineTo(W, 1050); ctx.lineTo(0, 1050); ctx.closePath(); ctx.fill();
+    for (let n = 0; n < 16; n++) {
+      const x = (n * 83 + (p * 90)) % (W + 100) - 50;
+      const y = 795 + (n % 5) * 48;
+      ctx.strokeStyle = "rgba(231,226,185," + (.15 + (n % 3) * .08) + ")";
+      ctx.lineWidth = 2 + (n % 2); ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 20, y - 5, x + 52, y + Math.sin(p * 8 + n) * 3); ctx.stroke();
+    }
+    // reeds and river-bank vegetation
+    ctx.strokeStyle = "#53694b"; ctx.lineWidth = 5;
+    for (let n = 0; n < 15; n++) {
+      const x = n * 54 - 10;
+      ctx.beginPath(); ctx.moveTo(x, 755); ctx.quadraticCurveTo(x - 8, 710, x + Math.sin(n) * 12, 678); ctx.stroke();
+    }
+    if (index === 0 || index === 1 || index === 5) {
+      // mud-brick homes: intentionally modest, not monumental palaces
+      for (let n = 0; n < 4; n++) {
+        const x = 30 + n * 156, y = 540 - (n % 2) * 30;
+        ctx.fillStyle = "#b78258"; ctx.fillRect(x, y, 122, 152);
+        ctx.fillStyle = "#d3a87c"; ctx.beginPath(); ctx.moveTo(x - 12, y + 4); ctx.lineTo(x + 61, y - 43); ctx.lineTo(x + 134, y + 4); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "#50372a"; ctx.fillRect(x + 48, y + 87, 28, 65);
+        ctx.fillStyle = "#8d6344"; ctx.fillRect(x + 15, y + 35, 23, 28);
+      }
+    }
+    drawPalm(ctx, 580, 720, .85, Math.sin(p * Math.PI * 2 + index));
+    drawPalm(ctx, 55, 730, .64, Math.cos(p * Math.PI * 2 + index));
+    if (index === 2) {
+      // farm furrows, irrigation and workers
+      ctx.strokeStyle = "#68754a"; ctx.lineWidth = 7;
+      for (let n = 0; n < 8; n++) { ctx.beginPath(); ctx.moveTo(n * 94 - 30, 665); ctx.lineTo(n * 94 + 20, 780); ctx.stroke(); }
+      drawPerson(ctx, 230, 700, 1.1, "#eee0c3", p);
+      drawPerson(ctx, 370, 725, .88, "#b76e40", p + .3);
+      ctx.fillStyle = "#94774a"; ctx.beginPath(); ctx.ellipse(295, 674, 28, 14, -.1, 0, Math.PI * 2); ctx.fill();
+    } else if (index === 3) {
+      // household breadmaking and pottery silhouettes
+      ctx.fillStyle = "#805137"; ctx.beginPath(); ctx.ellipse(180, 753, 78, 32, -.12, 0, Math.PI * 2); ctx.fill();
+      for (let n = 0; n < 4; n++) { ctx.fillStyle = ["#c58b51","#d9ae76","#9b6540","#e0c18b"][n]; ctx.beginPath(); ctx.ellipse(135 + n * 30, 742 + (n % 2) * 7, 15, 8, 0, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = "#ad7445"; ctx.beginPath(); ctx.ellipse(510, 720, 45, 50, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#70432e"; ctx.beginPath(); ctx.ellipse(510, 720, 22, 26, 0, 0, Math.PI * 2); ctx.fill();
+      drawPerson(ctx, 360, 736, .9, "#eee4ca", p);
+    } else if (index === 4) {
+      // market stalls, pottery and a scribe with papyrus
+      for (let n = 0; n < 3; n++) {
+        const x = 90 + n * 205;
+        ctx.fillStyle = "#f0d5ad"; ctx.beginPath(); ctx.moveTo(x - 55, 585); ctx.lineTo(x, 515); ctx.lineTo(x + 55, 585); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "#73513a"; ctx.fillRect(x - 48, 585, 96, 115);
+      }
+      drawPerson(ctx, 195, 710, .75, "#e8ddc6", p);
+      drawPerson(ctx, 515, 715, .8, "#ba8450", p + .2);
+      ctx.fillStyle = "#e6d09d"; ctx.fillRect(310, 680, 95, 55);
+      ctx.strokeStyle = "#795b43"; ctx.lineWidth = 2;
+      for (let n = 0; n < 4; n++) { ctx.beginPath(); ctx.moveTo(320, 690 + n * 10); ctx.lineTo(395, 690 + n * 10); ctx.stroke(); }
+    } else {
+      drawPerson(ctx, 265, 728, .94, "#f0e0c2", p);
+      drawPerson(ctx, 380, 728, .98, "#d6b17e", p + .4);
+      // small papyrus boat
+      ctx.fillStyle = "#8c5b3a"; ctx.beginPath(); ctx.moveTo(420, 864); ctx.quadraticCurveTo(540, 904, 655, 855); ctx.lineTo(628, 893); ctx.quadraticCurveTo(530, 934, 442, 892); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "#dec797"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(532, 852); ctx.lineTo(532, 774); ctx.stroke();
+      ctx.fillStyle = "#e5d2a6"; ctx.beginPath(); ctx.moveTo(536, 778); ctx.lineTo(584, 840); ctx.lineTo(536, 834); ctx.closePath(); ctx.fill();
+    }
+    // slow parallax pan, shot border and title labels
+    ctx.fillStyle = "rgba(18,25,29,.10)";
+    ctx.fillRect(0, 0, W, H);
+    const heading = String(scene?.on_screen_text || scene?.heading || ("مشهد " + (index + 1))).slice(0, 90);
+    ctx.fillStyle = "rgba(12,18,24,.74)"; ctx.fillRect(38, 60, W - 76, 120);
+    ctx.direction = "rtl"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#e5be83"; ctx.font = "bold 23px sans-serif"; ctx.fillText("ZOZ PRO  •  حكايات من مصر القديمة", W - 62, 90);
+    ctx.fillStyle = "#fff5e5"; ctx.font = "bold 30px sans-serif";
+    wrap(ctx, heading, W - 132, 2).forEach((line, n) => ctx.fillText(line, W - 62, 133 + n * 38));
+    const caption = String(scene?.narration || scene?.text || "").slice(0, 360);
+    ctx.fillStyle = "rgba(7,14,19,.83)"; ctx.beginPath(); ctx.roundRect(36, 930, W - 72, 245, 24); ctx.fill();
+    ctx.fillStyle = "#e9c58e"; ctx.font = "bold 19px sans-serif"; ctx.fillText("من حياة الناس على ضفاف النيل", W - 62, 966);
+    ctx.fillStyle = "#fffaf0"; ctx.font = "600 27px sans-serif";
+    wrap(ctx, caption, W - 132, 5).forEach((line, n) => ctx.fillText(line, W - 62, 1015 + n * 39));
+    ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.fillRect(40, 1200, W - 80, 4);
+    ctx.fillStyle = "#d5a15f"; ctx.fillRect(40, 1200, (W - 80) * clamp((index + p) / 6, 0, 1), 4);
+  }
+  function drawPhotoScene(ctx, image, index, p, scene) {
+    const zoom = 1.02 + p * .08;
+    const scale = Math.max(W / image.width, H / image.height) * zoom;
+    const dw = image.width * scale, dh = image.height * scale;
+    const sway = Math.sin(p * Math.PI) * 14;
+    ctx.drawImage(image, (W - dw) / 2 + sway, (H - dh) / 2, dw, dh);
+    const shade = ctx.createLinearGradient(0, 0, 0, H);
+    shade.addColorStop(0, "rgba(7,12,18,.58)"); shade.addColorStop(.48, "rgba(7,12,18,.04)"); shade.addColorStop(.70, "rgba(7,12,18,.16)"); shade.addColorStop(1, "rgba(7,12,18,.90)");
+    ctx.fillStyle = shade; ctx.fillRect(0, 0, W, H);
+    ctx.direction = "rtl"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#edc98d"; ctx.font = "bold 22px sans-serif";
+    ctx.fillText("ZOZ PRO  •  وثائقي تاريخي", W - 48, 75);
+    const title = String(scene?.on_screen_text || scene?.heading || ("مشهد " + (index + 1))).slice(0, 90);
+    ctx.fillStyle = "#fffaf1"; ctx.font = "bold 37px sans-serif";
+    wrap(ctx, title, W - 100, 2).forEach((line, n) => ctx.fillText(line, W - 50, 135 + n * 45));
+    const caption = String(scene?.narration || scene?.text || "").slice(0, 280);
+    ctx.fillStyle = "#fffaf1"; ctx.font = "600 27px sans-serif";
+    wrap(ctx, caption, W - 100, 4).forEach((line, n) => ctx.fillText(line, W - 50, 1015 + n * 40));
+    ctx.fillStyle = "rgba(255,255,255,.32)"; ctx.fillRect(36, 1200, W - 72, 5);
+    ctx.fillStyle = "#e4ba77"; ctx.fillRect(36, 1200, (W - 72) * clamp((index + p) / 6, 0, 1), 5);
+  }
+
+  function drawRealVideoScene(ctx, video, index, p, scene, projectTitle) {
+    const zoom = 1.015 + p * .045;
+    const scale = Math.max(W / video.videoWidth, H / video.videoHeight) * zoom;
+    const dw = video.videoWidth * scale, dh = video.videoHeight * scale;
+    const sway = Math.sin(p * Math.PI) * 8;
+    ctx.fillStyle = "#05080d"; ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(video, (W - dw) / 2 + sway, (H - dh) / 2, dw, dh);
+    const shade = ctx.createLinearGradient(0, 0, 0, H);
+    shade.addColorStop(0, "rgba(5,9,15,.76)");
+    shade.addColorStop(.28, "rgba(5,9,15,.08)");
+    shade.addColorStop(.58, "rgba(5,9,15,.04)");
+    shade.addColorStop(.76, "rgba(5,9,15,.48)");
+    shade.addColorStop(1, "rgba(5,9,15,.92)");
+    ctx.fillStyle = shade; ctx.fillRect(0, 0, W, H);
+    ctx.direction = "rtl"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#f2d19b"; ctx.font = "bold 21px sans-serif";
+    ctx.fillText("ZOZ NOW  •  وثائقي تاريخي", W - 42, 63);
+    if (scene?.closing && p > 0.76) {
+      ctx.fillStyle = "rgba(4,9,15,.82)"; ctx.fillRect(0, 0, W, H);
+      ctx.textAlign = "center"; ctx.direction = "rtl";
+      ctx.fillStyle = "#f2d19b"; ctx.font = "bold 22px sans-serif";
+      ctx.fillText("ZOZ NOW  •  تاريخ مصر", W / 2, 440);
+      ctx.fillStyle = "#fffaf2"; ctx.font = "bold 39px sans-serif";
+      wrap(ctx, String(scene.closing.title || "الحضارة صنعها الناس أيضًا"), W - 100, 3)
+        .forEach((line, n) => ctx.fillText(line, W / 2, 510 + n * 52));
+      ctx.fillStyle = "#e9edf5"; ctx.font = "24px sans-serif";
+      wrap(ctx, String(scene.closing.narration || "تابعونا لاكتشاف المزيد من تاريخ مصر."), W - 110, 3)
+        .forEach((line, n) => ctx.fillText(line, W / 2, 700 + n * 42));
+      return;
+    }
+    const heading = String(scene?.on_screen_text || scene?.heading || projectTitle || ("مشهد " + (index + 1))).slice(0, 90);
+    ctx.fillStyle = "#fffaf2"; ctx.font = "bold 32px sans-serif";
+    wrap(ctx, heading, W - 100, 2).forEach((line, n) => ctx.fillText(line, W - 50, 119 + n * 42));
+    const caption = String(scene?.narration || scene?.text || "").slice(0, 400);
+    ctx.fillStyle = "rgba(4,9,15,.80)";
+    ctx.beginPath(); ctx.roundRect(32, 954, W - 64, 226, 22); ctx.fill();
+    ctx.fillStyle = "#fffaf2"; ctx.font = "600 25px sans-serif";
+    wrap(ctx, caption, W - 108, 4).forEach((line, n) => ctx.fillText(line, W - 54, 1003 + n * 38));
+    ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.fillRect(36, 1207, W - 72, 5);
+    ctx.fillStyle = "#e5b96f"; ctx.fillRect(36, 1207, (W - 72) * clamp((index + p) / 6, 0, 1), 5);
+  }
+  async function loadImages(files) {
+    const urls = [], images = [];
+    for (const file of (files || []).slice(0, 6)) {
+      if (!file || !file.type.startsWith("image/")) continue;
+      const url = URL.createObjectURL(file); urls.push(url);
+      const image = new Image(); image.src = url;
+      await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error("تعذّر فتح إحدى صور المشاهد.")); });
+      images.push(image);
+    }
+    return { images, urls };
+  }
+
+  async function loadVideoClips(files) {
+    const urls = [], clips = [];
+    const candidates = (files || []).slice(0, 8);
+    for (const file of candidates) {
+      if (!file) continue;
+      const name = String(file.name || "").toLowerCase();
+      if (!(file.type.startsWith("video/") || /\\.(mp4|webm|mov|m4v)$/i.test(name))) {
+        throw new Error("أحد الملفات ليس فيديو. ارفع مقاطع MP4 أو WebM صالحة.");
+      }
+      const url = URL.createObjectURL(file);
+      urls.push(url);
+      const video = document.createElement("video");
+      video.preload = "auto";
+      video.playsInline = true;
+      video.muted = true;
+      video.src = url;
+      await new Promise((resolve, reject) => {
+        if (video.readyState >= 1 && Number.isFinite(video.duration)) return resolve();
+        const ok = () => { clean(); resolve(); };
+        const bad = () => { clean(); reject(new Error("تعذّر فتح أحد مقاطع الفيديو. أعد تنزيله من أداة التوليد بصيغة MP4 أو WebM.")); };
+        const clean = () => { video.removeEventListener("loadedmetadata", ok); video.removeEventListener("error", bad); };
+        video.addEventListener("loadedmetadata", ok, {once:true});
+        video.addEventListener("error", bad, {once:true});
+        video.load();
+      });
+      if (!Number.isFinite(video.duration) || video.duration < 3 || !video.videoWidth || !video.videoHeight) {
+        throw new Error("أحد مقاطع الفيديو أقصر من 3 ثوانٍ أو لا يحتوي على صورة قابلة للقراءة.");
+      }
+      await new Promise((resolve, reject) => {
+        if (video.readyState >= 2) return resolve();
+        const ok = () => { clean(); resolve(); };
+        const bad = () => { clean(); reject(new Error("تعذّر فك ترميز أحد مقاطع الفيديو.")); };
+        const clean = () => { video.removeEventListener("loadeddata", ok); video.removeEventListener("error", bad); };
+        video.addEventListener("loadeddata", ok, {once:true});
+        video.addEventListener("error", bad, {once:true});
+      });
+      clips.push({ video, duration: video.duration });
+    }
+    if (!clips.length) throw new Error("ارفع مقاطع فيديو حقيقية مولدة بالذكاء الاصطناعي أولًا.");
+    return { clips, urls };
+  }
+  function recordCanvas(canvas, stream, total, scenes, images, onProgress, audioSource = null) {
+    return new Promise((resolve, reject) => {
+      const preferred = "video/webm;codecs=vp9,opus";
+      const mime = MediaRecorder.isTypeSupported(preferred) ? preferred :
+        (MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus") ? "video/webm;codecs=vp8,opus" : "video/webm");
+      let recorder;
+      try { recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: BITRATE }); }
+      catch (_) { return reject(new Error("هذا المتصفح لا يتيح تسجيل الفيديو المحلي. افتح مركز الإنتاج في Chrome حديث.")); }
+      const chunks = []; let stopped = false;
+      recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+      recorder.onerror = () => { if (!stopped) { stopped = true; reject(new Error("أوقف المتصفح التسجيل؛ حاول بمدة أقصر وأبقِ الصفحة مفتوحة.")); } };
+      recorder.onstop = () => {
+        if (stopped) return; stopped = true;
+        const blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
+        if (blob.size < 1024) reject(new Error("لم ينتج التسجيل ملف فيديو صالحًا."));
+        else resolve(blob);
+      };
+      recorder.start(500);
+      if (audioSource) { try { audioSource.start(0); } catch (_) {} }
+      const start = performance.now();
+      const frame = () => {
+        if (stopped) return;
+        const elapsed = Math.min(total, (performance.now() - start) / 1000);
+        const position = Math.min(scenes.length - .0001, elapsed / total * scenes.length);
+        const index = Math.max(0, Math.floor(position));
+        const progress = position - index;
+        const image = images.length ? images[index % images.length] : null;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { try { recorder.stop(); } catch (_) {} return reject(new Error("تعذّر الرسم على لوحة الفيديو.")); }
+        if (image) drawPhotoScene(ctx, image, index, progress, scenes[index]);
+        else drawAncientScene(ctx, index, progress, scenes[index]);
+        if (onProgress) onProgress(Math.min(68, Math.floor(elapsed / total * 68)));
+        if (elapsed >= total) { if (recorder.state !== "inactive") recorder.stop(); return; }
+        requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    });
+  }
+
+  async function recordRealVideoClips(canvas, stream, total, clips, scenes, projectTitle, audioSource, speed, onProgress) {
+    const preferred = "video/webm;codecs=vp9,opus";
+    const mime = MediaRecorder.isTypeSupported(preferred) ? preferred :
+      (MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus") ? "video/webm;codecs=vp8,opus" : "video/webm");
+    let recorder;
+    try { recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: BITRATE }); }
+    catch (_) { throw new Error("هذا المتصفح لا يتيح تسجيل الفيديو المركب. افتح مركز الإنتاج في Chrome حديث."); }
+    const chunks = [];
+    return await new Promise((resolve, reject) => {
+      let settled = false, lastProgress = -5, audioStarted = false;
+      const fail = (error) => {
+        if (settled) return;
+        settled = true;
+        try { if (recorder.state !== "inactive") recorder.stop(); } catch (_) {}
+        reject(error instanceof Error ? error : new Error(String(error)));
+      };
+      recorder.ondataavailable = event => { if (event.data && event.data.size) chunks.push(event.data); };
+      recorder.onerror = () => fail(new Error("أوقف المتصفح تسجيل المقاطع. أبقِ الصفحة مفتوحة وأعد المحاولة بملفات أصغر."));
+      recorder.onstop = () => {
+        if (settled) return;
+        settled = true;
+        const blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
+        if (blob.size < 1024) reject(new Error("لم ينتج التسجيل ملف فيديو صالحًا."));
+        else resolve(blob);
+      };
+      (async () => {
+        recorder.start(500);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("تعذّر الرسم على لوحة الفيديو.");
+        const sourceTotal = clips.reduce((sum, clip) => sum + clip.duration, 0);
+        let elapsedBefore = 0;
+        for (let i = 0; i < clips.length; i++) {
+          const clip = clips[i], video = clip.video, scene = scenes[i] || {};
+          const segmentDuration = total * (clip.duration / sourceTotal);
+          video.pause();
+          try { video.currentTime = 0; } catch (_) {}
+          video.playbackRate = speed;
+          for (const candidate of clips) if (candidate.audioGain) candidate.audioGain.gain.value = 0;
+          if (clip.audioGain) clip.audioGain.gain.value = 1;
+          const clipStart = performance.now();
+          await video.play();
+          if (!audioStarted && audioSource) { audioSource.start(0); audioStarted = true; }
+          await new Promise((done, frameReject) => {
+            const frame = () => {
+              try {
+                const elapsed = Math.min(segmentDuration, Math.max(0, (performance.now() - clipStart) / 1000));
+                const p = segmentDuration > 0 ? elapsed / segmentDuration : 1;
+                drawRealVideoScene(ctx, video, i, p, scene, projectTitle);
+                const overall = (elapsedBefore + elapsed) / total;
+                const percent = Math.min(68, Math.floor(overall * 68));
+                if (onProgress && percent - lastProgress >= 2) { lastProgress = percent; onProgress(percent); }
+                if (elapsed >= segmentDuration || (video.ended && p > .96)) {
+                  video.pause();
+                  done();
+                } else requestAnimationFrame(frame);
+              } catch (error) { frameReject(error); }
+            };
+            requestAnimationFrame(frame);
+          });
+          elapsedBefore += segmentDuration;
+          video.pause();
+          if (clip.audioGain) clip.audioGain.gain.value = 0;
+        }
+        if (audioSource && !audioStarted) throw new Error("تعذّر بدء التعليق الصوتي.");
+        try { if (recorder.state !== "inactive") recorder.stop(); } catch (_) {}
+      })().catch(fail);
+    });
+  }
+  async function toMp4(webm, title, hasAudio, onProgress) {
+    if (typeof VideoEncoder === "undefined" || typeof VideoDecoder === "undefined") {
+      throw new Error("تسجيل الفيديو نجح لكن هذا المتصفح لا يدعم ترميز MP4 محليًا. افتح الرابط في Chrome حديث.");
+    }
+    let mod, aac;
+    try {
+      mod = await import("https://esm.sh/mediabunny@1.61.3");
+      aac = await import("https://esm.sh/@mediabunny/aac-encoder@1.61.3");
+    } catch (_) {
+      throw new Error("تعذّر تحميل محوّل MP4 مفتوح المصدر. تحقّق من الإنترنت ثم أعد التحويل؛ لم يُرفع ملف غير مكتمل.");
+    }
+    const canAvc = await mod.canEncodeVideo("avc", { width: W, height: H, bitrate: BITRATE, frameRate: FPS });
+    if (!canAvc) throw new Error("هذا الجهاز لا يتيح ترميز H.264. لم يتم إنشاء ملف MP4 زائف؛ استخدم Chrome/جهازًا يدعم الترميز.");
+    if (hasAudio && !(await mod.canEncodeAudio("aac"))) aac.registerAacEncoder();
+    const input = new mod.Input({ source: new mod.BlobSource(webm), formats: mod.ALL_FORMATS });
+    let output = null;
+    try {
+      if (!(await input.canRead())) throw new Error("تعذّرت قراءة الفيديو المحلي قبل التحويل.");
+      const track = await input.getPrimaryVideoTrack();
+      if (!track) throw new Error("ملف WebM لا يحتوي على مسار فيديو.");
+      output = new mod.Output({ format: new mod.Mp4OutputFormat(), target: new mod.BufferTarget() });
+      const config = { input, output, tracks: "primary", video: { codec: "avc", bitrate: BITRATE, frameRate: FPS, forceTranscode: true } };
+      if (hasAudio) config.audio = { codec: "aac", bitrate: 96000, forceTranscode: true };
+      const conversion = await mod.Conversion.init(config);
+      if (!conversion.isValid) throw new Error("تعذّر إعداد التحويل؛ قد يكون مسار الصوت غير مدعوم.");
+      conversion.onProgress = progress => { if (onProgress) onProgress(68 + Math.floor(progress * 31)); };
+      await conversion.execute();
+      const buffer = output.target instanceof mod.BufferTarget ? output.target.buffer : null;
+      if (!buffer || buffer.byteLength < 1024) throw new Error("انتهى التحويل دون ملف MP4 صالح.");
+      const fileName = (String(title || "ZOZ-Pro-video").replace(/[^\p{L}\p{N}_-]+/gu, "-").slice(0, 48) || "ZOZ-Pro-video") + ".mp4";
+      return new File([buffer], fileName, { type: "video/mp4" });
+    } finally { input.dispose(); if (output) { try { output.dispose(); } catch (_) {} } }
+  }
+
+  async function render({ job, videoFiles = [], onProgress = null }) {
+    if (!job || !job.id || !job.script_json) throw new Error("اختر مهمة محفوظة أولًا.");
+    const scenes = Array.isArray(job.script_json.scenes) ? job.script_json.scenes : [];
+    if (scenes.length < 1) throw new Error("المهمة لا تحتوي خطة مشاهد؛ لم يبدأ الدمج.");
+    const files = Array.from(videoFiles || []).filter(Boolean);
+    if (files.length !== scenes.length) throw new Error("لمنع إنتاج فيديو ناقص، اختر/ارفع عدد المقاطع نفسه الموجود في خطة المشاهد (" + scenes.length + ") وبالترتيب المطلوب. الموجود الآن: " + files.length + ".");
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if (!(f.type === "video/mp4" || /\.mp4$/i.test(f.name || ""))) {
+        throw new Error("المقطع رقم " + (i + 1) + " ليس MP4. لم يتم تحويله أو ضغطه.");
+      }
+      if (!f.size) throw new Error("المقطع رقم " + (i + 1) + " فارغ.");
+    }
+    const progress = p => { if (onProgress) onProgress(Math.max(0, Math.min(99, Math.round(p)))); };
+    const durationOf = file => new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const video = document.createElement("video");
+      video.preload = "metadata";
+      video.muted = true;
+      let settled = false;
+      const finish = (ok, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        video.onloadedmetadata = null;
+        video.onerror = null;
+        video.removeAttribute("src");
+        try { video.load(); } catch (_) {}
+        URL.revokeObjectURL(url);
+        ok ? resolve(value) : reject(new Error(value));
+      };
+      const timer = setTimeout(() => finish(false, "انتهت مهلة قراءة مدة أحد المقاطع؛ أعد رفع ملفات MP4 الأصلية."), 20000);
+      video.onloadedmetadata = () => {
+        if (!Number.isFinite(video.duration) || video.duration <= 0) finish(false, "تعذّرت قراءة مدة أحد المقاطع.");
+        else finish(true, video.duration);
+      };
+      video.onerror = () => finish(false, "تعذّر فتح أحد المقاطع للتحقق من المدة.");
+      video.src = url;
+      video.load();
+    });
+    const durations = await Promise.all(files.map(durationOf));
+    const expectedDuration = durations.reduce((sum, d) => sum + d, 0);
+    if (expectedDuration < 20) throw new Error("المدة الإجمالية للمقاطع قصيرة بصورة غير متوقعة؛ لم يبدأ الدمج.");
+    progress(3);
+
+    async function ensureFFmpeg() {
+      if (window.__ZOZ_FFMPEG_INSTANCE?.loaded) return window.__ZOZ_FFMPEG_INSTANCE;
+      if (!window.FFmpegWASM?.FFmpeg) {
+        if (!window.__ZOZ_FFMPEG_SCRIPT_PROMISE) {
+          window.__ZOZ_FFMPEG_SCRIPT_PROMISE = (async () => {
+            // GitHub Pages is currently returning 404 for the repository-local wrapper files.
+            // Load the official matching UMD wrapper/worker from jsDelivr and pin the worker
+            // to a same-origin Blob URL so browser Worker origin restrictions do not break concat.
+            const wrapperBase = "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd";
+            const [wrapperResponse, workerResponse] = await Promise.all([
+              fetch(wrapperBase + "/ffmpeg.js", { cache: "force-cache" }),
+              fetch(wrapperBase + "/814.ffmpeg.js", { cache: "force-cache" })
+            ]);
+            if (!wrapperResponse.ok || !workerResponse.ok) {
+              throw new Error("تعذّر تحميل مكتبة الدمج المجانية من المصدر الرسمي. لم يتم تعديل المقاطع.");
+            }
+            const [wrapperSource, workerSource] = await Promise.all([
+              wrapperResponse.text(), workerResponse.text()
+            ]);
+            const workerNeedle = "new Worker(new URL(e.p+e.u(814),e.b),{type:void 0})";
+            if (!wrapperSource.includes(workerNeedle)) {
+              throw new Error("نسخة محرك الدمج غير متوافقة مع إعداد المركز. لم يبدأ الدمج.");
+            }
+            const workerURL = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
+            const patchedWrapper = wrapperSource.replace(
+              workerNeedle,
+              'new Worker("' + workerURL + '",{type:void 0})'
+            );
+            const wrapperURL = URL.createObjectURL(new Blob([patchedWrapper], { type: "text/javascript" }));
+            window.__ZOZ_FFMPEG_WORKER_URL = workerURL;
+            window.__ZOZ_FFMPEG_WRAPPER_URL = wrapperURL;
+            await new Promise((resolve, reject) => {
+              const script = document.createElement("script");
+              script.src = wrapperURL;
+              script.async = true;
+              script.onload = () => window.FFmpegWASM?.FFmpeg
+                ? resolve()
+                : reject(new Error("تعذّر تهيئة محرك الدمج المحلي."));
+              script.onerror = () => reject(new Error("تعذّر تشغيل مكتبة الدمج. تحقق من الإنترنت ثم أعد المحاولة."));
+              document.head.appendChild(script);
+            });
+          })().catch(error => {
+            window.__ZOZ_FFMPEG_SCRIPT_PROMISE = null;
+            throw error;
+          });
+        }
+        await window.__ZOZ_FFMPEG_SCRIPT_PROMISE;
+      }
+      if (window.__ZOZ_FFMPEG_LOAD_PROMISE) return window.__ZOZ_FFMPEG_LOAD_PROMISE;
+      window.__ZOZ_FFMPEG_LOAD_PROMISE = (async () => {
+        const base = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.9/dist/umd";
+        progress(5);
+        const responses = await Promise.all([
+          fetch(base + "/ffmpeg-core.js", { cache: "force-cache" }),
+          fetch(base + "/ffmpeg-core.wasm", { cache: "force-cache" })
+        ]);
+        if (!responses[0].ok || !responses[1].ok) throw new Error("تعذّر تنزيل محرك الدمج المجاني. لم يتم تعديل المقاطع الأصلية.");
+        const coreBytes = await responses[0].arrayBuffer();
+        progress(8);
+        const wasmBytes = await responses[1].arrayBuffer();
+        const coreURL = URL.createObjectURL(new Blob([coreBytes], { type: "text/javascript" }));
+        const wasmURL = URL.createObjectURL(new Blob([wasmBytes], { type: "application/wasm" }));
+        const instance = new window.FFmpegWASM.FFmpeg();
+        const logs = [];
+        instance.on("log", ({ message }) => {
+          if (message) {
+            logs.push(String(message));
+            if (logs.length > 80) logs.shift();
+          }
+        });
+        instance.on("progress", ({ progress: part }) => progress(12 + (Number(part) || 0) * 76));
+        try {
+          await instance.load({ coreURL, wasmURL });
+        } catch (error) {
+          URL.revokeObjectURL(coreURL);
+          URL.revokeObjectURL(wasmURL);
+          throw new Error("لم يبدأ محرك الدمج على هذا المتصفح. جرّب فتح المركز في Chrome وتأكد من وجود مساحة ذاكرة كافية.");
+        }
+        window.__ZOZ_FFMPEG_LOGS = logs;
+        window.__ZOZ_FFMPEG_RESOURCES = { coreURL, wasmURL };
+        window.__ZOZ_FFMPEG_INSTANCE = instance;
+        progress(12);
+        return instance;
+      })();
+      try {
+        return await window.__ZOZ_FFMPEG_LOAD_PROMISE;
+      } finally {
+        window.__ZOZ_FFMPEG_LOAD_PROMISE = null;
+      }
+    }
+
+    const ffmpeg = await ensureFFmpeg();
+    const temporaryFiles = [];
+    try {
+      const names = [];
+      for (let i = 0; i < files.length; i++) {
+        const name = "zoz_scene_" + String(i + 1).padStart(2, "0") + ".mp4";
+        progress(14 + ((i + 1) / files.length) * 18);
+        await ffmpeg.writeFile(name, new Uint8Array(await files[i].arrayBuffer()));
+        names.push(name);
+        temporaryFiles.push(name);
+      }
+      const listName = "zoz_concat_list.txt";
+      const listContent = names.map(name => "file '" + name + "'").join("\n") + "\n";
+      await ffmpeg.writeFile(listName, new TextEncoder().encode(listContent));
+      temporaryFiles.push(listName);
+      progress(36);
+      const outputName = "zoz_ancient_egypt_final.mp4";
+      const exitCode = await ffmpeg.exec([
+        "-f", "concat", "-safe", "0", "-i", listName,
+        "-map", "0", "-c", "copy", "-movflags", "+faststart", outputName
+      ]);
+      if (exitCode !== 0) {
+        const detail = (window.__ZOZ_FFMPEG_LOGS || []).slice(-10).join(" ").slice(-500);
+        throw new Error("تعذّر دمج المقاطع دون إعادة ضغط لأن إعدادات الفيديو/الصوت بين المقاطع قد لا تتطابق. لم يُنشأ ملف ناقص ولم تُخفّض الجودة. أعد رفع المقاطع الثمانية الأصلية من نفس أداة التوليد. " + detail);
+      }
+      temporaryFiles.push(outputName);
+      const outputBytes = await ffmpeg.readFile(outputName);
+      if (!outputBytes || outputBytes.length < 1024) throw new Error("لم ينتج محرك الدمج ملفًا صالحًا.");
+      const safeTitle = String(job.topic || job.script_json.title || "ZOZ-Pro-video")
+        .replace(/[^\p{L}\p{N}_-]+/gu, "-").slice(0, 48) || "ZOZ-Pro-video";
+      const outputFile = new File([outputBytes], safeTitle + ".mp4", { type: "video/mp4" });
+      progress(92);
+      const finalDuration = await durationOf(outputFile);
+      if (finalDuration < expectedDuration * 0.85) {
+        throw new Error("فشل التحقق من مدة الفيديو النهائي: المتوقع قرابة " + Math.round(expectedDuration) + " ثانية، والناتج " + Math.round(finalDuration) + " ثانية. لن أحفظ ملفًا ناقصًا. أعد المحاولة بالمقاطع الثمانية.");
+      }
+      if (Math.abs(finalDuration - expectedDuration) > Math.max(4, expectedDuration * 0.15)) {
+        throw new Error("مدة الناتج لا تطابق مجموع مدد المقاطع الأصلية. لم يتم حفظ الناتج؛ تأكد من أن المقاطع الثمانية كاملة وصالحة.");
+      }
+      progress(99);
+      return outputFile;
+    } finally {
+      for (const name of temporaryFiles) {
+        try { await ffmpeg.deleteFile(name); } catch (_) {}
+      }
+    }
+  }
+  window.ZOZLocalRenderer = { render };
+})();
+</script><script src="./studio.js?v=20261026-close-loop-1"></script><script src="./visual-production.js?v=20261026-close-loop-1"></script><script src="./production-handoff.js?v=20261026-close-loop-1"></script><script src="./pwa.js?v=20261022-4"></script></body></html>
