@@ -378,6 +378,11 @@
     if (!job?.script_json || !Array.isArray(job.script_json.scenes) || !job.script_json.scenes.length) {
       throw new Error("ولّد النص والمشاهد أولًا، ثم ابدأ إنتاج الصور والصوت.");
     }
+    const needsCreationApproval = Boolean(job.script_json.recommendation_context);
+    const creationApproved = job.script_json.creation_approval?.approved === true || job.script_json.production_state === "approved_for_creation";
+    if (needsCreationApproval && !creationApproved) {
+      throw new Error("مهمة واردة من تحليل القناة بلا سجل موافقة إنشاء. افتح بطاقة الموافقة في المهمة أولًا؛ لم يبدأ توليد الصور أو الصوت.");
+    }
     if (!confirm("سيحاول المركز توليد صور مجانية عبر AI Horde (قائمة مجتمعية قد تكون بطيئة)، ويستخدم صور Wikimedia Commons عند تعذر التوليد، ثم يصنع تعليقًا صوتيًا عربيًا محليًا. قد تُشارك أوصاف المشاهد غير السرية مع خدمة الصور المجانية. لا توجد رسوم API، ولن يتم النشر. متابعة؟")) return;
     button.disabled = true;
     const scenes = job.script_json.scenes.slice(0, 12);
