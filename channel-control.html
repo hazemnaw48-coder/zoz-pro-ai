@@ -308,7 +308,7 @@ async function loadContentCalendar(){
   opts.filter(([s])=>({draft:['approved','dismissed'],approved:['in_production','dismissed'],in_production:['ready_for_review','dismissed'],ready_for_review:['completed','in_production','dismissed'],completed:[],dismissed:[]}[item.status]||[]).includes(s)).forEach(([status,label])=>{
    const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',async()=>{b.disabled=true;try{await call('review_calendar_item',{calendar_item_id:item.id,status,note:note.value});notice('calendar-msg','تم حفظ الحالة والملاحظة في سجل الإنتاج. لم يتغير أي فيديو على YouTube.','good');await loadContentCalendar();}catch(e){notice('calendar-msg',e.message||'تعذر حفظ القرار.','bad')}finally{b.disabled=false}});controls.appendChild(b);
   });
-  if(item.status==='approved'||item.status==='in_production'||item.status==='ready_for_review'){
+  if(item.status!=='dismissed'){
    const send=document.createElement('button');send.type='button';send.textContent='إرسال حزمة الإنتاج إلى مركز الإنشاء';send.addEventListener('click',()=>{
     try{
      const handoff={version:1,calendar_item_id:item.id,analytics_snapshot_id:item.snapshot_id||pkg.duplicate_check?.source_snapshot_id||'',topic:pkg.title_for_upload||item.working_title,audience:pkg.audience||'مشاهدون عرب مهتمون بتاريخ مصر القديمة',language:pkg.language||'ar-EG',duration_seconds:pkg.target_duration_seconds||40,production_package:pkg};
