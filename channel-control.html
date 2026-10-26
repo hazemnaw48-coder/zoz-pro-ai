@@ -506,19 +506,18 @@ async function loadRecommendations(){
     [['approved','موافقة على التوصية'],['dismissed','رفض'],['implemented','تم التنفيذ']].forEach(([state,label])=>{const b=document.createElement('button');b.textContent=label;b.className='secondary';b.addEventListener('click',async()=>{b.disabled=true;try{await call('review_recommendation',{recommendation_id:r.id,status:state,note:''});await loadRecommendations();}catch(e){notice('recommendations-msg',e.message||'تعذر حفظ القرار.','bad');b.disabled=false;}});controls.appendChild(b);});
     card.appendChild(controls);
    }
-   if(r.status==='approved'&&['repeat_winner','topic_test'].includes(r.recommendation_type)){
-    const send=document.createElement('button');send.type='button';send.textContent='إرسال إلى مركز الإنتاج';send.className='primary';send.style.marginTop='10px';
+   if(r.status==='approved'&&['repeat_winner','topic_test','retention'].includes(r.recommendation_type)){
+    const send=document.createElement('button');send.type='button';send.textContent='إرسال التوصية المعتمدة إلى مركز الإنتاج';send.className='primary';send.style.marginTop='10px';
     send.addEventListener('click',()=>{
-     const sequence=r.recommendation_type==='repeat_winner'?1:2;
-     const item=calendarItems.find(x=>Number(x.sequence_no)===sequence&&x.production_package&&Array.isArray(x.production_package.shotPlan)&&x.production_package.shotPlan.length&&Array.isArray(x.production_package.narration)&&x.production_package.narration.length);
-     if(!item){notice('recommendations-msg','لم أعثر على حزمة إنتاج كاملة مرتبطة بهذه التوصية في التقويم. افتح «التقويم» وتحقق من وجود خطة المشاهد والتعليق الصوتي.','bad');return;}
      try{
-      const pkg=item.production_package;
-      const handoff={version:1,calendar_item_id:item.id,analytics_snapshot_id:item.snapshot_id||r.snapshot_id||pkg.duplicate_check?.source_snapshot_id||'',recommendation_id:r.id,recommendation_type:r.recommendation_type,recommendation_title:r.title,topic:pkg.title_for_upload||item.working_title,audience:pkg.audience||'مشاهدون عرب مهتمون بتاريخ مصر القديمة',language:pkg.language||'ar-EG',duration_seconds:pkg.target_duration_seconds||40,production_package:pkg};
+      const handoff={version:2,handoff_type:'analytics_recommendation',recommendation:{
+       id:r.id,snapshot_id:r.snapshot_id||'',channel_id:CHANNEL_ID,recommendation_type:r.recommendation_type,
+       title:r.title||'',body:r.body||'',evidence:r.evidence||{},status:r.status
+      }};
       localStorage.setItem('zoz-pro-pending-production-handoff-v1',JSON.stringify(handoff));
       const w=window.open('./index.html?handoff=1&tab=jobs','_blank');
-      if(!w)notice('recommendations-msg','حُفظت الحزمة في هذا المتصفح لكن المتصفح منع فتح تبويب جديد. افتح «العودة إلى مركز الإنتاج» ثم سجّل الدخول؛ سيستورد المركز الحزمة المحفوظة.','good');
-      else notice('recommendations-msg','تم تجهيز الحزمة المرتبطة بالتوصية وفتح مركز الإنتاج. سجّل الدخول هناك إذا طُلب منك ذلك؛ لم يتم النشر.','good');
+      if(!w)notice('recommendations-msg','حُفظت التوصية المعتمدة في هذا المتصفح. افتح مركز الإنتاج من الرابط نفسه بهذا المتصفح؛ لن تُنشأ مهمة مكررة عند إعادة المحاولة.','good');
+      else notice('recommendations-msg','أُرسلت بيانات التوصية وأدلتها إلى مركز الإنتاج. سيُنشئ مهمة إنتاج مرتبطة بها؛ لا يوجد نشر تلقائي.','good');
      }catch(e){notice('recommendations-msg','تعذر تجهيز الإرسال: '+(e.message||String(e)),'bad');}
     });
     card.appendChild(send);
