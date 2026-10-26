@@ -71,7 +71,11 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
   <div id="history-wrap"></div>
  </section>
  <section class="card">
-  <div class="row"><h2>٧. توصيات المحتوى ومراجعتها</h2><button id="load-recommendations" class="secondary">تحميل التوصيات</button></div>
+  <div class="row"><h2>٧. تقويم المحتوى وخطة التنفيذ</h2>
+<p>مسودات أسبوعية مرتبطة بآخر لقطة تحليلات محفوظة. لا تنشئ فيديوهات ولا تنشر تلقائيًا. كل قرار وملاحظة يُحفظان في سجل الإنتاج.</p>
+<div class="actions"><button id="load-calendar" type="button">تحميل التقويم</button><button id="generate-calendar" type="button">إنشاء خطة أسبوعية من التحليلات</button></div>
+<div id="calendar-msg" class="notice"></div><div id="calendar-list" class="stack"></div>
+<h2>٨. توصيات المحتوى ومراجعتها</h2><button id="load-recommendations" class="secondary">تحميل التوصيات</button></div>
   <p>توصيات مسودة مبنية على بيانات التحليلات المحفوظة. الموافقة هنا تسجل قرارك فقط؛ لا تنشئ محتوى ولا تنشره تلقائيًا.</p>
   <div id="recommendations-msg" class="notice">احفظ لقطة تحليل أولًا لتوليد توصيات مبنية على بيانات فعلية.</div>
   <div id="recommendations-list"></div>
@@ -155,6 +159,41 @@ async function refreshStatus(){
  try{await loadAnalytics(true);}
  catch(e){notice('channel-status','تعذر إثبات قراءة البيانات: '+(e.message||'خطأ غير معروف')+'. لم نبدأ تفويض Google جديدًا ولم نغيّر بيانات القناة.','bad');}
 }
+
+function calendarActionLabel(status){
+ const map={draft:'مسودة',approved:'موافق عليها',in_production:'قيد الإنتاج',ready_for_review:'جاهزة للمراجعة',completed:'مكتملة',dismissed:'مرفوضة'};
+ return map[status]||status||'—';
+}
+async function loadContentCalendar(){
+ const d=await call('content_calendar',{channel_id:CHANNEL_ID});
+ const host=$('calendar-list');host.innerHTML='';
+ if(!Array.isArray(d.calendar)||!d.calendar.length){
+  host.textContent='لا توجد خطة لهذه اللقطة بعد. اضغط «إنشاء خطة أسبوعية من التحليلات».';
+  notice('calendar-msg','تم فحص التقويم؛ لا توجد مسودات محفوظة لهذه اللقطة.','good');return;
+ }
+ d.calendar.forEach(item=>{
+  const card=document.createElement('article');card.className='video-card';
+  const title=document.createElement('h3');title.textContent=item.sequence_no+'. '+item.working_title;card.appendChild(title);
+  const meta=document.createElement('p');meta.textContent=item.planned_date+' · '+(item.format==='long'?'فيديو طويل':'Shorts')+' · '+item.content_pillar+' · '+calendarActionLabel(item.status);card.appendChild(meta);
+  const hook=document.createElement('p');hook.textContent='الافتتاحية: '+item.hook;card.appendChild(hook);
+  const outline=document.createElement('ol');(Array.isArray(item.outline)?item.outline:[]).forEach(line=>{const li=document.createElement('li');li.textContent=line;outline.appendChild(li)});card.appendChild(outline);
+  const cta=document.createElement('p');cta.textContent='الدعوة: '+item.cta;card.appendChild(cta);
+  const evidence=document.createElement('p');evidence.textContent='ملاحظة تحقق: '+(item.evidence?.basis||'تحقق من المصادر قبل الإنتاج')+' — يلزم التحقق من الوقائع والمراجع.';card.appendChild(evidence);
+  const note=document.createElement('textarea');note.rows=2;note.maxLength=1000;note.placeholder='ملاحظتك لهذه الفكرة (اختياري)';note.value=item.owner_note||'';card.appendChild(note);
+  const controls=document.createElement('div');controls.className='actions';
+  const opts=[['approved','موافقة على المسودة'],['in_production','بدء الإنتاج'],['ready_for_review','جاهزة للمراجعة'],['completed','إكمال'],['dismissed','رفض الفكرة']];
+  opts.filter(([s])=>({draft:['approved','dismissed'],approved:['in_production','dismissed'],in_production:['ready_for_review','dismissed'],ready_for_review:['completed','in_production','dismissed'],completed:[],dismissed:[]}[item.status]||[]).includes(s)).forEach(([status,label])=>{
+   const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',async()=>{b.disabled=true;try{await call('review_calendar_item',{calendar_item_id:item.id,status,note:note.value});notice('calendar-msg','تم حفظ الحالة والملاحظة في سجل الإنتاج. لم يتغير أي فيديو على YouTube.','good');await loadContentCalendar();}catch(e){notice('calendar-msg',e.message||'تعذر حفظ القرار.','bad')}finally{b.disabled=false}});controls.appendChild(b);
+  });
+  card.appendChild(controls);host.appendChild(card);
+ });
+ notice('calendar-msg','تم تحميل '+d.calendar.length+' مسودات من قاعدة الإنتاج. لا يوجد نشر تلقائي.','good');
+}
+async function generateContentCalendar(){
+ const d=await call('generate_content_calendar',{channel_id:CHANNEL_ID});
+ notice('calendar-msg',d.message||'تم تحديث التقويم.','good');await loadContentCalendar();
+}
+
 async function loadVideoAnalytics(){
  const startDate=$('start-date').value,endDate=$('end-date').value;
  if(!startDate||!endDate||startDate>endDate)throw new Error('تحقق من تاريخ البداية والنهاية.');
@@ -299,6 +338,8 @@ $('save-snapshot').addEventListener('click',async()=>{try{await saveSnapshot();}
 $('load-history').addEventListener('click',loadHistory);
 $('load-recommendations').addEventListener('click',loadRecommendations);
 const end=new Date(Date.now()-86400000);const start=new Date(end);start.setDate(start.getDate()-27);$('start-date').value=dateInput(start);$('end-date').value=dateInput(end);
+$('load-calendar')?.addEventListener('click',async()=>{try{await loadContentCalendar()}catch(e){notice('calendar-msg',e.message||'تعذر تحميل التقويم.','bad')}});
+$('generate-calendar')?.addEventListener('click',async()=>{const b=$('generate-calendar');b.disabled=true;try{await generateContentCalendar()}catch(e){notice('calendar-msg',e.message||'تعذر إنشاء التقويم.','bad')}finally{b.disabled=false}});
 (async()=>{
  try{const {data}=await sb.auth.getSession();if(data&&data.session){await ownerSession();setSigned(true);notice('login-msg','تم العثور على جلسة مالك محفوظة في مشروع الإنتاج.','good');await refreshStatus();}else{setSigned(false);notice('login-msg','لم توجد جلسة إنتاج محفوظة. سجّل الدخول فقط؛ لن نعيد تفويض Google.');}}
  catch(e){setSigned(false);notice('login-msg',e.message||'تعذر استعادة الجلسة.','bad');}
