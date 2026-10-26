@@ -33,12 +33,21 @@ async function importHandoff(){
   const response=await fetch(CONTENT,{method:"POST",headers:{authorization:"Bearer "+session.access_token,apikey:SUPABASE_KEY,"content-type":"application/json"},body:JSON.stringify(payload)});
   const data=await response.json().catch(()=>({}));
   if(!response.ok||data.ok===false)throw new Error(data.error||("HTTP "+response.status));
+  let generationNote="";
+  if(isRecommendation&&data.job?.id&&!(data.job?.script_json?.scenes||[]).length){
+   try{
+    const gr=await fetch(CONTENT,{method:"POST",headers:{authorization:"Bearer "+session.access_token,apikey:SUPABASE_KEY,"content-type":"application/json"},body:JSON.stringify({action:"generate",job_id:data.job.id,provider:"local"})});
+    const gd=await gr.json().catch(()=>({}));
+    if(gr.ok&&gd.ok!==false)generationNote=" تم إعداد مسودة النص والمشاهد محليًا دون API مدفوع.";
+    else generationNote=" حُفظت المهمة، لكن يلزم تشغيل توليد النص من داخلها: "+(gd.error||("HTTP "+gr.status));
+   }catch(e){generationNote=" حُفظت المهمة، وتعذر بدء التوليد التلقائي؛ يمكن استكمالها من داخل المهمة.";}
+  }
   localStorage.removeItem(HANDOFF_KEY);
   const refresh=document.querySelector("#refresh-jobs")||document.querySelector("#refresh");
   if(refresh)refresh.click();
   const jobs=document.querySelector("[data-tab='jobs']");
   if(jobs)jobs.click();
-  message(data.already_imported?"هذه التوصية مستلمة سابقًا؛ لم تُكرر المهمة.":(isRecommendation?"وصلت التوصية المعتمدة إلى مركز الإنتاج مع الأدلة وبيانات الفيديو المرجعي. افتح المهمة لتوليد النص والمشاهد؛ لم يتم النشر.":(data.message||"تم استيراد الحزمة إلى مركز الإنتاج.")));
+  message((data.already_imported?"هذه التوصية مستلمة سابقًا؛ لم تُكرر المهمة.":(isRecommendation?"وصلت التوصية المعتمدة إلى مركز الإنتاج مع أدلتها وبيانات الفيديو المرجعي.":"تم استيراد الحزمة إلى مركز الإنتاج."))+generationNote+" لم يتم النشر.");
   const cards=[...document.querySelectorAll("#jobs .item")];
   const card=data.job&&cards.find(x=>x.textContent.includes(data.job.id));
   if(card)card.scrollIntoView({behavior:"smooth",block:"center"});
