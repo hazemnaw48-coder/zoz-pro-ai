@@ -57,6 +57,13 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
   <div id="videos-msg" class="notice">اضغط تحميل الفيديوهات لقراءتها مباشرة من YouTube.</div>
   <div id="videos-list"></div>
  </section>
+ <section class="card">
+  <div class="row"><h2>٥. تحليل أداء كل فيديو</h2><button id="load-video-analytics">تحليل الفيديوهات للفترة المحددة</button></div>
+  <p>يقرأ مقاييس YouTube Analytics للفيديوهات في القناة فقط. هذا التقرير للقراءة فقط؛ لا يغيّر العناوين أو الخصوصية ولا ينشر محتوى.</p>
+  <div id="video-analytics-msg" class="notice">حمّل الفيديوهات ثم اطلب التحليل للفترة المحددة أعلاه.</div>
+  <div id="video-analytics-summary" class="grid section-gap"></div>
+  <div id="video-analytics-wrap"></div>
+ </section>
 </div>
 <div class="footer small">وضع الاستعادة الحالي للقراءة فقط: لا نشر، لا تعديل بيانات الفيديو، ولا تغيير خصوصية. لا يُعاد ربط Google تلقائيًا؛ إذا ظهر خطأ سيُعرض سببه دون بدء تفويض جديد.</div>
 </main>
@@ -70,6 +77,7 @@ const CHANNEL_ID='UCIael48cvwPG3gKj--c7HKw';
 const API=SUPABASE_URL+'/functions/v1/zoz-pro-youtube-analytics';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
 const $=id=>document.getElementById(id);
+let loadedVideos=[];
 function notice(id,text,kind){const el=$(id);el.textContent=text;el.className='notice'+(kind?' '+kind:'');}
 function fmt(value){return Number(value||0).toLocaleString('ar-EG',{maximumFractionDigits:2});}
 function dateInput(d){return d.toISOString().slice(0,10);}
@@ -132,6 +140,35 @@ async function refreshStatus(){
  try{await loadAnalytics(true);}
  catch(e){notice('channel-status','تعذر إثبات قراءة البيانات: '+(e.message||'خطأ غير معروف')+'. لم نبدأ تفويض Google جديدًا ولم نغيّر بيانات القناة.','bad');}
 }
+async function loadVideoAnalytics(){
+ const start=$('start-date').value,end=$('end-date').value;
+ if(!start||!end||start>end)throw new Error('تحقق من تاريخ البداية والنهاية.');
+ if(!loadedVideos.length)await loadVideos();
+ if(!loadedVideos.length)throw new Error('حمّل قائمة الفيديوهات أولًا؛ لم توجد قائمة صالحة للتحليل.');
+ const d=await call('video_analytics',{start_date:start,end_date:end});
+ if(d.channel_id!==CHANNEL_ID)throw new Error('معرّف القناة في الرد لا يطابق القناة المثبتة.');
+ const byId=new Map((Array.isArray(d.videos)?d.videos:[]).map(v=>[v.video_id,v]));
+ const rows=loadedVideos.map(v=>({video:v,stats:byId.get(v.video_id)||null}))
+  .sort((a,b)=>(Number(b.stats?.views||0)-Number(a.stats?.views||0)));
+ const totals=rows.reduce((a,x)=>{if(!x.stats)return a;a.views+=x.stats.views;a.minutes+=x.stats.estimated_minutes_watched;a.likes+=x.stats.likes;a.comments+=x.stats.comments;a.subs+=x.stats.subscribers_gained-x.stats.subscribers_lost;a.count++;return a;},{views:0,minutes:0,likes:0,comments:0,subs:0,count:0});
+ const host=$('video-analytics-summary');host.innerHTML='';
+ [['فيديوهات القائمة',loadedVideos.length],['فيديوهات لها بيانات API',d.analytics_rows_returned||0],['المشاهدات ضمن الفترة',fmt(totals.views)],['ساعات المشاهدة',fmt(totals.minutes/60)],['الإعجابات',fmt(totals.likes)],['صافي المشتركين من الفيديوهات',fmt(totals.subs)]].forEach(([label,value])=>{const card=document.createElement('div');card.className='metric';const small=document.createElement('small');small.textContent=label;const num=document.createElement('div');num.className='number';num.textContent=String(value);card.append(small,num);host.appendChild(card);});
+ const body=rows.map(({video:v,stats:s})=>[
+  v.title||'بلا عنوان',
+  v.published_at||'—',
+  v.privacy_status||'—',
+  s?fmt(s.views):'لا توجد بيانات',
+  s?fmt(s.estimated_minutes_watched):'—',
+  s?fmt(s.average_view_duration_seconds)+' ث':'—',
+  s?fmt(s.average_view_percentage)+'%':'—',
+  s?fmt(s.likes):'—',
+  s?fmt(s.comments):'—',
+  s?fmt(s.shares):'—',
+  s?fmt(s.subscribers_gained-s.subscribers_lost):'—'
+ ]);
+ table('video-analytics-wrap',['الفيديو','تاريخ النشر','الخصوصية','المشاهدات','دقائق المشاهدة','متوسط المدة','متوسط المشاهدة %','إعجابات','تعليقات','مشاركات','صافي المشتركين'],body);
+ notice('video-analytics-msg','اكتمل التقرير للفترة '+start+' إلى '+end+'. عدد الفيديوهات التي أعاد لها API صفوفًا: '+(d.analytics_rows_returned||0)+' من '+loadedVideos.length+'. الفيديوهات بلا صف API تظهر «لا توجد بيانات» ولا تُعامل كصفر. '+(d.truncated_video_list?'تنبيه: تم فحص أول 500 فيديو فقط.':'')+' لا تعديل ولا نشر.','good');
+}
 async function loadVideos(){
  $('load-videos').disabled=true;notice('videos-msg','جارٍ تحميل الفيديوهات من القناة المحددة…');
  try{
@@ -139,6 +176,7 @@ async function loadVideos(){
   if(d.channel_id!==CHANNEL_ID)throw new Error('معرّف القناة في الرد لا يطابق القناة المثبتة.');
   const host=$('videos-list');host.innerHTML='';
   const list=Array.isArray(d.videos)?d.videos:[];
+  loadedVideos=list;
   if(!list.length){notice('videos-msg','نجح الاتصال، لكن API لم يُعد فيديوهات في هذه الاستجابة.','good');return;}
   list.forEach(v=>{
    const row=document.createElement('article');row.className='video';
@@ -172,6 +210,12 @@ $('load-analytics').addEventListener('click',async()=>{
  finally{$('load-analytics').disabled=false;}
 });
 $('load-videos').addEventListener('click',loadVideos);
+$('load-video-analytics').addEventListener('click',async()=>{
+ $('load-video-analytics').disabled=true;notice('video-analytics-msg','جارٍ قراءة أداء الفيديوهات مباشرة من YouTube Analytics…');
+ try{await loadVideoAnalytics();}
+ catch(e){notice('video-analytics-msg',e.message||'تعذر جلب تحليل الفيديوهات.','bad');}
+ finally{$('load-video-analytics').disabled=false;}
+});
 const end=new Date(Date.now()-86400000);const start=new Date(end);start.setDate(start.getDate()-27);$('start-date').value=dateInput(start);$('end-date').value=dateInput(end);
 (async()=>{
  try{const {data}=await sb.auth.getSession();if(data&&data.session){await ownerSession();setSigned(true);notice('login-msg','تم العثور على جلسة مالك محفوظة في مشروع الإنتاج.','good');await refreshStatus();}else{setSigned(false);notice('login-msg','لم توجد جلسة إنتاج محفوظة. سجّل الدخول فقط؛ لن نعيد تفويض Google.');}}
