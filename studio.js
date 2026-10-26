@@ -53,7 +53,7 @@ async function renderLocalMp4(id,target,button){
    msg(target,"5/5 التحقق من الملف وربطه بالمهمة…","warn");
    const final=await call(MEDIA,{action:"finalize_upload",job_id:id,path:prepared.path,mime_type:"video/mp4",size:file.size,filename:file.name,source_tool:sourceTool,is_final_video:true});
    if(!final.verified_in_storage||!final.job?.video_url)throw Error("رُفع الملف لكن لم ينجح التحقق النهائي من ربطه بالمهمة.");
-   msg(target,"نجح الإنتاج: تم حفظ MP4 والتحقق منه وربطه بالمهمة. افتح المعاينة أدناه.","good");
+   msg(target,final.production_export?.ok?"نجح الإنتاج والتصدير: تم حفظ MP4 والتحقق منه وإرساله تلقائيًا إلى مركز النشر. لم يتم نشره؛ راجعه هناك ثم وافق على الرفع الخاص.":"تم حفظ MP4 والتحقق منه وربطه بالمهمة. "+(final.production_export?.error?"لكن تعذر تصديره تلقائيًا إلى مركز النشر: "+final.production_export.error:"تعذر تأكيد التصدير الآلي؛ راجع حالة الاستقبال في مركز النشر.")+" لم يتم النشر العام.",final.production_export?.ok?"good":"warn");
    await refresh();
  }catch(err){
    msg(target,"لم يكتمل الإنتاج والحفظ: "+(err?.message||String(err)),"bad");
