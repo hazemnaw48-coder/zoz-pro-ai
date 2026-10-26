@@ -58,11 +58,23 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
   <div id="videos-list"></div>
  </section>
  <section class="card">
-  <div class="row"><h2>٥. تحليل أداء كل فيديو</h2><button id="load-video-analytics">تحليل الفيديوهات للفترة المحددة</button></div>
+  <div class="row"><h2>٥. تحليل أداء كل فيديو</h2><button id="load-video-analytics">تحليل الفيديوهات للفترة المحددة</button><button id="save-snapshot" class="secondary">حفظ لقطة وتوليد توصيات</button></div>
   <p>يقرأ مقاييس YouTube Analytics للفيديوهات في القناة فقط. هذا التقرير للقراءة فقط؛ لا يغيّر العناوين أو الخصوصية ولا ينشر محتوى.</p>
   <div id="video-analytics-msg" class="notice">حمّل الفيديوهات ثم اطلب التحليل للفترة المحددة أعلاه.</div>
   <div id="video-analytics-summary" class="grid section-gap"></div>
   <div id="video-analytics-wrap"></div>
+ </section>
+ <section class="card">
+  <div class="row"><h2>٦. السجل التاريخي</h2><button id="load-history" class="secondary">عرض اللقطات المحفوظة</button></div>
+  <p>يحفظ ملخص التحليلات وبيانات الفيديوهات في قاعدة الإنتاج لتتبع الأداء بين الفترات. لا تُعدّل هذه اللقطات أي شيء على YouTube.</p>
+  <div id="history-msg" class="notice">بعد حفظ أول لقطة، يمكنك عرض سجل المقارنات هنا.</div>
+  <div id="history-wrap"></div>
+ </section>
+ <section class="card">
+  <div class="row"><h2>٧. توصيات المحتوى ومراجعتها</h2><button id="load-recommendations" class="secondary">تحميل التوصيات</button></div>
+  <p>توصيات مسودة مبنية على بيانات التحليلات المحفوظة. الموافقة هنا تسجل قرارك فقط؛ لا تنشئ محتوى ولا تنشره تلقائيًا.</p>
+  <div id="recommendations-msg" class="notice">احفظ لقطة تحليل أولًا لتوليد توصيات مبنية على بيانات فعلية.</div>
+  <div id="recommendations-list"></div>
  </section>
 </div>
 <div class="footer small">وضع الاستعادة الحالي للقراءة فقط: لا نشر، لا تعديل بيانات الفيديو، ولا تغيير خصوصية. لا يُعاد ربط Google تلقائيًا؛ إذا ظهر خطأ سيُعرض سببه دون بدء تفويض جديد.</div>
@@ -78,6 +90,8 @@ const API=SUPABASE_URL+'/functions/v1/zoz-pro-youtube-analytics';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
 const $=id=>document.getElementById(id);
 let loadedVideos=[];
+let lastAnalytics=null;
+let lastVideoAnalytics=null;
 function notice(id,text,kind){const el=$(id);el.textContent=text;el.className='notice'+(kind?' '+kind:'');}
 function fmt(value){return Number(value||0).toLocaleString('ar-EG',{maximumFractionDigits:2});}
 function dateInput(d){return d.toISOString().slice(0,10);}
@@ -126,6 +140,7 @@ async function loadAnalytics(fromStatus){
  const start=$('start-date').value,end=$('end-date').value;
  if(!start||!end||start>end)throw new Error('تحقق من تاريخ البداية والنهاية.');
  const d=await call('analytics',{start_date:start,end_date:end});
+ lastAnalytics=d;
  if(d.channel_id!==CHANNEL_ID)throw new Error('معرّف القناة في الرد لا يطابق القناة المثبتة.');
  showMetrics(d.metrics||{});
  table('daily-wrap',['التاريخ','المشاهدات','دقائق المشاهدة','متوسط مدة المشاهدة (ثانية)','مشتركون مكتسبون','مشتركون مفقودون'],(d.daily||[]).map(x=>[x.date,fmt(x.views),fmt(x.estimated_minutes_watched),fmt(x.average_view_duration_seconds),fmt(x.subscribers_gained),fmt(x.subscribers_lost)]));
@@ -146,6 +161,7 @@ async function loadVideoAnalytics(){
  if(!loadedVideos.length)await loadVideos();
  if(!loadedVideos.length)throw new Error('حمّل قائمة الفيديوهات أولًا؛ لم توجد قائمة صالحة للتحليل.');
  const d=await call('video_analytics',{start_date:start,end_date:end});
+ lastVideoAnalytics=d;
  if(d.channel_id!==CHANNEL_ID)throw new Error('معرّف القناة في الرد لا يطابق القناة المثبتة.');
  const byId=new Map((Array.isArray(d.videos)?d.videos:[]).map(v=>[v.video_id,v]));
  const rows=loadedVideos.map(v=>({video:v,stats:byId.get(v.video_id)||null}))
@@ -168,6 +184,57 @@ async function loadVideoAnalytics(){
  ]);
  table('video-analytics-wrap',['الفيديو','تاريخ النشر','الخصوصية','المشاهدات','دقائق المشاهدة','متوسط المدة','متوسط المشاهدة %','إعجابات','تعليقات','مشاركات','صافي المشتركين'],body);
  notice('video-analytics-msg','اكتمل التقرير للفترة '+start+' إلى '+end+'. عدد الفيديوهات التي أعاد لها API صفوفًا: '+(d.analytics_rows_returned||0)+' من '+loadedVideos.length+'. الفيديوهات بلا صف API تظهر «لا توجد بيانات» ولا تُعامل كصفر. '+(d.truncated_video_list?'تنبيه: تم فحص أول 500 فيديو فقط.':'')+' لا تعديل ولا نشر.','good');
+}
+async function saveSnapshot(){
+ const start=$('start-date').value,end=$('end-date').value;
+ if(!start||!end||start>end)throw new Error('تحقق من تاريخ البداية والنهاية.');
+ $('save-snapshot').disabled=true;
+ notice('video-analytics-msg','جارٍ تحديث التحليلات وتجهيز اللقطة التاريخية والتوصيات…');
+ try{
+  const a=await call('analytics',{start_date:start,end_date:end});lastAnalytics=a;
+  if(a.channel_id!==CHANNEL_ID)throw new Error('معرّف القناة لا يطابق القناة المثبتة.');
+  if(!loadedVideos.length)await loadVideos();
+  if(!loadedVideos.length)throw new Error('لم تُحمّل قائمة الفيديوهات من القناة.');
+  const va=await call('video_analytics',{start_date:start,end_date:end});lastVideoAnalytics=va;
+  const byId=new Map((Array.isArray(va.videos)?va.videos:[]).map(v=>[v.video_id,v]));
+  const videos=loadedVideos.map(v=>{const s=byId.get(v.video_id);return {video_id:v.video_id,title:v.title,published_at:v.published_at,privacy_status:v.privacy_status,metrics:s?{views:s.views,estimated_minutes_watched:s.estimated_minutes_watched,average_view_duration_seconds:s.average_view_duration_seconds,average_view_percentage:s.average_view_percentage,likes:s.likes,comments:s.comments,shares:s.shares,subscribers_gained:s.subscribers_gained,subscribers_lost:s.subscribers_lost}:null};});
+  const saved=await call('save_snapshot',{start_date:start,end_date:end,metrics:a.metrics||{},daily:a.daily||[],traffic_sources_daily:a.traffic_sources_daily||[],missing_dates:a.missing_dates||[],videos});
+  notice('video-analytics-msg','تم حفظ اللقطة التاريخية بنجاح. الفيديوهات: '+saved.video_count+'، لها بيانات تحليلية: '+saved.analytics_video_count+'، توصيات جديدة/محدّثة: '+saved.recommendations_generated+'.','good');
+  await loadHistory();await loadRecommendations();
+ }catch(e){notice('video-analytics-msg','تعذر حفظ اللقطة: '+(e.message||'خطأ غير معروف'),'bad');throw e;}
+ finally{$('save-snapshot').disabled=false;}
+}
+async function loadHistory(){
+ $('load-history').disabled=true;notice('history-msg','جارٍ تحميل السجل التاريخي…');
+ try{
+  const d=await call('history',{});
+  table('history-wrap',['تاريخ الحفظ','بداية الفترة','نهاية الفترة','المشاهدات','ساعات المشاهدة','صافي المشتركين','الفيديوهات','لها بيانات تحليلية','أيام بلا صف API'],(d.snapshots||[]).map(s=>[s.snapshot_day,s.start_date,s.end_date,fmt(s.metrics?.views),fmt(s.metrics?.watch_time_hours),fmt(s.metrics?.subscribers_net),s.video_count,s.analytics_video_count,(s.missing_dates||[]).length]));
+  notice('history-msg','تم تحميل '+(d.snapshots||[]).length+' لقطة تاريخية من قاعدة الإنتاج.','good');
+ }catch(e){notice('history-msg',e.message||'تعذر تحميل السجل.','bad');}
+ finally{$('load-history').disabled=false;}
+}
+async function loadRecommendations(){
+ $('load-recommendations').disabled=true;notice('recommendations-msg','جارٍ تحميل توصيات المحتوى…');
+ try{
+  const d=await call('recommendations',{});const host=$('recommendations-list');host.innerHTML='';
+  const list=Array.isArray(d.recommendations)?d.recommendations:[];
+  if(!list.length){notice('recommendations-msg','لا توجد توصيات بعد. احفظ لقطة تحليل أولًا.','good');return;}
+  list.forEach(r=>{
+   const card=document.createElement('article');card.className='video';
+   const title=document.createElement('h3');title.textContent=r.title||'توصية';card.appendChild(title);
+   const status=document.createElement('p');status.textContent='الحالة: '+({draft:'مسودة للمراجعة',approved:'تمت الموافقة',dismissed:'مرفوضة',implemented:'تم التنفيذ'}[r.status]||r.status)+' · النوع: '+r.recommendation_type;card.appendChild(status);
+   const body=document.createElement('p');body.textContent=r.body||'';card.appendChild(body);
+   const evidence=document.createElement('p');evidence.className='small';evidence.textContent='الدليل: '+JSON.stringify(r.evidence||{});card.appendChild(evidence);
+   if(r.status==='draft'||r.status==='approved'){
+    const controls=document.createElement('div');controls.className='row';
+    [['approved','موافقة على التوصية'],['dismissed','رفض'],['implemented','تم التنفيذ']].forEach(([state,label])=>{const b=document.createElement('button');b.textContent=label;b.className='secondary';b.addEventListener('click',async()=>{b.disabled=true;try{await call('review_recommendation',{recommendation_id:r.id,status:state,note:''});await loadRecommendations();}catch(e){notice('recommendations-msg',e.message||'تعذر حفظ القرار.','bad');b.disabled=false;}});controls.appendChild(b);});
+    card.appendChild(controls);
+   }
+   host.appendChild(card);
+  });
+  notice('recommendations-msg','تم تحميل '+list.length+' توصية من سجل الإنتاج. قرارات المراجعة لا تنشر محتوى.','good');
+ }catch(e){notice('recommendations-msg',e.message||'تعذر تحميل التوصيات.','bad');}
+ finally{$('load-recommendations').disabled=false;}
 }
 async function loadVideos(){
  $('load-videos').disabled=true;notice('videos-msg','جارٍ تحميل الفيديوهات من القناة المحددة…');
@@ -216,6 +283,9 @@ $('load-video-analytics').addEventListener('click',async()=>{
  catch(e){notice('video-analytics-msg',e.message||'تعذر جلب تحليل الفيديوهات.','bad');}
  finally{$('load-video-analytics').disabled=false;}
 });
+$('save-snapshot').addEventListener('click',async()=>{try{await saveSnapshot();}catch(e){}});
+$('load-history').addEventListener('click',loadHistory);
+$('load-recommendations').addEventListener('click',loadRecommendations);
 const end=new Date(Date.now()-86400000);const start=new Date(end);start.setDate(start.getDate()-27);$('start-date').value=dateInput(start);$('end-date').value=dateInput(end);
 (async()=>{
  try{const {data}=await sb.auth.getSession();if(data&&data.session){await ownerSession();setSigned(true);notice('login-msg','تم العثور على جلسة مالك محفوظة في مشروع الإنتاج.','good');await refreshStatus();}else{setSigned(false);notice('login-msg','لم توجد جلسة إنتاج محفوظة. سجّل الدخول فقط؛ لن نعيد تفويض Google.');}}
