@@ -40,7 +40,7 @@ async function importHandoff(){
   const jobs=document.querySelector("[data-tab='jobs']");
   if(jobs)jobs.click();
   message((data.already_imported?"هذه التوصية مستلمة سابقًا؛ لم تُكرر المهمة.":(isRecommendation?"وصلت التوصية المعتمدة إلى مركز الإنتاج مع أدلتها وبيانات الفيديو المرجعي.":"تم استيراد الحزمة إلى مركز الإنتاج."))+generationNote+" لم يتم النشر.");
-  if(data.job&&data.job.id){location.href="./index.html?task="+encodeURIComponent(data.job.id);return;}
+
  }catch(e){
   message("تعذر استلام التوصية/الحزمة: "+(e.message||String(e))+". بقيت محفوظة للمحاولة التالية.");
  }finally{running=false;}
