@@ -156,11 +156,11 @@ async function refreshStatus(){
  catch(e){notice('channel-status','تعذر إثبات قراءة البيانات: '+(e.message||'خطأ غير معروف')+'. لم نبدأ تفويض Google جديدًا ولم نغيّر بيانات القناة.','bad');}
 }
 async function loadVideoAnalytics(){
- const start=$('start-date').value,end=$('end-date').value;
- if(!start||!end||start>end)throw new Error('تحقق من تاريخ البداية والنهاية.');
+ const startDate=$('start-date').value,endDate=$('end-date').value;
+ if(!startDate||!endDate||startDate>endDate)throw new Error('تحقق من تاريخ البداية والنهاية.');
  if(!loadedVideos.length)await loadVideos();
  if(!loadedVideos.length)throw new Error('حمّل قائمة الفيديوهات أولًا؛ لم توجد قائمة صالحة للتحليل.');
- const d=await call('video_analytics',{start_date:start,end_date:end});
+ const d=await call('video_analytics',{start_date:startDate,end_date:endDate});
  lastVideoAnalytics=d;
  if(d.channel_id!==CHANNEL_ID)throw new Error('معرّف القناة في الرد لا يطابق القناة المثبتة.');
  const byId=new Map((Array.isArray(d.videos)?d.videos:[]).map(v=>[v.video_id,v]));
@@ -170,20 +170,32 @@ async function loadVideoAnalytics(){
  const host=$('video-analytics-summary');host.innerHTML='';
  [['فيديوهات القائمة',loadedVideos.length],['فيديوهات لها بيانات API',d.analytics_rows_returned||0],['المشاهدات ضمن الفترة',fmt(totals.views)],['ساعات المشاهدة',fmt(totals.minutes/60)],['الإعجابات',fmt(totals.likes)],['صافي المشتركين من الفيديوهات',fmt(totals.subs)]].forEach(([label,value])=>{const card=document.createElement('div');card.className='metric';const small=document.createElement('small');small.textContent=label;const num=document.createElement('div');num.className='number';num.textContent=String(value);card.append(small,num);host.appendChild(card);});
  const body=rows.map(({video:v,stats:s})=>[
-  v.title||'بلا عنوان',
-  v.published_at||'—',
-  v.privacy_status||'—',
-  s?fmt(s.views):'لا توجد بيانات',
-  s?fmt(s.estimated_minutes_watched):'—',
-  s?fmt(s.average_view_duration_seconds)+' ث':'—',
-  s?fmt(s.average_view_percentage)+'%':'—',
-  s?fmt(s.likes):'—',
-  s?fmt(s.comments):'—',
-  s?fmt(s.shares):'—',
+  v.title||'بلا عنوان',v.published_at||'—',v.privacy_status||'—',
+  s?fmt(s.views):'لا توجد بيانات',s?fmt(s.estimated_minutes_watched):'—',
+  s?fmt(s.average_view_duration_seconds)+' ث':'—',s?fmt(s.average_view_percentage)+'%':'—',
+  s?fmt(s.likes):'—',s?fmt(s.comments):'—',s?fmt(s.shares):'—',
   s?fmt(s.subscribers_gained-s.subscribers_lost):'—'
  ]);
  table('video-analytics-wrap',['الفيديو','تاريخ النشر','الخصوصية','المشاهدات','دقائق المشاهدة','متوسط المدة','متوسط المشاهدة %','إعجابات','تعليقات','مشاركات','صافي المشتركين'],body);
- notice('video-analytics-msg','اكتمل التقرير للفترة '+start+' إلى '+end+'. عدد الفيديوهات التي أعاد لها API صفوفًا: '+(d.analytics_rows_returned||0)+' من '+loadedVideos.length+'. الفيديوهات بلا صف API تظهر «لا توجد بيانات» ولا تُعامل كصفر. '+(d.truncated_video_list?'تنبيه: تم فحص أول 500 فيديو فقط.':'')+' لا تعديل ولا نشر.','good');
+ notice('video-analytics-msg','اكتمل تحليل الفيديوهات للفترة '+startDate+' إلى '+endDate+'؛ جارٍ حفظ لقطة تاريخية تلقائيًا…','good');
+ // Automatically persist the full current report so viewing analytics cannot
+ // accidentally leave the historical section empty.
+ try{
+  const a=await call('analytics',{start_date:startDate,end_date:endDate});
+  lastAnalytics=a;
+  if(a.channel_id!==CHANNEL_ID)throw new Error('معرّف القناة في التحليلات اليومية لا يطابق القناة المثبتة.');
+  const videos=loadedVideos.map(v=>{
+   const s=byId.get(v.video_id);
+   return {video_id:v.video_id,title:v.title,published_at:v.published_at,privacy_status:v.privacy_status,
+    metrics:s?{views:s.views,estimated_minutes_watched:s.estimated_minutes_watched,average_view_duration_seconds:s.average_view_duration_seconds,average_view_percentage:s.average_view_percentage,likes:s.likes,comments:s.comments,shares:s.shares,subscribers_gained:s.subscribers_gained,subscribers_lost:s.subscribers_lost}:null};
+  });
+  const saved=await call('save_snapshot',{start_date:startDate,end_date:endDate,metrics:a.metrics||{},daily:a.daily||[],traffic_sources_daily:a.traffic_sources_daily||[],missing_dates:a.missing_dates||[],videos});
+  notice('video-analytics-msg','نجح التحليل وحُفظت لقطة تاريخية تلقائيًا. الفيديوهات: '+saved.video_count+'؛ لها بيانات تحليلية: '+saved.analytics_video_count+'؛ توصيات: '+saved.recommendations_generated+'. لا تعديل ولا نشر.','good');
+  await loadHistory();
+  await loadRecommendations();
+ }catch(e){
+  notice('video-analytics-msg','نجح تحليل الفيديوهات، لكن تعذّر حفظ اللقطة التاريخية: '+(e.message||'خطأ غير معروف')+'. بيانات YouTube لم تتغير.','warn');
+ }
 }
 async function saveSnapshot(){
  const start=$('start-date').value,end=$('end-date').value;
