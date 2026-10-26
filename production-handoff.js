@@ -33,15 +33,7 @@ async function importHandoff(){
   const response=await fetch(CONTENT,{method:"POST",headers:{authorization:"Bearer "+session.access_token,apikey:SUPABASE_KEY,"content-type":"application/json"},body:JSON.stringify(payload)});
   const data=await response.json().catch(()=>({}));
   if(!response.ok||data.ok===false)throw new Error(data.error||("HTTP "+response.status));
-  let generationNote="";
-  if(isRecommendation&&data.job?.id&&!(data.job?.script_json?.scenes||[]).length){
-   try{
-    const gr=await fetch(CONTENT,{method:"POST",headers:{authorization:"Bearer "+session.access_token,apikey:SUPABASE_KEY,"content-type":"application/json"},body:JSON.stringify({action:"generate",job_id:data.job.id,provider:"local"})});
-    const gd=await gr.json().catch(()=>({}));
-    if(gr.ok&&gd.ok!==false)generationNote=" تم إعداد مسودة النص والمشاهد محليًا دون API مدفوع.";
-    else generationNote=" حُفظت المهمة، لكن يلزم تشغيل توليد النص من داخلها: "+(gd.error||("HTTP "+gr.status));
-   }catch(e){generationNote=" حُفظت المهمة، وتعذر بدء التوليد التلقائي؛ يمكن استكمالها من داخل المهمة.";}
-  }
+  const generationNote=isRecommendation?" أُنشئت مهمة بانتظار موافقتك على بدء الإنشاء؛ لم يتم استدعاء نموذج ولم يتم النشر.":"";
   localStorage.removeItem(HANDOFF_KEY);
   const refresh=document.querySelector("#refresh-jobs")||document.querySelector("#refresh");
   if(refresh)refresh.click();
