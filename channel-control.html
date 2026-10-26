@@ -313,7 +313,7 @@ async function loadContentCalendar(){
     try{
      const handoff={version:1,calendar_item_id:item.id,analytics_snapshot_id:item.snapshot_id||pkg.duplicate_check?.source_snapshot_id||'',topic:pkg.title_for_upload||item.working_title,audience:pkg.audience||'مشاهدون عرب مهتمون بتاريخ مصر القديمة',language:pkg.language||'ar-EG',duration_seconds:pkg.target_duration_seconds||40,production_package:pkg};
      localStorage.setItem('zoz-pro-pending-production-handoff-v1',JSON.stringify(handoff));
-     const w=window.open('./index.html?handoff=1&tab=jobs','_blank');
+     location.href='./index.html?handoff=1&tab=jobs';
      if(!w)notice('calendar-msg','حُفظت الحزمة في هذا المتصفح. افتح مركز الإنتاج من الرابط أعلى الصفحة؛ ستُستورد بعد تسجيل الدخول.','good');
      else notice('calendar-msg','تم تجهيز الحزمة ونقلها إلى تبويب مركز الإنتاج؛ أكمل الاستيراد هناك. لم يتم النشر.','good');
     }catch(e){notice('calendar-msg','تعذر تجهيز تسليم الحزمة: '+(e.message||String(e)),'bad')}
