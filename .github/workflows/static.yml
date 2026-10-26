@@ -32,7 +32,7 @@ jobs:
       - name: Prepare static site files
         run: |
           mkdir -p _site
-          cp index.html channel-control.html youtube-analytics.html youtube-manager.html studio.html studio.css studio.js production-handoff.js pwa.js sw.js manifest.webmanifest zoz-icon.svg terms-of-service.html privacy-policy.html tiktok1ShjJDl7tDu6DbqXFuOmpvDQgPYBqPcZ.txt _site/
+          cp analysis-production.html index.html channel-control.html youtube-analytics.html youtube-manager.html studio.html studio.css studio.js production-handoff.js pwa.js sw.js manifest.webmanifest zoz-icon.svg terms-of-service.html privacy-policy.html tiktok1ShjJDl7tDu6DbqXFuOmpvDQgPYBqPcZ.txt _site/
           mkdir -p _site/production
           cp studio/index.html studio/style.css _site/production/
           git fetch origin supabase-studio-pages
