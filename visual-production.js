@@ -64,7 +64,7 @@
     if (!response.ok || !accepted.id) throw new Error(accepted.message || ("AI Horde HTTP " + response.status));
     const requestId = String(accepted.id);
     const started = Date.now();
-    while (Date.now() - started < 180000) {
+    while (Date.now() - started < 60000) {
       await wait(10000);
       const checkResponse = await fetch(HORDE + "/generate/check/" + encodeURIComponent(requestId), {
         headers: { apikey: "0000000000", "Client-Agent": OWNER_AGENT },
@@ -98,7 +98,7 @@
         return { blob: await imageResponse.blob(), source: "ai-horde", requestId, prompt };
       }
     }
-    throw new Error("انتهت مهلة انتظار محرك الصور المجاني؛ سيستخدم المركز صورًا تاريخية مرخصة بدل تعطيل الإنتاج.");
+    throw new Error("انتهت مهلة انتظار محرك الصور المجاني بعد دقيقة؛ سيستخدم المركز صورًا تاريخية مفتوحة بدل تعطيل الإنتاج.");
   }
   async function commonsImage(job, scene, index) {
     const specific = IMAGE_MODEL_HINTS[index % IMAGE_MODEL_HINTS.length];
