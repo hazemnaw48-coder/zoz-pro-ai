@@ -421,11 +421,7 @@
         });
         await wait(80);
       }
-      say(id, "حفظ التعليق الصوتي العربي…", "warn");
-      await uploadMedia(id, audioBlob, titleFor(job) + "-voiceover.wav", "audio/wav", {
-        visual_source: "nabra-tts-local", voice_language: "ar", generated_locally: true,
-        duration_seconds: recorded.audioDuration || null, text_characters: voiceText.length
-      });
+      say(id, "التعليق الصوتي مضمّن داخل MP4؛ حفظ الترجمة النصية…", "warn");
       say(id, "حفظ الترجمة النصية المتزامنة…", "warn");
       const subtitleBlob = new Blob([vttSubtitles(job, recorded.duration)], { type: "text/vtt;charset=utf-8" });
       await uploadMedia(id, subtitleBlob, titleFor(job) + "-subtitles.vtt", "text/vtt", {
