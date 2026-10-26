@@ -311,8 +311,24 @@ async function loadContentCalendar(){
   if(item.status!=='dismissed'){
    const send=document.createElement('button');send.type='button';send.textContent='إرسال حزمة الإنتاج إلى مركز الإنشاء';send.addEventListener('click',()=>{
     try{
-     const packageData=item.production_package&&typeof item.production_package==='object'&&!Array.isArray(item.production_package)?item.production_package:{};
-     if(!Object.keys(packageData).length)throw new Error('لا توجد حزمة إنتاج محفوظة لهذه الفكرة. أعد تحميل التقويم أو أنشئ الخطة الأسبوعية ثم أعد المحاولة.');
+     const savedPackage=item.production_package&&typeof item.production_package==='object'&&!Array.isArray(item.production_package)?item.production_package:null;
+     const packageData=savedPackage||{
+      title_for_upload:item.working_title||'فكرة محتوى عن مصر القديمة',
+      alternate_titles:[],
+      audience:'مشاهدون عرب مهتمون بتاريخ مصر القديمة',
+      language:'ar-EG',
+      target_duration_seconds:item.format==='long'?180:40,
+      narration:[{time:'00:00-00:05',text:item.hook||item.working_title||''},...(Array.isArray(item.outline)?item.outline:[]).map((line,i)=>({time:'مشهد '+(i+1),text:String(line)})),{time:'الخاتمة',text:item.cta||'اكتب رأيك في التعليقات.'}],
+      shotPlan:[{time:'00:00-00:05',visual:'لقطة افتتاحية موثقة مرتبطة بعنوان الفكرة: '+(item.working_title||''),overlay:'',audio:'تعليق صوتي عربي واضح: '+(item.hook||'')},...(Array.isArray(item.outline)?item.outline:[]).map((line,i)=>({time:'مشهد '+(i+1),visual:String(line),overlay:'',audio:'اشرح هذه النقطة بالعربية مع مراجعة مصدر موثوق قبل الإنتاج.'}))],
+      description:(item.hook||'')+'\n\n'+(Array.isArray(item.outline)?item.outline.join('\n'):'')+'\n\nيجب التحقق من الوقائع والمراجع قبل النشر.',
+      hashtags:['#مصر_القديمة','#الحضارة_المصرية','#AncientEgypt'],
+      tags:['مصر القديمة','الحضارة المصرية','التاريخ المصري'],
+      thumbnail_brief:'صورة رئيسية واضحة مرتبطة بالقطعة أو الموضوع التاريخي، دون كتابة معلومات غير موثقة.',
+      fact_check:['تحقق من مصدر متحفي أو أكاديمي موثوق.','لا تضف أسماء أو تواريخ غير مثبتة.','راجع حقوق استخدام الصور والمواد قبل النشر.'],
+      sources:[],
+      duplicate_check:{source_snapshot_id:item.snapshot_id||''},
+      package_reconstructed_from_calendar:true
+     };
      const handoff={version:1,calendar_item_id:item.id,analytics_snapshot_id:item.snapshot_id||packageData.duplicate_check?.source_snapshot_id||'',topic:packageData.title_for_upload||item.working_title,audience:packageData.audience||'مشاهدون عرب مهتمون بتاريخ مصر القديمة',language:packageData.language||'ar-EG',duration_seconds:packageData.target_duration_seconds||40,production_package:packageData};
      localStorage.setItem('zoz-pro-pending-production-handoff-v1',JSON.stringify(handoff));
      location.href='./index.html?handoff=1&tab=jobs';
