@@ -403,9 +403,9 @@
   async function render({ job, videoFiles = [], onProgress = null }) {
     if (!job || !job.id || !job.script_json) throw new Error("اختر مهمة محفوظة أولًا.");
     const scenes = Array.isArray(job.script_json.scenes) ? job.script_json.scenes : [];
-    if (scenes.length < 8) throw new Error("المهمة الحالية تحتاج إلى 8 مشاهد على الأقل لدمج 8 مقاطع. لم يبدأ الدمج.");
+    if (scenes.length < 1) throw new Error("المهمة لا تحتوي خطة مشاهد؛ لم يبدأ الدمج.");
     const files = Array.from(videoFiles || []).filter(Boolean);
-    if (files.length !== 8) throw new Error("لمنع إنتاج فيديو ناقص، اختر/ارفع 8 مقاطع بالضبط وبالترتيب المطلوب. الموجود الآن: " + files.length + ".");
+    if (files.length !== scenes.length) throw new Error("لمنع إنتاج فيديو ناقص، اختر/ارفع عدد المقاطع نفسه الموجود في خطة المشاهد (" + scenes.length + ") وبالترتيب المطلوب. الموجود الآن: " + files.length + ".");
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
       if (!(f.type === "video/mp4" || /\.mp4$/i.test(f.name || ""))) {
@@ -585,4 +585,4 @@
   }
   window.ZOZLocalRenderer = { render };
 })();
-</script><script src="./studio.js?v=3380b387a38cc491f27682666a78430e7152f30d"></script><script src="./pwa.js?v=20261022-4"></script></body></html>
+</script><script src="./studio.js?v=zoz-handoff-20261026-1"></script><script src="./pwa.js?v=20261022-4"></script></body></html>
