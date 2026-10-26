@@ -311,11 +311,12 @@ async function loadContentCalendar(){
   if(item.status!=='dismissed'){
    const send=document.createElement('button');send.type='button';send.textContent='إرسال حزمة الإنتاج إلى مركز الإنشاء';send.addEventListener('click',()=>{
     try{
-     const handoff={version:1,calendar_item_id:item.id,analytics_snapshot_id:item.snapshot_id||pkg.duplicate_check?.source_snapshot_id||'',topic:pkg.title_for_upload||item.working_title,audience:pkg.audience||'مشاهدون عرب مهتمون بتاريخ مصر القديمة',language:pkg.language||'ar-EG',duration_seconds:pkg.target_duration_seconds||40,production_package:pkg};
+     const packageData=item.production_package&&typeof item.production_package==='object'&&!Array.isArray(item.production_package)?item.production_package:{};
+     if(!Object.keys(packageData).length)throw new Error('لا توجد حزمة إنتاج محفوظة لهذه الفكرة. أعد تحميل التقويم أو أنشئ الخطة الأسبوعية ثم أعد المحاولة.');
+     const handoff={version:1,calendar_item_id:item.id,analytics_snapshot_id:item.snapshot_id||packageData.duplicate_check?.source_snapshot_id||'',topic:packageData.title_for_upload||item.working_title,audience:packageData.audience||'مشاهدون عرب مهتمون بتاريخ مصر القديمة',language:packageData.language||'ar-EG',duration_seconds:packageData.target_duration_seconds||40,production_package:packageData};
      localStorage.setItem('zoz-pro-pending-production-handoff-v1',JSON.stringify(handoff));
      location.href='./index.html?handoff=1&tab=jobs';
-     if(!w)notice('calendar-msg','حُفظت الحزمة في هذا المتصفح. افتح مركز الإنتاج من الرابط أعلى الصفحة؛ ستُستورد بعد تسجيل الدخول.','good');
-     else notice('calendar-msg','تم تجهيز الحزمة ونقلها إلى تبويب مركز الإنتاج؛ أكمل الاستيراد هناك. لم يتم النشر.','good');
+     notice('calendar-msg','تم تجهيز الحزمة ونقلها إلى مركز الإنتاج. أكمل هناك مراجعة الاستيراد؛ لم يتم النشر.','good');
     }catch(e){notice('calendar-msg','تعذر تجهيز تسليم الحزمة: '+(e.message||String(e)),'bad')}
    });controls.appendChild(send);
   }
