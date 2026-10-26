@@ -13,18 +13,24 @@ async function importHandoff(){
  if(running)return;
  let h=null;
  try{h=JSON.parse(localStorage.getItem(HANDOFF_KEY)||"null")}catch(_){localStorage.removeItem(HANDOFF_KEY)}
- if(!h||!h.production_package)return;
+ if(!h)return;
+ const isRecommendation=h.handoff_type==="analytics_recommendation"&&h.recommendation;
+ const isPackage=!!h.production_package;
+ if(!isRecommendation&&!isPackage)return;
  const app=document.querySelector("#app");
  if(!app||app.classList.contains("hidden"))return;
  running=true;
  try{
   const client=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
   const {data:{session}}=await client.auth.getSession();
-  if(!session?.access_token){running=false;return;}
+  if(!session?.access_token){message("سجّل الدخول بحساب مالك ZOZ Pro لاستلام التوصية. ستبقى محفوظة هنا.");running=false;return;}
   const {data:{user}}=await client.auth.getUser();
-  if((user?.email||"").toLowerCase()!=="hazemnaw48@gmail.com"||!user.email_confirmed_at){running=false;return;}
-  message("جارٍ استيراد حزمة الإنتاج المرسلة من مركز تحليل القناة…");
-  const response=await fetch(CONTENT,{method:"POST",headers:{authorization:"Bearer "+session.access_token,apikey:SUPABASE_KEY,"content-type":"application/json"},body:JSON.stringify({action:"import_package",handoff_id:h.calendar_item_id,calendar_item_id:h.calendar_item_id,analytics_snapshot_id:h.analytics_snapshot_id,topic:h.topic,audience:h.audience,language:h.language,duration_seconds:h.duration_seconds,production_package:h.production_package})});
+  if((user?.email||"").toLowerCase()!=="hazemnaw48@gmail.com"||!user.email_confirmed_at){message("يجب فتح مركز الإنتاج بحساب المالك المؤكد نفسه. التوصية محفوظة ولم تُحذف.");running=false;return;}
+  message(isRecommendation?"جارٍ تسليم التوصية المعتمدة وأدلتها إلى مهمة الإنتاج…":"جارٍ استيراد حزمة الإنتاج المرسلة من مركز تحليل القناة…");
+  const payload=isRecommendation
+   ? {action:"import_recommendation",recommendation:h.recommendation,recommendation_id:h.recommendation.id,analytics_snapshot_id:h.recommendation.snapshot_id,channel_id:h.recommendation.channel_id}
+   : {action:"import_package",handoff_id:h.calendar_item_id,calendar_item_id:h.calendar_item_id,analytics_snapshot_id:h.analytics_snapshot_id,topic:h.topic,audience:h.audience,language:h.language,duration_seconds:h.duration_seconds,production_package:h.production_package};
+  const response=await fetch(CONTENT,{method:"POST",headers:{authorization:"Bearer "+session.access_token,apikey:SUPABASE_KEY,"content-type":"application/json"},body:JSON.stringify(payload)});
   const data=await response.json().catch(()=>({}));
   if(!response.ok||data.ok===false)throw new Error(data.error||("HTTP "+response.status));
   localStorage.removeItem(HANDOFF_KEY);
@@ -32,12 +38,12 @@ async function importHandoff(){
   if(refresh)refresh.click();
   const jobs=document.querySelector("[data-tab='jobs']");
   if(jobs)jobs.click();
-  message(data.already_imported?"الحزمة مستوردة سابقًا؛ لم تُكرر المهمة.":(data.render_ready?"تم استيراد الحزمة إلى مركز الإنتاج. راجع المشاهد وجهّز المقاطع المتحركة قبل النشر.":(data.message||"تم استيراد الحزمة؛ يلزم استكمال المشاهد قبل الدمج.")));
+  message(data.already_imported?"هذه التوصية مستلمة سابقًا؛ لم تُكرر المهمة.":(isRecommendation?"وصلت التوصية المعتمدة إلى مركز الإنتاج مع الأدلة وبيانات الفيديو المرجعي. افتح المهمة لتوليد النص والمشاهد؛ لم يتم النشر.":(data.message||"تم استيراد الحزمة إلى مركز الإنتاج.")));
   const cards=[...document.querySelectorAll("#jobs .item")];
   const card=data.job&&cards.find(x=>x.textContent.includes(data.job.id));
   if(card)card.scrollIntoView({behavior:"smooth",block:"center"});
  }catch(e){
-  message("تعذر استيراد الحزمة: "+(e.message||String(e))+". ستبقى الحزمة محفوظة للمحاولة التالية.");
+  message("تعذر استلام التوصية/الحزمة: "+(e.message||String(e))+". بقيت محفوظة للمحاولة التالية.");
  }finally{running=false;}
 }
 document.addEventListener("DOMContentLoaded",()=>{
