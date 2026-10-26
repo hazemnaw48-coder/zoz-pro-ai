@@ -15,6 +15,8 @@ label{display:block;font-weight:650;margin:12px 0 5px}input{width:100%;backgroun
 button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0;color:white;padding:11px 15px;font:inherit;font-weight:700;cursor:pointer;text-decoration:none;margin:4px 0}button.secondary,.link.secondary{background:#263954;color:#eaf1ff}button:disabled{opacity:.5;cursor:not-allowed}
 .notice{padding:12px;border-radius:10px;background:#182a43;border:1px solid #314762;white-space:pre-wrap;overflow-wrap:anywhere}.notice.good{border-color:#27745d;color:var(--good)}.notice.warn{border-color:#806031;color:var(--warn)}.notice.bad{border-color:#84434b;color:var(--bad)}
 .metric{border:1px solid var(--line);border-radius:12px;padding:13px;min-width:0}.metric small{display:block;color:var(--muted)}.number{font-size:24px;font-weight:850;overflow-wrap:anywhere}.hidden{display:none!important}.tablewrap{overflow:auto;max-width:100%;border:1px solid var(--line);border-radius:10px;margin-top:10px}table{border-collapse:collapse;width:100%;min-width:500px;font-size:14px}td,th{padding:9px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}th{background:#1a2b42}.video{display:grid;grid-template-columns:145px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.video:last-child{border:0}.video img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:#25364b}.small{font-size:12px;color:var(--muted)}a{color:var(--accent)}.section-gap{margin-top:18px}
+.actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0}.stack{display:grid;gap:10px;margin-top:12px}.video-card{border:1px solid var(--line);background:#0e1a2b;border-radius:12px;padding:14px;min-width:0}.video-card h3{line-height:1.5}.video-card p{margin:8px 0}.video-card ol{margin:8px 0;padding-inline-start:24px;color:var(--muted)}.video-card li{padding:2px 0}.video-card textarea{width:100%;resize:vertical;background:#0a1422;color:var(--text);border:1px solid #40536d;border-radius:8px;padding:10px;font:inherit;margin:8px 0}.video-card .actions{border-top:1px solid var(--line);padding-top:10px}.video-card button{font-size:14px;padding:8px 10px}.footer{padding:16px 4px 28px;line-height:1.9}.footer a{display:inline-block;margin-inline-start:4px}
+@media(max-width:480px){.actions button{flex:1 1 140px}.video-card{padding:11px}.video-card button{flex:1 1 120px}}
 @media(max-width:480px){main{padding:10px}.card{padding:12px}.video{grid-template-columns:100px 1fr}.number{font-size:21px}}
 </style>
 </head>
@@ -70,18 +72,21 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
   <div id="history-msg" class="notice">بعد حفظ أول لقطة، يمكنك عرض سجل المقارنات هنا.</div>
   <div id="history-wrap"></div>
  </section>
- <section class="card">
-  <div class="row"><h2>٧. تقويم المحتوى وخطة التنفيذ</h2>
-<p>مسودات أسبوعية مرتبطة بآخر لقطة تحليلات محفوظة. لا تنشئ فيديوهات ولا تنشر تلقائيًا. كل قرار وملاحظة يُحفظان في سجل الإنتاج.</p>
-<div class="actions"><button id="load-calendar" type="button">تحميل التقويم</button><button id="generate-calendar" type="button">إنشاء خطة أسبوعية من التحليلات</button></div>
-<div id="calendar-msg" class="notice"></div><div id="calendar-list" class="stack"></div>
-<h2>٨. توصيات المحتوى ومراجعتها</h2><button id="load-recommendations" class="secondary">تحميل التوصيات</button></div>
-  <p>توصيات مسودة مبنية على بيانات التحليلات المحفوظة. الموافقة هنا تسجل قرارك فقط؛ لا تنشئ محتوى ولا تنشره تلقائيًا.</p>
-  <div id="recommendations-msg" class="notice">احفظ لقطة تحليل أولًا لتوليد توصيات مبنية على بيانات فعلية.</div>
+ <section class="card" id="content-calendar-section">
+  <div class="row"><h2>٧. تقويم المحتوى وخطة التنفيذ</h2><span class="small">مسودات فقط · لا نشر تلقائي</span></div>
+  <p>خطة أسبوعية مبنية على آخر لقطة تحليل محفوظة. كل فكرة تضم موعدًا، ونوع المحتوى، وافتتاحية، وخطوات إنتاج، ودعوة تفاعل. راجع الوقائع والمصادر قبل الإنتاج.</p>
+  <div class="actions"><button id="load-calendar" type="button" class="secondary">تحميل التقويم</button><button id="generate-calendar" type="button">إنشاء خطة أسبوعية من التحليلات</button></div>
+  <div id="calendar-msg" class="notice">حمّل التقويم لعرض المسودات المحفوظة، أو أنشئ خطة من التحليلات.</div>
+  <div id="calendar-list" class="stack"></div>
+ </section>
+ <section class="card" id="recommendations-section">
+  <div class="row"><h2>٨. توصيات المحتوى ومراجعتها</h2><button id="load-recommendations" class="secondary">تحميل التوصيات</button></div>
+  <p>اقتراحات مبنية على بيانات التحليلات. الموافقة تسجل قرارك داخل المركز فقط؛ لا تعدل الفيديوهات ولا تنشرها.</p>
+  <div id="recommendations-msg" class="notice">حمّل التوصيات المحفوظة للمراجعة.</div>
   <div id="recommendations-list"></div>
  </section>
 </div>
-<div class="footer small">وضع الاستعادة الحالي للقراءة فقط: لا نشر، لا تعديل بيانات الفيديو، ولا تغيير خصوصية. لا يُعاد ربط Google تلقائيًا؛ إذا ظهر خطأ سيُعرض سببه دون بدء تفويض جديد.</div>
+<div class="footer small">وضع الاستعادة للقراءة فقط: لا نشر، ولا تعديل لفيديوهات YouTube أو خصوصيتها. <span>·</span> <a href="https://github.com/hazemnaw48-coder/zoz-pro-ai/blob/main/ZOZ-PRO-EXECUTION-NOTES.md" target="_blank" rel="noopener">سجل تنفيذ المركز والملاحظات</a></div>وضع الاستعادة الحالي للقراءة فقط: لا نشر، لا تعديل بيانات الفيديو، ولا تغيير خصوصية. لا يُعاد ربط Google تلقائيًا؛ إذا ظهر خطأ سيُعرض سببه دون بدء تفويض جديد.</div>
 </main>
 <script>
 (function(){
