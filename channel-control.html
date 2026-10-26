@@ -61,6 +61,7 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
    <button type="button" class="section-tab" data-page-target="video-analytics">٥ · أداء الفيديو</button>
    <button type="button" class="section-tab" data-page-target="history">٦ · السجل</button>
    <button type="button" class="section-tab" data-page-target="calendar">٧ · التقويم</button>
+   <button type="button" class="section-tab" data-page-target="intake">٩ · استقبال الفيديوهات</button>
    <button type="button" class="section-tab" data-page-target="recommendations">٨ · التوصيات</button>
   </nav>
   <div id="page-indicator" class="page-indicator" aria-live="polite">القسم الحالي: حالة الربط · ١ من ٧</div>
@@ -120,7 +121,45 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
   <div id="calendar-list" class="stack"></div>
  </section>
 </div>
- <div class="page-panel" data-page="recommendations" id="page-recommendations">
+ <div class="page-panel" data-page="intake" id="page-intake">
+<section class="card">
+ <h2>٩. بوابة استقبال الفيديوهات والنشر الفعلي</h2>
+ <p>ارفع ملفًا من الهاتف أو استقبل تصديرًا من مراكز الإنتاج المعتمدة. يتم حفظ الأجزاء في مخزن خاص، ثم مراجعتها، ثم رفعها إلى YouTube بوضع خاص أولًا. لا يُنشر الفيديو علنًا إلا بعد موافقة صريحة منفصلة.</p>
+ <div id="intake-msg" class="notice">سجّل الدخول، ثم حمّل قائمة الملفات.</div>
+ <h3 class="section-gap">أ. استقبال ملف من الهاتف</h3>
+ <label for="intake-file">ملف الفيديو (MP4 أو MOV أو WebM أو MKV)</label><input id="intake-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,application/octet-stream">
+ <label for="intake-title">عنوان YouTube</label><input id="intake-title" maxlength="100" placeholder="عنوان الفيديو النهائي">
+ <label for="intake-description">الوصف</label><textarea id="intake-description" rows="4" maxlength="5000" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit"></textarea>
+ <label for="intake-tags">كلمات مفتاحية، افصل بينها بفواصل</label><input id="intake-tags" maxlength="2000" placeholder="مصر القديمة، الآثار، التاريخ">
+ <div class="grid">
+  <div><label for="intake-kids">هل صُنع الفيديو خصيصًا للأطفال؟</label><select id="intake-kids" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px"><option value="">اختر الإجابة</option><option value="false">لا</option><option value="true">نعم</option></select></div>
+  <div><label for="intake-synthetic">هل يحتوي مشاهد واقعية مولدة أو معدلة اصطناعيًا؟</label><select id="intake-synthetic" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px"><option value="">اختر الإجابة</option><option value="false">لا</option><option value="true">نعم</option></select></div>
+ </div>
+ <label for="intake-privacy">الخصوصية بعد موافقة النشر</label><select id="intake-privacy" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px"><option value="public">عام — بعد تأكيد النشر</option><option value="unlisted">غير مدرج — بعد تأكيد النشر</option></select>
+ <div class="actions"><button id="intake-upload">رفع الفيديو إلى مركز ZOZ Pro</button><button id="intake-refresh" class="secondary">تحديث قائمة الاستقبال</button></div>
+ <div id="intake-progress" class="notice">الأجزاء تُرفع بالتتابع، ويمكن إعادة المحاولة إذا انقطع الاتصال.</div>
+</section>
+<section class="card">
+ <h3>ب. ربط مركز إنتاج معتمد</h3>
+ <p>أنشئ رمزًا مستقلًا لكل مركز مثل Google Flow workflow أو Runway أو Kling أو محرر خارجي. الرمز يسمح باستقبال الملفات فقط؛ لا يملك صلاحية الموافقة أو النشر، ويمكن إلغاؤه في أي وقت. لا تضع الرمز داخل تطبيق عام أو مستودع GitHub.</p>
+ <label for="intake-source-name">اسم المركز</label><input id="intake-source-name" maxlength="120" placeholder="مثال: Google Flow — ZOZ NOW">
+ <div class="actions"><button id="intake-source-create">إنشاء رمز ربط للمركز</button><button id="intake-source-refresh" class="secondary">عرض المراكز المرتبطة</button></div>
+ <div id="intake-source-msg" class="notice">سيظهر الرمز مرة واحدة عند إنشائه؛ انسخه واحفظه في المركز الموثوق فقط.</div>
+ <div id="intake-source-list" class="stack"></div>
+ <details class="production-package"><summary>عقد التصدير للمراكز المعتمدة</summary>
+ <p>Endpoint: <code>https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-youtube-analytics?action=intake_create</code></p>
+ <p>أرسل POST مع ترويسة <code>x-zoz-intake-token: TOKEN</code> وJSON يحتوي filename وtotal_bytes وcontent_type وtitle وdescription وtags وmade_for_kids وcontains_synthetic_media وtarget_privacy_status.</p>
+ <p>الرد يعيد asset.id وchunk_size وchunk_count. لكل جزء من 0 إلى chunk_count-1: اطلب <code>intake_signed_part</code> مع asset_id وpart_index، ارفع الجزء إلى upload_url بترويسة Content-Type: application/octet-stream، ثم سجّل الجزء عبر <code>intake_part_done</code>. بعد اكتمال جميع الأجزاء اطلب <code>intake_finalize</code>. كل طلب يحتاج ترويسة الرمز نفسها. رمز المركز لا يستطيع الموافقة أو النشر.</p>
+ <button type="button" id="intake-copy-contract" class="secondary">نسخ عنوان التكامل وخطواته</button>
+ </details>
+</section>
+<section class="card">
+ <div class="row"><h3>ج. قائمة الاستقبال ومراحل النشر</h3><button id="intake-refresh-list" class="secondary">تحديث الحالة</button></div>
+ <p>التدفق: رفع مكتمل ← مراجعة المالك ← رفع خاص إلى YouTube ← معالجة YouTube ← مراجعة نهائية ← نشر مؤكد ← حذف الأجزاء المؤقتة مع الاحتفاظ بسجل الفيديو.</p>
+ <div id="intake-list" class="stack"></div>
+</section>
+</div>
+<div class="page-panel" data-page="recommendations" id="page-recommendations">
 <section class="card" id="recommendations-section">
   <div class="row"><h2>٨. توصيات المحتوى ومراجعتها</h2><button id="load-recommendations" class="secondary">تحميل التوصيات</button></div>
   <p>اقتراحات مبنية على بيانات التحليلات. الموافقة تسجل قرارك داخل المركز فقط؛ لا تعدل الفيديوهات ولا تنشرها.</p>
@@ -278,6 +317,71 @@ async function generateContentCalendar(){
  notice('calendar-msg',d.message||'تم تحديث التقويم.','good');await loadContentCalendar();
 }
 
+async function intakeApi(action,body){return await call(action,body||{});}
+async function uploadIntakeFile(){
+ const file=$('intake-file').files&&$('intake-file').files[0];
+ if(!file)throw new Error('اختر ملف فيديو أولًا.');
+ if(!file.size)throw new Error('الملف فارغ.');
+ const kids=$('intake-kids').value,synthetic=$('intake-synthetic').value;
+ if(kids===''||synthetic==='')throw new Error('اختر إجابة واضحة لسؤال الجمهور وإفصاح المشاهد الاصطناعية.');
+ const b=$('intake-upload');b.disabled=true;
+ try{
+  notice('intake-progress','جارٍ إنشاء جلسة استقبال آمنة…');
+  const created=await intakeApi('intake_create',{filename:file.name,total_bytes:file.size,content_type:file.type||'application/octet-stream',title:$('intake-title').value.trim()||file.name.replace(/\.[^.]+$/,''),description:$('intake-description').value,tags:$('intake-tags').value.split(',').map(x=>x.trim()).filter(Boolean),made_for_kids:kids==='true',contains_synthetic_media:synthetic==='true',target_privacy_status:$('intake-privacy').value});
+  const a=created.asset,chunk=a.chunk_size;
+  for(let part=0;part<a.chunk_count;part++){
+   const blob=file.slice(part*chunk,Math.min(file.size,(part+1)*chunk));
+   const signed=await intakeApi('intake_signed_part',{asset_id:a.id,part_index:part});
+   const uploaded=await fetch(signed.upload_url,{method:'POST',headers:{'content-type':'application/octet-stream','x-upsert':'false'},body:blob});
+   if(!uploaded.ok)throw new Error('فشل رفع الجزء '+(part+1)+' من '+a.chunk_count+' (HTTP '+uploaded.status+'). يمكنك المحاولة مجددًا من قائمة الاستقبال.');
+   const progress=await intakeApi('intake_part_done',{asset_id:a.id,part_index:part});
+   notice('intake-progress','تم رفع '+(part+1)+' / '+a.chunk_count+' جزءًا — '+fmt(progress.uploaded_bytes)+' من '+fmt(progress.total_bytes)+' بايت.');
+  }
+  await intakeApi('intake_finalize',{asset_id:a.id});
+  notice('intake-progress','اكتمل الاستقبال. الملف محفوظ في طابور المراجعة ولم يُنشر.','good');
+  notice('intake-msg','تم استقبال الفيديو بنجاح داخل قاعدة الإنتاج. راجعه في قائمة الاستقبال.','good');
+  $('intake-file').value='';await loadIntakeAssets();
+ }finally{b.disabled=false;}
+}
+function intakeStatusLabel(s){return ({uploading:'جارٍ الاستقبال',ready_for_review:'ينتظر مراجعة المالك',approved:'موافق عليه للرفع الخاص',rejected:'مرفوض',uploading_to_youtube:'جارٍ الرفع إلى YouTube',processing:'YouTube يعالج الفيديو',ready_to_publish:'جاهز للنشر بعد تأكيدك',published:'منشور',archived:'أُرشف وحُذفت أجزاؤه المؤقتة',failed:'فشل — يحتاج مراجعة'}[s]||s);}
+async function loadIntakeAssets(){
+ const d=await intakeApi('intake_list',{}),host=$('intake-list');host.innerHTML='';
+ const assets=Array.isArray(d.assets)?d.assets:[];
+ if(!assets.length){host.textContent='لا توجد فيديوهات مستقبلة حتى الآن.';return;}
+ assets.forEach(a=>{
+  const card=document.createElement('article');card.className='video-card';
+  const h=document.createElement('h3');h.textContent=a.title||a.original_filename;card.appendChild(h);
+  const p=document.createElement('p');p.textContent=a.original_filename+' · '+fmt(a.total_bytes)+' بايت · '+a.source_name;card.appendChild(p);
+  const st=document.createElement('p');st.className='notice';st.textContent='الحالة: '+intakeStatusLabel(a.status)+' · '+fmt(a.uploaded_bytes)+' / '+fmt(a.total_bytes)+' بايت';card.appendChild(st);
+  if(a.youtube_video_id){const link=document.createElement('a');link.href='https://www.youtube.com/watch?v='+encodeURIComponent(a.youtube_video_id);link.target='_blank';link.rel='noopener';link.textContent='فتح فيديو YouTube';card.appendChild(link);}
+  if(a.last_error||a.youtube_failure_reason){const err=document.createElement('p');err.textContent='ملاحظة الخطأ: '+(a.last_error||a.youtube_failure_reason);card.appendChild(err);}
+  const controls=document.createElement('div');controls.className='actions';
+  const addButton=(label,fn,kind)=>{const b=document.createElement('button');b.type='button';b.textContent=label;if(kind)b.className='secondary';b.addEventListener('click',async()=>{b.disabled=true;try{await fn();await loadIntakeAssets();}catch(e){notice('intake-msg',e.message||'تعذر تنفيذ العملية.','bad');}finally{b.disabled=false;}});controls.appendChild(b);};
+  if(a.status==='uploading')addButton('استكمال استقبال الملف',async()=>{throw new Error('للاستكمال بعد انقطاع، أعد اختيار الملف الأصلي نفسه ثم أرسل الاستقبال مجددًا. سيتم دعم الاستئناف المباشر في تحديث لاحق.');},true);
+  if(a.status==='ready_for_review'){
+   addButton('موافقة المالك',async()=>{if(!confirm('تأكيد مراجعة بيانات الفيديو والسماح برفعه إلى YouTube بوضع خاص؟'))return;await intakeApi('intake_review',{asset_id:a.id,decision:'approve'});notice('intake-msg','تم تسجيل الموافقة؛ الفيديو لم يُنشر علنًا.','good');});
+   addButton('رفض الفيديو',async()=>{if(!confirm('رفض هذا الملف؟'))return;await intakeApi('intake_review',{asset_id:a.id,decision:'reject',note:'رفض من مراجعة المالك'});notice('intake-msg','تم رفض الملف.','good');},true);
+  }
+  if(a.status==='approved')addButton('رفع إلى YouTube بوضع خاص',async()=>{if(!confirm('بدء رفع الفيديو إلى قناتك بوضع خاص؟ لن يكون عامًا بعد الرفع.'))return;await intakeApi('intake_start_youtube',{asset_id:a.id});for(let i=0;i<a.chunk_count;i++){const r=await intakeApi('intake_youtube_part',{asset_id:a.id,part_index:i});notice('intake-msg','جارٍ نقل الفيديو إلى YouTube: '+fmt(r.uploaded_bytes||0)+' / '+fmt(r.total_bytes||a.total_bytes)+' بايت.','');if(r.complete)break;}notice('intake-msg','انتهى رفع الملف إلى YouTube؛ انتظر اكتمال المعالجة ثم افحص الحالة.','good');});
+  if(a.status==='processing')addButton('فحص معالجة YouTube',async()=>{const r=await intakeApi('intake_check_processing',{asset_id:a.id});notice('intake-msg','حالة YouTube: '+intakeStatusLabel(r.status)+' · '+r.processing_status,'good');},true);
+  if(a.status==='ready_to_publish')addButton('نشر فعلي الآن',async()=>{if(!confirm('هذا الإجراء سيغيّر خصوصية الفيديو على القناة إلى '+(a.target_privacy_status==='unlisted'?'غير مدرج':'عام')+'. هل راجعت الفيديو والعنوان والوصف وحقوق الصور وتريد النشر الآن؟'))return;const r=await intakeApi('intake_publish',{asset_id:a.id,publish_confirmed:true});notice('intake-msg','تم النشر: '+r.url,'good');});
+  if(a.status==='published')addButton('حذف النسخة المؤقتة بعد النشر',async()=>{if(!confirm('سيتم حذف أجزاء الفيديو المؤقتة من التخزين مع إبقاء بيانات السجل ورابط YouTube. هل تتابع؟'))return;await intakeApi('intake_archive',{asset_id:a.id});notice('intake-msg','تمت الأرشفة وحذف الأجزاء المؤقتة.','good');},true);
+  if(controls.childNodes.length)card.appendChild(controls);host.appendChild(card);
+ });
+}
+async function loadIntakeSources(){
+ const d=await intakeApi('intake_source_list',{}),host=$('intake-source-list');host.innerHTML='';
+ (d.sources||[]).forEach(s=>{const card=document.createElement('article');card.className='video-card';const p=document.createElement('p');p.textContent=s.source_name+' · '+(s.is_active?'نشط':'ملغى')+' · آخر استخدام: '+(s.last_used_at||'لم يستخدم بعد');card.appendChild(p);if(s.is_active){const b=document.createElement('button');b.className='secondary';b.textContent='إلغاء الرمز';b.addEventListener('click',async()=>{if(!confirm('إلغاء رمز '+s.source_name+'؟'))return;await intakeApi('intake_source_revoke',{source_id:s.id});await loadIntakeSources();});card.appendChild(b);}host.appendChild(card);});
+ if(!(d.sources||[]).length)host.textContent='لم يتم ربط أي مركز بعد.';
+}
+async function createIntakeSource(){
+ const name=$('intake-source-name').value.trim();if(!name)throw new Error('اكتب اسم مركز الإنتاج.');
+ const d=await intakeApi('intake_source_create',{source_name:name});
+ const output='رمز المركز: '+d.token+'\n\nعنوان API: '+API+'\nالترويسة: x-zoz-intake-token: '+d.token+'\n\nاحتفظ بالرمز في إعدادات المركز الموثوق فقط. لا يمكن عرضه مرة أخرى.';
+ notice('intake-source-msg',output,'good');
+ try{await navigator.clipboard.writeText(output);}catch(e){}
+ $('intake-source-name').value='';await loadIntakeSources();
+}
 async function loadVideoAnalytics(){
  const startDate=$('start-date').value,endDate=$('end-date').value;
  if(!startDate||!endDate||startDate>endDate)throw new Error('تحقق من تاريخ البداية والنهاية.');
@@ -420,6 +524,12 @@ $('load-video-analytics').addEventListener('click',async()=>{
  finally{$('load-video-analytics').disabled=false;}
 });
 $('save-snapshot').addEventListener('click',async()=>{try{await saveSnapshot();}catch(e){}});
+$('intake-upload')?.addEventListener('click',async()=>{try{await uploadIntakeFile();}catch(e){notice('intake-progress',e.message||'تعذر رفع الملف.','bad');notice('intake-msg','لم يكتمل الاستقبال؛ راجع رسالة الخطأ قبل إعادة المحاولة.','warn');}});
+$('intake-refresh')?.addEventListener('click',async()=>{try{await loadIntakeAssets();notice('intake-msg','تم تحديث قائمة الاستقبال.','good');}catch(e){notice('intake-msg',e.message||'تعذر تحميل القائمة.','bad');}});
+$('intake-refresh-list')?.addEventListener('click',async()=>{try{await loadIntakeAssets();}catch(e){notice('intake-msg',e.message||'تعذر تحميل القائمة.','bad');}});
+$('intake-source-create')?.addEventListener('click',async()=>{const b=$('intake-source-create');b.disabled=true;try{await createIntakeSource();}catch(e){notice('intake-source-msg',e.message||'تعذر ربط المركز.','bad');}finally{b.disabled=false;}});
+$('intake-source-refresh')?.addEventListener('click',async()=>{try{await loadIntakeSources();}catch(e){notice('intake-source-msg',e.message||'تعذر تحميل المراكز.','bad');}});
+$('intake-copy-contract')?.addEventListener('click',async()=>{const text='Endpoint: '+API+'?action=intake_create\nAuth: x-zoz-intake-token: TOKEN\nActions: intake_create → intake_signed_part → POST binary to upload_url → intake_part_done → intake_finalize. Use 8 MiB chunks in ascending order. Source tokens cannot approve or publish.';try{await navigator.clipboard.writeText(text);notice('intake-source-msg','تم نسخ عقد التكامل.','good');}catch(e){notice('intake-source-msg',text,'warn');}});
 $('load-history').addEventListener('click',loadHistory);
 $('load-recommendations').addEventListener('click',loadRecommendations);
 const end=new Date(Date.now()-86400000);const start=new Date(end);start.setDate(start.getDate()-27);$('start-date').value=dateInput(start);$('end-date').value=dateInput(end);
