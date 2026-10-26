@@ -30,6 +30,8 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
 .actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0}.stack{display:grid;gap:10px;margin-top:12px}.video-card{border:1px solid var(--line);background:#0e1a2b;border-radius:12px;padding:14px;min-width:0}.video-card h3{line-height:1.5}.video-card p{margin:8px 0}.video-card ol{margin:8px 0;padding-inline-start:24px;color:var(--muted)}.video-card li{padding:2px 0}.video-card textarea{width:100%;resize:vertical;background:#0a1422;color:var(--text);border:1px solid #40536d;border-radius:8px;padding:10px;font:inherit;margin:8px 0}.video-card .actions{border-top:1px solid var(--line);padding-top:10px}.video-card button{font-size:14px;padding:8px 10px}.footer{padding:16px 4px 28px;line-height:1.9}.footer a{display:inline-block;margin-inline-start:4px}
 @media(max-width:480px){.actions button{flex:1 1 140px}.video-card{padding:11px}.video-card button{flex:1 1 120px}}
 @media(max-width:480px){main{padding:10px}.card{padding:12px}.video{grid-template-columns:100px 1fr}.number{font-size:21px}}
+
+.production-package{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:#0e1928}.production-package summary{cursor:pointer;font-weight:700;color:var(--accent)}.production-package h4{font-size:15px;margin:14px 0 4px}.production-package p{overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -243,6 +245,24 @@ async function loadContentCalendar(){
   const outline=document.createElement('ol');(Array.isArray(item.outline)?item.outline:[]).forEach(line=>{const li=document.createElement('li');li.textContent=line;outline.appendChild(li)});card.appendChild(outline);
   const cta=document.createElement('p');cta.textContent='الدعوة: '+item.cta;card.appendChild(cta);
   const evidence=document.createElement('p');evidence.textContent='ملاحظة تحقق: '+(item.evidence?.basis||'تحقق من المصادر قبل الإنتاج')+' — يلزم التحقق من الوقائع والمراجع.';card.appendChild(evidence);
+  if(item.production_package&&typeof item.production_package==='object'&&!Array.isArray(item.production_package)){
+   const pkg=item.production_package;
+   const details=document.createElement('details');details.className='production-package';
+   const summary=document.createElement('summary');summary.textContent='حزمة الإنتاج الكاملة — '+(pkg.target_duration_seconds||'')+' ثانية';details.appendChild(summary);
+   const addBlock=(heading,body)=>{if(!body)return;const h=document.createElement('h4');h.textContent=heading;details.appendChild(h);const p=document.createElement('p');p.style.whiteSpace='pre-wrap';p.textContent=body;details.appendChild(p);};
+   addBlock('عنوان النشر',pkg.title_for_upload);
+   addBlock('عناوين بديلة',(pkg.alternate_titles||[]).map((x,i)=>(i+1)+'. '+x).join('\n'));
+   addBlock('نص التعليق الصوتي',(pkg.narration||[]).map(x=>x.time+' — '+x.text).join('\n'));
+   addBlock('خطة المشاهد',(pkg.shotPlan||[]).map(x=>x.time+'\nالصورة: '+x.visual+'\nالنص على الشاشة: '+(x.overlay||'—')+'\nالصوت: '+(x.audio||'—')).join('\n\n'));
+   addBlock('الوصف',pkg.description);
+   addBlock('الهاشتاغات',(pkg.hashtags||[]).join(' '));
+   addBlock('الكلمات المفتاحية',(pkg.tags||[]).join('، '));
+   addBlock('موجز الصورة المصغرة',pkg.thumbnail_brief);
+   addBlock('قائمة التحقق قبل الإنتاج',(pkg.fact_check||[]).map((x,i)=>(i+1)+'. '+x).join('\n'));
+   addBlock('المراجع',(pkg.sources||[]).map(x=>x.name+' — '+x.url+'\n'+x.purpose).join('\n\n'));
+   const copy=document.createElement('button');copy.type='button';copy.className='secondary';copy.textContent='نسخ حزمة الإنتاج';copy.addEventListener('click',async()=>{const payload=JSON.stringify(pkg,null,2);try{await navigator.clipboard.writeText(payload);notice('calendar-msg','تم نسخ حزمة الإنتاج إلى الحافظة.','good');}catch(e){notice('calendar-msg','تعذر النسخ المباشر على هذا المتصفح؛ افتح تفاصيل الحزمة وانسخ النص يدويًا.','bad')}});details.appendChild(copy);
+   card.appendChild(details);
+  }
   const note=document.createElement('textarea');note.rows=2;note.maxLength=1000;note.placeholder='ملاحظتك لهذه الفكرة (اختياري)';note.value=item.owner_note||'';card.appendChild(note);
   const controls=document.createElement('div');controls.className='actions';
   const opts=[['approved','موافقة على المسودة'],['in_production','بدء الإنتاج'],['ready_for_review','جاهزة للمراجعة'],['completed','إكمال'],['dismissed','رفض الفكرة']];
