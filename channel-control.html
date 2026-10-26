@@ -490,8 +490,6 @@ async function loadRecommendations(){
  $('load-recommendations').disabled=true;notice('recommendations-msg','جارٍ تحميل توصيات المحتوى…');
  try{
   const d=await call('recommendations',{});
-  let calendarItems=[];
-  try{const cd=await call('content_calendar',{});calendarItems=Array.isArray(cd.calendar)?cd.calendar:[];}catch(_){calendarItems=[];}
   const host=$('recommendations-list');host.innerHTML='';
   const list=Array.isArray(d.recommendations)?d.recommendations:[];
   if(!list.length){notice('recommendations-msg','لا توجد توصيات بعد. احفظ لقطة تحليل أولًا.','good');return;}
@@ -515,9 +513,8 @@ async function loadRecommendations(){
        title:r.title||'',body:r.body||'',evidence:r.evidence||{},status:r.status
       }};
       localStorage.setItem('zoz-pro-pending-production-handoff-v1',JSON.stringify(handoff));
-      const w=window.open('./index.html?handoff=1&tab=jobs','_blank');
-      if(!w)notice('recommendations-msg','حُفظت التوصية المعتمدة في هذا المتصفح. افتح مركز الإنتاج من الرابط نفسه بهذا المتصفح؛ لن تُنشأ مهمة مكررة عند إعادة المحاولة.','good');
-      else notice('recommendations-msg','أُرسلت بيانات التوصية وأدلتها إلى مركز الإنتاج. سيُنشئ مهمة إنتاج مرتبطة بها؛ لا يوجد نشر تلقائي.','good');
+      notice('recommendations-msg','أُرسلت بيانات التوصية المعتمدة. سيتم فتح مركز الإنتاج في النافذة الحالية لتجنب حظر النوافذ المنبثقة على الهاتف؛ لن يتم النشر تلقائيًا.','good');
+      location.href='./index.html?handoff=1&tab=jobs';
      }catch(e){notice('recommendations-msg','تعذر تجهيز الإرسال: '+(e.message||String(e)),'bad');}
     });
     card.appendChild(send);
