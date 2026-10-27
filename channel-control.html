@@ -149,7 +149,7 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
  <label for="studio-topic">موضوع الحلقة</label><input id="studio-topic" maxlength="240" value="ليه نب آمون أكبر من الفلاحين في الرسمة؟">
  <div class="grid"><div><label for="studio-format">نوع الفيديو</label><select id="studio-format"><option value="short">Short</option><option value="long">فيديو طويل</option></select></div><div><label for="studio-duration">المدة بالثواني</label><input id="studio-duration" type="number" min="20" max="180" value="40"></div></div>
  <div class="actions"><button id="studio-generate">إنشاء سكربت من بيانات القناة</button><button id="studio-refresh" class="secondary">عرض المسودات المحفوظة</button></div>
- <div id="studio-msg" class="notice">المسودات تُحفظ في Supabase ولا تُنشر تلقائيًا.</div><div id="studio-result" class="stack"></div>
+ <div id="studio-msg" class="notice">المسودات تُحفظ في Supabase ولا تُنشر تلقائيًا.</div><div id="studio-generated-result" class="stack"></div><h3 class="section-gap">المسودات المحفوظة</h3><div id="studio-result" class="stack"></div>
 </section>
 </div>
 <div class="page-panel" data-page="intake" id="page-intake">
@@ -725,7 +725,20 @@ $('load-video-analytics').addEventListener('click',async()=>{
  finally{$('load-video-analytics').disabled=false;}
 });
 $('save-snapshot').addEventListener('click',async()=>{try{await saveSnapshot();}catch(e){}});
-$('studio-generate')?.addEventListener('click',async()=>{const b=$('studio-generate');b.disabled=true;try{const r=await managedCall('studio_generate',{topic:$('studio-topic').value.trim(),mode:$('studio-format').value,duration_seconds:Number($('studio-duration').value)});const s=r.script||{};const pkg=s.production_package||s;notice('studio-msg','تم حفظ مسودة سكربت بناءً على بيانات القناة. تحقّق من المصدر الأثري قبل الإنتاج.','good');$('studio-result').innerHTML='<article class="item"><h3>'+studioEsc(s.title||pkg.title||'مسودة جديدة')+'</h3><p><b>الافتتاحية:</b> '+studioEsc(s.hook||pkg.hook||'')+'</p><p><b>الوصف:</b></p><pre style="white-space:pre-wrap">'+studioEsc(s.description||pkg.description||'')+'</pre><p><b>الكلمات المفتاحية:</b> '+studioEsc((s.tags||pkg.tags||[]).join('، '))+'</p><p><b>السكربت:</b></p><pre style="white-space:pre-wrap">'+studioEsc((s.narration||pkg.narration||[]).map(x=>(x.time||'')+' '+(x.text||'')).join('\\n'))+'</pre><p><b>الأساس التحليلي:</b> '+studioEsc(JSON.stringify(r.analytics_winner||{}))+'</p></article>';await loadStudioScripts();}catch(e){notice('studio-msg',e.message||'تعذر إنشاء المسودة.','bad');}finally{b.disabled=false;}});
+$('studio-generate')?.addEventListener('click',async()=>{
+ const b=$('studio-generate');b.disabled=true;
+ try{
+  const topic=$('studio-topic').value.trim();
+  if(!topic)throw new Error('اكتب موضوع الحلقة أولًا.');
+  const r=await managedCall('studio_generate',{topic,mode:$('studio-format').value,duration_seconds:Number($('studio-duration').value)});
+  const s=r.script||{},pkg=s.production_package||s,method=String(r.script_engine||r.method||s.generation_method||'غير مسجل');
+  const methodLabel=method.startsWith('gemini-api:')?'Gemini API · '+method.replace('gemini-api:',''):method==='local-template'?'القالب المحلي الاحتياطي':method;
+  notice('studio-msg','تم حفظ المسودة. محرك التوليد: '+methodLabel+'. راجع المصدر الأثري قبل الإنتاج. لا يوجد نشر تلقائي.',method==='local-template'?'warn':'good');
+  $('studio-generated-result').innerHTML='<article class="video-card"><h3>'+studioEsc(s.title||pkg.title||'مسودة جديدة')+'</h3><p><b>محرك التوليد الفعلي:</b> '+studioEsc(methodLabel)+'</p><p><b>الافتتاحية:</b> '+studioEsc(s.hook||pkg.hook||'')+'</p><p><b>الوصف:</b></p><pre style="white-space:pre-wrap">'+studioEsc(s.description||pkg.description||'')+'</pre><p><b>الكلمات المفتاحية:</b> '+studioEsc((s.tags||pkg.tags||[]).join('، '))+'</p><p><b>السكربت:</b></p><pre style="white-space:pre-wrap">'+studioEsc((s.narration||pkg.narration||[]).map(x=>(x.time||'')+' '+(x.text||'')).join('\\n'))+'</pre><p><b>الأساس التحليلي:</b> '+studioEsc(JSON.stringify(r.analytics_winner||{}))+'</p><p><b>مراجعة المصدر:</b> '+(pkg.source_check_required||pkg.analytics_basis?.fact_check_required?'مطلوبة قبل الإنتاج':'تحقق من المرجع قبل الاعتماد')+'</p></article>';
+  await loadStudioScripts();
+ }catch(e){notice('studio-msg',e.message||'تعذر إنشاء المسودة.','bad');}
+ finally{b.disabled=false;}
+});
 $('studio-refresh')?.addEventListener('click',loadStudioScripts);
 
 function managedEsc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -760,7 +773,7 @@ $('managed-ai-check')?.addEventListener('click',checkManagedAi);
 $('managed-news-refresh')?.addEventListener('click',loadManagedNews);
 $('managed-calendar-load')?.addEventListener('click',()=>loadManagedCalendar(false));
 $('managed-calendar-generate')?.addEventListener('click',()=>loadManagedCalendar(true));
-$('managed-channel-selector')?.addEventListener('change',async()=>{ $('managed-news-list').innerHTML='';$('managed-calendar-list').innerHTML='';$('studio-result').innerHTML='';$('intake-list').innerHTML='';await loadStudioScripts().catch(()=>{});await loadIntakeAssets().catch(()=>{}); });
+$('managed-channel-selector')?.addEventListener('change',async()=>{ $('managed-news-list').innerHTML='';$('managed-calendar-list').innerHTML='';$('studio-result').innerHTML='';$('studio-generated-result').innerHTML='';$('intake-list').innerHTML='';await loadStudioScripts().catch(()=>{});await loadIntakeAssets().catch(()=>{}); });
 
 function studioEsc(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function applyStudioPackage(pkg,topic){
@@ -785,7 +798,23 @@ function applyStudioPackage(pkg,topic){
   $('intake-title')?.focus({preventScroll:true});
  },80);
 }
-async function loadStudioScripts(){const r=await managedCall('studio_list',{});const items=r.scripts||[];$('studio-result').innerHTML=items.map(s=>'<article class="video-card"><h3>'+studioEsc(s.title)+'</h3><p>'+studioEsc(s.topic)+' · '+studioEsc(s.status)+' · '+studioEsc((s.production_package||{}).format||'مسودة')+'</p><div class="actions"><button type="button" data-studio-use="'+studioEsc(s.id)+'">استخدام بيانات المسودة لتجهيز الفيديو</button><button class="secondary" type="button" data-studio-id="'+studioEsc(s.id)+'">عرض بيانات المسودة</button></div><pre class="studio-json" id="studio-json-'+studioEsc(s.id)+'" style="display:none;white-space:pre-wrap">'+studioEsc(JSON.stringify(s.production_package||{},null,2))+'</pre></article>').join('')||'<p>لا توجد مسودات محفوظة بعد.</p>';
+async function loadStudioScripts(){
+ const r=await managedCall('studio_list',{});
+ const items=(r.scripts||[]).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
+ const normKey=s=>String(s.topic||s.title||'').trim().toLocaleLowerCase('ar').replace(/[؟?!.,،؛:]+/g,' ').replace(/\s+/g,' ');
+ const seen=new Set(),latest=[],older=[];
+ items.forEach(s=>{const k=normKey(s);if(!k||!seen.has(k)){latest.push(s);if(k)seen.add(k);}else older.push(s);});
+ const renderScript=(s,isLatest)=>{
+  const id=studioEsc(s.id),title=studioEsc(s.title||s.topic||'مسودة دون عنوان'),topic=studioEsc(s.topic||s.title||''),method=String(s.generation_method||'غير مسجل');
+  const methodLabel=method.startsWith('gemini-api:')?'Gemini API · '+method.replace('gemini-api:',''):method==='local-template'?'قالب محلي احتياطي':method;
+  const date=s.created_at?new Date(s.created_at).toLocaleString('ar-EG'):'وقت الإنشاء غير مسجل';
+  const pkg=s.production_package||{};
+  return '<article class="video-card"><h3>'+title+'</h3><p><b>'+(isLatest?'أحدث مسودة لهذه الفكرة':'مسودة أقدم محفوظة')+'</b> · '+topic+' · '+studioEsc(s.status||'مسودة')+' · '+studioEsc(pkg.format||'YouTube')+'</p><p>محرك التوليد: '+studioEsc(methodLabel)+'</p><p class="small">تاريخ الحفظ: '+studioEsc(date)+'</p><div class="actions"><button type="button" data-studio-use="'+id+'">استخدام بيانات المسودة لتجهيز الفيديو</button><button class="secondary" type="button" data-studio-id="'+id+'">عرض بيانات المسودة</button></div><pre class="studio-json" id="studio-json-'+id+'" style="display:none;white-space:pre-wrap">'+studioEsc(JSON.stringify(pkg,null,2))+'</pre></article>';
+ };
+ $('studio-result').innerHTML=latest.length?latest.map(s=>renderScript(s,true)).join(''):'<p>لا توجد مسودات محفوظة لهذه القناة.</p>';
+ if(older.length){
+  $('studio-result').insertAdjacentHTML('beforeend','<details class="production-package"><summary>المسودات الأقدم المكررة — محفوظة دون حذف ('+older.length+')</summary><p>هذه نسخ سابقة محتفظ بها في قاعدة البيانات. اختر واحدة فقط عند الحاجة.</p>'+older.map(s=>renderScript(s,false)).join('')+'</details>');
+ }
  document.querySelectorAll('[data-studio-id]').forEach(b=>b.addEventListener('click',()=>{const e=$('studio-json-'+b.dataset.studioId);if(e)e.style.display=e.style.display==='none'?'block':'none';}));
  document.querySelectorAll('[data-studio-use]').forEach(b=>b.addEventListener('click',()=>{try{const e=$('studio-json-'+b.dataset.studioUse);const pkg=JSON.parse(e?.textContent||'{}');const card=b.closest('article');const topic=card?.querySelector('h3')?.textContent||pkg.title||'';applyStudioPackage(pkg,topic);}catch(e){notice('studio-msg',e.message||'تعذر نقل بيانات المسودة.','bad');}}));
 }
