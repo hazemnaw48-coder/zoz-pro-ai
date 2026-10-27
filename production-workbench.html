@@ -27,14 +27,10 @@ label{display:block;font-weight:700;margin:10px 0 5px}input,textarea,select{widt
  <div class="step" id="step-review"><b>٣ · مراجعة الناتج</b>رفع MP4 النهائي للمراجعة</div>
 </div>
 <section class="card" id="login-card">
- <div class="row"><h2>دخول مالك ZOZ Pro</h2><span id="auth-pill" class="pill">لم يتم التحقق</span></div>
- <p class="muted">هذه الورشة تستخدم حساب الإنتاج المحفوظ في Supabase. لا تحتاج إلى إعادة تفويض YouTube أو إدخال أسرار Google.</p>
- <form id="login-form">
-  <label for="email">بريد المالك</label><input id="email" type="email" autocomplete="username" value="hazemnaw48@gmail.com" required>
-  <label for="password">كلمة المرور الخاصة بمشروع الإنتاج</label><input id="password" type="password" autocomplete="current-password" required>
-  <div class="row"><button id="login-button" type="submit">دخول إلى الورشة</button><button id="logout-button" class="secondary hidden" type="button">تسجيل الخروج</button></div>
- </form>
- <div id="auth-message" class="status">تُعرض الحزمة الواردة أدناه حتى قبل تسجيل الدخول؛ يلزم الدخول لحفظها في قاعدة الإنتاج.</div>
+ <div class="row"><h2>جلسة مالك ZOZ Pro</h2><span id="auth-pill" class="pill">جارٍ فحص الجلسة</span></div>
+ <p class="muted">تستخدم هذه الورشة جلسة مركز التحليل نفسها. لا تدخل كلمة مرور هنا ولا توجد جلسة إنتاج منفصلة.</p>
+ <div id="auth-message" class="status">جارٍ التحقق من جلسة مركز التحليل…</div>
+ <a id="analysis-login-link" class="button secondary" href="./channel-control.html">العودة إلى مركز التحليل وتفعيل الجلسة</a>
 </section>
 <section class="card" id="incoming-card">
  <div class="row"><h2>الحزمة الواردة من مركز التحليل</h2><span id="incoming-type" class="pill">في انتظار البيانات</span></div>
@@ -65,6 +61,6 @@ label{display:block;font-weight:700;margin:10px 0 5px}input,textarea,select{widt
 </section>
 <div class="footer">ZOZ Pro · لا نشر تلقائي · لا يتم حذف الحزمة الواردة إلا بعد تأكيد استيرادها إلى قاعدة الإنتاج.</div>
 </main>
-<script src="./production-workbench.js?v=20261027-workbench-3"></script>
+<script src="./production-workbench.js?v=20261027-same-session-1"></script>
 </body>
 </html>
