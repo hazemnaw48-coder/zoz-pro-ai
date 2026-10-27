@@ -133,7 +133,7 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
 <section class="card">
  <h2>٩. بوابة استقبال الفيديوهات والنشر الفعلي</h2>
  <p>ارفع ملفًا من الهاتف أو استقبل تصديرًا من مراكز الإنتاج المعتمدة. يتم حفظ الأجزاء في مخزن خاص، ثم مراجعتها، ثم رفعها إلى YouTube بوضع خاص أولًا. لا يُنشر الفيديو علنًا إلا بعد موافقة صريحة منفصلة.</p>
- <div id="intake-msg" class="notice">سجّل الدخول، ثم حمّل قائمة الملفات.</div>
+ <div id="intake-msg" class="notice">يتم التحقق من جلسة المالك في مشروع الإنتاج…</div>
  <h3 class="section-gap">أ. استقبال ملف من الهاتف</h3>
  <label for="intake-file">ملف الفيديو (MP4 أو MOV أو WebM أو MKV)</label><input id="intake-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,application/octet-stream">
  <label for="intake-title">عنوان YouTube</label><input id="intake-title" maxlength="100" placeholder="عنوان الفيديو النهائي">
@@ -176,7 +176,7 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
  </section>
 </div>
 </div>
-<div class="footer small">وضع الاستعادة للقراءة فقط: لا نشر، ولا تعديل لفيديوهات YouTube أو خصوصيتها. <span>·</span> <a href="https://github.com/hazemnaw48-coder/zoz-pro-ai/blob/main/ZOZ-PRO-EXECUTION-NOTES.md" target="_blank" rel="noopener">سجل تنفيذ المركز والملاحظات</a></div>
+<div class="footer small">إدارة محكومة: تبقى الفيديوهات خاصة حتى اكتمال مراجعة المالك وتأكيد النشر صراحةً. <span>·</span> <a href="https://github.com/hazemnaw48-coder/zoz-pro-ai/blob/main/ZOZ-PRO-EXECUTION-NOTES.md" target="_blank" rel="noopener">سجل تنفيذ المركز والملاحظات</a></div>
 </main>
 <script>
 (function(){
@@ -212,7 +212,7 @@ function showPage(pageKey, scrollTop=true){
  if(indicator)indicator.textContent='القسم الحالي: '+label+' · '+step+' من '+tabs.length;
  if(scrollTop)window.scrollTo(0,0);
 }
-function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on)showPage('connection',false);}
+function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage('connection',false);notice('intake-msg','جلسة المالك متصلة بمشروع الإنتاج. افتح «٩ · استقبال الفيديوهات» لتحديث القائمة أو اختيار ملف.','good');}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
 async function ownerSession(){
  const {data,error}=await sb.auth.getSession();if(error)throw error;const session=data&&data.session;
  if(!session||!session.access_token)throw new Error('لا توجد جلسة مالك محفوظة. سجّل الدخول بحساب مالك ZOZ Pro.');
@@ -397,9 +397,9 @@ async function uploadIntakeFile(){
   for(let part=0;part<count;part++){
    if(completed.has(part))continue;
    const blob=file.slice(part*chunk,Math.min(file.size,(part+1)*chunk));
-   const signed=await intakeApi('intake_signed_part',{asset_id:asset.id,part_index:part});
-   const uploaded=await fetch(signed.upload_url,{method:'PUT',headers:{'authorization':'Bearer '+storageSession.access_token,'apikey':SUPABASE_PUBLISHABLE_KEY,'content-type':'application/octet-stream','x-upsert':'true'},body:blob});
-   if(!uploaded.ok)throw new Error('فشل رفع الجزء '+(part+1)+' من '+count+' (HTTP '+uploaded.status+'). أعد اختيار الملف نفسه لاستكمال الرفع.');
+   const uploaded=await fetch(API+'?action=intake_upload_part&asset_id='+encodeURIComponent(asset.id)+'&part_index='+encodeURIComponent(part),{method:'POST',headers:{'apikey':SUPABASE_PUBLISHABLE_KEY,'authorization':'Bearer '+storageSession.access_token,'content-type':'application/octet-stream'},body:blob,cache:'no-store'});
+   const uploadResult=await uploaded.json().catch(()=>({}));
+   if(!uploaded.ok||uploadResult.ok===false)throw new Error('فشل رفع الجزء '+(part+1)+' من '+count+' (HTTP '+uploaded.status+'): '+String(uploadResult.error||'تحقق من الاتصال وحاول استكمال الملف نفسه.'));
    const progress=await intakeApi('intake_part_done',{asset_id:asset.id,part_index:part});
    completed.add(part);
    notice('intake-progress','تم رفع '+completed.size+' / '+count+' جزءًا — '+fmt(progress.uploaded_bytes)+' من '+fmt(progress.total_bytes)+' بايت.');
@@ -619,7 +619,7 @@ $('intake-refresh')?.addEventListener('click',async()=>{try{await loadIntakeAsse
 $('intake-refresh-list')?.addEventListener('click',async()=>{try{await loadIntakeAssets();}catch(e){notice('intake-msg',e.message||'تعذر تحميل القائمة.','bad');}});
 $('intake-source-create')?.addEventListener('click',async()=>{const b=$('intake-source-create');b.disabled=true;try{await createIntakeSource();}catch(e){notice('intake-source-msg',e.message||'تعذر ربط المركز.','bad');}finally{b.disabled=false;}});
 $('intake-source-refresh')?.addEventListener('click',async()=>{try{await loadIntakeSources();}catch(e){notice('intake-source-msg',e.message||'تعذر تحميل المراكز.','bad');}});
-$('intake-copy-contract')?.addEventListener('click',async()=>{const text='Endpoint: '+API+'?action=intake_create\nAuth: x-zoz-intake-token: TOKEN\nActions: intake_create → intake_signed_part → POST binary to upload_url → intake_part_done → intake_finalize. Use 8 MiB chunks in ascending order. Source tokens cannot approve or publish.';try{await navigator.clipboard.writeText(text);notice('intake-source-msg','تم نسخ عقد التكامل.','good');}catch(e){notice('intake-source-msg',text,'warn');}});
+$('intake-copy-contract')?.addEventListener('click',async()=>{const text='Endpoint: '+API+'?action=intake_create\nAuth: x-zoz-intake-token: TOKEN\nActions: intake_create → POST binary to action=intake_upload_part (asset_id, part_index) → intake_part_done → intake_finalize. Use 8 MiB chunks in ascending order. Source tokens cannot approve or publish.';try{await navigator.clipboard.writeText(text);notice('intake-source-msg','تم نسخ عقد التكامل.','good');}catch(e){notice('intake-source-msg',text,'warn');}});
 $('load-history').addEventListener('click',loadHistory);
 $('load-recommendations').addEventListener('click',loadRecommendations);
 const end=new Date(Date.now()-86400000);const start=new Date(end);start.setDate(start.getDate()-27);$('start-date').value=dateInput(start);$('end-date').value=dateInput(end);
