@@ -1,10 +1,13 @@
-(function(){
+(async function(){
 "use strict";
 const KEY_NAME="zoz-pro-pending-production-handoff-v1";
-const URL="https://vjnwojrqduoxhetutxrs.supabase.co";
-const KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInR5cCI6IkpXVCJ9"; 
-const PUBLISHABLE="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
-const REAL_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInJlZiI6InZqbndvanJxZHVveGhldHV0eHJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxODM3ODcsImV4cCI6MjEwNzc1OTc4N30.2qoa7Fh1qLGGwrOUem7QVTJJivTADTTJPkO_FdbC9_Y";
+const configResponse=await fetch("./studio.js?v=20261027-login-runtime-fix-4",{cache:"no-store"});
+if(!configResponse.ok)throw Error("تعذر تحميل إعداد اتصال Supabase المشترك.");
+const sharedConfig=await configResponse.text();
+const configMatch=sharedConfig.match(/URL0="([^"]+)",KEY="([^"]+)"/);
+if(!configMatch)throw Error("لم يتم العثور على إعداد اتصال Supabase الصحيح.");
+const URL=configMatch[1];
+const REAL_KEY=configMatch[2];
 const CONTENT=URL+"/functions/v1/zoz-pro-content-center";
 const MEDIA=URL+"/functions/v1/zoz-pro-media-upload";
 const sb=window.supabase.createClient(URL,REAL_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
@@ -206,4 +209,4 @@ function bind(){
  $("scenes-list").addEventListener("click",async e=>{const b=e.target.closest("[data-copy-scene]");if(!b||!job)return;const sc=job.script_json?.scenes?.[Number(b.dataset.copyScene)];notice("scene-message",await copyText(sceneText(sc,Number(b.dataset.copyScene)))?"تم نسخ تعليمات المشهد.":"تعذر النسخ؛ نزّل ملف TXT.","good");});
 }
 document.addEventListener("DOMContentLoaded",async()=>{bind();showIncoming();try{await checkSession();await loadExistingJob();}catch(e){notice("auth-message",e.message||"تعذر فحص الجلسة.","bad");}});
-})();
+})().catch(e=>{const el=document.getElementById("auth-message");if(el){el.textContent="تعذر تهيئة الاتصال: "+(e.message||String(e));el.className="status bad";}});
