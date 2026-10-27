@@ -131,6 +131,17 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
 </div>
  <div class="page-panel" data-page="intake" id="page-intake">
 <section class="card" id="zoz-content-studio">
+ <h2>مركز صناعة المحتوى والتحكم متعدد القنوات</h2>
+ <label for="managed-channel-selector">القناة النشطة — تُستخدم للقوائم والمسودات واستقبال الفيديو</label>
+ <select id="managed-channel-selector" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px">
+ <option value="UCIael48cvwPG3gKj--c7HKw">Hazem Ahmed — مصر القديمة</option>
+ <option value="UC9fr5B0SZZkmVAApfCqEO3w">فكره 🗣️ — أفكار ومعلومات وذكاء اصطناعي</option>
+ <option value="UC-FimUUFXRd0MOSoikzczcQ">القناة السياسية — الاسم قيد الاختيار</option>
+ </select>
+ <div class="actions"><button id="managed-news-refresh" class="secondary">بحث الأخبار السياسية الحديثة</button><button id="managed-calendar-load" class="secondary">عرض تقويم القناة</button><button id="managed-calendar-generate" class="secondary">إنشاء خطة أسبوعية</button></div>
+ <div id="managed-news-status" class="notice">الأخبار السياسية تظهر للقناة السياسية فقط، وتظل بحاجة لمراجعة المصادر.</div>
+ <div id="managed-news-list" class="stack"></div>
+ <div id="managed-calendar-list" class="stack"></div>
  <h2>مركز صناعة المحتوى المبني على التحليلات</h2>
  <p>يستخدم بيانات القناة والتوصيات المحفوظة لإنشاء مسودات سكربت وعنوان ووصف وكلمات مفتاحية. لا يعتمد على رصيد vidIQ أو Claude؛ ويمكن إضافة نتائج الأدوات الخارجية عند توفرها.</p>
  <div class="notice" style="margin:12px 0">مسار العمل المعتمد: <b>اختيار الفكرة ← إعداد السكربت والبيانات ← ربطها بملف الفيديو المطابق ← استقبال الملف ← مراجعة المالك ← رفع خاص إلى YouTube ← فحص المعالجة ← النشر بتأكيدك ← أرشفة الأجزاء المؤقتة.</b><br>قبل استخدام أي مسودة، تأكد أن موضوعها يطابق محتوى الفيديو الفعلي؛ لا تستخدم مسودة نب آمون لفيديو إخناتون.</div>
@@ -423,6 +434,10 @@ async function generateContentCalendar(){
 }
 
 async function intakeApi(action,body){return await call(action,body||{});}
+function managedChannelId(){return $('managed-channel-selector')?.value||CHANNEL_ID;}
+function managedPayload(body){return Object.assign({channel_id:managedChannelId()},body||{});}
+async function managedCall(action,body){return await call(action,managedPayload(body));}
+
 async function uploadIntakeFile(){
  const file=$('intake-file').files&&$('intake-file').files[0];
  if(!file)throw new Error('اختر ملف فيديو أولًا.');
@@ -447,7 +462,7 @@ async function uploadIntakeFile(){
   }
   if(!asset){
    notice('intake-progress','جارٍ إنشاء جلسة استقبال آمنة…');
-   const created=await intakeApi('intake_create',{filename:file.name,total_bytes:file.size,content_type:file.type||'application/octet-stream',title:$('intake-title').value.trim()||file.name.replace(/\.[^.]+$/,''),description:$('intake-description').value,tags:$('intake-tags').value.split(',').map(x=>x.trim()).filter(Boolean),made_for_kids:kids==='true',contains_synthetic_media:synthetic==='true',target_privacy_status:$('intake-privacy').value});
+   const created=await managedCall('intake_create',{filename:file.name,total_bytes:file.size,content_type:file.type||'application/octet-stream',title:$('intake-title').value.trim()||file.name.replace(/\.[^.]+$/,''),description:$('intake-description').value,tags:$('intake-tags').value.split(',').map(x=>x.trim()).filter(Boolean),made_for_kids:kids==='true',contains_synthetic_media:synthetic==='true',target_privacy_status:$('intake-privacy').value});
    asset=created.asset;
    localStorage.setItem(resumeKey,JSON.stringify({asset_id:asset.id,filename:file.name,total_bytes:file.size}));
    asset.uploaded_parts=[];
@@ -474,7 +489,7 @@ async function uploadIntakeFile(){
 }
 function intakeStatusLabel(s){return ({uploading:'جارٍ الاستقبال',ready_for_review:'ينتظر مراجعة المالك',approved:'موافق عليه للرفع الخاص',rejected:'مرفوض',uploading_to_youtube:'جارٍ الرفع إلى YouTube',processing:'YouTube يعالج الفيديو',ready_to_publish:'جاهز للنشر بعد تأكيدك',published:'منشور',archived:'أُرشف وحُذفت أجزاؤه المؤقتة',failed:'فشل — يحتاج مراجعة'}[s]||s);}
 async function loadIntakeAssets(){
- const d=await intakeApi('intake_list',{}),host=$('intake-list');host.innerHTML='';
+ const d=await managedCall('intake_list',{}),host=$('intake-list');host.innerHTML='';
  const assets=Array.isArray(d.assets)?d.assets:[];
  if(!assets.length){host.textContent='لا توجد فيديوهات مستقبلة حتى الآن.';return;}
  assets.forEach(a=>{
@@ -499,13 +514,13 @@ async function loadIntakeAssets(){
  });
 }
 async function loadIntakeSources(){
- const d=await intakeApi('intake_source_list',{}),host=$('intake-source-list');host.innerHTML='';
- (d.sources||[]).forEach(s=>{const card=document.createElement('article');card.className='video-card';const p=document.createElement('p');p.textContent=s.source_name+' · '+(s.is_active?'نشط':'ملغى')+' · آخر استخدام: '+(s.last_used_at||'لم يستخدم بعد');card.appendChild(p);if(s.is_active){const b=document.createElement('button');b.className='secondary';b.textContent='إلغاء الرمز';b.addEventListener('click',async()=>{if(!confirm('إلغاء رمز '+s.source_name+'؟'))return;await intakeApi('intake_source_revoke',{source_id:s.id});await loadIntakeSources();});card.appendChild(b);}host.appendChild(card);});
+ const d=await managedCall('intake_source_list',{}),host=$('intake-source-list');host.innerHTML='';
+ (d.sources||[]).forEach(s=>{const card=document.createElement('article');card.className='video-card';const p=document.createElement('p');p.textContent=s.source_name+' · '+(s.is_active?'نشط':'ملغى')+' · آخر استخدام: '+(s.last_used_at||'لم يستخدم بعد');card.appendChild(p);if(s.is_active){const b=document.createElement('button');b.className='secondary';b.textContent='إلغاء الرمز';b.addEventListener('click',async()=>{if(!confirm('إلغاء رمز '+s.source_name+'؟'))return;await managedCall('intake_source_revoke',{source_id:s.id});await loadIntakeSources();});card.appendChild(b);}host.appendChild(card);});
  if(!(d.sources||[]).length)host.textContent='لم يتم ربط أي مركز بعد.';
 }
 async function createIntakeSource(){
  const name=$('intake-source-name').value.trim();if(!name)throw new Error('اكتب اسم مركز الإنتاج.');
- const d=await intakeApi('intake_source_create',{source_name:name});
+ const d=await managedCall('intake_source_create',{source_name:name});
  const output='رمز المركز: '+d.token+'\n\nعنوان API: '+API+'\nالترويسة: x-zoz-intake-token: '+d.token+'\n\nاحتفظ بالرمز في إعدادات المركز الموثوق فقط. لا يمكن عرضه مرة أخرى.';
  notice('intake-source-msg',output,'good');
  try{await navigator.clipboard.writeText(output);}catch(e){}
@@ -695,8 +710,41 @@ $('load-video-analytics').addEventListener('click',async()=>{
  finally{$('load-video-analytics').disabled=false;}
 });
 $('save-snapshot').addEventListener('click',async()=>{try{await saveSnapshot();}catch(e){}});
-$('studio-generate')?.addEventListener('click',async()=>{const b=$('studio-generate');b.disabled=true;try{const r=await intakeApi('studio_generate',{topic:$('studio-topic').value.trim(),mode:$('studio-format').value,duration_seconds:Number($('studio-duration').value)});const s=r.script||{};const pkg=s.production_package||s;notice('studio-msg','تم حفظ مسودة سكربت بناءً على بيانات القناة. تحقّق من المصدر الأثري قبل الإنتاج.','good');$('studio-result').innerHTML='<article class="item"><h3>'+studioEsc(s.title||pkg.title||'مسودة جديدة')+'</h3><p><b>الافتتاحية:</b> '+studioEsc(s.hook||pkg.hook||'')+'</p><p><b>الوصف:</b></p><pre style="white-space:pre-wrap">'+studioEsc(s.description||pkg.description||'')+'</pre><p><b>الكلمات المفتاحية:</b> '+studioEsc((s.tags||pkg.tags||[]).join('، '))+'</p><p><b>السكربت:</b></p><pre style="white-space:pre-wrap">'+studioEsc((s.narration||pkg.narration||[]).map(x=>(x.time||'')+' '+(x.text||'')).join('\\n'))+'</pre><p><b>الأساس التحليلي:</b> '+studioEsc(JSON.stringify(r.analytics_winner||{}))+'</p></article>';await loadStudioScripts();}catch(e){notice('studio-msg',e.message||'تعذر إنشاء المسودة.','bad');}finally{b.disabled=false;}});
+$('studio-generate')?.addEventListener('click',async()=>{const b=$('studio-generate');b.disabled=true;try{const r=await managedCall('studio_generate',{topic:$('studio-topic').value.trim(),mode:$('studio-format').value,duration_seconds:Number($('studio-duration').value)});const s=r.script||{};const pkg=s.production_package||s;notice('studio-msg','تم حفظ مسودة سكربت بناءً على بيانات القناة. تحقّق من المصدر الأثري قبل الإنتاج.','good');$('studio-result').innerHTML='<article class="item"><h3>'+studioEsc(s.title||pkg.title||'مسودة جديدة')+'</h3><p><b>الافتتاحية:</b> '+studioEsc(s.hook||pkg.hook||'')+'</p><p><b>الوصف:</b></p><pre style="white-space:pre-wrap">'+studioEsc(s.description||pkg.description||'')+'</pre><p><b>الكلمات المفتاحية:</b> '+studioEsc((s.tags||pkg.tags||[]).join('، '))+'</p><p><b>السكربت:</b></p><pre style="white-space:pre-wrap">'+studioEsc((s.narration||pkg.narration||[]).map(x=>(x.time||'')+' '+(x.text||'')).join('\\n'))+'</pre><p><b>الأساس التحليلي:</b> '+studioEsc(JSON.stringify(r.analytics_winner||{}))+'</p></article>';await loadStudioScripts();}catch(e){notice('studio-msg',e.message||'تعذر إنشاء المسودة.','bad');}finally{b.disabled=false;}});
 $('studio-refresh')?.addEventListener('click',loadStudioScripts);
+
+function managedEsc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function loadManagedNews(){
+ const cid=managedChannelId(),status=$('managed-news-status'),host=$('managed-news-list');host.innerHTML='';
+ if(cid!=='UC-FimUUFXRd0MOSoikzczcQ'){status.textContent='البحث الإخباري السياسي متاح للقناة السياسية فقط. اختر القناة السياسية من القائمة.';return;}
+ status.textContent='جارٍ البحث في موجزات الأخبار الحديثة…';
+ try{
+  const r=await managedCall('managed_political_news',{});
+  status.textContent='آخر فحص: '+new Date(r.checked_at||Date.now()).toLocaleString('ar-EG')+' · أخبار جديدة محفوظة: '+(r.saved_new_count||0)+' · اكتشاف لا يعني تحققًا من الصحة.';
+  (r.items||[]).forEach(item=>{
+   const card=document.createElement('article');card.className='video-card';
+   card.innerHTML='<h3>'+managedEsc(item.title)+'</h3><p>'+managedEsc(item.evidence?.source_name||'مصدر غير محدد')+' · '+managedEsc(item.evidence?.published_at||'تاريخ النشر غير متاح')+'</p><p>'+managedEsc(item.body||'')+'</p><p><a href="'+managedEsc(item.evidence?.source_url||'#')+'" target="_blank" rel="noopener">فتح المصدر الأصلي</a></p><p>الحالة: '+managedEsc(item.evidence?.verification_status||'تحتاج مراجعة')+'</p>';
+   const urls=document.createElement('textarea');urls.rows=2;urls.placeholder='أدخل رابطين HTTPS لمصدرين مستقلين موثوقين، كل رابط في سطر';urls.style.width='100%';urls.value=(item.evidence?.independent_sources||[]).join('\n');card.appendChild(urls);
+   const notes=document.createElement('textarea');notes.rows=2;notes.placeholder='ملخص ما تؤكده المصادر وما لم يتأكد (20 حرفًا على الأقل)';notes.style.width='100%';notes.value=item.evidence?.verification_notes||'';card.appendChild(notes);
+   const actions=document.createElement('div');actions.className='actions';
+   const verify=document.createElement('button');verify.textContent='اعتماد مراجعة المالك';verify.addEventListener('click',async()=>{if(!confirm('هل فتحت المصدر الأصلي والمصدرين المستقلين وتحققت من الوقائع؟'))return;verify.disabled=true;try{await managedCall('managed_political_news_review',{recommendation_id:item.id,decision:'verify',source_urls:urls.value.split(/\n/).map(x=>x.trim()).filter(Boolean),notes:notes.value});status.textContent='تم حفظ قرار المراجعة والمصادر المدخلة.';await loadManagedNews();}catch(e){status.textContent=e.message||'تعذرت المراجعة';}finally{verify.disabled=false;}});actions.appendChild(verify);
+   const reject=document.createElement('button');reject.className='secondary';reject.textContent='استبعاد الخبر';reject.addEventListener('click',async()=>{try{await managedCall('managed_political_news_review',{recommendation_id:item.id,decision:'reject',notes:notes.value});await loadManagedNews();}catch(e){status.textContent=e.message||'تعذر الاستبعاد';}});actions.appendChild(reject);
+   const script=document.createElement('button');script.className='secondary';script.textContent='إنشاء مسودة بعد الاعتماد';script.addEventListener('click',async()=>{if(item.status!=='approved'&&!item.evidence?.editor_verified_by_owner){status.textContent='اعتمد مراجعة الخبر أولًا.';return;}try{$('studio-topic').value=item.title;const out=await managedCall('studio_generate',{topic:item.title,news_item_id:item.id,mode:'short',duration_seconds:45});status.textContent='حُفظت مسودة القناة السياسية: '+(out.script?.title||item.title);await loadStudioScripts();}catch(e){status.textContent=e.message||'تعذر إنشاء المسودة';}});actions.appendChild(script);
+   card.appendChild(actions);host.appendChild(card);
+  });
+  if(!(r.items||[]).length)host.insertAdjacentHTML('beforeend','<p>لا توجد أخبار مرشحة محفوظة حاليًا. افحص حالة المصادر أعلاه.</p>');
+  if(r.feed_status)status.textContent+=' · المصادر: '+r.feed_status.map(x=>x.source+': '+(x.ok?'متاح':'تعذر')).join('؛ ');
+ }catch(e){status.textContent=e.message||'تعذر البحث في الأخبار.';}
+}
+async function loadManagedCalendar(generate){
+ const host=$('managed-calendar-list');host.innerHTML='جارٍ تحميل التقويم…';
+ try{const r=await managedCall(generate?'managed_channel_calendar_generate':'managed_channel_calendar',{});host.innerHTML='';(r.calendar||[]).forEach(item=>{const card=document.createElement('article');card.className='video-card';card.innerHTML='<h3>'+managedEsc(item.working_title||item.title||'')+'</h3><p>'+managedEsc(item.planned_date||'')+' · '+managedEsc(item.content_pillar||'')+' · '+managedEsc(item.status||'draft')+'</p><p>'+managedEsc(item.hook||'')+'</p>';host.appendChild(card);});if(!(r.calendar||[]).length)host.textContent='لا توجد عناصر تقويم بعد.';}catch(e){host.textContent=e.message||'تعذر تحميل التقويم.';}
+}
+$('managed-news-refresh')?.addEventListener('click',loadManagedNews);
+$('managed-calendar-load')?.addEventListener('click',()=>loadManagedCalendar(false));
+$('managed-calendar-generate')?.addEventListener('click',()=>loadManagedCalendar(true));
+$('managed-channel-selector')?.addEventListener('change',async()=>{ $('managed-news-list').innerHTML='';$('managed-calendar-list').innerHTML='';$('studio-result').innerHTML='';$('intake-list').innerHTML='';await loadStudioScripts().catch(()=>{});await loadIntakeAssets().catch(()=>{}); });
+
 function studioEsc(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function applyStudioPackage(pkg,topic){
  if(!pkg||typeof pkg!=='object')throw new Error('لا توجد حزمة إنتاج صالحة في هذه المسودة.');
@@ -712,7 +760,7 @@ function applyStudioPackage(pkg,topic){
  $('intake-file').scrollIntoView({behavior:'smooth',block:'center'});
  $('intake-title').focus({preventScroll:true});
 }
-async function loadStudioScripts(){const r=await intakeApi('studio_list',{});const items=r.scripts||[];$('studio-result').innerHTML=items.map(s=>'<article class="video-card"><h3>'+studioEsc(s.title)+'</h3><p>'+studioEsc(s.topic)+' · '+studioEsc(s.status)+' · '+studioEsc((s.production_package||{}).format||'مسودة')+'</p><div class="actions"><button type="button" data-studio-use="'+studioEsc(s.id)+'">استخدام بيانات المسودة لتجهيز الفيديو</button><button class="secondary" type="button" data-studio-id="'+studioEsc(s.id)+'">عرض بيانات المسودة</button></div><pre class="studio-json" id="studio-json-'+studioEsc(s.id)+'" style="display:none;white-space:pre-wrap">'+studioEsc(JSON.stringify(s.production_package||{},null,2))+'</pre></article>').join('')||'<p>لا توجد مسودات محفوظة بعد.</p>';
+async function loadStudioScripts(){const r=await managedCall('studio_list',{});const items=r.scripts||[];$('studio-result').innerHTML=items.map(s=>'<article class="video-card"><h3>'+studioEsc(s.title)+'</h3><p>'+studioEsc(s.topic)+' · '+studioEsc(s.status)+' · '+studioEsc((s.production_package||{}).format||'مسودة')+'</p><div class="actions"><button type="button" data-studio-use="'+studioEsc(s.id)+'">استخدام بيانات المسودة لتجهيز الفيديو</button><button class="secondary" type="button" data-studio-id="'+studioEsc(s.id)+'">عرض بيانات المسودة</button></div><pre class="studio-json" id="studio-json-'+studioEsc(s.id)+'" style="display:none;white-space:pre-wrap">'+studioEsc(JSON.stringify(s.production_package||{},null,2))+'</pre></article>').join('')||'<p>لا توجد مسودات محفوظة بعد.</p>';
  document.querySelectorAll('[data-studio-id]').forEach(b=>b.addEventListener('click',()=>{const e=$('studio-json-'+b.dataset.studioId);if(e)e.style.display=e.style.display==='none'?'block':'none';}));
  document.querySelectorAll('[data-studio-use]').forEach(b=>b.addEventListener('click',()=>{try{const e=$('studio-json-'+b.dataset.studioUse);const pkg=JSON.parse(e?.textContent||'{}');const card=b.closest('article');const topic=card?.querySelector('h3')?.textContent||pkg.title||'';applyStudioPackage(pkg,topic);}catch(e){notice('studio-msg',e.message||'تعذر نقل بيانات المسودة.','bad');}}));
 }
