@@ -390,7 +390,7 @@ async function uploadIntakeFile(){
    if(completed.has(part))continue;
    const blob=file.slice(part*chunk,Math.min(file.size,(part+1)*chunk));
    const signed=await intakeApi('intake_signed_part',{asset_id:asset.id,part_index:part});
-   const uploaded=await fetch(signed.upload_url,{method:'POST',headers:{'authorization':'Bearer '+storageSession.access_token,'content-type':'application/octet-stream','x-upsert':'true'},body:blob});
+   const uploaded=await fetch(signed.upload_url,{method:'PUT',headers:{'authorization':'Bearer '+storageSession.access_token,'apikey':SUPABASE_PUBLISHABLE_KEY,'content-type':'application/octet-stream','x-upsert':'true'},body:blob});
    if(!uploaded.ok)throw new Error('فشل رفع الجزء '+(part+1)+' من '+count+' (HTTP '+uploaded.status+'). أعد اختيار الملف نفسه لاستكمال الرفع.');
    const progress=await intakeApi('intake_part_done',{asset_id:asset.id,part_index:part});
    completed.add(part);
