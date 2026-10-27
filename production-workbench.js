@@ -122,13 +122,24 @@ function sceneText(scene,i){
  "ملاحظات: لا تضف شعارات أو علامة مائية. تحقّق من صحة الوقائع وحقوق المشاهد."].join("\n");
 }
 function showJob(j){
- job=j;const s=j.script_json||{},scenes=Array.isArray(s.scenes)?s.scenes:[];
+ job=j;
+ window.ZOZVisualProductionBridge={
+  MEDIA,
+  sb,
+  call:api,
+  getJob:(id)=>job&&job.id===id?job:null,
+  get state(){return {jobs:job?[job]:[]};},
+  msg:(selector,text,kind)=>{const e=document.querySelector(selector);if(e){e.textContent=String(text??"");e.className="status"+(kind?" "+kind:"");}},
+  refresh:async()=>{const d=await api(CONTENT);const latest=(d.jobs||[]).find(x=>x.id===job?.id);if(latest)showJob(latest);await refreshJobs();}
+ };
+ const s=j.script_json||{},scenes=Array.isArray(s.scenes)?s.scenes:[];
  $("job-card").classList.remove("hidden");
  $("job-title").textContent=titleOf(j);
  $("job-status").textContent=j.status||"—";
  $("job-meta").textContent="المهمة: "+j.id+" · "+(j.duration_seconds||s.duration_seconds||45)+" ثانية · "+(j.language||"ar");
  $("job-brief").textContent="عنوان YouTube: "+(s.seo_title||s.title||j.topic)+"\n\nالوصف: "+(s.description||s.caption||"—")+"\n\nالكلمات المفتاحية: "+(s.tags||[]).join("، ")+"\n\nالصورة المصغرة: "+(s.thumbnail_brief||"—")+"\n\nملاحظات المصادر: "+(s.source_notes||[]).map(x=>typeof x==="string"?x:(x.name||"")+" "+(x.url||"")).join("\n");
  $("scenes-list").innerHTML=scenes.map((sc,i)=>'<details class="scene" open><summary>'+esc("المشهد "+(sc.scene_number||i+1)+" · "+(sc.time||((sc.seconds||"")+" ثانية")))+'</summary><div class="prewrap">'+esc(sceneText(sc,i))+'</div><div class="actions"><button class="secondary" type="button" data-copy-scene="'+i+'">نسخ تعليمات هذا المشهد</button></div></details>').join("")||'<div class="status warn">لا توجد مشاهد بعد. إذا كانت هذه توصية تحليل، وافق على إعداد المشاهد أولًا.</div>';
+ $("visual-production-host").innerHTML='<div class="card"><h3>الإنتاج الداخلي المجاني</h3><p class="muted">صور توضيحية + تعليق عربي + فيديو عمودي MP4. لا API مدفوعة ولا نشر تلقائي. قد يستغرق التوليد وقتًا حسب توفر الخدمات المجانية وقدرة الهاتف.</p><button type="button" data-visual-production="'+esc(j.id)+'">ابدأ إنتاج الصور والصوت والفيديو</button><div id="m-'+esc(j.id)+'" class="status">جاهز لبدء الإنتاج بعد مراجعة النص والمشاهد.</div></div>';
  $("prepare-scenes-button").classList.toggle("hidden",!(s.recommendation_context&&!(Array.isArray(s.scenes)&&s.scenes.length)));
  $("prepare-scenes-button").disabled=false;
  $("step-incoming").classList.add("done");$("step-scenes").classList.add("active");$("step-review").classList.remove("active");
