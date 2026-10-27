@@ -766,6 +766,8 @@ function studioEsc(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'
 function applyStudioPackage(pkg,topic){
  if(!pkg||typeof pkg!=='object')throw new Error('لا توجد حزمة إنتاج صالحة في هذه المسودة.');
  const expected=String(topic||pkg.title||'').trim();
+ if(!expected)throw new Error('عنوان المسودة فارغ؛ افتح بيانات المسودة وتحقق منها أولًا.');
+ // Transfer metadata only. This does not generate, upload, or publish a video.
  $('intake-title').value=String(pkg.title||expected).slice(0,100);
  $('intake-description').value=String(pkg.description||'').slice(0,5000);
  $('intake-tags').value=(Array.isArray(pkg.tags)?pkg.tags:[]).map(x=>String(x)).join('، ').slice(0,2000);
@@ -773,9 +775,15 @@ function applyStudioPackage(pkg,topic){
  $('intake-synthetic').value='';
  $('intake-privacy').value='public';
  const needsSource=pkg.source_check_required===true||pkg.analytics_basis?.fact_check_required===true||!String(pkg.source_reference||pkg.analytics_basis?.source_reference||'').trim();
- notice('intake-msg','تم نقل العنوان والوصف والكلمات المفتاحية من مسودة «'+expected+'». اختر ملف الفيديو المطابق، ثم حدّد إجابة الأطفال والإفصاح الاصطناعي يدويًا. '+(needsSource?'تنبيه: المرجع الأثري غير مكتمل؛ راجع الوقائع والمصدر قبل النشر.':'راجع أن المرجع المذكور يطابق المشهد الفعلي.'),needsSource?'warn':'good');
- $('intake-file').scrollIntoView({behavior:'smooth',block:'center'});
- $('intake-title').focus({preventScroll:true});
+ const channel=$('managed-channel-selector');
+ const channelLabel=channel?.selectedOptions?.[0]?.textContent?.trim()||managedChannelId();
+ notice('intake-msg','تم نقل بيانات المسودة «'+expected+'» للقناة «'+channelLabel+'». انتقلت إلى استقبال الفيديوهات؛ اختر ملف الفيديو المطابق وحدد إجابة الأطفال والإفصاح عن المشاهد الاصطناعية يدويًا. '+(needsSource?'تنبيه: المرجع الأثري غير مكتمل؛ لا تعتمد المسودة قبل التحقق من المصدر والوقائع.':'راجع أن المصدر يطابق المشهد الفعلي.'),needsSource?'warn':'good');
+ // The intake panel is hidden until its tab is activated; navigate before scrolling/focusing.
+ showPage('intake',false);
+ window.setTimeout(()=>{
+  $('intake-file')?.scrollIntoView({behavior:'smooth',block:'center'});
+  $('intake-title')?.focus({preventScroll:true});
+ },80);
 }
 async function loadStudioScripts(){const r=await managedCall('studio_list',{});const items=r.scripts||[];$('studio-result').innerHTML=items.map(s=>'<article class="video-card"><h3>'+studioEsc(s.title)+'</h3><p>'+studioEsc(s.topic)+' · '+studioEsc(s.status)+' · '+studioEsc((s.production_package||{}).format||'مسودة')+'</p><div class="actions"><button type="button" data-studio-use="'+studioEsc(s.id)+'">استخدام بيانات المسودة لتجهيز الفيديو</button><button class="secondary" type="button" data-studio-id="'+studioEsc(s.id)+'">عرض بيانات المسودة</button></div><pre class="studio-json" id="studio-json-'+studioEsc(s.id)+'" style="display:none;white-space:pre-wrap">'+studioEsc(JSON.stringify(s.production_package||{},null,2))+'</pre></article>').join('')||'<p>لا توجد مسودات محفوظة بعد.</p>';
  document.querySelectorAll('[data-studio-id]').forEach(b=>b.addEventListener('click',()=>{const e=$('studio-json-'+b.dataset.studioId);if(e)e.style.display=e.style.display==='none'?'block':'none';}));
