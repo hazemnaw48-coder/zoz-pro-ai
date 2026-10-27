@@ -125,6 +125,7 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
 <section class="card" id="zoz-content-studio">
  <h2>مركز صناعة المحتوى المبني على التحليلات</h2>
  <p>يستخدم بيانات القناة والتوصيات المحفوظة لإنشاء مسودات سكربت وعنوان ووصف وكلمات مفتاحية. لا يعتمد على رصيد vidIQ أو Claude؛ ويمكن إضافة نتائج الأدوات الخارجية عند توفرها.</p>
+ <div class="notice" style="margin:12px 0">مسار العمل المعتمد: <b>اختيار الفكرة ← إعداد السكربت والبيانات ← ربطها بملف الفيديو المطابق ← استقبال الملف ← مراجعة المالك ← رفع خاص إلى YouTube ← فحص المعالجة ← النشر بتأكيدك ← أرشفة الأجزاء المؤقتة.</b><br>قبل استخدام أي مسودة، تأكد أن موضوعها يطابق محتوى الفيديو الفعلي؛ لا تستخدم مسودة نب آمون لفيديو إخناتون.</div>
  <label for="studio-topic">موضوع الحلقة</label><input id="studio-topic" maxlength="240" value="ليه نب آمون أكبر من الفلاحين في الرسمة؟">
  <div class="grid"><div><label for="studio-format">نوع الفيديو</label><select id="studio-format"><option value="short">Short</option><option value="long">فيديو طويل</option></select></div><div><label for="studio-duration">المدة بالثواني</label><input id="studio-duration" type="number" min="20" max="180" value="40"></div></div>
  <div class="actions"><button id="studio-generate">إنشاء سكربت من بيانات القناة</button><button id="studio-refresh" class="secondary">عرض المسودات المحفوظة</button></div>
@@ -132,7 +133,7 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
 </section>
 <section class="card">
  <h2>٩. بوابة استقبال الفيديوهات والنشر الفعلي</h2>
- <p>ارفع ملفًا من الهاتف أو استقبل تصديرًا من مراكز الإنتاج المعتمدة. يتم حفظ الأجزاء في مخزن خاص، ثم مراجعتها، ثم رفعها إلى YouTube بوضع خاص أولًا. لا يُنشر الفيديو علنًا إلا بعد موافقة صريحة منفصلة.</p>
+ <p>ارفع ملفًا من الهاتف أو استقبل تصديرًا من مراكز الإنتاج المعتمدة. تُنقل بيانات العنوان والوصف والكلمات المفتاحية من المسودة المختارة عند استخدام زر المسودة أعلاه. يتم حفظ الأجزاء في مخزن خاص، ثم مراجعتها، ثم رفعها إلى YouTube بوضع خاص أولًا. لا يُنشر الفيديو علنًا إلا بعد موافقة صريحة منفصلة.</p>
  <div id="intake-msg" class="notice">يتم التحقق من جلسة المالك في مشروع الإنتاج…</div>
  <h3 class="section-gap">أ. استقبال ملف من الهاتف</h3>
  <label for="intake-file">ملف الفيديو (MP4 أو MOV أو WebM أو MKV)</label><input id="intake-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,application/octet-stream">
@@ -613,7 +614,24 @@ $('save-snapshot').addEventListener('click',async()=>{try{await saveSnapshot();}
 $('studio-generate')?.addEventListener('click',async()=>{const b=$('studio-generate');b.disabled=true;try{const r=await intakeApi('studio_generate',{topic:$('studio-topic').value.trim(),mode:$('studio-format').value,duration_seconds:Number($('studio-duration').value)});const s=r.script||{};const pkg=s.production_package||s;notice('studio-msg','تم حفظ مسودة سكربت بناءً على بيانات القناة. تحقّق من المصدر الأثري قبل الإنتاج.','good');$('studio-result').innerHTML='<article class="item"><h3>'+studioEsc(s.title||pkg.title||'مسودة جديدة')+'</h3><p><b>الافتتاحية:</b> '+studioEsc(s.hook||pkg.hook||'')+'</p><p><b>الوصف:</b></p><pre style="white-space:pre-wrap">'+studioEsc(s.description||pkg.description||'')+'</pre><p><b>الكلمات المفتاحية:</b> '+studioEsc((s.tags||pkg.tags||[]).join('، '))+'</p><p><b>السكربت:</b></p><pre style="white-space:pre-wrap">'+studioEsc((s.narration||pkg.narration||[]).map(x=>(x.time||'')+' '+(x.text||'')).join('\\n'))+'</pre><p><b>الأساس التحليلي:</b> '+studioEsc(JSON.stringify(r.analytics_winner||{}))+'</p></article>';await loadStudioScripts();}catch(e){notice('studio-msg',e.message||'تعذر إنشاء المسودة.','bad');}finally{b.disabled=false;}});
 $('studio-refresh')?.addEventListener('click',loadStudioScripts);
 function studioEsc(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-async function loadStudioScripts(){const r=await intakeApi('studio_list',{});const items=r.scripts||[];$('studio-result').innerHTML=items.map(s=>'<article class="item"><h3>'+studioEsc(s.title)+'</h3><p>'+studioEsc(s.topic)+' · '+studioEsc(s.status)+'</p><button class="secondary" type="button" data-studio-id="'+studioEsc(s.id)+'">عرض بيانات المسودة</button><pre class="studio-json" id="studio-json-'+studioEsc(s.id)+'" style="display:none;white-space:pre-wrap">'+studioEsc(JSON.stringify(s.production_package||{},null,2))+'</pre></article>').join('')||'<p>لا توجد مسودات محفوظة بعد.</p>';document.querySelectorAll('[data-studio-id]').forEach(b=>b.addEventListener('click',()=>{const e=$('studio-json-'+b.dataset.studioId);if(e)e.style.display=e.style.display==='none'?'block':'none';}));}
+function applyStudioPackage(pkg,topic){
+ if(!pkg||typeof pkg!=='object')throw new Error('لا توجد حزمة إنتاج صالحة في هذه المسودة.');
+ const expected=String(topic||pkg.title||'').trim();
+ $('intake-title').value=String(pkg.title||expected).slice(0,100);
+ $('intake-description').value=String(pkg.description||'').slice(0,5000);
+ $('intake-tags').value=(Array.isArray(pkg.tags)?pkg.tags:[]).map(x=>String(x)).join('، ').slice(0,2000);
+ $('intake-kids').value='';
+ $('intake-synthetic').value='';
+ $('intake-privacy').value='public';
+ const needsSource=pkg.source_check_required===true||pkg.analytics_basis?.fact_check_required===true||!String(pkg.source_reference||pkg.analytics_basis?.source_reference||'').trim();
+ notice('intake-msg','تم نقل العنوان والوصف والكلمات المفتاحية من مسودة «'+expected+'». اختر ملف الفيديو المطابق، ثم حدّد إجابة الأطفال والإفصاح الاصطناعي يدويًا. '+(needsSource?'تنبيه: المرجع الأثري غير مكتمل؛ راجع الوقائع والمصدر قبل النشر.':'راجع أن المرجع المذكور يطابق المشهد الفعلي.'),needsSource?'warn':'good');
+ $('intake-file').scrollIntoView({behavior:'smooth',block:'center'});
+ $('intake-title').focus({preventScroll:true});
+}
+async function loadStudioScripts(){const r=await intakeApi('studio_list',{});const items=r.scripts||[];$('studio-result').innerHTML=items.map(s=>'<article class="video-card"><h3>'+studioEsc(s.title)+'</h3><p>'+studioEsc(s.topic)+' · '+studioEsc(s.status)+' · '+studioEsc((s.production_package||{}).format||'مسودة')+'</p><div class="actions"><button type="button" data-studio-use="'+studioEsc(s.id)+'">استخدام بيانات المسودة لتجهيز الفيديو</button><button class="secondary" type="button" data-studio-id="'+studioEsc(s.id)+'">عرض بيانات المسودة</button></div><pre class="studio-json" id="studio-json-'+studioEsc(s.id)+'" style="display:none;white-space:pre-wrap">'+studioEsc(JSON.stringify(s.production_package||{},null,2))+'</pre></article>').join('')||'<p>لا توجد مسودات محفوظة بعد.</p>';
+ document.querySelectorAll('[data-studio-id]').forEach(b=>b.addEventListener('click',()=>{const e=$('studio-json-'+b.dataset.studioId);if(e)e.style.display=e.style.display==='none'?'block':'none';}));
+ document.querySelectorAll('[data-studio-use]').forEach(b=>b.addEventListener('click',()=>{try{const e=$('studio-json-'+b.dataset.studioUse);const pkg=JSON.parse(e?.textContent||'{}');const card=b.closest('article');const topic=card?.querySelector('h3')?.textContent||pkg.title||'';applyStudioPackage(pkg,topic);}catch(e){notice('studio-msg',e.message||'تعذر نقل بيانات المسودة.','bad');}}));
+}
 $('intake-upload')?.addEventListener('click',async()=>{try{await uploadIntakeFile();}catch(e){notice('intake-progress',e.message||'تعذر رفع الملف.','bad');notice('intake-msg','لم يكتمل الاستقبال؛ راجع رسالة الخطأ قبل إعادة المحاولة.','warn');}});
 $('intake-refresh')?.addEventListener('click',async()=>{try{await loadIntakeAssets();notice('intake-msg','تم تحديث قائمة الاستقبال.','good');}catch(e){notice('intake-msg',e.message||'تعذر تحميل القائمة.','bad');}});
 $('intake-refresh-list')?.addEventListener('click',async()=>{try{await loadIntakeAssets();}catch(e){notice('intake-msg',e.message||'تعذر تحميل القائمة.','bad');}});
