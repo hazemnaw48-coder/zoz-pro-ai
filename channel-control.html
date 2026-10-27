@@ -256,8 +256,8 @@ async function call(action,body){
 
 const MANAGED_CHANNELS=[
  {channel_id:'UCIael48cvwPG3gKj--c7HKw',label:'Hazem Ahmed',purpose:'تاريخ مصر القديمة والآثار'},
- {channel_id:'UC9fr5B0SZZkmVAApfCqEO3w',label:'فكره',purpose:'قناة جديدة — يحدد مجالها قبل أول إنتاج'},
- {channel_id:'UC-FimUUFXRd0MOSoikzczcQ',label:'مختبر فِكرة (الاسم المقترح)',purpose:'علوم مبسطة وتجارب آمنة — الاسم الفعلي لا يتغير تلقائيًا'}
+ {channel_id:'UC9fr5B0SZZkmVAApfCqEO3w',label:'فكره 🗣️',purpose:'أفكار مفيدة ومعلومات متنوعة وذكاء اصطناعي عملي'},
+ {channel_id:'UC-FimUUFXRd0MOSoikzczcQ',label:'القناة السياسية — الاسم قيد الاختيار',purpose:'أخبار مصرية وعالمية موثوقة وتحليل سياسي موثق'}
 ];
 async function loadManagedChannels(){
  const host=$('managed-channels-list');host.innerHTML='';
@@ -435,6 +435,7 @@ async function generateContentCalendar(){
 
 async function intakeApi(action,body){return await call(action,body||{});}
 function managedChannelId(){return $('managed-channel-selector')?.value||CHANNEL_ID;}
+$('managed-channel-selector')?.addEventListener('change',async()=>{try{await loadStudioScripts();await loadIntakeAssets();await loadIntakeSources();}catch(e){notice('intake-msg',e.message||'تعذر تحديث بيانات القناة.','bad');}});
 function managedPayload(body){return Object.assign({channel_id:managedChannelId()},body||{});}
 async function managedCall(action,body){return await call(action,managedPayload(body));}
 
