@@ -48,9 +48,11 @@ function setAuth(on,email){
  $("auth-pill").textContent=on?"جلسة المالك مؤكدة":"لم يتم التحقق";
  $("login-button").classList.toggle("hidden",on);
  $("password").classList.toggle("hidden",on);
+ $("email").classList.toggle("hidden",on);
  $("logout-button").classList.toggle("hidden",!on);
- if(on){$("auth-message").textContent="تم التحقق من جلسة المالك. يمكنك استيراد الحزمة وحفظها في مشروع الإنتاج."; $("auth-message").className="status good";$("login-card").classList.add("hidden");refreshJobs().catch(()=>{});}
- else {$("login-card").classList.remove("hidden");}
+ $("login-card").classList.remove("hidden");
+ if(on){$("auth-message").textContent="تم التحقق من جلسة المالك. يمكنك استيراد الحزمة وحفظها في مشروع الإنتاج."; $("auth-message").className="status good";refreshJobs().catch(()=>{});}
+ else {$("email").classList.remove("hidden");$("password").classList.remove("hidden");}
 }
 async function checkSession(){
  const {data:{session}}=await sb.auth.getSession();
