@@ -74,7 +74,7 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
   <p class="small">معرّف القناة المثبّت: <b dir="ltr">UCIael48cvwPG3gKj--c7HKw</b>. لا يتم تغيير القناة المستهدفة.</p>
  </section>
 <section class="card" id="managed-channels-card">
- <div class="row"><h2>إدارة القنوات والتفويض المستقل</h2><button type="button" id="managed-channels-refresh" class="secondary">تحديث حالة القنوات</button></div>
+ <div class="row"><h2>إدارة القنوات والتفويض المستقل</h2><div class="actions"><button type="button" id="managed-channels-refresh" class="secondary">تحديث حالة القنوات</button><button type="button" id="managed-channels-sync-all">مزامنة كل القنوات المفوضة</button></div></div>
  <p>كل قناة لها تفويض Google وتحليلات وسجل خاص بها. لا يقرأ المركز قناة أخرى إذا لم يطابق معرّف القناة الذي تحقق منه Google.</p>
  <div id="managed-channels-msg" class="notice">جارٍ تحميل القنوات المسجلة…</div>
  <div id="managed-channels-list" class="grid"></div>
@@ -643,6 +643,29 @@ async function loadVideos(){
  }catch(e){notice('videos-msg',e.message||'تعذر تحميل الفيديوهات.','bad');}
  finally{$('load-videos').disabled=false;}
 }
+
+$('managed-channels-sync-all')?.addEventListener('click',async()=>{
+ const button=$('managed-channels-sync-all');button.disabled=true;
+ try{
+  const d=await call('managed_channels',{}),rows=(d.channels||[]).filter(x=>x.has_authorization);
+  if(!rows.length)throw new Error('لا توجد قناة لها تفويض محفوظ صالح. ابدأ بزر «ربط Google لهذه القناة».');
+  const end=new Date(Date.now()-86400000),start=new Date(end.getTime()-27*86400000),iso=x=>x.toISOString().slice(0,10);
+  const results=[];
+  for(const ch of rows){
+   notice('managed-channels-msg','مزامنة مباشرة: '+(ch.display_name||ch.channel_title||ch.channel_id)+'…');
+   try{const r=await call('managed_channel_sync',{channel_id:ch.channel_id,start_date:iso(start),end_date:iso(end)});results.push({title:r.channel_title||ch.channel_title,ok:true,views:r.metrics?.views||0});}
+   catch(e){results.push({title:ch.display_name||ch.channel_title||ch.channel_id,ok:false,error:e.message||'فشلت المزامنة'});}
+  }
+  const out=$('managed-channel-live-result');out.innerHTML='';
+  const ul=document.createElement('ul');
+  results.forEach(x=>{const li=document.createElement('li');li.textContent=x.title+' — '+(x.ok?'نجحت المزامنة · مشاهدات الفترة '+fmt(x.views):'لم تنجح: '+x.error);ul.appendChild(li);});
+  out.appendChild(ul);
+  notice('managed-channels-msg','انتهت المزامنة المباشرة. نجاح '+results.filter(x=>x.ok).length+' من '+results.length+' قناة مفوضة.','good');
+  await loadManagedChannels();
+ }catch(e){notice('managed-channels-msg',e.message||'تعذر مزامنة القنوات.','bad');}
+ finally{button.disabled=false;}
+});
+
 $('managed-channels-refresh')?.addEventListener('click',loadManagedChannels);
 $('login').addEventListener('click',async()=>{
  $('login').disabled=true;notice('login-msg','جارٍ التحقق من حساب مالك ZOZ Pro…');
