@@ -23,6 +23,44 @@
     const b = bridge();
     if (typeof b?.msg === "function") b.msg("#m-" + id, text, kind);
   };
+  function addImagePreview(id, item, index, total) {
+    const host = $v("#visual-images-" + id);
+    if (!host || !item?.blob) return;
+    const url = URL.createObjectURL(item.blob);
+    const card = document.createElement("figure");
+    card.className = "visual-image-card";
+    const image = document.createElement("img");
+    image.src = url;
+    image.alt = "صورة المشهد " + (index + 1);
+    image.loading = "lazy";
+    const caption = document.createElement("figcaption");
+    caption.textContent = "المشهد " + (index + 1) + " من " + total +
+      (item.source === "ai-horde" ? " · صورة مولدة توضيحية" : " · صورة أرشيفية مفتوحة");
+    card.append(image, caption);
+    host.appendChild(card);
+  }
+  function showAudioPreview(id, blob) {
+    const audio = $v("#visual-audio-" + id);
+    const note = $v("#visual-audio-note-" + id);
+    if (!audio || !blob) return;
+    if (audio.dataset.objectUrl) URL.revokeObjectURL(audio.dataset.objectUrl);
+    const url = URL.createObjectURL(blob);
+    audio.dataset.objectUrl = url;
+    audio.src = url;
+    audio.classList.remove("hidden");
+    if (note) note.textContent = "تم إنشاء التعليق الصوتي العربي ويمكن الاستماع إليه قبل اعتماد الفيديو.";
+  }
+  function showVideoPreview(id, blob) {
+    const video = $v("#visual-video-" + id);
+    const note = $v("#visual-video-note-" + id);
+    if (!video || !blob) return;
+    if (video.dataset.objectUrl) URL.revokeObjectURL(video.dataset.objectUrl);
+    const url = URL.createObjectURL(blob);
+    video.dataset.objectUrl = url;
+    video.src = url;
+    video.classList.remove("hidden");
+    if (note) note.textContent = "معاينة MP4 محلية — الفيديو لم يُنشر علنًا.";
+  }
   function titleFor(job) {
     return String(job?.script_json?.title || job?.topic || "ZOZ-Pro-video")
       .replace(/[^\p{L}\p{N}_-]+/gu, "-").slice(0, 54) || "ZOZ-Pro-video";
@@ -184,23 +222,60 @@
     return String(s.voiceover_script || s.script || byScenes || job.topic || "").trim().slice(0, 5000);
   }
   async function makeArabicVoiceover(text, id) {
-    say(id, "تحميل محرك التعليق الصوتي العربي المجاني إلى المتصفح (أول مرة نحو 30 ميجابايت)…");
-    let mod;
-    try {
-      mod = await import("https://cdn.jsdelivr.net/npm/nabra-tts@0/+esm");
-    } catch (error) {
-      throw new Error("تعذر تحميل محرك الصوت العربي المجاني. افتح الصفحة في Chrome مع إنترنت ثم أعد المحاولة. لم يتم إنشاء فيديو صامت.");
+    say(id, "تحميل محرك الصوت العربي المجاني — نسخة خفيفة أولًا، وقد يحتاج التنزيل الأول إلى إنترنت…");
+    const loaders = [
+      () => import("https://cdn.jsdelivr.net/npm/nabra-tts@0/+esm"),
+      () => import("https://esm.sh/nabra-tts@latest?bundle"),
+      () => import("https://unpkg.com/nabra-tts@latest?module")
+    ];
+    let mod = null;
+    const importErrors = [];
+    for (let i = 0; i < loaders.length; i++) {
+      try {
+        mod = await loaders[i]();
+        if (mod && (mod.NabraTTS || mod.default?.NabraTTS || mod.default)) break;
+      } catch (error) {
+        importErrors.push(String(error?.message || error).slice(0, 180));
+      }
+    }
+    if (!mod) {
+      throw new Error("تعذر تحميل مكتبة الصوت من مصادرها المجانية الثلاثة. تأكد من فتح الصفحة في Chrome مع الإنترنت، وأوقف مانع المحتوى لهذه الصفحة مؤقتًا إن وُجد. التفاصيل: " +
+        (importErrors.join(" | ") || "لم تُرجع المكتبة واجهة قابلة للاستخدام") + ". لم يتم إنشاء فيديو صامت.");
     }
     const Engine = mod.NabraTTS || mod.default?.NabraTTS || mod.default;
-    if (!Engine || typeof Engine.load !== "function") throw new Error("نسخة محرك الصوت العربي لا توفر واجهة التشغيل المتوقعة.");
-    const tts = await Engine.load();
-    const result = await tts.generate(text);
-    const wavResult = tts.toWav(result.audio);
-    const blob = wavResult instanceof Blob ? wavResult :
-      (wavResult instanceof ArrayBuffer || ArrayBuffer.isView(wavResult))
-        ? new Blob([wavResult], { type: "audio/wav" }) : null;
-    if (!blob || blob.size < 2000) throw new Error("لم ينتج محرك الصوت ملف WAV صالحًا؛ أوقف المركز إنتاج الفيديو الصامت.");
-    return blob;
+    if (!Engine || typeof Engine.load !== "function") throw new Error("المكتبة المحملة لا تعرض واجهة NabraTTS.load المتوقعة.");
+    let tts;
+    try {
+      tts = await Engine.load({
+        dtype: "fp16",
+        device: "auto",
+        onProgress: p => {
+          const file = String(p?.file || "نموذج الصوت").split("/").pop();
+          const percent = p?.total > 0 ? Math.floor(p.loaded / p.total * 100) : 0;
+          say(id, "تحميل محرك الصوت العربي: " + file + (percent ? " · " + percent + "%" : "") + "…");
+        }
+      });
+    } catch (firstError) {
+      say(id, "تعذر تحميل النسخة الخفيفة؛ محاولة النسخة المتوافقة الأكبر مرة واحدة…");
+      try {
+        tts = await Engine.load({ dtype: "fp32", device: "auto" });
+      } catch (secondError) {
+        throw new Error("تم تحميل مكتبة الصوت لكن تعذر تحميل نموذجها. تأكد من الاتصال بالإنترنت وتوفر مساحة ذاكرة في Chrome. السبب: " +
+          String(secondError?.message || firstError?.message || secondError).slice(0, 260));
+      }
+    }
+    try {
+      say(id, "إنشاء التعليق الصوتي العربي…");
+      const result = await tts.generate(text);
+      const wavResult = tts.toWav(result.audio);
+      const blob = wavResult instanceof Blob ? wavResult :
+        (wavResult instanceof ArrayBuffer || ArrayBuffer.isView(wavResult))
+          ? new Blob([wavResult], { type: "audio/wav" }) : null;
+      if (!blob || blob.size < 2000) throw new Error("لم ينتج محرك الصوت ملف WAV صالحًا.");
+      return blob;
+    } finally {
+      try { await tts.dispose?.(); } catch (_) {}
+    }
   }
   function loadImage(blob) {
     return new Promise((resolve, reject) => {
@@ -394,7 +469,13 @@
     const imageFiles = [];
     const sourceLog = [];
     try {
-      say(id, "بدأ الإنتاج من دون رفع يدوي: " + scenes.length + " مشاهد، ثم صوت عربي محلي وتجميع MP4.", "warn");
+      const imageHost = $v("#visual-images-" + id);
+      if (imageHost) imageHost.replaceChildren();
+      const audioPreview = $v("#visual-audio-" + id);
+      const videoPreview = $v("#visual-video-" + id);
+      if (audioPreview) { audioPreview.pause(); audioPreview.removeAttribute("src"); audioPreview.load(); audioPreview.classList.add("hidden"); }
+      if (videoPreview) { videoPreview.pause(); videoPreview.removeAttribute("src"); videoPreview.load(); videoPreview.classList.add("hidden"); }
+      say(id, "بدأ الإنتاج الداخلي: سنعرض كل صورة ونحفظها فورًا، ثم ننشئ الصوت والفيديو.", "warn");
       for (let i = 0; i < scenes.length; i++) {
         const image = await generateSceneImage(job, scenes[i], i, scenes.length, id);
         imageFiles.push(image);
@@ -404,14 +485,31 @@
           attribution: image.attribution || null, license: image.license || null,
           generation_request_id: image.requestId || null
         });
+        addImagePreview(id, image, i, scenes.length);
+        say(id, "ظهرت الصورة " + (i + 1) + "/" + scenes.length + "؛ حفظها في التخزين الخاص…", "warn");
+        await uploadMedia(id, image.blob, image.filename, "image/jpeg", {
+          visual_source: image.source, prompt: String(image.prompt || "").slice(0, 1500),
+          source_url: image.originalUrl || image.sourceUrl || null,
+          attribution: image.attribution || null, license: image.license || null,
+          generation_request_id: image.requestId || null, scene_number: image.sceneNumber,
+          historical_accuracy_note: image.source === "ai-horde" ? "صورة مولدة توضيحية وليست صورة أثر أصلي" : "صورة أرشيفية؛ راجع صفحة المصدر وشروط الرخصة قبل إعادة الاستخدام خارج سياق المشروع"
+        });
         const preview = $v("#m-" + id);
         if (preview) preview.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        say(id, "تم توليد الصورة وحفظها " + (i + 1) + "/" + scenes.length + ".", "good");
+        await wait(80);
       }
       say(id, "اكتملت الصور (" + imageFiles.filter(x => x.source === "ai-horde").length + " مولدة و" +
         imageFiles.filter(x => x.source === "wikimedia-commons").length + " تاريخية مفتوحة). تجهيز التعليق الصوتي العربي…", "warn");
       const voiceText = narrationFor(job);
       if (!voiceText) throw new Error("لا يوجد نص صوتي يمكن تحويله إلى تعليق.");
       const audioBlob = await makeArabicVoiceover(voiceText, id);
+      showAudioPreview(id, audioBlob);
+      say(id, "حُفظت معاينة التعليق الصوتي؛ جارٍ حفظ ملف WAV ثم إدخاله في الفيديو…", "warn");
+      await uploadMedia(id, audioBlob, titleFor(job) + "-voiceover.wav", "audio/wav", {
+        generated_locally: true, voiceover_engine: "nabra-tts-local", language: "ar",
+        text_characters: voiceText.length, voiceover_preview: true
+      });
       const target = clamp(Number(job.duration_seconds) || Number(job.script_json.duration_seconds) || 45, 20, 150);
       say(id, "تجهيز الفيديو المتحرك بالصوت؛ أبقِ الصفحة مفتوحة حتى ينتهي التسجيل والتحويل.", "warn");
       const recorded = await recordImageMontage(imageFiles, scenes, audioBlob, target, id,
@@ -421,17 +519,8 @@
       if (video.type !== "video/mp4" || video.size < 5000) throw new Error("لم ينتج ملف MP4 صالح.");
       const max = 50 * 1024 * 1024;
       if (video.size > max) throw new Error("حجم MP4 أكبر من حد التخزين الحالي 50 ميجابايت؛ لم أضغطه أو أحذف الصوت.");
-      say(id, "حفظ الصور الناتجة مع بيانات المصدر…", "warn");
-      for (const image of imageFiles) {
-        await uploadMedia(id, image.blob, image.filename, "image/jpeg", {
-          visual_source: image.source, prompt: String(image.prompt || "").slice(0, 1500),
-          source_url: image.originalUrl || image.sourceUrl || null,
-          attribution: image.attribution || null, license: image.license || null,
-          generation_request_id: image.requestId || null, scene_number: image.sceneNumber,
-          historical_accuracy_note: image.source === "ai-horde" ? "صورة مولدة توضيحية وليست صورة أثر أصلي" : "صورة أرشيفية؛ راجع صفحة المصدر وشروط الرخصة قبل إعادة الاستخدام خارج سياق المشروع"
-        });
-        await wait(80);
-      }
+      showVideoPreview(id, video);
+      say(id, "تم إنشاء MP4 مع الصوت؛ ظهرت المعاينة ويجري الآن حفظ الترجمة والفيديو النهائي.", "good");
       say(id, "التعليق الصوتي مضمّن داخل MP4؛ حفظ الترجمة النصية…", "warn");
       say(id, "حفظ الترجمة النصية المتزامنة…", "warn");
       const subtitleBlob = new Blob([vttSubtitles(job, recorded.duration)], { type: "text/vtt;charset=utf-8" });
