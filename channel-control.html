@@ -312,7 +312,7 @@ async function loadContentCalendar(){
    const send=document.createElement('button');send.type='button';send.textContent='إرسال حزمة الإنتاج إلى مركز الإنشاء';send.addEventListener('click',()=>{
     try{
      const savedPackage=item.production_package&&typeof item.production_package==='object'&&!Array.isArray(item.production_package)?item.production_package:null;
-     const packageData=savedPackage||{
+     const fallbackPackage={
       title_for_upload:item.working_title||'فكرة محتوى عن مصر القديمة',
       alternate_titles:[],
       audience:'مشاهدون عرب مهتمون بتاريخ مصر القديمة',
@@ -329,7 +329,15 @@ async function loadContentCalendar(){
       duplicate_check:{source_snapshot_id:item.snapshot_id||''},
       package_reconstructed_from_calendar:true
      };
-     const handoff={version:1,calendar_item_id:item.id,analytics_snapshot_id:item.snapshot_id||packageData.duplicate_check?.source_snapshot_id||'',topic:packageData.title_for_upload||item.working_title,audience:packageData.audience||'مشاهدون عرب مهتمون بتاريخ مصر القديمة',language:packageData.language||'ar-EG',duration_seconds:packageData.target_duration_seconds||40,production_package:packageData};
+     const packageData={...fallbackPackage,...(savedPackage||{})};
+     if(!Array.isArray(packageData.narration)||!packageData.narration.some(x=>String(x?.text||x?.narration||'').trim())) packageData.narration=fallbackPackage.narration;
+     if(!Array.isArray(packageData.shotPlan)||!packageData.shotPlan.some(x=>String(x?.visual||x?.generation_prompt||x?.prompt||'').trim())) packageData.shotPlan=fallbackPackage.shotPlan;
+     if(!String(packageData.description||'').trim()) packageData.description=fallbackPackage.description;
+     if(!Array.isArray(packageData.tags)||!packageData.tags.length) packageData.tags=fallbackPackage.tags;
+     if(!Array.isArray(packageData.hashtags)||!packageData.hashtags.length) packageData.hashtags=fallbackPackage.hashtags;
+     if(!String(packageData.thumbnail_brief||'').trim()) packageData.thumbnail_brief=fallbackPackage.thumbnail_brief;
+     if(!Array.isArray(packageData.fact_check)||!packageData.fact_check.length) packageData.fact_check=fallbackPackage.fact_check;
+     if(!Array.isArray(packageData.sources)) packageData.sources=[];const handoff={version:1,calendar_item_id:item.id,analytics_snapshot_id:item.snapshot_id||packageData.duplicate_check?.source_snapshot_id||'',topic:packageData.title_for_upload||item.working_title,audience:packageData.audience||'مشاهدون عرب مهتمون بتاريخ مصر القديمة',language:packageData.language||'ar-EG',duration_seconds:packageData.target_duration_seconds||40,production_package:packageData};
      localStorage.setItem('zoz-pro-pending-production-handoff-v1',JSON.stringify(handoff));
      window.top.location.href='./production-workbench.html?handoff=1';
      notice('calendar-msg','تم تجهيز الحزمة ونقلها إلى مركز الإنتاج. أكمل هناك مراجعة الاستيراد؛ لم يتم النشر.','good');
