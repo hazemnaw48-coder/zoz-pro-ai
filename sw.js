@@ -1,10 +1,10 @@
-const CACHE_NAME = "zoz-pro-shell-v23";
+const CACHE_NAME = "zoz-pro-shell-v26";
 const APP_FILES = [
   "./",
   "./index.html",
   "./production-center.html",
   "./production-workbench.html",
-  "./production-workbench.js?v=20261027-workbench-3",
+  "./production-workbench.js?v=20261027-same-session-1",
   "./analysis-production.html",
   "./channel-control.html",
   "./youtube-analytics.html",
