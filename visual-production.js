@@ -16,10 +16,12 @@
     "Egyptian art museum relief head in profile"
   ];
   const $v = s => document.querySelector(s);
+  const bridge = () => window.ZOZVisualProductionBridge || null;
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
   const say = (id, text, kind = "warn") => {
-    if (typeof msg === "function") msg("#m-" + id, text, kind);
+    const b = bridge();
+    if (typeof b?.msg === "function") b.msg("#m-" + id, text, kind);
   };
   function titleFor(job) {
     return String(job?.script_json?.title || job?.topic || "ZOZ-Pro-video")
@@ -337,15 +339,17 @@
     } finally { input.dispose(); if (output) { try { output.dispose(); } catch (_) {} } }
   }
   async function uploadMedia(id, blob, filename, mime, sourceMetadata = {}) {
-    const prepared = await call(MEDIA, {
+    const b = bridge();
+    if (!b?.call || !b?.MEDIA || !b?.sb) throw new Error("اتصال محرك الإنتاج بورشة ZOZ Pro غير جاهز. أعد تحميل الصفحة.");
+    const prepared = await b.call(b.MEDIA, {
       action: "prepare_upload", job_id: id, filename, mime_type: mime, size: blob.size,
       source_tool: "zoz-pro-free-image-audio"
     });
-    const { data, error } = await sb.storage.from("zoz-pro-media").uploadToSignedUrl(
+    const { data, error } = await b.sb.storage.from("zoz-pro-media").uploadToSignedUrl(
       prepared.path, prepared.token, new File([blob], filename, { type: mime }), { contentType: mime }
     );
     if (error || !data) throw new Error("فشل حفظ " + filename + " في التخزين الخاص: " + (error?.message || "لم يؤكد التخزين اكتمال الرفع."));
-    const finalized = await call(MEDIA, {
+    const finalized = await b.call(b.MEDIA, {
       action: "finalize_upload", job_id: id, path: prepared.path, mime_type: mime,
       size: blob.size, filename, source_tool: "zoz-pro-free-image-audio",
       source_metadata: sourceMetadata,
@@ -374,7 +378,8 @@
     }).join("\n");
   }
   async function runProduction(id, button) {
-    const job = (typeof state !== "undefined" ? (state?.jobs || []).find(x => x.id === id) : null);
+    const b = bridge();
+    const job = typeof b?.getJob === "function" ? b.getJob(id) : (b?.state?.jobs || []).find(x => x.id === id);
     if (!job?.script_json || !Array.isArray(job.script_json.scenes) || !job.script_json.scenes.length) {
       throw new Error("ولّد النص والمشاهد أولًا، ثم ابدأ إنتاج الصور والصوت.");
     }
@@ -434,7 +439,9 @@
         generated_locally: true, language: "ar", format: "webvtt"
       });
       say(id, "حفظ الفيديو النهائي والتحقق منه في Supabase…", "warn");
-      await call(MEDIA, {
+      const b = bridge();
+      if (!b?.call || !b?.MEDIA) throw new Error("اتصال محرك الإنتاج بورشة ZOZ Pro غير جاهز.");
+      await b.call(b.MEDIA, {
         action: "save_prompt", job_id: id,
         prompt: String(job.script_json.original_prompt || job.script_json.script || job.topic || ""),
         source_tool: "zoz-pro-free-image-audio",
@@ -453,7 +460,7 @@
         ? "نجح الإنتاج: الصور والصوت والترجمة وMP4 محفوظة ومتحقق منها، وصُدّر الفيديو إلى قائمة مراجعة النشر. لم يتم النشر العام."
         : "نجح الإنتاج: تم حفظ MP4 مع الصور والصوت والترجمة داخل Supabase، وأصبح جاهزًا لمراجعتك. لم يتم النشر العام."
         + (final.production_export?.error ? " ملاحظة التصدير: " + final.production_export.error : ""), "good");
-      if (typeof refresh === "function") await refresh();
+      if (typeof bridge()?.refresh === "function") await bridge().refresh();
     } catch (error) {
       say(id, "لم يكتمل الإنتاج: " + String(error?.message || error).slice(0, 600), "bad");
     } finally {
