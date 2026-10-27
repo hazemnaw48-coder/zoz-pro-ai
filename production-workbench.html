@@ -18,7 +18,7 @@ label{display:block;font-weight:700;margin:10px 0 5px}input,textarea,select{widt
 <body>
 <main>
 <header>
- <div class="brand"><span class="mark">Z</span><div><h1>ورشة إنتاج الفيديو</h1><p>تستقبل توصية التحليل والوصف وخطة المشاهد، ثم تحفظ الفيديو النهائي للمراجعة</p></div></div>
+ <div class="brand"><span class="mark">Z</span><div><h1>ورشة إنتاج الفيديو</h1><p>تنفيذ المشاهد في Google Flow / ZOZ NOW ثم رفع MP4 للمراجعة والإكمال داخل المركز</p></div></div>
  <div class="links"><a class="button secondary" href="./channel-control.html">العودة للتحليل والتوصيات</a><a class="button ghost" href="./production-center.html">مركز المهام القديم</a></div>
 </header>
 <div class="steps" aria-label="مراحل العمل">
@@ -46,7 +46,7 @@ label{display:block;font-weight:700;margin:10px 0 5px}input,textarea,select{widt
  <div id="job-brief" class="status"></div>
  <div class="grid">
   <div><label for="source-tool">أداة إنتاج الفيديو</label><select id="source-tool"><option value="google-flow">Google Flow / ZOZ NOW</option><option value="manual-upload">رفع يدوي / محرر خارجي</option><option value="gemini">Gemini</option><option value="kling">Kling</option><option value="luma">Luma</option><option value="runway">Runway</option><option value="pixverse">PixVerse</option><option value="vidu">Vidu</option><option value="qwen">Qwen / Alibaba</option><option value="other">أداة أخرى</option></select></div>
-  <div><label for="upload-file">الفيديو النهائي (MP4)</label><input id="upload-file" type="file" accept="video/mp4,.mp4"><p class="hint">حد التخزين الحالي 50 ميجابايت. لن يتم ضغط الفيديو تلقائيًا أو نشره علنًا.</p></div>
+  <div><label for="upload-file">الفيديو النهائي (MP4)</label><input id="upload-file" type="file" accept="video/mp4,.mp4"><p class="hint">ارفع ملف MP4 النهائي الذي صدّرته من Google Flow. الحد الحالي 50 ميجابايت؛ لا ضغط تلقائي ولا نشر عام قبل المراجعة.</p></div>
  </div>
  <div class="row"><button id="prepare-scenes-button" type="button" class="secondary hidden">اعتماد إعداد المشاهد لهذه التوصية</button><button id="copy-all-button" type="button" class="secondary">نسخ خطة المشاهد كاملة</button><button id="download-plan-button" type="button" class="secondary">تنزيل تعليمات الإنتاج TXT</button></div>
  <div id="scene-message" class="status">سيظهر وصف كل مشهد هنا بعد استيراد المهمة.</div>
@@ -62,7 +62,7 @@ label{display:block;font-weight:700;margin:10px 0 5px}input,textarea,select{widt
 </section>
 <div class="footer">ZOZ Pro · لا نشر تلقائي · لا يتم حذف الحزمة الواردة إلا بعد تأكيد استيرادها إلى قاعدة الإنتاج.</div>
 </main>
-<script src="./production-workbench.js?v=20261027-visual-previews-tts-fallback-2"></script>
-<script src="./visual-production.js?v=20261027-visual-previews-tts-fallback-2"></script>
+<script src="./production-workbench.js?v=20261027-google-flow-workflow-1"></script>
+<!-- تم إيقاف محرك الصور/الصوت الداخلي غير الموثوق؛ الإنتاج البصري يتم في Google Flow. -->
 </body>
 </html>
