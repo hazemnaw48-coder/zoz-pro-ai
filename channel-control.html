@@ -73,6 +73,14 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
   <div id="channel-status" class="notice">سيتم اختبار الاتصال من خلال طلب تحليلات للقراءة فقط.</div>
   <p class="small">معرّف القناة المثبّت: <b dir="ltr">UCIael48cvwPG3gKj--c7HKw</b>. لا يتم تغيير القناة المستهدفة.</p>
  </section>
+<section class="card" id="managed-channels-card">
+ <div class="row"><h2>إدارة القنوات والتفويض المستقل</h2><button type="button" id="managed-channels-refresh" class="secondary">تحديث حالة القنوات</button></div>
+ <p>كل قناة لها تفويض Google وتحليلات وسجل خاص بها. لا يقرأ المركز قناة أخرى إذا لم يطابق معرّف القناة الذي تحقق منه Google.</p>
+ <div id="managed-channels-msg" class="notice">جارٍ تحميل القنوات المسجلة…</div>
+ <div id="managed-channels-list" class="grid"></div>
+ <div id="managed-channel-live-result" class="section-gap"></div>
+ <p class="small">لإكمال التفويض: اضغط ربط Google للقناة المطلوبة، واختر حساب Google الذي يديرها ووافق على الصلاحيات. بعد العودة إلى المركز اضغط «مزامنة التحليلات الآن». لا يمكن تجاوز موافقة Google أو منح صلاحية لا يملكها الحساب.</p>
+</section>
 </div>
  <div class="page-panel" data-page="analytics" id="page-analytics">
 <section class="card">
@@ -213,7 +221,7 @@ function showPage(pageKey, scrollTop=true){
  if(indicator)indicator.textContent='القسم الحالي: '+label+' · '+step+' من '+tabs.length;
  if(scrollTop)window.scrollTo(0,0);
 }
-function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage('connection',false);notice('intake-msg','جلسة المالك متصلة بمشروع الإنتاج. افتح «٩ · استقبال الفيديوهات» لتحديث القائمة أو اختيار ملف.','good');}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
+function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage('connection',false);notice('intake-msg','جلسة المالك متصلة بمشروع الإنتاج. افتح «٩ · استقبال الفيديوهات» لتحديث القائمة أو اختيار ملف.','good');loadManagedChannels();}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
 async function ownerSession(){
  const {data,error}=await sb.auth.getSession();if(error)throw error;const session=data&&data.session;
  if(!session||!session.access_token)throw new Error('لا توجد جلسة مالك محفوظة. سجّل الدخول بحساب مالك ZOZ Pro.');
@@ -234,6 +242,58 @@ async function call(action,body){
  if(!response.ok||data.ok===false)throw new Error(data.error||('فشل الطلب HTTP '+response.status));
  return data;
 }
+
+const MANAGED_CHANNELS=[
+ {channel_id:'UCIael48cvwPG3gKj--c7HKw',label:'Hazem Ahmed',purpose:'تاريخ مصر القديمة والآثار'},
+ {channel_id:'UC9fr5B0SZZkmVAApfCqEO3w',label:'فكره',purpose:'قناة جديدة — يحدد مجالها قبل أول إنتاج'},
+ {channel_id:'UC-FimUUFXRd0MOSoikzczcQ',label:'مختبر فِكرة (الاسم المقترح)',purpose:'علوم مبسطة وتجارب آمنة — الاسم الفعلي لا يتغير تلقائيًا'}
+];
+async function loadManagedChannels(){
+ const host=$('managed-channels-list');host.innerHTML='';
+ notice('managed-channels-msg','جارٍ قراءة حالة التفويض من قاعدة الإنتاج…');
+ try{
+  const d=await call('managed_channels',{});
+  const rows=Array.isArray(d.channels)?d.channels:[];
+  for(const wanted of MANAGED_CHANNELS){
+   const item=rows.find(x=>x.channel_id===wanted.channel_id)||{channel_id:wanted.channel_id,display_name:wanted.label,channel_title:wanted.label,niche:wanted.purpose,connection_status:'not_registered',has_authorization:false,credential_status:'missing'};
+   const card=document.createElement('article');card.className='video-card';
+   const title=document.createElement('h3');title.textContent=item.display_name||item.channel_title||wanted.label;card.appendChild(title);
+   const id=document.createElement('p');id.className='small';id.dir='ltr';id.textContent=item.channel_id;card.appendChild(id);
+   const purpose=document.createElement('p');purpose.textContent=item.niche||wanted.purpose;card.appendChild(purpose);
+   const status=document.createElement('p');status.textContent='حالة الربط: '+(item.has_authorization?'تفويض محفوظ':item.connection_status==='connected'?'متصل — يلزم التحقق من الرمز':item.connection_status==='not_registered'?'غير مسجلة في قاعدة الإنتاج':item.connection_status==='needs_reconnect'?'يحتاج إلى إعادة التفويض':'غير مفوض');card.appendChild(status);
+   if(item.last_synced_at){const sync=document.createElement('p');sync.className='small';sync.textContent='آخر مزامنة ناجحة: '+new Date(item.last_synced_at).toLocaleString('ar-EG');card.appendChild(sync);}
+   const actions=document.createElement('div');actions.className='actions';
+   const connect=document.createElement('button');connect.type='button';connect.textContent='ربط Google لهذه القناة';connect.addEventListener('click',async()=>{
+    connect.disabled=true;notice('managed-channels-msg','جارٍ تجهيز تفويض منفصل لـ '+wanted.label+'…');
+    try{const result=await call('managed_channel_connect',{channel_id:wanted.channel_id});if(!result.authorization_url)throw new Error('لم يُرجع النظام رابط تفويض Google.');window.location.href=result.authorization_url;}
+    catch(e){notice('managed-channels-msg',e.message||'تعذر بدء التفويض.','bad');connect.disabled=false;}
+   });actions.appendChild(connect);
+   const syncBtn=document.createElement('button');syncBtn.type='button';syncBtn.className='secondary';syncBtn.textContent='مزامنة التحليلات الآن';syncBtn.addEventListener('click',async()=>{
+    syncBtn.disabled=true;notice('managed-channels-msg','جارٍ قراءة بيانات '+wanted.label+' مباشرة من YouTube…');
+    try{
+     const end=new Date(Date.now()-86400000),start=new Date(end.getTime()-27*86400000),iso=x=>x.toISOString().slice(0,10);
+     const result=await call('managed_channel_sync',{channel_id:wanted.channel_id,start_date:iso(start),end_date:iso(end)});
+     const out=$('managed-channel-live-result');out.innerHTML='';
+     const h=document.createElement('h3');h.textContent='آخر مزامنة: '+(result.channel_title||wanted.label);out.appendChild(h);
+     const summary=document.createElement('p');summary.textContent='الفترة '+result.period.start_date+' إلى '+result.period.end_date+' · المشاهدات '+fmt(result.metrics.views)+' · ساعات المشاهدة '+fmt(result.metrics.watch_time_hours)+' · صافي المشتركين '+fmt(result.metrics.subscribers_net)+' · الإعجابات '+fmt(result.metrics.likes)+' · التعليقات '+fmt(result.metrics.comments);out.appendChild(summary);
+     tableInto(out,['تاريخ النشر','الفيديو','المشاهدات','الإعجابات','التعليقات','الخصوصية','المعالجة'],(result.videos||[]).slice(0,15).map(v=>[v.published_at?new Date(v.published_at).toLocaleDateString('ar-EG'):'—',v.title,fmt(v.views),fmt(v.likes),fmt(v.comments),v.privacy_status||'—',v.processing_status||v.upload_status||'—']));
+     notice('managed-channels-msg','نجحت القراءة المباشرة وحفظ اللقطة المستقلة للقناة: '+(result.channel_title||wanted.label),'good');
+     await loadManagedChannels();
+    }catch(e){notice('managed-channels-msg',(e.message||'فشلت المزامنة.')+' لم يتم عرض بيانات قناة أخرى.','bad');}
+    finally{syncBtn.disabled=false;}
+   });actions.appendChild(syncBtn);card.appendChild(actions);host.appendChild(card);
+  }
+  notice('managed-channels-msg','تم تحميل '+rows.length+' سجل قناة من قاعدة الإنتاج. حالة كل قناة معروضة منفصلة.','good');
+ }catch(e){notice('managed-channels-msg','تعذر تحميل القنوات: '+(e.message||'خطأ غير معروف'),'bad');}
+}
+function tableInto(host,headers,rows){
+ const wrap=document.createElement('div');wrap.className='table-wrap';
+ const t=document.createElement('table'),thead=document.createElement('thead'),tr=document.createElement('tr');
+ headers.forEach(h=>addCell(tr,h,true));thead.appendChild(tr);t.appendChild(thead);
+ const body=document.createElement('tbody');rows.forEach(values=>{const row=document.createElement('tr');values.forEach(v=>addCell(row,v,false));body.appendChild(row);});
+ t.appendChild(body);wrap.appendChild(t);host.appendChild(wrap);
+}
+
 function addCell(row,value,isHeader){const el=document.createElement(isHeader?'th':'td');el.textContent=String(value==null?'':value);row.appendChild(el);}
 function table(target,headers,rows){
  const wrap=$(target);wrap.innerHTML='';
@@ -583,6 +643,7 @@ async function loadVideos(){
  }catch(e){notice('videos-msg',e.message||'تعذر تحميل الفيديوهات.','bad');}
  finally{$('load-videos').disabled=false;}
 }
+$('managed-channels-refresh')?.addEventListener('click',loadManagedChannels);
 $('login').addEventListener('click',async()=>{
  $('login').disabled=true;notice('login-msg','جارٍ التحقق من حساب مالك ZOZ Pro…');
  try{
