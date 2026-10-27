@@ -10,7 +10,14 @@ const URL=configMatch[1];
 const REAL_KEY=configMatch[2];
 const CONTENT=URL+"/functions/v1/zoz-pro-content-center";
 const MEDIA=URL+"/functions/v1/zoz-pro-media-upload";
-const sb=window.supabase.createClient(URL,REAL_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+// Read the owner session already established by Channel Control (analytics Supabase project).
+const controlHtml=await fetch("./channel-control.html?session-config=1",{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("تعذر تحميل إعداد جلسة مركز التحليل.");return r.text();});
+const authUrlMatch=controlHtml.match(/const SUPABASE_URL='([^']+)'/);
+const authKeyMatch=controlHtml.match(/const SUPABASE_PUBLISHABLE_KEY='([^']+)'/);
+if(!authUrlMatch||!authKeyMatch)throw Error("تعذر قراءة إعداد جلسة مركز التحليل.");
+const authClient=window.supabase.createClient(authUrlMatch[1],authKeyMatch[1],{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:"sb-oxyzxbkwhafzaztraowc-auth-token"}});
+// The preview client is only for signed uploads and does not create a second login session.
+const sb=window.supabase.createClient(URL,REAL_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let handoff=null, job=null, busy=false;
@@ -19,7 +26,7 @@ function titleOf(j){return j?.script_json?.title||j?.topic||"مهمة إنتاج
 function currentPackage(){return handoff?.production_package||handoff?.package||null;}
 function recommendation(){return handoff?.recommendation||null;}
 async function api(url,body){
- const {data:{session}}=await sb.auth.getSession();
+ const {data:{session}}=await authClient.auth.getSession();
  if(!session?.access_token)throw Error("انتهت جلسة الدخول. سجّل الدخول ثم أعد المحاولة.");
  const r=await fetch(url,{method:body?"POST":"GET",headers:{authorization:"Bearer "+session.access_token,apikey:REAL_KEY,"content-type":"application/json"},...(body?{body:JSON.stringify(body)}:{})});
  const d=await r.json().catch(()=>({}));
@@ -48,34 +55,30 @@ function showIncoming(){
  $("incoming-details").innerHTML=lines.map(([h,v])=>'<details class="scene" '+(["عنوان الفيديو","التوجيه","الوصف","التعليق الصوتي","خطة المشاهد"].includes(h)?'open':"")+'><summary>'+esc(h)+'</summary><div class="prewrap">'+esc(v)+'</div></details>').join("");
 }
 function setAuth(on,email){
- $("auth-pill").textContent=on?"جلسة المالك مؤكدة":"لم يتم التحقق";
- $("login-button").classList.toggle("hidden",on);
- $("password").classList.toggle("hidden",on);
- $("email").classList.toggle("hidden",on);
- $("logout-button").classList.toggle("hidden",!on);
- $("login-card").classList.remove("hidden");
- if(on){$("auth-message").textContent="تم التحقق من جلسة المالك. يمكنك استيراد الحزمة وحفظها في مشروع الإنتاج."; $("auth-message").className="status good";refreshJobs().catch(()=>{});}
- else {$("email").classList.remove("hidden");$("password").classList.remove("hidden");}
+ $("auth-pill").textContent=on?"جلسة مركز التحليل متصلة":"لا توجد جلسة مالك";
+ $("analysis-login-link").classList.toggle("hidden",on);
+ if(on){
+  $("auth-message").textContent="تم التعرف على جلسة مالك مركز التحليل نفسها. يمكنك استيراد الحزمة وحفظها دون تسجيل دخول جديد.";
+  $("auth-message").className="status good";
+  refreshJobs().catch(()=>{});
+ }else{
+  $("auth-message").textContent="لم يُطلب تسجيل دخول هنا. افتح مركز التحليل وسجّل الدخول فيه، ثم أرسل التوصية إلى الورشة.";
+  $("auth-message").className="status warn";
+ }
 }
 async function checkSession(){
- const {data:{session}}=await sb.auth.getSession();
- if(!session){setAuth(false);return;}
- const {data:{user}}=await sb.auth.getUser();
- if((user?.email||"").toLowerCase()!=="hazemnaw48@gmail.com"||!user.email_confirmed_at){await sb.auth.signOut();setAuth(false);notice("auth-message","يلزم حساب مالك ZOZ Pro المؤكد في مشروع الإنتاج.","bad");return;}
+ const {data:{session},error}=await authClient.auth.getSession();
+ if(error)throw error;
+ if(!session?.access_token){setAuth(false);return;}
+ const {data:{user},error:userError}=await authClient.auth.getUser(session.access_token);
+ if(userError||!user||(user.email||"").toLowerCase()!=="hazemnaw48@gmail.com"||!user.email_confirmed_at){
+  setAuth(false);
+  notice("auth-message","لم يتم العثور على جلسة مالك مؤكدة في مركز التحليل. سجّل الدخول هناك فقط ثم أعد إرسال الحزمة.","warn");
+  return;
+ }
  setAuth(true,user.email);
 }
-async function login(e){
- e?.preventDefault();
- const b=$("login-button");b.disabled=true;
- notice("auth-message","جارٍ التحقق من حساب الإنتاج…");
- try{
-  const {data,error}=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
-  if(error)throw error;
-  if((data.user?.email||"").toLowerCase()!=="hazemnaw48@gmail.com"||!data.user?.email_confirmed_at){await sb.auth.signOut();throw Error("هذا ليس حساب المالك المؤكد لمشروع الإنتاج.");}
-  setAuth(true,data.user.email);
- }catch(e){notice("auth-message",e.message||"تعذر تسجيل الدخول.","bad");}
- finally{b.disabled=false;}
-}
+
 function packageForImport(){
  const p=currentPackage();
  if(p)return {kind:"package",handoff:handoff,pkg:p};
@@ -196,8 +199,6 @@ function downloadPlan(){
  const blob=new Blob(["\ufeff",text],{type:"text/plain;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=(s.title||job.topic||"zoz-production").replace(/[^\p{L}\p{N}-]+/gu,"-").slice(0,50)+".txt";a.click();URL.revokeObjectURL(url);
 }
 function bind(){
- $("login-form").addEventListener("submit",login);
- $("logout-button").addEventListener("click",async()=>{await sb.auth.signOut();setAuth(false);});
  $("import-button").addEventListener("click",importIncoming);
  $("retry-read-button").addEventListener("click",showIncoming);
  $("refresh-jobs-button").addEventListener("click",refreshJobs);
@@ -208,5 +209,6 @@ function bind(){
  $("copy-all-button").addEventListener("click",async()=>{if(!job)return notice("scene-message","افتح مهمة إنتاج أولًا.","warn");const text=(job.script_json?.scenes||[]).map(sceneText).join("\n\n");notice("scene-message",await copyText(text)?"تم نسخ تعليمات كل المشاهد.":"تعذر النسخ التلقائي؛ استخدم تنزيل TXT.","good");});
  $("scenes-list").addEventListener("click",async e=>{const b=e.target.closest("[data-copy-scene]");if(!b||!job)return;const sc=job.script_json?.scenes?.[Number(b.dataset.copyScene)];notice("scene-message",await copyText(sceneText(sc,Number(b.dataset.copyScene)))?"تم نسخ تعليمات المشهد.":"تعذر النسخ؛ نزّل ملف TXT.","good");});
 }
+authClient.auth.onAuthStateChange((_event,session)=>{if(session?.access_token)checkSession().catch(e=>notice("auth-message",e.message||"تعذر فحص الجلسة.","bad"));else setAuth(false);});
 document.addEventListener("DOMContentLoaded",async()=>{bind();showIncoming();try{await checkSession();await loadExistingJob();}catch(e){notice("auth-message",e.message||"تعذر فحص الجلسة.","bad");}});
 })().catch(e=>{const el=document.getElementById("auth-message");if(el){el.textContent="تعذر تهيئة الاتصال: "+(e.message||String(e));el.className="status bad";}});
