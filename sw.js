@@ -1,11 +1,11 @@
-const CACHE_NAME = "zoz-pro-shell-v18";
+const CACHE_NAME = "zoz-pro-shell-v19";
 const APP_FILES = [
   "./",
   "./index.html",
   "./production-center.html",
   "./analysis-production.html",
   "./studio.css?v=20261022-4",
-  "./studio.js?v=20261027-login-runtime-fix-3",
+  "./studio.js?v=20261027-login-runtime-fix-4",
   "./visual-production.js?v=20261026-close-loop-1",
   "./pwa.js?v=20261026-production-focus-4",
   "./production-handoff.js?v=20261026-integrated-shell-1",
