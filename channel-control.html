@@ -331,7 +331,7 @@ async function loadContentCalendar(){
      };
      const handoff={version:1,calendar_item_id:item.id,analytics_snapshot_id:item.snapshot_id||packageData.duplicate_check?.source_snapshot_id||'',topic:packageData.title_for_upload||item.working_title,audience:packageData.audience||'مشاهدون عرب مهتمون بتاريخ مصر القديمة',language:packageData.language||'ar-EG',duration_seconds:packageData.target_duration_seconds||40,production_package:packageData};
      localStorage.setItem('zoz-pro-pending-production-handoff-v1',JSON.stringify(handoff));
-     window.top.location.href='./index.html?handoff=1&tab=jobs';
+     window.top.location.href='./production-workbench.html?handoff=1';
      notice('calendar-msg','تم تجهيز الحزمة ونقلها إلى مركز الإنتاج. أكمل هناك مراجعة الاستيراد؛ لم يتم النشر.','good');
     }catch(e){notice('calendar-msg','تعذر تجهيز تسليم الحزمة: '+(e.message||String(e)),'bad')}
    });controls.appendChild(send);
@@ -518,7 +518,7 @@ async function loadRecommendations(){
    const evidence=document.createElement('p');evidence.className='small';evidence.textContent='الدليل: '+JSON.stringify(r.evidence||{});card.appendChild(evidence);
    if(r.status==='draft'||r.status==='approved'){
     const controls=document.createElement('div');controls.className='row';
-    [['approved','موافقة على التوصية'],['dismissed','رفض'],['implemented','تم التنفيذ']].forEach(([state,label])=>{const b=document.createElement('button');b.textContent=label;b.className='secondary';b.addEventListener('click',async()=>{b.disabled=true;try{await call('review_recommendation',{recommendation_id:r.id,status:state,note:''});if(state==='approved'&&['repeat_winner','topic_test','retention'].includes(r.recommendation_type)){const handoff={version:2,handoff_type:'analytics_recommendation',recommendation:{id:r.id,snapshot_id:r.snapshot_id||'',channel_id:CHANNEL_ID,recommendation_type:r.recommendation_type,title:r.title||'',body:r.body||'',evidence:r.evidence||{},status:'approved'}};localStorage.setItem('zoz-pro-pending-production-handoff-v1',JSON.stringify(handoff));notice('recommendations-msg','تم اعتماد التوصية وحُفظت بياناتها؛ جارٍ الانتقال إلى مركز الإنتاج لتسليمها. ستنتظر موافقتك المنفصلة على الإنشاء.','good');window.top.location.href='./index.html?handoff=1&tab=jobs';}await loadRecommendations();}catch(e){notice('recommendations-msg',e.message||'تعذر حفظ القرار.','bad');b.disabled=false;}});controls.appendChild(b);});
+    [['approved','موافقة على التوصية'],['dismissed','رفض'],['implemented','تم التنفيذ']].forEach(([state,label])=>{const b=document.createElement('button');b.textContent=label;b.className='secondary';b.addEventListener('click',async()=>{b.disabled=true;try{await call('review_recommendation',{recommendation_id:r.id,status:state,note:''});if(state==='approved'&&['repeat_winner','topic_test','retention'].includes(r.recommendation_type)){const handoff={version:2,handoff_type:'analytics_recommendation',recommendation:{id:r.id,snapshot_id:r.snapshot_id||'',channel_id:CHANNEL_ID,recommendation_type:r.recommendation_type,title:r.title||'',body:r.body||'',evidence:r.evidence||{},status:'approved'}};localStorage.setItem('zoz-pro-pending-production-handoff-v1',JSON.stringify(handoff));notice('recommendations-msg','تم اعتماد التوصية وحُفظت بياناتها؛ جارٍ الانتقال إلى مركز الإنتاج لتسليمها. ستنتظر موافقتك المنفصلة على الإنشاء.','good');window.top.location.href='./production-workbench.html?handoff=1';}await loadRecommendations();}catch(e){notice('recommendations-msg',e.message||'تعذر حفظ القرار.','bad');b.disabled=false;}});controls.appendChild(b);});
     card.appendChild(controls);
    }
    if(r.status==='approved'&&['repeat_winner','topic_test','retention'].includes(r.recommendation_type)){
@@ -531,7 +531,7 @@ async function loadRecommendations(){
       }};
       localStorage.setItem('zoz-pro-pending-production-handoff-v1',JSON.stringify(handoff));
       notice('recommendations-msg','أُرسلت بيانات التوصية المعتمدة. سيتم فتح مركز الإنتاج في النافذة الحالية لتجنب حظر النوافذ المنبثقة على الهاتف؛ لن يتم النشر تلقائيًا.','good');
-      window.top.location.href='./index.html?handoff=1&tab=jobs';
+      window.top.location.href='./production-workbench.html?handoff=1';
      }catch(e){notice('recommendations-msg','تعذر تجهيز الإرسال: '+(e.message||String(e)),'bad');}
     });
     card.appendChild(send);
