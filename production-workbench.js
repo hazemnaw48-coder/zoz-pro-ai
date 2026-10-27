@@ -113,13 +113,20 @@ async function importIncoming(){
  finally{busy=false;b.disabled=false;showIncoming();}
 }
 function sceneText(scene,i){
- return ["المشهد "+(scene.scene_number||i+1)+" · "+(scene.time||scene.seconds?String(scene.time||scene.seconds+" ثانية"):""),
- "الوصف البصري: "+(scene.generation_prompt||scene.visual||"حدّد وصفًا بصريًا دقيقًا."),
- "التعليق الصوتي: "+(scene.narration||""),
- "حركة الكاميرا: "+(scene.camera_motion||"حركة سينمائية طبيعية هادئة"),
- "الصوت: "+(scene.sound_design||"التعليق الصوتي الأصلي؛ لا تضف موسيقى تلقائيًا"),
- "الانتقال: "+(scene.transition||"قطع وثائقي نظيف"),
- "ملاحظات: لا تضف شعارات أو علامة مائية. تحقّق من صحة الوقائع وحقوق المشاهد."].join("\n");
+ const time=scene.time||scene.seconds?String(scene.time||scene.seconds+" ثانية"):"";
+ const visual=scene.generation_prompt||scene.visual||"حدّد وصفًا بصريًا دقيقًا.";
+ const narration=scene.narration||scene.text||"";
+ return [
+  "المشهد "+(scene.scene_number||i+1)+(time?" · "+time:""),
+  "تعليمات الفيديو في Google Flow: لقطة وثائقية سينمائية عمودية 9:16، واقعية عالية التفاصيل، حركة كاميرا هادئة ومقصودة، إضاءة طبيعية متحفية، ألوان حجرية مصرية طبيعية، واستمرارية بصرية متسقة بين المشاهد.",
+  "الدقة الأثرية: إذا ظهر تمثال أو نقش حقيقي، أرفق صورة مرجعية حقيقية ومرخصة داخل Flow واستخدمها كمرجع/إطار. حافظ على هندسة القطعة وتفاصيلها الأصلية؛ لا تخترع قطعة أثرية أو نقوشًا ولا تغيّر ملامح الأثر.",
+  "النص البصري الخاص بالمشهد: "+visual,
+  "التعليق الصوتي لهذا التوقيت: "+narration,
+  "الصوت: عند توفر توليد صوت موثوق، انطق الجملة العربية أعلاه كما هي تمامًا بلهجة مصرية واضحة وطبيعية ومن دون كلمات إضافية؛ وإلا اترك اللقطة بلا كلام وأضف التعليق في مرحلة التجميع. لا موسيقى مضافة ولا مؤثرات تغطي الصوت.",
+  "ممنوع: كتابة داخل الصورة، ترجمة تلقائية، عناوين، شعارات، علامات مائية، مونتاج سريع عشوائي، أو دمج آثار مختلفة على أنها قطعة واحدة.",
+  "الانتقال/حركة الكاميرا: "+(scene.camera_motion||"حركة بطيئة ثابتة")+" · "+(scene.transition||"قطع وثائقي نظيف"),
+  "مراجعة قبل التصدير: طابق المشهد مع الخطة، وتحقق من مصدر الصورة وحقوق استخدامها."
+ ].join("\n");
 }
 const visualStyles = document.createElement("style");
 visualStyles.textContent = ".visual-image-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0}.visual-image-card{margin:0;min-width:0;background:#0c1727;border:1px solid #40536d;border-radius:10px;overflow:hidden}.visual-image-card img{display:block;width:100%;aspect-ratio:9/16;object-fit:cover;background:#182a43}.visual-image-card figcaption{font-size:12px;padding:7px;color:var(--muted);overflow-wrap:anywhere}@media(min-width:700px){.visual-image-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}";
@@ -142,11 +149,11 @@ function showJob(j){
  $("job-meta").textContent="المهمة: "+j.id+" · "+(j.duration_seconds||s.duration_seconds||45)+" ثانية · "+(j.language||"ar");
  $("job-brief").textContent="عنوان YouTube: "+(s.seo_title||s.title||j.topic)+"\n\nالوصف: "+(s.description||s.caption||"—")+"\n\nالكلمات المفتاحية: "+(s.tags||[]).join("، ")+"\n\nالصورة المصغرة: "+(s.thumbnail_brief||"—")+"\n\nملاحظات المصادر: "+(s.source_notes||[]).map(x=>typeof x==="string"?x:(x.name||"")+" "+(x.url||"")).join("\n");
  $("scenes-list").innerHTML=scenes.map((sc,i)=>'<details class="scene" open><summary>'+esc("المشهد "+(sc.scene_number||i+1)+" · "+(sc.time||((sc.seconds||"")+" ثانية")))+'</summary><div class="prewrap">'+esc(sceneText(sc,i))+'</div><div class="actions"><button class="secondary" type="button" data-copy-scene="'+i+'">نسخ تعليمات هذا المشهد</button></div></details>').join("")||'<div class="status warn">لا توجد مشاهد بعد. إذا كانت هذه توصية تحليل، وافق على إعداد المشاهد أولًا.</div>';
- $("visual-production-host").innerHTML='<div class="card"><h3>الإنتاج الداخلي المجاني</h3><p class="muted">صور توضيحية + تعليق عربي + فيديو عمودي MP4. لا API مدفوعة ولا نشر تلقائي. تظهر الصور والصوت والفيديو هنا أثناء إنتاجها، وتُحفظ الأصول فور إنشائها.</p><button type="button" data-visual-production="'+esc(j.id)+'">ابدأ إنتاج الصور والصوت والفيديو</button><div id="m-'+esc(j.id)+'" class="status">جاهز لبدء الإنتاج بعد مراجعة النص والمشاهد.</div><h4>الصور الناتجة</h4><div id="visual-images-'+esc(j.id)+'" class="visual-image-grid"></div><h4>معاينة التعليق العربي</h4><div id="visual-audio-note-'+esc(j.id)+'" class="muted">سيظهر ملف الصوت هنا بعد إنشائه.</div><audio id="visual-audio-'+esc(j.id)+'" class="hidden" controls preload="metadata" style="width:100%"></audio><h4>معاينة الفيديو النهائي</h4><div id="visual-video-note-'+esc(j.id)+'" class="muted">سيظهر الفيديو هنا بعد اكتمال الإنشاء.</div><video id="visual-video-'+esc(j.id)+'" class="hidden" controls playsinline preload="metadata" style="width:100%;max-height:70vh;background:#000"></video></div>';
+ $("visual-production-host").innerHTML='<div class="card"><h3>مسار الإنتاج المعتمد: Google Flow / ZOZ NOW</h3><p class="muted">تم إيقاف التوليد الداخلي للصور والصوت في هذه الورشة لأن النتائج السابقة لم تكن مناسبة للنشر ومحرك الصوت المجاني تعطل. أنشئ اللقطات في Flow باستخدام أوصاف المشاهد أدناه، ثم اجمعها في فيديو MP4 نهائي وارفعه إلى هذه الصفحة. لن يُنشر الفيديو تلقائيًا.</p><div class="row"><a class="button" href="https://labs.google/fx/tools/flow" target="_blank" rel="noopener">فتح Google Flow</a></div><div class="status warn">للقطع الأثرية: أضف صورة مرجعية حقيقية ومرخصة داخل Flow قبل التحريك، وحافظ على شكلها الأصلي. لا تعتمد على توليد شكل إخناتون من الوصف وحده. بعد التصدير، ارفع MP4 من خانة «الفيديو النهائي» ثم اضغط «رفع MP4 النهائي للمراجعة».</div></div>';
  $("prepare-scenes-button").classList.toggle("hidden",!(s.recommendation_context&&!(Array.isArray(s.scenes)&&s.scenes.length)));
  $("prepare-scenes-button").disabled=false;
  $("step-incoming").classList.add("done");$("step-scenes").classList.add("active");$("step-review").classList.remove("active");
- notice("scene-message",scenes.length?"تم تحميل "+scenes.length+" مشاهد من قاعدة الإنتاج. انسخ وصف كل مشهد إلى أداة الفيديو ثم ارفع ملف MP4 النهائي للمراجعة.":"وصلت التوصية إلى الإنتاج، لكن لم تُنشأ المشاهد بعد. اضغط اعتماد إعداد المشاهد لتوليد مسودة محلية مجانية.","good");
+ notice("scene-message",scenes.length?"تم تحميل "+scenes.length+" مشاهد من قاعدة الإنتاج. انسخ تعليمات كل مشهد إلى Google Flow / ZOZ NOW، ثم ارفع MP4 النهائي للمراجعة.":"وصلت التوصية إلى الإنتاج، لكن لم تُنشأ المشاهد بعد. راجعها وأعد إعدادها في مركز التحليل قبل تنفيذها في Google Flow.","good");
 }
 async function prepareScenes(){
  if(!job)return;
