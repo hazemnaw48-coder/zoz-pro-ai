@@ -122,6 +122,14 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
  </section>
 </div>
  <div class="page-panel" data-page="intake" id="page-intake">
+<section class="card" id="zoz-content-studio">
+ <h2>مركز صناعة المحتوى المبني على التحليلات</h2>
+ <p>يستخدم بيانات القناة والتوصيات المحفوظة لإنشاء مسودات سكربت وعنوان ووصف وكلمات مفتاحية. لا يعتمد على رصيد vidIQ أو Claude؛ ويمكن إضافة نتائج الأدوات الخارجية عند توفرها.</p>
+ <label for="studio-topic">موضوع الحلقة</label><input id="studio-topic" maxlength="240" value="ليه نب آمون أكبر من الفلاحين في الرسمة؟">
+ <div class="grid"><div><label for="studio-format">نوع الفيديو</label><select id="studio-format"><option value="short">Short</option><option value="long">فيديو طويل</option></select></div><div><label for="studio-duration">المدة بالثواني</label><input id="studio-duration" type="number" min="20" max="180" value="40"></div></div>
+ <div class="actions"><button id="studio-generate">إنشاء سكربت من بيانات القناة</button><button id="studio-refresh" class="secondary">عرض المسودات المحفوظة</button></div>
+ <div id="studio-msg" class="notice">المسودات تُحفظ في Supabase ولا تُنشر تلقائيًا.</div><div id="studio-result" class="stack"></div>
+</section>
 <section class="card">
  <h2>٩. بوابة استقبال الفيديوهات والنشر الفعلي</h2>
  <p>ارفع ملفًا من الهاتف أو استقبل تصديرًا من مراكز الإنتاج المعتمدة. يتم حفظ الأجزاء في مخزن خاص، ثم مراجعتها، ثم رفعها إلى YouTube بوضع خاص أولًا. لا يُنشر الفيديو علنًا إلا بعد موافقة صريحة منفصلة.</p>
@@ -602,6 +610,9 @@ $('load-video-analytics').addEventListener('click',async()=>{
  finally{$('load-video-analytics').disabled=false;}
 });
 $('save-snapshot').addEventListener('click',async()=>{try{await saveSnapshot();}catch(e){}});
+$('studio-generate')?.addEventListener('click',async()=>{const b=$('studio-generate');b.disabled=true;try{const r=await intakeApi('studio_generate',{topic:$('studio-topic').value.trim(),mode:$('studio-format').value,duration_seconds:Number($('studio-duration').value)});const s=r.script||{};const pkg=s.production_package||s;notice('studio-msg','تم حفظ مسودة سكربت بناءً على بيانات القناة. تحقّق من المصدر الأثري قبل الإنتاج.','good');$('studio-result').innerHTML='<article class="item"><h3>'+escapeHtml(s.title||pkg.title||'مسودة جديدة')+'</h3><p><b>الافتتاحية:</b> '+escapeHtml(s.hook||pkg.hook||'')+'</p><p><b>الوصف:</b></p><pre style="white-space:pre-wrap">'+escapeHtml(s.description||pkg.description||'')+'</pre><p><b>الكلمات المفتاحية:</b> '+escapeHtml((s.tags||pkg.tags||[]).join('، '))+'</p><p><b>السكربت:</b></p><pre style="white-space:pre-wrap">'+escapeHtml((s.narration||pkg.narration||[]).map(x=>(x.time||'')+' '+(x.text||'')).join('\\n'))+'</pre><p><b>الأساس التحليلي:</b> '+escapeHtml(JSON.stringify(r.analytics_winner||{}))+'</p></article>';await loadStudioScripts();}catch(e){notice('studio-msg',e.message||'تعذر إنشاء المسودة.','bad');}finally{b.disabled=false;}});
+$('studio-refresh')?.addEventListener('click',loadStudioScripts);
+async function loadStudioScripts(){const r=await intakeApi('studio_list',{});const items=r.scripts||[];$('studio-result').innerHTML=items.map(s=>'<article class="item"><h3>'+escapeHtml(s.title)+'</h3><p>'+escapeHtml(s.topic)+' · '+escapeHtml(s.status)+'</p><button class="secondary" type="button" data-studio-id="'+escapeHtml(s.id)+'">عرض بيانات المسودة</button><pre class="studio-json" id="studio-json-'+escapeHtml(s.id)+'" style="display:none;white-space:pre-wrap">'+escapeHtml(JSON.stringify(s.production_package||{},null,2))+'</pre></article>').join('')||'<p>لا توجد مسودات محفوظة بعد.</p>';document.querySelectorAll('[data-studio-id]').forEach(b=>b.addEventListener('click',()=>{const e=$('studio-json-'+b.dataset.studioId);if(e)e.style.display=e.style.display==='none'?'block':'none';}));}
 $('intake-upload')?.addEventListener('click',async()=>{try{await uploadIntakeFile();}catch(e){notice('intake-progress',e.message||'تعذر رفع الملف.','bad');notice('intake-msg','لم يكتمل الاستقبال؛ راجع رسالة الخطأ قبل إعادة المحاولة.','warn');}});
 $('intake-refresh')?.addEventListener('click',async()=>{try{await loadIntakeAssets();notice('intake-msg','تم تحديث قائمة الاستقبال.','good');}catch(e){notice('intake-msg',e.message||'تعذر تحميل القائمة.','bad');}});
 $('intake-refresh-list')?.addEventListener('click',async()=>{try{await loadIntakeAssets();}catch(e){notice('intake-msg',e.message||'تعذر تحميل القائمة.','bad');}});
