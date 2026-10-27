@@ -121,6 +121,9 @@ function sceneText(scene,i){
  "الانتقال: "+(scene.transition||"قطع وثائقي نظيف"),
  "ملاحظات: لا تضف شعارات أو علامة مائية. تحقّق من صحة الوقائع وحقوق المشاهد."].join("\n");
 }
+const visualStyles = document.createElement("style");
+visualStyles.textContent = ".visual-image-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0}.visual-image-card{margin:0;min-width:0;background:#0c1727;border:1px solid #40536d;border-radius:10px;overflow:hidden}.visual-image-card img{display:block;width:100%;aspect-ratio:9/16;object-fit:cover;background:#182a43}.visual-image-card figcaption{font-size:12px;padding:7px;color:var(--muted);overflow-wrap:anywhere}@media(min-width:700px){.visual-image-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}";
+document.head.appendChild(visualStyles);
 function showJob(j){
  job=j;
  window.ZOZVisualProductionBridge={
@@ -139,7 +142,7 @@ function showJob(j){
  $("job-meta").textContent="المهمة: "+j.id+" · "+(j.duration_seconds||s.duration_seconds||45)+" ثانية · "+(j.language||"ar");
  $("job-brief").textContent="عنوان YouTube: "+(s.seo_title||s.title||j.topic)+"\n\nالوصف: "+(s.description||s.caption||"—")+"\n\nالكلمات المفتاحية: "+(s.tags||[]).join("، ")+"\n\nالصورة المصغرة: "+(s.thumbnail_brief||"—")+"\n\nملاحظات المصادر: "+(s.source_notes||[]).map(x=>typeof x==="string"?x:(x.name||"")+" "+(x.url||"")).join("\n");
  $("scenes-list").innerHTML=scenes.map((sc,i)=>'<details class="scene" open><summary>'+esc("المشهد "+(sc.scene_number||i+1)+" · "+(sc.time||((sc.seconds||"")+" ثانية")))+'</summary><div class="prewrap">'+esc(sceneText(sc,i))+'</div><div class="actions"><button class="secondary" type="button" data-copy-scene="'+i+'">نسخ تعليمات هذا المشهد</button></div></details>').join("")||'<div class="status warn">لا توجد مشاهد بعد. إذا كانت هذه توصية تحليل، وافق على إعداد المشاهد أولًا.</div>';
- $("visual-production-host").innerHTML='<div class="card"><h3>الإنتاج الداخلي المجاني</h3><p class="muted">صور توضيحية + تعليق عربي + فيديو عمودي MP4. لا API مدفوعة ولا نشر تلقائي. قد يستغرق التوليد وقتًا حسب توفر الخدمات المجانية وقدرة الهاتف.</p><button type="button" data-visual-production="'+esc(j.id)+'">ابدأ إنتاج الصور والصوت والفيديو</button><div id="m-'+esc(j.id)+'" class="status">جاهز لبدء الإنتاج بعد مراجعة النص والمشاهد.</div></div>';
+ $("visual-production-host").innerHTML='<div class="card"><h3>الإنتاج الداخلي المجاني</h3><p class="muted">صور توضيحية + تعليق عربي + فيديو عمودي MP4. لا API مدفوعة ولا نشر تلقائي. تظهر الصور والصوت والفيديو هنا أثناء إنتاجها، وتُحفظ الأصول فور إنشائها.</p><button type="button" data-visual-production="'+esc(j.id)+'">ابدأ إنتاج الصور والصوت والفيديو</button><div id="m-'+esc(j.id)+'" class="status">جاهز لبدء الإنتاج بعد مراجعة النص والمشاهد.</div><h4>الصور الناتجة</h4><div id="visual-images-'+esc(j.id)+'" class="visual-image-grid"></div><h4>معاينة التعليق العربي</h4><div id="visual-audio-note-'+esc(j.id)+'" class="muted">سيظهر ملف الصوت هنا بعد إنشائه.</div><audio id="visual-audio-'+esc(j.id)+'" class="hidden" controls preload="metadata" style="width:100%"></audio><h4>معاينة الفيديو النهائي</h4><div id="visual-video-note-'+esc(j.id)+'" class="muted">سيظهر الفيديو هنا بعد اكتمال الإنشاء.</div><video id="visual-video-'+esc(j.id)+'" class="hidden" controls playsinline preload="metadata" style="width:100%;max-height:70vh;background:#000"></video></div>';
  $("prepare-scenes-button").classList.toggle("hidden",!(s.recommendation_context&&!(Array.isArray(s.scenes)&&s.scenes.length)));
  $("prepare-scenes-button").disabled=false;
  $("step-incoming").classList.add("done");$("step-scenes").classList.add("active");$("step-review").classList.remove("active");
