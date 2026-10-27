@@ -61,10 +61,11 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
    <button type="button" class="section-tab" data-page-target="video-analytics">٥ · أداء الفيديو</button>
    <button type="button" class="section-tab" data-page-target="history">٦ · السجل</button>
    <button type="button" class="section-tab" data-page-target="calendar">٧ · التقويم</button>
-   <button type="button" class="section-tab" data-page-target="intake">٩ · استقبال الفيديوهات</button>
    <button type="button" class="section-tab" data-page-target="recommendations">٨ · التوصيات</button>
+   <button type="button" class="section-tab" data-page-target="studio">٩ · صناعة المحتوى</button>
+   <button type="button" class="section-tab" data-page-target="intake">١٠ · استقبال الفيديوهات</button>
   </nav>
-  <div id="page-indicator" class="page-indicator" aria-live="polite">القسم الحالي: حالة الربط · ١ من ٧</div>
+  <div id="page-indicator" class="page-indicator" aria-live="polite">القسم الحالي: حالة الربط · ١ من ٩</div>
  </div>
 
  <div class="page-panel active" data-page="connection" id="page-connection">
@@ -129,7 +130,7 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
   <div id="calendar-list" class="stack"></div>
  </section>
 </div>
- <div class="page-panel" data-page="intake" id="page-intake">
+ <div class="page-panel" data-page="studio" id="page-studio">
 <section class="card" id="zoz-content-studio">
  <h2>مركز صناعة المحتوى والتحكم متعدد القنوات</h2>
  <label for="managed-channel-selector">القناة النشطة — تُستخدم للقوائم والمسودات واستقبال الفيديو</label>
@@ -150,6 +151,8 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
  <div class="actions"><button id="studio-generate">إنشاء سكربت من بيانات القناة</button><button id="studio-refresh" class="secondary">عرض المسودات المحفوظة</button></div>
  <div id="studio-msg" class="notice">المسودات تُحفظ في Supabase ولا تُنشر تلقائيًا.</div><div id="studio-result" class="stack"></div>
 </section>
+</div>
+<div class="page-panel" data-page="intake" id="page-intake">
 <section class="card">
  <h2>٩. بوابة استقبال الفيديوهات والنشر الفعلي</h2>
  <p>ارفع ملفًا من الهاتف أو استقبل تصديرًا من مراكز الإنتاج المعتمدة. تُنقل بيانات العنوان والوصف والكلمات المفتاحية من المسودة المختارة عند استخدام زر المسودة أعلاه. يتم حفظ الأجزاء في مخزن خاص، ثم مراجعتها، ثم رفعها إلى YouTube بوضع خاص أولًا. لا يُنشر الفيديو علنًا إلا بعد موافقة صريحة منفصلة.</p>
@@ -232,7 +235,7 @@ function showPage(pageKey, scrollTop=true){
  if(indicator)indicator.textContent='القسم الحالي: '+label+' · '+step+' من '+tabs.length;
  if(scrollTop)window.scrollTo(0,0);
 }
-function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage('connection',false);notice('intake-msg','جلسة المالك متصلة بمشروع الإنتاج. افتح «٩ · استقبال الفيديوهات» لتحديث القائمة أو اختيار ملف.','good');loadManagedChannels();}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
+function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage('connection',false);notice('intake-msg','جلسة المالك متصلة بمشروع الإنتاج. افتح «٩ · صناعة المحتوى» لإعداد المسودات، أو «١٠ · استقبال الفيديوهات» لاستقبال الملفات ومراحل النشر.','good');loadManagedChannels();}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
 async function ownerSession(){
  const {data,error}=await sb.auth.getSession();if(error)throw error;const session=data&&data.session;
  if(!session||!session.access_token)throw new Error('لا توجد جلسة مالك محفوظة. سجّل الدخول بحساب مالك ZOZ Pro.');
@@ -696,7 +699,18 @@ $('login').addEventListener('click',async()=>{
 });
 $('logout').addEventListener('click',async()=>{await sb.auth.signOut();setSigned(false);notice('login-msg','تم تسجيل الخروج من هذه الجلسة.');notice('channel-status','لم تعد هناك جلسة مالك متصلة.');});
 $('refresh').addEventListener('click',refreshStatus);
-document.querySelectorAll('[data-page-target]').forEach(button=>button.addEventListener('click',()=>showPage(button.dataset.pageTarget)));
+document.querySelectorAll('[data-page-target]').forEach(button=>button.addEventListener('click',async()=>{
+ const key=button.dataset.pageTarget;showPage(key);
+ try{
+  if(key==='studio'){
+   await loadStudioScripts();
+   if(managedChannelId()==='UC-FimUUFXRd0MOSoikzczcQ')await loadManagedNews();
+   await checkManagedAi();
+   await loadManagedCalendar(false);
+  }
+  if(key==='intake'){await loadIntakeAssets();await loadIntakeSources();}
+ }catch(e){const el=key==='studio'?$('managed-ai-status'):$('intake-msg');if(el)el.textContent=e.message||'تعذر تحميل بيانات القسم.';}
+}));
 $('load-analytics').addEventListener('click',async()=>{
  $('load-analytics').disabled=true;
  try{await loadAnalytics(false);}
