@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<meta name="robots" content="noindex,nofollow">
+<title>ZOZ Pro — ورشة الإنتاج</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#121f31;--panel2:#0e1928;--line:#2b3c53;--text:#eef4ff;--muted:#a9bad0;--accent:#80a9ff;--good:#50d5a0;--warn:#ffca70;--bad:#ff8989}
+*{box-sizing:border-box}html{background:var(--bg)}body{margin:0;background:linear-gradient(155deg,#0b1220,#101c2d);color:var(--text);font:16px/1.75 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1020px;padding:14px;margin:auto}header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 2px 18px}.brand{display:flex;gap:10px;align-items:center}.mark{display:grid;place-items:center;background:#284573;border-radius:12px;width:42px;height:42px;font-weight:900;font-size:22px}.brand h1{font-size:clamp(22px,4vw,32px);line-height:1.25;margin:0}.brand p{margin:4px 0 0;color:var(--muted);font-size:13px}.links{display:flex;gap:8px;flex-wrap:wrap}a,.button{color:var(--text);text-decoration:none}.button,button{background:#416fe0;border:1px solid transparent;color:white;border-radius:11px;padding:10px 14px;font:inherit;font-weight:750;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;line-height:1.4;min-height:42px}.secondary{background:#263954!important;border-color:#40536d!important}.ghost{background:transparent!important;border-color:#40536d!important}button:disabled{opacity:.5;cursor:not-allowed}
+.card{background:rgba(18,31,49,.96);border:1px solid var(--line);border-radius:17px;padding:16px;margin:12px 0;min-width:0}.card h2{font-size:20px;margin:0 0 8px}.card h3{font-size:17px;margin:0 0 7px}.muted,.hint{color:var(--muted)}.muted{margin:4px 0 12px}.hint{font-size:13px;margin:6px 0}.status{white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #314762;background:#182a43;border-radius:11px;padding:12px;margin:10px 0}.status.good{border-color:#27745d;color:var(--good)}.status.warn{border-color:#806031;color:var(--warn)}.status.bad{border-color:#84434b;color:var(--bad)}
+label{display:block;font-weight:700;margin:10px 0 5px}input,textarea,select{width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit}input[type=file]{padding:10px}textarea{resize:vertical}form .grid,.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;justify-content:space-between}.row>*{min-width:0}.hidden{display:none!important}.pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--muted)}.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0}.step{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--panel2);font-size:13px}.step b{display:block;font-size:14px;color:var(--accent)}.step.active{border-color:#668fe2;background:#172a46}.step.done b{color:var(--good)}.incoming-title{font-size:22px;font-weight:850;line-height:1.4;overflow-wrap:anywhere}.prewrap{white-space:pre-wrap;overflow-wrap:anywhere}.scene{background:var(--panel2);border:1px solid var(--line);padding:13px;border-radius:13px;margin:10px 0}.scene summary{cursor:pointer;font-weight:800;color:var(--accent)}.scene .prompt{white-space:pre-wrap;overflow-wrap:anywhere;border:1px dashed #40536d;border-radius:9px;padding:10px;background:#091321}.scene .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.scene .actions button{font-size:13px}.mini{font-size:12px;color:var(--muted)}.taskitem{display:flex;gap:10px;align-items:start;justify-content:space-between;border-bottom:1px solid var(--line);padding:10px 0}.taskitem:last-child{border-bottom:0}.taskitem .name{font-weight:750;overflow-wrap:anywhere}.footer{text-align:center;color:var(--muted);font-size:12px;padding:18px 0 30px}.goodtext{color:var(--good)}@media(max-width:560px){main{padding:9px}.card{padding:12px}.links{width:100%}.links a{flex:1}.steps{grid-template-columns:1fr}.row button{flex:1}.brand p{font-size:12px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+ <div class="brand"><span class="mark">Z</span><div><h1>ورشة إنتاج الفيديو</h1><p>تستقبل توصية التحليل والوصف وخطة المشاهد، ثم تحفظ الفيديو النهائي للمراجعة</p></div></div>
+ <div class="links"><a class="button secondary" href="./channel-control.html">العودة للتحليل والتوصيات</a><a class="button ghost" href="./production-center.html">مركز المهام القديم</a></div>
+</header>
+<div class="steps" aria-label="مراحل العمل">
+ <div class="step active" id="step-incoming"><b>١ · استلام الحزمة</b>التوصية والوصف وخطة المشاهد</div>
+ <div class="step" id="step-scenes"><b>٢ · تنفيذ المشاهد</b>نسخ وصف كل مشهد إلى أداة الفيديو</div>
+ <div class="step" id="step-review"><b>٣ · مراجعة الناتج</b>رفع MP4 النهائي للمراجعة</div>
+</div>
+<section class="card" id="login-card">
+ <div class="row"><h2>دخول مالك ZOZ Pro</h2><span id="auth-pill" class="pill">لم يتم التحقق</span></div>
+ <p class="muted">هذه الورشة تستخدم حساب الإنتاج المحفوظ في Supabase. لا تحتاج إلى إعادة تفويض YouTube أو إدخال أسرار Google.</p>
+ <form id="login-form">
+  <label for="email">بريد المالك</label><input id="email" type="email" autocomplete="username" value="hazemnaw48@gmail.com" required>
+  <label for="password">كلمة المرور الخاصة بمشروع الإنتاج</label><input id="password" type="password" autocomplete="current-password" required>
+  <div class="row"><button id="login-button" type="submit">دخول إلى الورشة</button><button id="logout-button" class="secondary hidden" type="button">تسجيل الخروج</button></div>
+ </form>
+ <div id="auth-message" class="status">تُعرض الحزمة الواردة أدناه حتى قبل تسجيل الدخول؛ يلزم الدخول لحفظها في قاعدة الإنتاج.</div>
+</section>
+<section class="card" id="incoming-card">
+ <div class="row"><h2>الحزمة الواردة من مركز التحليل</h2><span id="incoming-type" class="pill">في انتظار البيانات</span></div>
+ <div id="incoming-summary" class="status">افتح هذا المسار باستخدام زر «إرسال إلى مركز الإنتاج» من التقويم أو التوصيات داخل مركز التحليل.</div>
+ <div id="incoming-details"></div>
+ <div class="row"><button id="import-button" type="button" disabled>استيراد الحزمة إلى قائمة الإنتاج</button><button id="retry-read-button" class="secondary" type="button">إعادة قراءة الحزمة</button></div>
+ <div id="import-message" class="status">لن يُنشر أي محتوى تلقائيًا. الاستيراد ينشئ مهمة إنتاج فقط.</div>
+</section>
+<section class="card hidden" id="job-card">
+ <div class="row"><h2>بطاقة تنفيذ الإنتاج</h2><span id="job-status" class="pill">—</span></div>
+ <div class="incoming-title" id="job-title"></div>
+ <p id="job-meta" class="muted"></p>
+ <div id="job-brief" class="status"></div>
+ <div class="grid">
+  <div><label for="source-tool">أداة إنتاج الفيديو</label><select id="source-tool"><option value="google-flow">Google Flow / ZOZ NOW</option><option value="manual-upload">رفع يدوي / محرر خارجي</option><option value="gemini">Gemini</option><option value="kling">Kling</option><option value="luma">Luma</option><option value="runway">Runway</option><option value="pixverse">PixVerse</option><option value="vidu">Vidu</option><option value="qwen">Qwen / Alibaba</option><option value="other">أداة أخرى</option></select></div>
+  <div><label for="upload-file">الفيديو النهائي (MP4)</label><input id="upload-file" type="file" accept="video/mp4,.mp4"><p class="hint">حد التخزين الحالي 50 ميجابايت. لن يتم ضغط الفيديو تلقائيًا أو نشره علنًا.</p></div>
+ </div>
+ <div class="row"><button id="prepare-scenes-button" type="button" class="secondary hidden">اعتماد إعداد المشاهد لهذه التوصية</button><button id="copy-all-button" type="button" class="secondary">نسخ خطة المشاهد كاملة</button><button id="download-plan-button" type="button" class="secondary">تنزيل تعليمات الإنتاج TXT</button></div>
+ <div id="scene-message" class="status">سيظهر وصف كل مشهد هنا بعد استيراد المهمة.</div>
+ <div id="scenes-list"></div>
+ <div class="row"><button id="upload-final-button" type="button">رفع MP4 النهائي للمراجعة</button><button id="reload-job-button" type="button" class="secondary">تحديث حالة المهمة</button></div>
+ <div id="upload-message" class="status">بعد تجهيز الفيديو في Google Flow أو محرر خارجي، اختر ملف MP4 النهائي وارفعه هنا. سيُحفظ مع المهمة ويُرسل إلى المراجعة فقط.</div>
+</section>
+<section class="card" id="recent-card">
+ <div class="row"><h2>مهام الإنتاج المحفوظة</h2><button id="refresh-jobs-button" type="button" class="secondary">تحديث القائمة</button></div>
+ <p class="muted">هذه المهام محفوظة في مشروع الإنتاج الحالي، وليست بيانات التحليلات في المشروع الآخر.</p>
+ <div id="recent-list"><div class="mini">سجّل الدخول لعرض المهام المحفوظة.</div></div>
+</section>
+<div class="footer">ZOZ Pro · لا نشر تلقائي · لا يتم حذف الحزمة الواردة إلا بعد تأكيد استيرادها إلى قاعدة الإنتاج.</div>
+</main>
+<script src="./production-workbench.js?v=20261027-workbench-1"></script>
+</body>
+</html>
