@@ -153,7 +153,7 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
  <h3>محرك إنتاج فيديو بالذكاء الاصطناعي — تجربة مجانية محدودة</h3>
  <p>ينشئ مشهدًا بصريًا قصيرًا عبر LTX العام وتعليقًا صوتيًا عربيًا عبر مفاتيح Gemini الثلاثة بالتناوب، ثم يدمجهما محليًا في المتصفح ويجهزه في قائمة مراجعة ZOZ Pro. قد تتوقف خدمة الفيديو المجانية بسبب الطابور أو الحصة؛ لا يستخدم هذا المسار API فيديو مدفوعًا.</p>
  <label for="ai-video-topic">موضوع الفيديو</label><input id="ai-video-topic" maxlength="240" value="الحياة اليومية في مصر القديمة">
- <label for="ai-video-narration">نص التعليق الصوتي العربي</label><textarea id="ai-video-narration" rows="4" maxlength="1800" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit">تخيل أنك تستيقظ على ضفاف النيل قبل آلاف السنين. يبدأ يومك مع ضوء الشمس، وأعمال الحقول، والأسواق، والحرفيين الذين صنعوا أدوات الحياة اليومية في مصر القديمة.</textarea>
+ <label for="ai-video-narration">نص التعليق الصوتي العربي</label><textarea id="ai-video-narration" rows="4" maxlength="1800" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit">في مصر القديمة، بدأ يوم الناس مع شروق الشمس، بين نهر النيل والحقول والأسواق.</textarea>
  <label for="ai-video-visual">وصف المشهد الواقعي المراد توليده</label><textarea id="ai-video-visual" rows="3" maxlength="1200" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;font:inherit">مشهد سينمائي واقعي للحياة اليومية على ضفاف النيل في مصر القديمة، مزارعون مصريون بملابس كتان تاريخية يعملون قرب الحقول وقارب خشبي على النهر، ضوء صباح طبيعي، حركة كاميرا هادئة، تفاصيل أثرية واقعية، بلا كتابة أو شعارات أو مظهر كرتوني.</textarea>
  <div class="grid">
   <div><label for="ai-video-kids">هل صُنع للأطفال؟</label><select id="ai-video-kids" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px"><option value="">اختر الإجابة</option><option value="false">لا</option><option value="true">نعم</option></select></div>
@@ -848,7 +848,7 @@ async function generateAIVideoPreview(){
   const host=$('ai-video-results');
   const video=document.createElement('video');video.controls=true;video.playsInline=true;video.src=data.video_url;video.style.width='100%';video.style.maxHeight='420px';host.appendChild(video);
   const audio=document.createElement('audio');audio.controls=true;audio.src=data.audio_url;audio.style.width='100%';host.appendChild(audio);
-  const info=document.createElement('p');info.className='small';info.textContent='الفيديو: '+data.visual_provider+' · الصوت: '+data.speech_provider+' · المدة البصرية: '+data.video_seconds+' ثوانٍ. هذا اختبار مشهد واحد، وليس فيديو طويلًا مكتملًا.';host.appendChild(info);
+  const info=document.createElement('p');info.className='small';info.textContent='الفيديو: '+data.visual_provider+' · الصوت: '+data.speech_provider+' · المدة البصرية: '+data.video_seconds+' ثوانٍ. هذا اختبار مشهد واحد مدته ست ثوانٍ، وليس فيديو طويلًا مكتملًا؛ استخدم تعليقًا قصيرًا يناسب المدة.';host.appendChild(info);
   $('ai-video-merge').disabled=false;
   notice('ai-video-msg','نجح إنشاء المشهد والصوت وحُفظا مؤقتًا في تخزين ZOZ Pro الخاص. الخطوة التالية تدمجهما في ملف MP4 واحد. لم يتم رفع أي شيء إلى YouTube.','good');
  }finally{button.disabled=false;}
