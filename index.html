@@ -30,10 +30,10 @@ footer{flex:0 0 auto;padding:4px 10px;text-align:center;font-size:10px;color:#82
  <span class="guard">لا نشر تلقائي</span>
 </header>
 <nav class="tabs" aria-label="أقسام مركز ZOZ Pro">
- <button id="channel-tab" type="button" aria-selected="false">بيانات القناة والتوصيات</button>
+ <button id="channel-tab" type="button" aria-selected="false">لوحة أداء القنوات</button>
  <button id="production-tab" type="button" aria-selected="false">الإنشاء والمهام والملفات والنشر</button>
 </nav>
-<iframe id="channel-frame" class="workspace" title="بيانات قناة Hazem Ahmed والتوصيات" loading="eager" allow="clipboard-read; clipboard-write; autoplay"></iframe>
+<iframe id="channel-frame" class="workspace" title="لوحة أداء قنوات ZOZ Pro" loading="eager" allow="clipboard-read; clipboard-write; autoplay"></iframe>
 <iframe id="production-frame" class="workspace" title="إنشاء المحتوى والمهام والملفات والنشر" loading="lazy" allow="clipboard-read; clipboard-write; autoplay"></iframe>
 <footer>ZOZ Pro · واجهة موحّدة · تُحفظ الملفات للمراجعة ولا يتم النشر العام دون موافقة</footer>
 <script>
@@ -44,7 +44,7 @@ footer{flex:0 0 auto;padding:4px 10px;text-align:center;font-size:10px;color:#82
  const productionFrame=document.getElementById("production-frame");
  const channelTab=document.getElementById("channel-tab");
  const productionTab=document.getElementById("production-tab");
- const channelUrl="./channel-control.html?integrated=1";
+ const channelUrl="./channel-dashboard.html";
  const productionParams=new URLSearchParams({embedded:"1",tab:"jobs"});
  if(query.has("handoff")) productionParams.set("handoff","1");
  if(query.has("task")) productionParams.set("task",query.get("task"));
