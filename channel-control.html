@@ -40,6 +40,10 @@ body.upload-mode #page-intake{display:block!important}
 body.upload-mode #page-intake>section.card:nth-of-type(2){display:none!important}
 body.upload-mode #ai-video-studio,
 body.upload-mode #external-production-approved{display:none!important}
+body.upload-mode #page-intake>section.card:nth-of-type(2){display:none!important}
+body.upload-mode #page-intake>section.card:first-of-type>p{max-width:650px}
+body.upload-mode #intake-file{display:block;width:100%;max-width:100%;margin:8px 0 16px}
+body.upload-mode #page-intake>section.card:nth-of-type(3){margin-top:14px}
 body.upload-mode #page-intake>section.card:first-of-type{border-color:#416fe0}
 body.upload-mode #page-intake h2{font-size:clamp(21px,4vw,28px)}
 body.upload-mode #page-intake #intake-file{border:2px dashed #648fce;padding:16px;background:#101e31}
@@ -925,6 +929,7 @@ async function mergeAIVideoAndQueue(){
 $('ai-video-generate')?.addEventListener('click',async()=>{try{await generateAIVideoPreview();}catch(e){notice('ai-video-msg',e.message||'فشل توليد المشاهد أو الصوت.','bad');}});
 $('ai-video-merge')?.addEventListener('click',async()=>{try{await mergeAIVideoAndQueue();}catch(e){notice('ai-video-msg',e.message||'تعذر دمج الفيديو والصوت.','bad');}});
 
+ $('intake-file')?.addEventListener('change',()=>{const f=$('intake-file').files?.[0];if(!f)return;const title=$('intake-title');if(title&&!title.value.trim()){title.value=f.name.replace(/\\.[^.]+$/,'').replace(/[_-]+/g,' ').slice(0,100);}notice('intake-msg','تم اختيار الملف: '+f.name+' ('+(f.size/1024/1024).toFixed(1)+' MB). راجع بيانات النشر ثم ارفع الفيديو.','good');});
 $('intake-upload')?.addEventListener('click',async()=>{try{await uploadIntakeFile();}catch(e){notice('intake-progress',e.message||'تعذر رفع الملف.','bad');notice('intake-msg','لم يكتمل الاستقبال؛ راجع رسالة الخطأ قبل إعادة المحاولة.','warn');}});
 $('intake-refresh')?.addEventListener('click',async()=>{try{await loadIntakeAssets();notice('intake-msg','تم تحديث قائمة الاستقبال.','good');}catch(e){notice('intake-msg',e.message||'تعذر تحميل القائمة.','bad');}});
 $('intake-refresh-list')?.addEventListener('click',async()=>{try{await loadIntakeAssets();}catch(e){notice('intake-msg',e.message||'تعذر تحميل القائمة.','bad');}});
