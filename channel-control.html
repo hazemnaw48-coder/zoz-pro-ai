@@ -149,7 +149,16 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
  <label for="studio-topic">موضوع الحلقة</label><input id="studio-topic" maxlength="240" value="ليه نب آمون أكبر من الفلاحين في الرسمة؟">
  <div class="grid"><div><label for="studio-format">نوع الفيديو</label><select id="studio-format"><option value="short">Short</option><option value="long">فيديو طويل</option></select></div><div><label for="studio-duration">المدة بالثواني</label><input id="studio-duration" type="number" min="20" max="180" value="40"></div></div>
  <div class="actions"><button id="studio-generate">إنشاء سكربت من بيانات القناة</button><button id="studio-refresh" class="secondary">عرض المسودات المحفوظة</button></div>
- <div id="studio-msg" class="notice">المسودات تُحفظ في Supabase ولا تُنشر تلقائيًا.</div><div class="card" id="ai-video-studio" style="border-color:#416fe0">
+ <div id="studio-msg" class="notice">المسودات تُحفظ في Supabase ولا تُنشر تلقائيًا.</div><div id="studio-generated-result" class="stack"></div><h3 class="section-gap">المسودات المحفوظة</h3><div id="studio-result" class="stack"></div>
+</section>
+</div>
+<div class="page-panel" data-page="intake" id="page-intake">
+<section class="card">
+ <h2>٩. بوابة استقبال الفيديوهات والنشر الفعلي</h2>
+ <p>ارفع ملفًا من الهاتف أو استقبل تصديرًا من مراكز الإنتاج المعتمدة. تُنقل بيانات العنوان والوصف والكلمات المفتاحية من المسودة المختارة عند استخدام زر المسودة أعلاه. يتم حفظ الأجزاء في مخزن خاص، ثم مراجعتها، ثم رفعها إلى YouTube بوضع خاص أولًا. لا يُنشر الفيديو علنًا إلا بعد موافقة صريحة منفصلة.</p>
+ <div id="intake-msg" class="notice">يتم التحقق من جلسة المالك في مشروع الإنتاج…</div>
+ <div class="section-gap"></div>
+ <div class="card" id="ai-video-studio" style="border-color:#416fe0">
  <h3>محرك إنتاج فيديو بالذكاء الاصطناعي — تجربة مجانية محدودة</h3>
  <p>ينشئ مشهدًا بصريًا قصيرًا عبر LTX العام وتعليقًا صوتيًا عربيًا عبر مفاتيح Gemini الثلاثة بالتناوب، ثم يدمجهما محليًا في المتصفح ويجهزه في قائمة مراجعة ZOZ Pro. قد تتوقف خدمة الفيديو المجانية بسبب الطابور أو الحصة؛ لا يستخدم هذا المسار API فيديو مدفوعًا.</p>
  <label for="ai-video-topic">موضوع الفيديو</label><input id="ai-video-topic" maxlength="240" value="الحياة اليومية في مصر القديمة">
@@ -162,14 +171,8 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
  <div class="actions"><button type="button" id="ai-video-generate">إنشاء المشهد والصوت</button><button type="button" id="ai-video-merge" class="secondary" disabled>دمج الصوت بالفيديو وتجهيز المراجعة</button></div>
  <div id="ai-video-msg" class="notice">لم يبدأ التوليد بعد. لا تُرسل أي نتيجة إلى YouTube قبل المراجعة والموافقة.</div>
  <div id="ai-video-results" class="stack"></div>
- </div><div id="studio-generated-result" class="stack"></div><h3 class="section-gap">المسودات المحفوظة</h3><div id="studio-result" class="stack"></div>
-</section>
-</div>
-<div class="page-panel" data-page="intake" id="page-intake">
-<section class="card">
- <h2>٩. بوابة استقبال الفيديوهات والنشر الفعلي</h2>
- <p>ارفع ملفًا من الهاتف أو استقبل تصديرًا من مراكز الإنتاج المعتمدة. تُنقل بيانات العنوان والوصف والكلمات المفتاحية من المسودة المختارة عند استخدام زر المسودة أعلاه. يتم حفظ الأجزاء في مخزن خاص، ثم مراجعتها، ثم رفعها إلى YouTube بوضع خاص أولًا. لا يُنشر الفيديو علنًا إلا بعد موافقة صريحة منفصلة.</p>
- <div id="intake-msg" class="notice">يتم التحقق من جلسة المالك في مشروع الإنتاج…</div>
+ 
+
  <h3 class="section-gap">أ. استقبال ملف من الهاتف</h3>
  <label for="intake-file">ملف الفيديو (MP4 أو MOV أو WebM أو MKV)</label><input id="intake-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,application/octet-stream">
  <label for="intake-title">عنوان YouTube</label><input id="intake-title" maxlength="100" placeholder="عنوان الفيديو النهائي">
