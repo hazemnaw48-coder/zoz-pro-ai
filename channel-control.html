@@ -164,6 +164,8 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
  <label for="ai-video-topic">موضوع الفيديو</label><input id="ai-video-topic" maxlength="240" value="الحياة اليومية في مصر القديمة">
  <label for="ai-video-narration">نص التعليق الصوتي العربي</label><textarea id="ai-video-narration" rows="4" maxlength="1800" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit">في مصر القديمة، بدأ يوم الناس مع شروق الشمس، بين نهر النيل والحقول والأسواق.</textarea>
  <label for="ai-video-visual">وصف المشهد الواقعي المراد توليده</label><textarea id="ai-video-visual" rows="3" maxlength="1200" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;font:inherit">مشهد سينمائي واقعي للحياة اليومية على ضفاف النيل في مصر القديمة، مزارعون مصريون بملابس كتان تاريخية يعملون قرب الحقول وقارب خشبي على النهر، ضوء صباح طبيعي، حركة كاميرا هادئة، تفاصيل أثرية واقعية، بلا كتابة أو شعارات أو مظهر كرتوني.</textarea>
+ <label for="ai-video-visual-2">وصف المشهد الثاني</label><textarea id="ai-video-visual-2" rows="3" maxlength="1200" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;font:inherit">لقطة واقعية قريبة ليد فلاح مصري قديم يحصد القمح بمنجل برونزي قرب النيل، ملابس كتان بسيطة، أدوات مناسبة للعصر، ضوء طبيعي وحركة كاميرا هادئة، بلا نصوص أو شعارات.</textarea>
+ <label for="ai-video-visual-3">وصف المشهد الثالث</label><textarea id="ai-video-visual-3" rows="3" maxlength="1200" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;font:inherit">لقطة سينمائية واقعية لسوق مصري قديم قرب النيل، أوانٍ فخارية وسلال حبوب وأقمشة كتان، أشخاص بملابس تاريخية بسيطة، دون رموز أو كتابات مختلقة، بلا نصوص أو شعارات.</textarea>
  <div class="grid">
   <div><label for="ai-video-kids">هل صُنع للأطفال؟</label><select id="ai-video-kids" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px"><option value="">اختر الإجابة</option><option value="false">لا</option><option value="true">نعم</option></select></div>
   <div><label for="ai-video-synthetic">هل المشاهد واقعية مولدة اصطناعيًا؟</label><select id="ai-video-synthetic" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px"><option value="true" selected>نعم</option><option value="false">لا</option></select></div>
@@ -837,59 +839,73 @@ async function loadStudioScripts(){
 
 let aiVideoResult=null;
 let aiVideoFinalFile=null;
+async function requestAIVideoPart(session,body){
+ const response=await fetch(SUPABASE_URL+'/functions/v1/zoz-pro-ai-video-studio?action=generate_clip',{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store'});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok||data.ok===false)throw new Error(data.error||('تعذر إنشاء المشهد (HTTP '+response.status+').'));
+ return data;
+}
 async function generateAIVideoPreview(){
- const topic=$('ai-video-topic').value.trim(),narration=$('ai-video-narration').value.trim(),visual=$('ai-video-visual').value.trim();
- if(!topic||narration.length<30||!visual)throw new Error('أكمل الموضوع والتعليق الصوتي ووصف المشهد.');
+ const topic=$('ai-video-topic').value.trim(),narration=$('ai-video-narration').value.trim();
+ const visuals=[$('ai-video-visual').value.trim(),$('ai-video-visual-2').value.trim(),$('ai-video-visual-3').value.trim()];
+ if(!topic||narration.length<30||visuals.some(x=>!x))throw new Error('أكمل الموضوع والتعليق الصوتي وأوصاف المشاهد الثلاثة.');
+ if(narration.length>420)throw new Error('اختصر التعليق الصوتي إلى نحو 60 كلمة حتى يلائم المقطع التجريبي الذي تبلغ مدته 18 ثانية.');
  const channelId=managedChannelId(),session=await ownerSession(),button=$('ai-video-generate');
  button.disabled=true;$('ai-video-merge').disabled=true;aiVideoResult=null;aiVideoFinalFile=null;
- $('ai-video-results').innerHTML='';notice('ai-video-msg','جارٍ توليد التعليق الصوتي عبر Gemini، ثم طلب مشهد بصري قصير من خدمة LTX المجانية. قد يستغرق ذلك عدة دقائق.','');
+ $('ai-video-results').innerHTML='';
  try{
-  const response=await fetch(SUPABASE_URL+'/functions/v1/zoz-pro-ai-video-studio?action=generate_clip',{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({action:'generate_clip',channel_id:channelId,topic,narration,visual_prompt:visual}),cache:'no-store'});
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok||data.ok===false)throw new Error(data.error||('تعذر إنشاء المقطع (HTTP '+response.status+').'));
-  aiVideoResult=data;
-  const host=$('ai-video-results');
-  const video=document.createElement('video');video.controls=true;video.playsInline=true;video.src=data.video_url;video.style.width='100%';video.style.maxHeight='420px';host.appendChild(video);
-  const audio=document.createElement('audio');audio.controls=true;audio.src=data.audio_url;audio.style.width='100%';host.appendChild(audio);
-  const info=document.createElement('p');info.className='small';info.textContent='الفيديو: '+data.visual_provider+' · الصوت: '+data.speech_provider+' · المدة البصرية: '+data.video_seconds+' ثوانٍ. هذا اختبار مشهد واحد مدته ست ثوانٍ، وليس فيديو طويلًا مكتملًا؛ استخدم تعليقًا قصيرًا يناسب المدة.';host.appendChild(info);
+  const scenes=[];
+  let audioUrl=null,speechProvider='';
+  for(let i=0;i<3;i++){
+   notice('ai-video-msg','توليد المشهد '+(i+1)+' من 3 عبر LTX'+(i===0)+'؛ قد تنتظر الخدمة المجانية في الطابور…','');
+   const data=await requestAIVideoPart(session,{action:'generate_clip',channel_id:channelId,topic,narration,visual_prompt:visuals[i],visual_only:i>0});
+   scenes.push(data.video_url);
+   if(i===0){audioUrl=data.audio_url;speechProvider=data.speech_provider||'';}
+   const video=document.createElement('video');video.controls=true;video.playsInline=true;video.src=data.video_url;video.style.width='100%';video.style.maxHeight='320px';$('ai-video-results').appendChild(video);
+   const label=document.createElement('p');label.className='small';label.textContent='معاينة المشهد '+(i+1)+' · 6 ثوانٍ';$('ai-video-results').appendChild(label);
+  }
+  if(!audioUrl)throw new Error('لم ينتج التعليق الصوتي.');
+  const audio=document.createElement('audio');audio.controls=true;audio.src=audioUrl;audio.style.width='100%';$('ai-video-results').appendChild(audio);
+  aiVideoResult={scene_urls:scenes,audio_url:audioUrl,speech_provider:speechProvider,topic};
   $('ai-video-merge').disabled=false;
-  notice('ai-video-msg','نجح إنشاء المشهد والصوت وحُفظا مؤقتًا في تخزين ZOZ Pro الخاص. الخطوة التالية تدمجهما في ملف MP4 واحد. لم يتم رفع أي شيء إلى YouTube.','good');
+  notice('ai-video-msg','اكتملت 3 مشاهد تجريبية مع تعليق Gemini. افحص كل معاينة قبل الدمج؛ التوليد المجاني قد يتوقف إذا انتهت حصة الخدمة. لم يتم النشر.','good');
  }finally{button.disabled=false;}
 }
 async function mergeAIVideoAndQueue(){
- if(!aiVideoResult)throw new Error('أنشئ المشهد والصوت أولًا.');
+ if(!aiVideoResult||aiVideoResult.scene_urls?.length!==3)throw new Error('أنشئ المشاهد الثلاثة والتعليق أولًا.');
  if($('ai-video-kids').value==='')throw new Error('اختر إجابة سؤال الأطفال قبل تجهيز المراجعة.');
  const b=$('ai-video-merge');b.disabled=true;
  try{
-  notice('ai-video-msg','جارٍ تحميل أداة الدمج داخل المتصفح. قد يستغرق تحميلها وقتًا على الهاتف.','');
+  notice('ai-video-msg','تحميل أداة الدمج داخل المتصفح؛ قد يستغرق ذلك وقتًا على الهاتف…','');
   const mod=await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js');
   const util=await import('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/esm/index.js');
   const ffmpeg=new mod.FFmpeg();
   const core='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd';
   await ffmpeg.load({coreURL:await util.toBlobURL(core+'/ffmpeg-core.js','text/javascript'),wasmURL:await util.toBlobURL(core+'/ffmpeg-core.wasm','application/wasm')});
-  notice('ai-video-msg','جارٍ تنزيل المشهد والصوت ودمجهما في ملف MP4 واحد…','');
-  const [vr,ar]=await Promise.all([fetch(aiVideoResult.video_url),fetch(aiVideoResult.audio_url)]);
-  if(!vr.ok||!ar.ok)throw new Error('انتهت صلاحية رابط المعاينة؛ أعد إنشاء المشهد والصوت.');
-  await ffmpeg.writeFile('visual.mp4',new Uint8Array(await vr.arrayBuffer()));
+  const list=[];
+  for(let i=0;i<3;i++){
+   notice('ai-video-msg','تنزيل ودمج المشهد '+(i+1)+' من 3…','');
+   const response=await fetch(aiVideoResult.scene_urls[i]);if(!response.ok)throw new Error('انتهت صلاحية رابط المشهد '+(i+1)+'؛ أعد التوليد.');
+   const name='scene'+(i+1)+'.mp4';await ffmpeg.writeFile(name,new Uint8Array(await response.arrayBuffer()));list.push("file '"+name+"'");
+  }
+  const ar=await fetch(aiVideoResult.audio_url);if(!ar.ok)throw new Error('انتهت صلاحية رابط التعليق؛ أعد التوليد.');
   await ffmpeg.writeFile('voice.wav',new Uint8Array(await ar.arrayBuffer()));
-  await ffmpeg.exec(['-i','visual.mp4','-i','voice.wav','-map','0:v:0','-map','1:a:0','-c:v','copy','-c:a','aac','-b:a','128k','-shortest','-movflags','+faststart','final.mp4']);
-  const out=await ffmpeg.readFile('final.mp4');
-  if(!out||!out.length)throw new Error('لم ينتج الدمج ملف MP4 صالحًا.');
+  await ffmpeg.writeFile('list.txt',new TextEncoder().encode(list.join('\n')));
+  await ffmpeg.exec(['-f','concat','-safe','0','-i','list.txt','-i','voice.wav','-map','0:v:0','-map','1:a:0','-vf','scale=448:768:force_original_aspect_ratio=decrease,pad=448:768:(ow-iw)/2:(oh-ih)/2,setsar=1','-c:v','libx264','-preset','ultrafast','-crf','24','-c:a','aac','-b:a','128k','-shortest','-movflags','+faststart','final.mp4']);
+  const out=await ffmpeg.readFile('final.mp4');if(!out||!out.length)throw new Error('لم ينتج الدمج ملف MP4 صالحًا.');
   aiVideoFinalFile=new File([out],'zoz-ai-video-'+Date.now()+'.mp4',{type:'video/mp4'});
-  if(aiVideoFinalFile.size>50*1024*1024)throw new Error('الملف النهائي أكبر من حد حاوية الاستقبال الحالية (50 ميجابايت). لم يتم رفعه.');
+  if(aiVideoFinalFile.size>50*1024*1024)throw new Error('الملف النهائي أكبر من حد استقبال ZOZ Pro (50 ميجابايت). لم يتم رفعه.');
   const dt=new DataTransfer();dt.items.add(aiVideoFinalFile);$('intake-file').files=dt.files;
   $('intake-title').value=$('ai-video-topic').value.trim().slice(0,100);
-  $('intake-description').value='فيديو تعليمي مولد بمساعدة الذكاء الاصطناعي. تمت مراجعة النص والمشهد قبل النشر.\n\n'+$('ai-video-narration').value.trim();
+  $('intake-description').value='فيديو تعليمي مولد بمساعدة الذكاء الاصطناعي. تمت مراجعة النص والمشاهد قبل النشر.\n\n'+$('ai-video-narration').value.trim();
   $('intake-tags').value='مصر القديمة، الحضارة المصرية، التاريخ المصري، Ancient Egypt';
-  $('intake-kids').value=$('ai-video-kids').value;
-  $('intake-synthetic').value=$('ai-video-synthetic').value;
-  $('intake-privacy').value='unlisted';
+  $('intake-kids').value=$('ai-video-kids').value;$('intake-synthetic').value=$('ai-video-synthetic').value;$('intake-privacy').value='unlisted';
   showPage('intake');
-  notice('ai-video-msg','اكتمل دمج الصوت والصورة. تم نقل الملف النهائي إلى بوابة المراجعة؛ اضغط «رفع الفيديو إلى مركز ZOZ Pro» لإرساله إلى طابور المراجعة. لن يُنشر تلقائيًا.','good');
-  notice('intake-msg','وصل ملف مولّد من مركز صناعة الفيديو. راجع العنوان والوصف والإفصاح، ثم اضغط زر الاستقبال.','good');
+  notice('ai-video-msg','اكتمل دمج المشاهد الثلاثة والتعليق في MP4 واحد، وتم نقله إلى بوابة الاستقبال. اضغط «رفع الفيديو إلى مركز ZOZ Pro» لإرساله للمراجعة؛ لن ينشر تلقائيًا.','good');
+  notice('intake-msg','وصل ملف الفيديو من محرك الإنتاج. راجع العنوان والوصف والإفصاح، ثم اضغط زر الاستقبال.','good');
  }finally{b.disabled=false;}
 }
-$('ai-video-generate')?.addEventListener('click',async()=>{try{await generateAIVideoPreview();}catch(e){notice('ai-video-msg',e.message||'فشل توليد المشهد أو الصوت.','bad');}});
+$('ai-video-generate')?.addEventListener('click',async()=>{try{await generateAIVideoPreview();}catch(e){notice('ai-video-msg',e.message||'فشل توليد المشاهد أو الصوت.','bad');}});
 $('ai-video-merge')?.addEventListener('click',async()=>{try{await mergeAIVideoAndQueue();}catch(e){notice('ai-video-msg',e.message||'تعذر دمج الفيديو والصوت.','bad');}});
 
 $('intake-upload')?.addEventListener('click',async()=>{try{await uploadIntakeFile();}catch(e){notice('intake-progress',e.message||'تعذر رفع الملف.','bad');notice('intake-msg','لم يكتمل الاستقبال؛ راجع رسالة الخطأ قبل إعادة المحاولة.','warn');}});
