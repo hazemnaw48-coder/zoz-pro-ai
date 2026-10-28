@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#101827">
-<title>ZOZ Pro — مركز التحكم ببيانات قناة Hazem Ahmed</title>
+<title>ZOZ Pro — مركز التحليل ورفع الفيديو</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{color-scheme:dark;--bg:#0c1422;--panel:#121f31;--line:#2b3c53;--text:#eef4ff;--muted:#a9bad0;--accent:#80a9ff;--good:#50d5a0;--warn:#ffca70;--bad:#ff8989}
@@ -32,14 +32,28 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
 @media(max-width:480px){main{padding:10px}.card{padding:12px}.video{grid-template-columns:100px 1fr}.number{font-size:21px}}
 
 .production-package{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:#0e1928}.production-package summary{cursor:pointer;font-weight:700;color:var(--accent)}.production-package h4{font-size:15px;margin:14px 0 4px}.production-package p{overflow-wrap:anywhere}
+
+/* Focused phone-first upload view; the full legacy controls remain available only with ?mode=full. */
+body.upload-mode .section-nav-shell{display:none!important}
+body.upload-mode .page-panel:not(#page-intake){display:none!important}
+body.upload-mode #page-intake{display:block!important}
+body.upload-mode #page-intake>section.card:nth-of-type(2){display:none!important}
+body.upload-mode #ai-video-studio,
+body.upload-mode #external-production-approved{display:none!important}
+body.upload-mode #page-intake>section.card:first-of-type{border-color:#416fe0}
+body.upload-mode #page-intake h2{font-size:clamp(21px,4vw,28px)}
+body.upload-mode #page-intake #intake-file{border:2px dashed #648fce;padding:16px;background:#101e31}
+body.upload-mode #page-intake #intake-upload{min-height:50px;font-size:17px;width:100%}
+body.upload-mode #page-intake .card{padding:14px}
+body.upload-mode .footer{font-size:11px}
 </style>
 </head>
 <body>
 <main>
 <header>
  <div class="row">
-  <div><div class="small">ZOZ Pro · اتصال مباشر بمشروع الإنتاج</div><h1>مركز بيانات قناة Hazem Ahmed</h1><p>قراءة الفيديوهات والتحليلات من الربط المحفوظ في Supabase للإنتاج.</p></div>
-  <a class="link secondary" href="./index.html">العودة إلى مركز الإنتاج</a>
+  <div><div class="small">ZOZ Pro · اتصال مباشر بمشروع الإنتاج</div><h1>ZOZ Pro — مركز التحليل ورفع الفيديو</h1><p>اختر تحليل القنوات والبيانات، أو ارفع الفيديو النهائي للمراجعة والنشر.</p></div>
+  <a class="link secondary" href="./index.html">العودة إلى مركز التحليل والقنوات</a>
  </div>
 </header>
 <section class="card" id="login-card">
@@ -154,8 +168,8 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
 </div>
 <div class="page-panel" data-page="intake" id="page-intake">
 <section class="card">
- <h2>٩. بوابة استقبال الفيديوهات والنشر الفعلي</h2>
- <p>ارفع ملفًا من الهاتف أو استقبل تصديرًا من مراكز الإنتاج المعتمدة. تُنقل بيانات العنوان والوصف والكلمات المفتاحية من المسودة المختارة عند استخدام زر المسودة أعلاه. يتم حفظ الأجزاء في مخزن خاص، ثم مراجعتها، ثم رفعها إلى YouTube بوضع خاص أولًا. لا يُنشر الفيديو علنًا إلا بعد موافقة صريحة منفصلة.</p>
+ <h2>رفع فيديو جاهز إلى YouTube</h2>
+ <p>اختر ملف الفيديو النهائي من هاتفك، أدخل بيانات النشر، ثم ارفعه للمراجعة. يُرفع إلى YouTube بوضع خاص أولًا، ولا يصبح عامًا إلا بتأكيدك الصريح.</p>
  <div id="intake-msg" class="notice">يتم التحقق من جلسة المالك في مشروع الإنتاج…</div>
  <div class="section-gap"></div>
  <div class="notice" id="external-production-approved" style="margin:12px 0">مسار الإنتاج المعتمد: أنشئ المشاهد والتعليق الصوتي النهائي في Google Flow أو مركز فيديو خارجي مناسب، ثم صدّر ملف MP4 وارفعه أدناه إلى ZOZ Pro. يتولى المركز حفظ الملف وبيانات النشر والتحقق والمراجعة ورفع الفيديو إلى YouTube. أُخفيت تجربة التوليد الداخلي المحدودة لأن جودة المشاهد والدمج لم تكن مناسبة للنشر؛ لا توليد مدفوع ولا نشر عام تلقائي.</div>
@@ -174,19 +188,19 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
  <div class="actions"><button type="button" id="ai-video-generate">إنشاء المشهد والصوت</button><button type="button" id="ai-video-merge" class="secondary" disabled>دمج الصوت بالفيديو وتجهيز المراجعة</button></div>
  <div id="ai-video-msg" class="notice">لم يبدأ التوليد بعد. لا تُرسل أي نتيجة إلى YouTube قبل المراجعة والموافقة.</div>
  <div id="ai-video-results" class="stack"></div>
- 
+ </div>
 
- <h3 class="section-gap">أ. استقبال ملف من الهاتف</h3>
- <label for="intake-file">ملف الفيديو (MP4 أو MOV أو WebM أو MKV)</label><input id="intake-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,application/octet-stream">
- <label for="intake-title">عنوان YouTube</label><input id="intake-title" maxlength="100" placeholder="عنوان الفيديو النهائي">
- <label for="intake-description">الوصف</label><textarea id="intake-description" rows="4" maxlength="5000" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit"></textarea>
- <label for="intake-tags">كلمات مفتاحية، افصل بينها بفواصل</label><input id="intake-tags" maxlength="2000" placeholder="مصر القديمة، الآثار، التاريخ">
+ <h3 class="section-gap">ملف الفيديو وبيانات النشر</h3>
+ <label for="intake-file">اختر ملف الفيديو من الهاتف (MP4 أو MOV أو WebM أو MKV)</label><input id="intake-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,application/octet-stream">
+ <label for="intake-title">عنوان الفيديو على YouTube</label><input id="intake-title" maxlength="100" placeholder="عنوان الفيديو النهائي">
+ <label for="intake-description">وصف الفيديو</label><textarea id="intake-description" rows="4" maxlength="5000" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit"></textarea>
+ <label for="intake-tags">الكلمات المفتاحية (افصل بينها بفواصل)</label><input id="intake-tags" maxlength="2000" placeholder="مصر القديمة، الآثار، التاريخ">
  <div class="grid">
-  <div><label for="intake-kids">هل صُنع الفيديو خصيصًا للأطفال؟</label><select id="intake-kids" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px"><option value="">اختر الإجابة</option><option value="false">لا</option><option value="true">نعم</option></select></div>
-  <div><label for="intake-synthetic">هل يحتوي مشاهد واقعية مولدة أو معدلة اصطناعيًا؟</label><select id="intake-synthetic" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px"><option value="">اختر الإجابة</option><option value="false">لا</option><option value="true">نعم</option></select></div>
+  <div><label for="intake-kids">هل صُنع الفيديو خصيصًا للأطفال؟</label><select id="intake-kids" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px"><option value="false" selected>لا</option><option value="true">نعم</option></select></div>
+  <div><label for="intake-synthetic">هل يحتوي مشاهد واقعية مولدة أو معدلة اصطناعيًا؟</label><select id="intake-synthetic" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px"><option value="true" selected>نعم</option><option value="false">لا</option></select></div>
  </div>
  <label for="intake-privacy">الخصوصية بعد موافقة النشر</label><select id="intake-privacy" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px"><option value="public">عام — بعد تأكيد النشر</option><option value="unlisted">غير مدرج — بعد تأكيد النشر</option></select>
- <div class="actions"><button id="intake-upload">رفع الفيديو إلى مركز ZOZ Pro</button><button id="intake-refresh" class="secondary">تحديث قائمة الاستقبال</button></div>
+ <div class="actions"><button id="intake-upload">رفع الفيديو للمراجعة والنشر</button><button id="intake-refresh" class="secondary">تحديث قائمة الاستقبال</button></div>
  <div id="intake-progress" class="notice">الأجزاء تُرفع بالتتابع، ويمكن إعادة المحاولة إذا انقطع الاتصال.</div>
 </section>
 <section class="card">
@@ -223,6 +237,8 @@ button,.link{display:inline-block;border:0;border-radius:10px;background:#416fe0
 <script>
 (function(){
 'use strict';
+const uploadMode=new URLSearchParams(window.location.search).get('mode')!=='full';
+if(uploadMode)document.body.classList.add('upload-mode');
 const SUPABASE_URL='https://oxyzxbkwhafzaztraowc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm';
 const OWNER='hazemnaw48@gmail.com';
@@ -254,7 +270,7 @@ function showPage(pageKey, scrollTop=true){
  if(indicator)indicator.textContent='القسم الحالي: '+label+' · '+step+' من '+tabs.length;
  if(scrollTop)window.scrollTo(0,0);
 }
-function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage('connection',false);notice('intake-msg','جلسة المالك متصلة بمشروع الإنتاج. افتح «٩ · صناعة المحتوى» لإعداد المسودات، أو «١٠ · استقبال الفيديوهات» لاستقبال الملفات ومراحل النشر.','good');loadManagedChannels();}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
+function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage(uploadMode?'intake':'connection',false);notice('intake-msg',uploadMode?'الجلسة متصلة. اختر ملف الفيديو ثم اضغط «رفع الفيديو للمراجعة والنشر».':'جلسة المالك متصلة بمشروع الإنتاج.','good');if(!uploadMode)loadManagedChannels();}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
 async function ownerSession(){
  const {data,error}=await sb.auth.getSession();if(error)throw error;const session=data&&data.session;
  if(!session||!session.access_token)throw new Error('لا توجد جلسة مالك محفوظة. سجّل الدخول بحساب مالك ZOZ Pro.');
@@ -712,7 +728,7 @@ $('login').addEventListener('click',async()=>{
   $('password').value='';
   if(error)throw error;
   if(!data||!data.session)throw new Error('لم تُنشأ جلسة تسجيل دخول.');
-  await ownerSession();setSigned(true);notice('login-msg','تم تسجيل الدخول إلى مشروع الإنتاج الصحيح.','good');await refreshStatus();
+  await ownerSession();setSigned(true);notice('login-msg','تم تسجيل الدخول إلى مشروع الإنتاج الصحيح.','good');if(uploadMode)await loadIntakeAssets();else await refreshStatus();
  }catch(e){setSigned(false);notice('login-msg',e.message||'تعذر تسجيل الدخول.','bad');}
  finally{$('login').disabled=false;}
 });
@@ -921,7 +937,7 @@ const end=new Date(Date.now()-86400000);const start=new Date(end);start.setDate(
 $('load-calendar')?.addEventListener('click',async()=>{try{await loadContentCalendar()}catch(e){notice('calendar-msg',e.message||'تعذر تحميل التقويم.','bad')}});
 $('generate-calendar')?.addEventListener('click',async()=>{const b=$('generate-calendar');b.disabled=true;try{await generateContentCalendar()}catch(e){notice('calendar-msg',e.message||'تعذر إنشاء التقويم.','bad')}finally{b.disabled=false}});
 (async()=>{
- try{const {data}=await sb.auth.getSession();if(data&&data.session){await ownerSession();setSigned(true);notice('login-msg','تم العثور على جلسة مالك محفوظة في مشروع الإنتاج.','good');await refreshStatus();}else{setSigned(false);notice('login-msg','لم توجد جلسة إنتاج محفوظة. سجّل الدخول فقط؛ لن نعيد تفويض Google.');}}
+ try{const {data}=await sb.auth.getSession();if(data&&data.session){await ownerSession();setSigned(true);notice('login-msg','تم العثور على جلسة مالك محفوظة في مشروع الإنتاج.','good');if(uploadMode)await loadIntakeAssets();else await refreshStatus();}else{setSigned(false);notice('login-msg','لم توجد جلسة إنتاج محفوظة. سجّل الدخول فقط؛ لن نعيد تفويض Google.');}}
  catch(e){setSigned(false);notice('login-msg',e.message||'تعذر استعادة الجلسة.','bad');}
 })();
 })();
