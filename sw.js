@@ -1,4 +1,4 @@
-const CACHE_NAME = "zoz-pro-shell-v28";
+const CACHE_NAME = "zoz-pro-shell-v29";
 const APP_FILES = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const APP_FILES = [
   "./analysis-production.html",
   "./channel-control.html",
   "./channel-dashboard.html",
+  "./dashboard.html",
   "./youtube-analytics.html",
   "./youtube-manager.html",
   "./studio.css?v=20261022-4",
