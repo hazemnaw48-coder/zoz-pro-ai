@@ -81,7 +81,7 @@ function channelCard(ch){
  '<div class="chartbox"><div class="charthead"><strong>اتجاه المشاهدات اليومية</strong><span class="muted">آخر 21 يومًا متاحًا</span></div>'+chart+'</div>'+
  '<div class="subsection"><h4>أحدث الفيديوهات وأداؤها</h4><div class="video-list">'+(videoRows||'<div class="notice">لا توجد فيديوهات محفوظة في آخر مزامنة.</div>')+'</div></div>'+
  '<div class="subsection"><h4>توصيات التحليل لهذه القناة</h4><div class="rec-list">'+(recRows||'<div class="notice">لا توجد توصيات محفوظة بعد. شغّل تحليل الفترة من مركز القناة بعد المزامنة.</div>')+'</div></div>'+
- '<div class="card-actions"><button data-sync="'+esc(cid)+'">مزامنة الآن</button><a class="pill" href="./channel-control.html" style="display:grid;place-items:center">التحليل والتوصيات</a><a class="pill" href="https://studio.youtube.com/channel/'+encodeURIComponent(cid)+'" target="_blank" rel="noopener" style="display:grid;place-items:center">استوديو YouTube</a></div></article>';
+ '<div class="card-actions"><button data-sync="'+esc(cid)+'">مزامنة الآن</button><a class="pill" href="./channel-control.html" style="display:grid;place-items:center">التحليل والتوصيات</a><a class="pill" href="./production-center.html" style="display:grid;place-items:center">مركز الإنتاج والمهام</a><a class="pill" href="https://studio.youtube.com/channel/'+encodeURIComponent(cid)+'" target="_blank" rel="noopener" style="display:grid;place-items:center">استوديو YouTube</a></div></article>';
 }
 function render(data){
  lastPayload=data;const channels=Array.isArray(data.channels)?data.channels:[];
