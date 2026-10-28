@@ -857,7 +857,7 @@ async function generateAIVideoPreview(){
   const scenes=[];
   let audioUrl=null,speechProvider='';
   for(let i=0;i<3;i++){
-   notice('ai-video-msg','توليد المشهد '+(i+1)+' من 3 عبر LTX'+(i===0)+'؛ قد تنتظر الخدمة المجانية في الطابور…','');
+   notice('ai-video-msg','توليد المشهد '+(i+1)+' من 3 عبر LTX'+(i===0?' مع التعليق الصوتي':' دون تكرار التعليق')+'؛ قد تنتظر الخدمة المجانية في الطابور…','');
    const data=await requestAIVideoPart(session,{action:'generate_clip',channel_id:channelId,topic,narration,visual_prompt:visuals[i],visual_only:i>0});
    scenes.push(data.video_url);
    if(i===0){audioUrl=data.audio_url;speechProvider=data.speech_provider||'';}
