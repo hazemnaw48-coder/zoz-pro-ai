@@ -63,7 +63,7 @@ body.upload-mode .footer{font-size:11px}
 <section class="card" id="zoz-agent-panel" aria-label="وكيل الإدارة الذكي">
 <div class="row"><div><h2 style="margin:0 0 4px">وكيل الإدارة الذكي</h2><p style="margin:0">تشغيل مباشر داخل مركز التحكم الحالي — دون فتح صفحة منفصلة.</p></div><button type="button" class="secondary" id="zoz-agent-health-btn">فحص الخدمة</button></div>
 <div id="zoz-agent-health" class="notice" style="margin-top:10px">جارٍ فحص الوكيل التنفيذي في مشروع الإنتاج…</div>
-<div class="section-gap"><h3>١ · تحليل قناة Hazem Ahmed</h3><p>يقرأ حالة القناة والتحليلات والتقويم والمسودات وملفات الفيديو، ثم يعرض التشخيص والخطوات العملية. لا يغيّر الفيديوهات ولا ينشر.</p><div class="actions"><button type="button" id="zoz-agent-analyze-btn">حلّل القناة الآن</button></div><div id="zoz-agent-analysis-status" class="notice" style="display:none"></div><pre id="zoz-agent-analysis-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre></div>
+<div class="section-gap"><h3>١ · تحليل قناة Hazem Ahmed</h3><p>يقرأ حالة القناة والتحليلات والتقويم والمسودات وملفات الفيديو، ثم يعرض التشخيص والخطوات العملية. لا يغيّر الفيديوهات ولا ينشر.</p><div class="actions"><button type="button" id="zoz-agent-analyze-btn">حلّل القناة الآن</button><button type="button" class="secondary" id="zoz-agent-video-test-btn">اختبر نجاح آخر فيديو</button></div><div id="zoz-agent-analysis-status" class="notice" style="display:none"></div><pre id="zoz-agent-analysis-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre></div>
 <div class="section-gap"><h3>٢ · إنشاء مسودة محتوى</h3><p>المسودة تُحفظ في مركز الإنتاج للمراجعة. لا يتم إنشاء فيديو أو رفعه أو نشره تلقائيًا.</p><label for="zoz-agent-topic">موضوع المسودة</label><input id="zoz-agent-topic" maxlength="240" placeholder="مثال: كيف عاش العمال في دير المدينة؟"><div class="grid"><div><label for="zoz-agent-mode">نوع المحتوى</label><select id="zoz-agent-mode" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit"><option value="short">Short</option><option value="long">فيديو طويل</option></select></div><div><label for="zoz-agent-duration">المدة المقترحة بالثواني</label><input id="zoz-agent-duration" type="number" min="20" max="180" value="45"></div></div><div class="actions"><button type="button" id="zoz-agent-draft-btn">أنشئ المسودة واحفظها</button></div><div id="zoz-agent-draft-status" class="notice" style="display:none"></div><pre id="zoz-agent-draft-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre></div>
 </section>
 <section class="card" id="login-card">
@@ -998,6 +998,39 @@ $('zoz-agent-draft-btn')?.addEventListener('click',async()=>{
   status.className='notice good';status.textContent='تم تأكيد حفظ المسودة. لن يتم رفع الفيديو أو نشره تلقائيًا.';
  }catch(e){status.className='notice bad';status.textContent='تعذر إنشاء المسودة: '+(e.message||e);}
  finally{b.disabled=false;b.textContent='أنشئ المسودة واحفظها';}
+});
+$('zoz-agent-video-test-btn')?.addEventListener('click',async()=>{
+ const b=$('zoz-agent-video-test-btn'),status=$('zoz-agent-analysis-status'),out=$('zoz-agent-analysis-result');
+ b.disabled=true;b.textContent='جارٍ اختبار الأداء…';status.style.display='block';out.style.display='none';status.className='notice';status.textContent='يجمع الوكيل بيانات أحدث فيديو عام، ويقارنها باللقطات المحفوظة والفيديوهات السابقة…';
+ try{
+  const d=await callZozAgent('evaluate_latest_video');
+  const t=d.test||{};
+  const lines=[
+   'نتيجة اختبار الفيديو: '+(t.verdict||'غير محددة'),
+   'العنوان: '+(t.title||'غير متاح'),
+   'رابط الفيديو: https://www.youtube.com/watch?v='+(t.video_id||''),
+   'وقت القياس: '+(t.observed_at||'غير متاح'),
+   'عمر الفيديو بالساعات: '+(t.age_hours??'غير متاح'),
+   'المشاهدات: '+(Number(t.views||0).toLocaleString('ar-EG')),
+   'الإعجابات: '+(Number(t.likes||0).toLocaleString('ar-EG')),
+   'التعليقات: '+(Number(t.comments||0).toLocaleString('ar-EG')),
+   'معدل الإعجاب من المشاهدات: '+(t.like_rate_percent==null?'غير متاح':t.like_rate_percent+'%'),
+   'متوسط المشاهدات الحسابي منذ النشر: '+(t.views_per_hour_since_publication??'غير متاح')+' مشاهدة/ساعة',
+   'التغير بين آخر نقطتي رصد: '+(t.snapshot_view_delta==null?'لا توجد نقطتا رصد كافيتان':t.snapshot_view_delta+' مشاهدة خلال '+t.snapshot_interval_hours+' ساعة'),
+   'مقاييس الاحتفاظ متاحة: '+(t.retention_metrics_available?'نعم':'لا؛ يلزم مزامنة تحليلات إضافية'),
+   '',
+   'الفيديوهات المقارنة:',
+   ...(Array.isArray(t.comparable_public_art_videos)&&t.comparable_public_art_videos.length?t.comparable_public_art_videos.map(v=>'• '+v.title+' — '+v.views+' مشاهدة، '+v.likes+' إعجابًا، عمر '+v.age_hours+' ساعة') : ['• لا توجد مجموعة مقارنة كافية.']),
+   '',
+   'الخطوات التالية:',
+   ...(Array.isArray(d.next_actions)?d.next_actions.map((x,i)=>(i+1)+'. '+x):['لا توجد توصيات إضافية.']),
+   '',
+   'حُفظ تقرير الاختبار في توصيات القناة. رقم التقرير: '+(d.recommendation_id||'غير متاح'),
+   'لم يتغير العنوان أو الخصوصية ولم يتم نشر أي شيء.'
+  ];
+  out.textContent=lines.join('\n');out.style.display='block';status.className='notice good';status.textContent='اكتمل اختبار الأداء وحُفظ التقرير في قاعدة الإنتاج.';
+ }catch(e){status.className='notice bad';status.textContent='تعذر اختبار الأداء: '+(e.message||e);}
+ finally{b.disabled=false;b.textContent='اختبر نجاح آخر فيديو';}
 });
 checkZozAgentHealth();
 
