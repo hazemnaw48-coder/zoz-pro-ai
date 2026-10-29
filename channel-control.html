@@ -88,8 +88,9 @@ body.upload-mode .footer{font-size:11px}
    <button type="button" class="section-tab" data-page-target="recommendations">٨ · التوصيات</button>
    <button type="button" class="section-tab" data-page-target="studio">٩ · صناعة المحتوى</button>
    <button type="button" class="section-tab" data-page-target="intake">١٠ · استقبال الفيديوهات</button>
+   <button type="button" class="section-tab" data-page-target="books">١١ · الكتب وأمازون</button>
   </nav>
-  <div id="page-indicator" class="page-indicator" aria-live="polite">القسم الحالي: حالة الربط · ١ من ٩</div>
+  <div id="page-indicator" class="page-indicator" aria-live="polite">القسم الحالي: حالة الربط · ١ من ١٠</div>
  </div>
 
  <div class="page-panel active" data-page="connection" id="page-connection">
@@ -240,6 +241,27 @@ body.upload-mode .footer{font-size:11px}
   <div id="recommendations-msg" class="notice">حمّل التوصيات المحفوظة للمراجعة.</div>
   <div id="recommendations-list"></div>
  </section>
+</div>
+
+<div class="page-panel" data-page="books" id="page-books">
+ <section class="card">
+  <div class="row"><div><h2>١١. إدارة الكتب ومبيعات Amazon KDP</h2><p class="small">لوحة مرتبطة بقاعدة الإنتاج. بيانات الرف من آخر رصد قدّمه المالك؛ المبيعات والعوائد تُحدّث من تقارير KDP.</p></div><button type="button" id="books-refresh" class="secondary">تحديث من قاعدة الإنتاج</button></div>
+  <div id="books-status" class="notice">اضغط تحديث لتحميل سجل الكتب والتنبيهات.</div><div id="books-metrics" class="grid"></div><div id="books-list" class="stack"></div>
+ </section>
+ <section class="card">
+  <h3>تسجيل تقرير مبيعات أو عائدات</h3><p>أدخل الأرقام كما تظهر في تقرير أمازون للفترة المحددة. هذا يسجل التقرير في ZOZ Pro فقط ولا يغير حساب KDP.</p>
+  <form id="books-report-form">
+   <label for="books-report-book">الكتاب</label><select id="books-report-book" required style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit"></select>
+   <div class="grid">
+    <div><label for="books-period-start">بداية الفترة</label><input id="books-period-start" type="date" required></div><div><label for="books-period-end">نهاية الفترة</label><input id="books-period-end" type="date" required></div>
+    <div><label for="books-units">الوحدات المعالجة</label><input id="books-units" type="number" min="0" step="1" placeholder="0"></div><div><label for="books-pages">صفحات KENP</label><input id="books-pages" type="number" min="0" step="1" placeholder="0"></div>
+    <div><label for="books-royalties">العائدات المقدرة (USD)</label><input id="books-royalties" type="number" min="0" step="0.01" placeholder="اختياري"></div><div><label for="books-ad-spend">إنفاق الإعلانات (USD)</label><input id="books-ad-spend" type="number" min="0" step="0.01" placeholder="اختياري"></div>
+   </div>
+   <label for="books-report-notes">ملاحظات ومصدر التقرير</label><textarea id="books-report-notes" rows="3" placeholder="مثال: تقرير Orders وKENP من KDP للفترة المحددة"></textarea>
+   <button type="submit" id="books-report-save">حفظ التقرير في ZOZ Pro</button>
+  </form><div id="books-report-msg" class="notice" style="margin-top:10px">لا تدخل قيمة العائدات إلا إذا ظهرت في التقرير.</div>
+ </section>
+ <section class="card"><h3>تنبيهات متابعة الكتب</h3><div id="books-alerts" class="stack"></div></section>
 </div>
 </div>
 <div class="footer small">إدارة محكومة: تبقى الفيديوهات خاصة حتى اكتمال مراجعة المالك وتأكيد النشر صراحةً. <span>·</span> <a href="https://github.com/hazemnaw48-coder/zoz-pro-ai/blob/main/ZOZ-PRO-EXECUTION-NOTES.md" target="_blank" rel="noopener">سجل تنفيذ المركز والملاحظات</a></div>
@@ -748,6 +770,7 @@ $('refresh').addEventListener('click',refreshStatus);
 document.querySelectorAll('[data-page-target]').forEach(button=>button.addEventListener('click',async()=>{
  const key=button.dataset.pageTarget;showPage(key);
  try{
+  if(key==='books'){await loadBooksDashboard();}
   if(key==='studio'){
    await loadStudioScripts();
    if(managedChannelId()==='UC-FimUUFXRd0MOSoikzczcQ')await loadManagedNews();
@@ -971,6 +994,36 @@ async function callZozAgent(action,extra){
  if(!response.ok||data.ok===false)throw new Error(data.error||('فشل طلب الوكيل HTTP '+response.status));
  return data;
 }
+
+function bookMetric(label,value){const box=document.createElement('div');box.className='metric';const small=document.createElement('small');small.textContent=label;const num=document.createElement('div');num.className='number';num.textContent=String(value);box.append(small,num);return box;}
+function bookField(label,id,value,placeholder,type='text'){const wrap=document.createElement('div'),lab=document.createElement('label'),input=document.createElement('input');lab.htmlFor=id;lab.textContent=label;input.id=id;input.value=value==null?'':String(value);input.placeholder=placeholder||'';input.type=type;input.style.cssText='width:100%;padding:10px;border-radius:9px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit';wrap.append(lab,input);return {wrap,input};}
+function bookSelectField(label,id,value,options){const wrap=document.createElement('div'),lab=document.createElement('label'),sel=document.createElement('select');lab.htmlFor=id;lab.textContent=label;sel.id=id;sel.style.cssText='width:100%;padding:10px;border-radius:9px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit';options.forEach(o=>{const opt=document.createElement('option');opt.value=o.value;opt.textContent=o.label;opt.selected=o.value===value;sel.appendChild(opt)});wrap.append(lab,sel);return {wrap,input:sel};}
+async function loadBooksDashboard(){
+ const status=$('books-status'),list=$('books-list'),metrics=$('books-metrics'),alerts=$('books-alerts'),selector=$('books-report-book');if(!status||!list)return;
+ status.className='notice';status.textContent='جارٍ قراءة سجل الكتب وتقاريرها من قاعدة الإنتاج…';$('books-refresh').disabled=true;
+ try{
+  const data=await callZozAgent('books_monitor'),books=Array.isArray(data.books)?data.books:[];list.replaceChildren();metrics.replaceChildren();selector.replaceChildren();
+  metrics.append(bookMetric('الكتب المسجلة',data.books_seen??books.length),bookMetric('تقارير محفوظة',data.performance_snapshots??0),bookMetric('الوحدات المسجلة',data.total_units_in_saved_snapshots??0),bookMetric('العائدات المسجلة (USD)',Number(data.total_royalties_in_saved_snapshots||0).toFixed(2)));
+  books.forEach((book,i)=>{
+   const opt=document.createElement('option');opt.value=book.id;opt.textContent=book.title;selector.appendChild(opt);
+   const card=document.createElement('article');card.className='card';card.style.margin='8px 0';const title=document.createElement('h3');title.textContent=book.title;card.appendChild(title);
+   const meta=document.createElement('p');meta.className='small';meta.textContent='الصيغة: '+(book.format||'غير محددة')+' · الحالة حسب آخر رصد: '+(book.kdp_status||'غير معروفة')+' · آخر تحقق: '+(book.last_verified_at?new Date(book.last_verified_at).toLocaleString('ar-EG'):'غير مسجل');card.appendChild(meta);
+   const grid=document.createElement('div');grid.className='grid';
+   const author=bookField('المؤلف','book-author-'+i,book.author,'اسم المؤلف'),asin=bookField('ASIN','book-asin-'+i,book.asin,'معرّف من 10 أحرف'),price=bookField('السعر','book-price-'+i,book.price_amount,'السعر','number'),url=bookField('رابط أمازون','book-url-'+i,book.product_url,'https://www.amazon.com/dp/...');
+   const fmt=bookSelectField('الصيغة','book-format-'+i,book.format,[{value:'ebook',label:'Kindle إلكتروني'},{value:'paperback',label:'غلاف ورقي'},{value:'hardcover',label:'غلاف مقوى'},{value:'journal',label:'دفتر'},{value:'other',label:'أخرى'},{value:'unknown',label:'غير محددة'}]);
+   const stat=bookSelectField('الحالة حسب آخر رصد','book-status-'+i,book.kdp_status,[{value:'published',label:'Live / منشور حسب الرصد'},{value:'in_review',label:'قيد المراجعة'},{value:'draft',label:'مسودة'},{value:'blocked',label:'محظور'},{value:'unpublished',label:'غير منشور'},{value:'unknown',label:'غير متحقق'}]);
+   [author,asin,price,url,fmt,stat].forEach(f=>grid.appendChild(f.wrap));card.appendChild(grid);
+   const snap=book.latest_report,p=document.createElement('p');p.className='notice';p.textContent=snap?'آخر تقرير '+(snap.period_start||'')+' — '+(snap.period_end||'')+' | الوحدات: '+(snap.units_sold??'غير مسجلة')+' | KENP: '+(snap.pages_read??'غير مسجل')+' | العائدات: '+(snap.royalties_amount==null?'غير مسجلة':snap.royalties_amount+' '+(snap.royalties_currency||'USD')):'لا توجد بيانات أداء مسجلة لهذا العنوان بعد.';card.appendChild(p);
+   const actions=document.createElement('div');actions.className='actions';const save=document.createElement('button');save.type='button';save.textContent='حفظ بيانات الكتاب';save.addEventListener('click',async()=>{save.disabled=true;notice('books-status','جارٍ حفظ سجل الكتاب داخل ZOZ Pro…');try{const r=await callZozAgent('update_book_record',{book_id:book.id,author:author.input.value,asin:asin.input.value,price_amount:price.input.value,product_url:url.input.value,format:fmt.input.value,kdp_status:stat.input.value,price_currency:book.price_currency||'USD',marketplace:book.marketplace||'Amazon.com'});notice('books-status',r.note||'تم تحديث سجل الكتاب.','good');await loadBooksDashboard()}catch(e){notice('books-status','تعذر الحفظ: '+(e.message||e),'bad')}finally{save.disabled=false}});actions.appendChild(save);
+   const open=document.createElement('a');open.href=book.product_url||('https://www.amazon.com/s?k='+encodeURIComponent(book.title));open.target='_blank';open.rel='noopener noreferrer';open.textContent='فتح صفحة أمازون';open.className='link secondary';actions.appendChild(open);card.appendChild(actions);list.appendChild(card);
+  });
+  alerts.replaceChildren();const all=Array.isArray(data.alerts)?data.alerts:[];if(!all.length){const empty=document.createElement('p');empty.textContent='لا توجد تنبيهات مفتوحة في آخر قراءة.';alerts.appendChild(empty)}all.forEach(a=>{const e=document.createElement('div');e.className='notice '+(a.severity==='warning'?'warn':'');e.textContent=(a.title||a.event_type||'تنبيه')+(a.detail?' — '+a.detail:'');alerts.appendChild(e)});
+  status.className='notice '+(data.direct_kdp_connection==='not_configured'?'warn':'good');status.textContent='تم تحميل '+books.length+' سجل كتاب من قاعدة الإنتاج. '+(data.direct_kdp_connection==='not_configured'?'الاتصال المباشر بحساب KDP غير مهيأ؛ هذه لوحة السجلات والتقارير المحفوظة.':'حالة الاتصال: '+data.direct_kdp_connection);
+ }catch(e){status.className='notice bad';status.textContent='تعذر تحميل سجل الكتب: '+(e.message||e)}finally{$('books-refresh').disabled=false}
+}
+$('books-refresh')?.addEventListener('click',loadBooksDashboard);
+$('books-report-form')?.addEventListener('submit',async ev=>{ev.preventDefault();const button=$('books-report-save');button.disabled=true;notice('books-report-msg','جارٍ تسجيل بيانات التقرير…');try{const val=id=>$(id).value.trim(),d={book_id:val('books-report-book'),period_start:val('books-period-start'),period_end:val('books-period-end'),units_sold:val('books-units'),pages_read:val('books-pages'),royalties_amount:val('books-royalties'),ad_spend_amount:val('books-ad-spend'),notes:val('books-report-notes'),royalties_currency:'USD',ad_spend_currency:'USD',marketplace:'Amazon.com'};if(d.period_start>d.period_end)throw new Error('تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.');if(!d.book_id)throw new Error('اختر الكتاب أولًا.');if(!d.units_sold&&!d.pages_read&&!d.royalties_amount)throw new Error('أدخل قيمة واحدة على الأقل من التقرير؛ اترك القيم غير المتاحة فارغة.');const r=await callZozAgent('record_book_snapshot',d);notice('books-report-msg','تم حفظ التقرير في قاعدة الإنتاج. معرّف السجل: '+(r.snapshot_id||'تم الحفظ')+'. البيانات مدخلة من المالك وليست اتصالًا تلقائيًا بأمازون.','good');$('books-report-form').reset();await loadBooksDashboard()}catch(e){notice('books-report-msg','تعذر حفظ التقرير: '+(e.message||e),'bad')}finally{button.disabled=false}});
+
 $('zoz-agent-health-btn')?.addEventListener('click',checkZozAgentHealth);
 $('zoz-agent-analyze-btn')?.addEventListener('click',async()=>{
  const b=$('zoz-agent-analyze-btn'),status=$('zoz-agent-analysis-status'),out=$('zoz-agent-analysis-result');
