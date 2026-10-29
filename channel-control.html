@@ -63,7 +63,7 @@ body.upload-mode .footer{font-size:11px}
 <section class="card" id="zoz-agent-panel" aria-label="وكيل الإدارة الذكي">
 <div class="row"><div><h2 style="margin:0 0 4px">وكيل الإدارة الذكي</h2><p style="margin:0">تشغيل مباشر داخل مركز التحكم الحالي — دون فتح صفحة منفصلة.</p></div><button type="button" class="secondary" id="zoz-agent-health-btn">فحص الخدمة</button></div>
 <div id="zoz-agent-health" class="notice" style="margin-top:10px">جارٍ فحص الوكيل التنفيذي في مشروع الإنتاج…</div>
-<div class="section-gap"><h3>١ · تحليل قناة Hazem Ahmed</h3><p>يقرأ حالة القناة والتحليلات والتقويم والمسودات وملفات الفيديو، ثم يعرض التشخيص والخطوات العملية. لا يغيّر الفيديوهات ولا ينشر.</p><div class="actions"><button type="button" id="zoz-agent-analyze-btn">حلّل القناة الآن</button><button type="button" class="secondary" id="zoz-agent-video-test-btn">اختبر نجاح آخر فيديو</button></div><div id="zoz-agent-analysis-status" class="notice" style="display:none"></div><pre id="zoz-agent-analysis-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre></div>
+<div class="section-gap"><h3>١ · تحليل قناة Hazem Ahmed</h3><p>يقرأ حالة القناة والتحليلات والتقويم والمسودات وملفات الفيديو، ثم يعرض التشخيص والخطوات العملية. لا يغيّر الفيديوهات ولا ينشر.</p><div class="actions"><button type="button" id="zoz-agent-analyze-btn">حلّل القناة الآن</button><button type="button" class="secondary" id="zoz-agent-video-test-btn">اختبر نجاح آخر فيديو</button><button type="button" id="zoz-agent-cycle-btn">شغّل دورة الإدارة</button></div><div id="zoz-agent-analysis-status" class="notice" style="display:none"></div><pre id="zoz-agent-analysis-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre></div>
 <div class="section-gap"><h3>٢ · إنشاء مسودة محتوى</h3><p>المسودة تُحفظ في مركز الإنتاج للمراجعة. لا يتم إنشاء فيديو أو رفعه أو نشره تلقائيًا.</p><label for="zoz-agent-topic">موضوع المسودة</label><input id="zoz-agent-topic" maxlength="240" placeholder="مثال: كيف عاش العمال في دير المدينة؟"><div class="grid"><div><label for="zoz-agent-mode">نوع المحتوى</label><select id="zoz-agent-mode" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit"><option value="short">Short</option><option value="long">فيديو طويل</option></select></div><div><label for="zoz-agent-duration">المدة المقترحة بالثواني</label><input id="zoz-agent-duration" type="number" min="20" max="180" value="45"></div></div><div class="actions"><button type="button" id="zoz-agent-draft-btn">أنشئ المسودة واحفظها</button></div><div id="zoz-agent-draft-status" class="notice" style="display:none"></div><pre id="zoz-agent-draft-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre></div>
 </section>
 <section class="card" id="login-card">
@@ -986,6 +986,43 @@ $('zoz-agent-analyze-btn')?.addEventListener('click',async()=>{
  }catch(e){status.className='notice bad';status.textContent='تعذر التحليل: '+(e.message||e);}
  finally{b.disabled=false;b.textContent='حلّل القناة الآن';}
 });
+
+$('zoz-agent-cycle-btn')?.addEventListener('click',async()=>{
+ const b=$('zoz-agent-cycle-btn'),status=$('zoz-agent-analysis-status'),out=$('zoz-agent-analysis-result');
+ b.disabled=true;b.textContent='جارٍ تشغيل دورة الإدارة…';status.style.display='block';out.style.display='none';status.className='notice';status.textContent='الوكيل يزامن بيانات YouTube، ويفحص الفيديوهات قيد المعالجة، ويحدّث مهمة المتابعة في مركز الإنتاج. لن ينشر أو يغيّر خصوصية أي فيديو.';
+ try{
+  const d=await callZozAgent('run_management_cycle');
+  const s=d.system_state||{},w=d.work_item||{},sync=d.live_sync||{};
+  const checks=Array.isArray(d.processing_checks)?d.processing_checks:[];
+  const lines=[
+   'دورة الإدارة: اكتملت'+(sync.ok?' مع مزامنة مباشرة':' مع تعذر المزامنة المباشرة'),
+   'القناة: '+(d.channel_name||'Hazem Ahmed'),
+   'وقت التنفيذ: '+(d.completed_at||'غير متاح'),
+   'نتيجة مزامنة YouTube: '+(sync.ok?'نجحت':'تعذرت — '+(sync.error||'راجع رسالة الخطأ')),
+   'النموذج التحليلي: '+(d.analysis_model||'غير محدد'),
+   '',
+   'حالة مركز الإنتاج:',
+   'فيديوهات نشطة في الاستقبال: '+(s.active_video_intake??'غير متاح'),
+   'تنتظر مراجعة المالك: '+(s.items_needing_owner_review??'غير متاح'),
+   'فيديوهات فاشلة: '+(s.failed_video_items??'غير متاح'),
+   'توصيات محتوى معلقة: '+(s.pending_content_recommendations??'غير متاح'),
+   'عناصر التقويم القادمة: '+(s.upcoming_calendar_items??'غير متاح'),
+   'مسودات محفوظة: '+(s.saved_scripts??'غير متاح'),
+   '',
+   'فحص معالجة الفيديوهات:'
+  ];
+  if(checks.length)lines.push(...checks.map(x=>'• '+(x.title||x.asset_id)+' — '+(x.ok?x.status+' / '+(x.processing_status||'الحالة غير محددة'):'تعذر الفحص: '+(x.error||'خطأ غير معروف'))));
+  else lines.push('• لا توجد فيديوهات بحالة processing ضمن قائمة الفحص في هذه الجولة.');
+  lines.push('','مهمة المتابعة المحفوظة:',w.title||'غير متاح','معرّف المهمة: '+(w.id||'غير متاح'),'الحالة: '+(w.status||'غير متاح'),'تتطلب مراجعة المالك: '+(w.approval_required?'نعم':'راجع المهمة'));
+  lines.push('','الخطوات التالية:',...(Array.isArray(w.next_actions)&&w.next_actions.length?w.next_actions.map((x,i)=>(i+1)+'. '+x):['راجع المهمة المحفوظة في مركز الإنتاج.']));
+  lines.push('','إجراءات مؤثرة منفذة: لا نشر، لا تعديل خصوصية، لا تعديل بيانات فيديو، ولا رفع جديد.');
+  out.textContent=lines.join('\n');out.style.display='block';
+  status.className=sync.ok?'notice good':'notice warn';
+  status.textContent=sync.ok?'اكتملت دورة الإدارة، وتم حفظ مهمة متابعة داخل النظام.':'حُفظت نتيجة دورة الإدارة ومهمة المتابعة، لكن المزامنة المباشرة لم تنجح؛ راجع الخطأ قبل الاعتماد على الأرقام.';
+ }catch(e){status.className='notice bad';status.textContent='تعذر تشغيل دورة الإدارة: '+(e.message||e);}
+ finally{b.disabled=false;b.textContent='شغّل دورة الإدارة';}
+});
+
 $('zoz-agent-draft-btn')?.addEventListener('click',async()=>{
  const b=$('zoz-agent-draft-btn'),status=$('zoz-agent-draft-status'),out=$('zoz-agent-draft-result');
  const topic=$('zoz-agent-topic').value.trim();
