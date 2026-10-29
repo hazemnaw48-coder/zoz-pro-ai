@@ -960,7 +960,7 @@ async function checkZozAgentHealth(){
   const d=await r.json().catch(()=>({}));
   if(!r.ok||d.ok!==true)throw new Error(d.error||('HTTP '+r.status));
   el.className='notice good';
-  el.textContent='الخدمة متاحة · البيئة: '+(d.environment||'production')+' · مفاتيح النموذج: '+String(d.model_key_count??'غير معروف')+' · الإجراءات: '+(Array.isArray(d.actions)?d.actions.join('، '):'غير معلنة')+' · التشغيل الذاتي: '+(d.automatic_worker_enabled?'مفعّل كل 15 دقيقة':'غير مفعّل')+' · النشر العام: يتطلب موافقة المالك';
+  el.textContent='الخدمة متاحة · البيئة: '+(d.environment||'production')+' · مفاتيح النموذج: '+String(d.model_key_count??'غير معروف')+' · الإجراءات: '+(Array.isArray(d.actions)?d.actions.join('، '):'غير معلنة')+' · التشغيل الذاتي: '+(d.automatic_worker_enabled?'مفعّل كل 15 دقيقة':'غير مفعّل')+' · مخطط المهام: '+(d.tool_planner_enabled?'مفعّل':'غير مفعّل')+' · طابور المهام الآلي: '+(d.automatic_queue_enabled?'مفعّل':'غير مفعّل')+' · النشر العام: يتطلب موافقة المالك';
  }catch(e){el.className='notice bad';el.textContent='تعذر فحص الوكيل: '+(e.message||e);}
  finally{if(b)b.disabled=false;}
 }
