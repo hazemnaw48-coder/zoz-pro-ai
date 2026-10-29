@@ -1003,7 +1003,7 @@ async function loadBooksDashboard(){
  status.className='notice';status.textContent='جارٍ قراءة سجل الكتب وتقاريرها من قاعدة الإنتاج…';$('books-refresh').disabled=true;
  try{
   const data=await callZozAgent('books_monitor'),books=Array.isArray(data.books)?data.books:[];list.replaceChildren();metrics.replaceChildren();selector.replaceChildren();
-  metrics.append(bookMetric('الكتب المسجلة',data.books_seen??books.length),bookMetric('تقارير محفوظة',data.performance_snapshots??0),bookMetric('الوحدات المسجلة',data.total_units_in_saved_snapshots??0),bookMetric('العائدات المسجلة (USD)',Number(data.total_royalties_in_saved_snapshots||0).toFixed(2)));
+  metrics.append(bookMetric('الكتب المسجلة',data.books_seen??books.length),bookMetric('تقارير محفوظة',data.performance_snapshots??0),bookMetric('الوحدات المسجلة',data.total_units_in_saved_snapshots??0),bookMetric('العائدات المسجلة (USD)',(data.total_royalties_in_saved_snapshots==null?'غير مسجلة':Number(data.total_royalties_in_saved_snapshots).toFixed(2))));
   books.forEach((book,i)=>{
    const opt=document.createElement('option');opt.value=book.id;opt.textContent=book.title;selector.appendChild(opt);
    const card=document.createElement('article');card.className='card';card.style.margin='8px 0';const title=document.createElement('h3');title.textContent=book.title;card.appendChild(title);
