@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#08111f">
+<title>ZOZ Pro — تشغيل الوكيل (المعاينة)</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{color-scheme:dark;--bg:#08111f;--panel:#101d30;--line:#29405e;--text:#eef5ff;--muted:#9fb2cc;--blue:#7cb4ff;--green:#55ddb0;--amber:#ffd078;--red:#ff929c}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top right,#172b48 0,#08111f 50%);color:var(--text);font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}.shell{max-width:820px;margin:auto;padding:18px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;margin:14px 0}.brand{display:flex;align-items:center;gap:12px}.logo{width:46px;height:46px;border-radius:14px;background:#24508a;display:grid;place-items:center;font-size:24px;font-weight:900}.muted,small{color:var(--muted)}h1{font-size:24px;margin:4px 0}h2{font-size:18px;margin:0 0 10px}p{margin:7px 0}.notice{padding:12px;border-radius:12px;background:#172a40;border:1px solid var(--line);margin:12px 0;white-space:pre-wrap;overflow-wrap:anywhere}.good{border-color:#2b7c66;color:#a7f5d8}.warn{border-color:#886a2e;color:#ffe0a0}.bad{border-color:#8b4550;color:#ffc0c5}label{display:block;margin:10px 0 5px;color:var(--muted)}input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#071321;color:var(--text);font:inherit}button,a.btn{font:inherit;border:1px solid #3c5b81;border-radius:11px;padding:12px 15px;color:white;background:#24508a;font-weight:750;text-decoration:none;display:inline-flex;justify-content:center;align-items:center;min-height:46px}button:disabled{opacity:.55}button.secondary,a.secondary{background:#192a40}button.danger{background:#5c2731;border-color:#8b4550}.actions{display:flex;gap:10px;flex-wrap:wrap}.actions>*{flex:1}.hidden{display:none!important}code{direction:ltr;unicode-bidi:plaintext;overflow-wrap:anywhere}.status{font-weight:800}.small{font-size:13px}.run-result{direction:rtl;white-space:pre-wrap;overflow-wrap:anywhere;background:#071321;border-radius:12px;padding:12px;min-height:70px}.footer{display:flex;gap:10px;flex-wrap:wrap}.footer a{color:var(--blue)}@media(max-width:480px){.shell{padding:10px}.panel{padding:14px}h1{font-size:21px}.actions>*{flex-basis:100%}}
+</style>
+</head>
+<body><main class="shell">
+<header class="brand"><div class="logo">Z</div><div><small>ZOZ Pro · Supabase Preview</small><h1>تشغيل الوكيل الفعلي</h1><div class="muted">لوحة مالك لتشغيل دورة واحدة ومراجعة النتيجة</div></div></header>
+<section class="panel">
+<h2>حالة الوكيل</h2>
+<div id="health" class="notice">جارٍ فحص خدمة الوكيل…</div>
+<p class="small muted">هذه اللوحة تتصل بمشروع المعاينة فقط، ولا تغيّر أسرار Supabase أو إعدادات الإنتاج. التشغيل لا يرفع فيديو ولا يولّده ولا ينشره.</p>
+</section>
+<section id="login-panel" class="panel">
+<h2>دخول المالك</h2>
+<p class="muted">استخدم حساب ZOZ Pro المؤكد. كلمة المرور تُرسل إلى Supabase Auth مباشرة ولا تُحفظ في هذه الصفحة.</p>
+<form id="login-form">
+<label for="email">البريد الإلكتروني</label><input id="email" type="email" autocomplete="username" required>
+<label for="password">كلمة المرور</label><input id="password" type="password" autocomplete="current-password" required>
+<div class="actions" style="margin-top:14px"><button id="login-btn" type="submit">دخول</button></div>
+</form><div id="login-message" class="notice">يلزم تسجيل الدخول بحساب المالك.</div>
+</section>
+<section id="control-panel" class="panel hidden">
+<h2>تشغيل دورة الوكيل</h2>
+<p>يشغّل الوكيل الموجود على Supabase Preview. يتحقق من قناة Hazem Ahmed ومؤشرات المعاينة، ثم ينفّذ مراجعة آمنة أو ينشئ مسودة عند استيفاء الشروط. إذا كانت قائمة المهام ممتلئة، يسجل عدم التنفيذ دون استدعاء Gemini.</p>
+<div class="notice warn">موافقتك مطلوبة دائمًا قبل أي إنتاج نهائي أو نشر. النشر التلقائي وتوليد الفيديو غير مفعّلين في هذا الوكيل.</div>
+<div class="actions"><button id="run-btn" type="button">تشغيل الوكيل الآن</button><button id="logout-btn" type="button" class="secondary">خروج</button></div>
+<div id="run-result" class="run-result" aria-live="polite">لم يتم طلب تشغيل من هذه الصفحة بعد.</div>
+</section>
+<section class="panel"><h2>روابط ZOZ Pro</h2><div class="footer"><a href="./channel-dashboard.html">لوحة القنوات</a><a href="./channel-control.html">مركز التحليل والتوصيات</a><a href="./production-center.html">مركز الإنتاج والمهام</a></div></section>
+</main>
+<script>
+(function(){
+"use strict";
+const URL="https://vjnwojrqduoxhetutxrs.supabase.co";
+const KEY="sb_publishable_h0eas8ulCa_7zdrt3OvFGA_6aeAuxSw";
+const OWNER="hazemnaw48@gmail.com";
+const AGENT=URL+"/functions/v1/zoz-pro-agent";
+const $=id=>document.getElementById(id);
+const sb=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+let busy=false;
+function show(id,on){$(id).classList.toggle("hidden",!on);}
+function notice(id,msg,kind){$(id).className="notice"+(kind?" "+kind:"");$(id).textContent=msg;}
+function safeText(v){return typeof v==="string"?v:"";}
+async function ownerSession(){
+ const {data,error}=await sb.auth.getSession();if(error)throw error;
+ const s=data&&data.session;if(!s||!s.access_token)throw new Error("سجّل الدخول بحساب المالك.");
+ const {data:ud,error:ue}=await sb.auth.getUser(s.access_token);if(ue)throw ue;
+ const u=ud&&ud.user;
+ if(!u||String(u.email||"").toLowerCase()!==OWNER||!u.email_confirmed_at){await sb.auth.signOut();throw new Error("هذا الحساب ليس حساب المالك المؤكد.");}
+ return s;
+}
+async function health(){
+ try{
+  const r=await fetch(AGENT+"?health=1",{headers:{apikey:KEY},cache:"no-store"});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||d.ok!==true)throw new Error(d.error||("HTTP "+r.status));
+  const msg="الخدمة: "+d.service+" · النسخة: "+d.version+"\nحالة النموذج: "+(d.model_configured?"مفتاح Gemini موجود":"مفتاح Gemini غير مهيأ")+"\nتشغيل يدوي للمالك: "+(d.manual_owner_trigger_enabled?"مفعّل":"غير مفعّل")+"\nآخر تشغيل: "+(d.last_run_at||"لا يوجد") +" · "+(d.last_run_status||"لم يُشغّل") +"\nالنشر: "+(d.publishing_enabled?"مفعّل":"معطّل")+" · توليد الفيديو: "+(d.video_generation_enabled?"مفعّل":"معطّل");
+  notice("health",msg,d.manual_owner_trigger_enabled?"good":"warn");
+ }catch(e){notice("health","تعذر قراءة حالة الوكيل: "+(e.message||e),"bad");}
+}
+async function syncLogin(){
+ try{await ownerSession();show("login-panel",false);show("control-panel",true);notice("login-message","تم التحقق من حساب المالك.","good");}
+ catch(e){show("login-panel",true);show("control-panel",false);notice("login-message",e.message||"سجّل الدخول.","warn");}
+}
+$("login-form").addEventListener("submit",async e=>{
+ e.preventDefault();const b=$("login-btn");b.disabled=true;b.textContent="جارٍ التحقق…";
+ try{
+  const {data,error}=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
+  if(error)throw error;
+  const u=data&&data.user;if(!u||String(u.email||"").toLowerCase()!==OWNER||!u.email_confirmed_at){await sb.auth.signOut();throw new Error("الحساب ليس حساب المالك المؤكد.");}
+  await syncLogin();
+ }catch(e){notice("login-message",e.message||"تعذر تسجيل الدخول.","bad");}
+ finally{b.disabled=false;b.textContent="دخول";}
+});
+$("run-btn").addEventListener("click",async()=>{
+ if(busy)return;busy=true;const b=$("run-btn");b.disabled=true;b.textContent="جارٍ تشغيل الوكيل…";
+ $("run-result").textContent="جارٍ التحقق من جلسة المالك وإرسال طلب تشغيل واحد…";
+ try{
+  const s=await ownerSession();
+  const r=await fetch(AGENT,{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+s.access_token,"Content-Type":"application/json"},body:JSON.stringify({action:"manual_run"}),cache:"no-store"});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||d.ok===false)throw new Error(d.error||("HTTP "+r.status));
+  const run=d.run||{};
+  const summary=[
+   "الحالة: "+safeText(run.status||"غير محددة"),
+   "الوقت: "+safeText(run.finished_at||new Date().toISOString()),
+   "النتيجة: "+safeText(run.summary||"لا يوجد ملخص"),
+   "الإجراءات المنفذة: "+String(run.action_count??0),
+   "النموذج: "+safeText(run.model||"—"),
+   "رقم التشغيل: "+safeText(run.run_id||"—"),
+   "الإجراءات: "+JSON.stringify(Array.isArray(run.actions)?run.actions:[],null,2)
+  ].join("\n");
+  $("run-result").textContent=summary;
+  await health();
+ }catch(e){$("run-result").textContent="فشل التشغيل: "+(e.message||String(e));}
+ finally{busy=false;b.disabled=false;b.textContent="تشغيل الوكيل الآن";}
+});
+$("logout-btn").addEventListener("click",async()=>{await sb.auth.signOut();show("control-panel",false);show("login-panel",true);notice("login-message","تم تسجيل الخروج.","warn");});
+sb.auth.onAuthStateChange(()=>{setTimeout(syncLogin,0);});
+health();syncLogin();
+})();
+</script></body></html>
