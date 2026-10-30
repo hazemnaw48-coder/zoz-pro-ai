@@ -299,28 +299,63 @@ private fun intakePost(action: String, body: JSONObject, token: String): JSONObj
 
 private fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kids: Boolean): String {
     val intakeToken = DeviceTokenVault.readIntake(context) ?: throw IllegalStateException("رمز استقبال الفيديو غير موجود. أعد اقتران الجهاز.")
+    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     val name = queryName(context, uri) ?: "ZOZ-final-video.mp4"
     val size = querySize(context, uri)
     if (size <= 0L) throw IllegalStateException("تعذر قراءة حجم الملف النهائي.")
-    val created = intakePost("intake_create", JSONObject()
-        .put("filename", name)
-        .put("total_bytes", size)
-        .put("content_type", "video/mp4")
-        .put("title", name.substringBeforeLast("."))
-        .put("description", "تم تجميع الفيديو محليًا على جهاز ZOZ Android؛ ينتظر مراجعة المالك.")
-        .put("tags", JSONArray())
-        .put("made_for_kids", kids)
-        .put("contains_synthetic_media", synthetic)
-        .put("target_privacy_status", "public"), intakeToken)
-    val asset = created.getJSONObject("asset")
+    var asset: JSONObject
+    val savedId = prefs.getString("intake_upload_asset_id", null)
+    val savedUri = prefs.getString("intake_upload_uri", null)
+    val savedSize = prefs.getLong("intake_upload_size", -1L)
+    if (!savedId.isNullOrBlank()) {
+        if (savedUri != uri.toString() || savedSize != size) {
+            throw IllegalStateException("يوجد رفع سابق غير مكتمل. أعد اختيار الملف نفسه لاستكماله أولًا.")
+        }
+        val status = intakePost("intake_status", JSONObject().put("asset_id", savedId), intakeToken)
+        asset = status.getJSONObject("asset")
+        if (asset.optString("status") == "ready_for_review") {
+            prefs.edit().remove("intake_upload_asset_id").remove("intake_upload_uri").remove("intake_upload_size").apply()
+            return "الفيديو موجود بالفعل في استقبال ZOZ وينتظر المراجعة. رقم الملف: $savedId"
+        }
+        if (asset.optString("status") != "uploading") {
+            throw IllegalStateException("حالة الرفع السابق هي ${asset.optString("status")}؛ راجع مركز الاستقبال قبل بدء رفع جديد.")
+        }
+    } else {
+        val created = intakePost("intake_create", JSONObject()
+            .put("filename", name)
+            .put("total_bytes", size)
+            .put("content_type", "video/mp4")
+            .put("title", name.substringBeforeLast("."))
+            .put("description", "تم تجميع الفيديو محليًا على جهاز ZOZ Android؛ ينتظر مراجعة المالك.")
+            .put("tags", JSONArray())
+            .put("made_for_kids", kids)
+            .put("contains_synthetic_media", synthetic)
+            .put("target_privacy_status", "public"), intakeToken)
+        asset = created.getJSONObject("asset")
+        prefs.edit().putString("intake_upload_asset_id", asset.getString("id"))
+            .putString("intake_upload_uri", uri.toString()).putLong("intake_upload_size", size).apply()
+    }
     val assetId = asset.getString("id")
     val chunkSize = asset.optInt("chunk_size", 8388608)
     val chunkCount = asset.optInt("chunk_count", 0)
     if (chunkSize <= 0 || chunkCount <= 0) throw IllegalStateException("بيانات تقسيم الملف غير صالحة.")
+    val uploaded = asset.optJSONArray("uploaded_parts") ?: JSONArray()
+    val uploadedParts = (0 until uploaded.length()).map { uploaded.optInt(it, -1) }.toSet()
     context.contentResolver.openInputStream(uri).use { input ->
         if (input == null) throw IllegalStateException("تعذر فتح الملف النهائي.")
         for (part in 0 until chunkCount) {
             val expected = minOf(chunkSize.toLong(), size - part.toLong() * chunkSize).toInt()
+            if (part in uploadedParts) {
+                var skip = expected.toLong()
+                while (skip > 0) {
+                    val n = input.skip(skip)
+                    if (n <= 0) {
+                        if (input.read() < 0) throw IllegalStateException("تعذر استكمال قراءة الملف عند الجزء ${part + 1}.")
+                        skip--
+                    } else skip -= n
+                }
+                continue
+            }
             val buffer = ByteArrayOutputStream(expected)
             val chunk = ByteArray(64 * 1024)
             var remaining = expected
@@ -352,6 +387,7 @@ private fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Bool
         }
     }
     intakePost("intake_finalize", JSONObject().put("asset_id", assetId), intakeToken)
+    prefs.edit().remove("intake_upload_asset_id").remove("intake_upload_uri").remove("intake_upload_size").apply()
     return "اكتمل استقبال الفيديو النهائي في ZOZ. رقم الملف: $assetId. ينتظر موافقة المالك، ولم يُرفع إلى YouTube أو يُنشر بعد."
 }
 
