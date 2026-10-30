@@ -185,3 +185,17 @@ The center project `894a0e3a-85c4-43de-b8f7-205db24685b9` still uses browser `lo
 - No production Supabase tables, RLS policies, secrets, existing YouTube flows, or publication permissions were changed.
 - No APK build, device pairing, browser automation, Flow automation, KDP submission, or Play Store release is claimed complete.
 - Next: inspect CI status for the latest feature branch head; verify APK build; then inspect production schema/RLS before designing additive app-project/device/job tables.
+
+
+## Extended Android execution design — 2026-10-30
+
+- Added `docs/ZOZ_DEVICE_AGENT_SPEC.md`: owner-bound device pairing, short-lived scoped grants, typed job envelopes, idempotency, local queue, cancellation, revocation, and acceptance tests.
+- Added `docs/ZOZ_BROWSER_AGENT_SPEC.md`: on-device sessions, origin allowlists, capability levels, approval before submissions, and explicit prohibition on bypassing MFA/CAPTCHA/quotas.
+- Added `docs/ZOZ_VIDEO_FACTORY_SPEC.md`: local import, metadata inspection, stream-copy remux when compatible, explicit transcode fallback, source preservation, integrity checks, and resumable private upload.
+- Added `docs/ZOZ_KDP_WORKSPACE_SPEC.md`: automated manuscript/package preparation and owner-controlled KDP submission.
+- Expanded Android App Factory page with links to all four specifications.
+- Updated Flow Bridge app to persist scene prompt and selected content URI references locally, restoring only files for which Android still grants persisted read permission. Clearing the in-app list does not delete source files.
+- Latest successful general ZOZ Pro CI on the branch: run 41018546263 (before the newest Android persistence commit). Android build workflow run 41018671491 is queued/in progress at the time of this note; no APK artifact has yet been verified.
+- Android workflow setup now successfully passed Android SDK setup and package installation in run 41018541159, but that run is still compiling. A newer run for the persistence changes is active.
+- No production Supabase schema or RLS changes have been made because the current authorized SQL path was previously blocked; do not create device pairing endpoints or claim server-side device execution until additive schema and owner-scope policies are safely implemented and verified.
+- Browser automation, autonomous Flow generation, local video assembly, direct KDP access/submission, device pairing, and Play Store release remain unimplemented and must not be described as live.
