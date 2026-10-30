@@ -13,6 +13,7 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -151,6 +152,22 @@ private fun FlowBridgeScreen() {
                     }
                 }
 
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("تنفيذ Google Flow تلقائيًا", fontWeight = FontWeight.Bold)
+                        Text(if (FlowAutomationService.isEnabled(context)) "خدمة الوصول مفعّلة على هذا الهاتف." else "يلزم تفعيل خدمة ZOZ Flow Automation مرة واحدة من إعدادات Android للسماح بالتعامل المرئي مع Flow.")
+                        OutlinedButton(onClick = {
+                            try { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+                            catch (_: Exception) { lastAction = "تعذر فتح إعدادات إمكانية الوصول." }
+                        }, modifier = Modifier.fillMaxWidth()) { Text("فتح إعدادات إمكانية الوصول") }
+                        Button(enabled = !busy && paired && FlowAutomationService.isEnabled(context), onClick = { runAsync {
+                            val token = DeviceTokenVault.read(context) ?: throw IllegalStateException("الجهاز غير مقرون.")
+                            apiPostWithToken("enable_flow_automation", JSONObject(), token)
+                            "تم تفعيل قدرة تنفيذ مشاهد Flow للجهاز بعد تحقق التطبيق من تفعيل خدمة الوصول."
+                        } }, modifier = Modifier.fillMaxWidth()) { Text("تأكيد التفعيل وربط الوكيل") }
+                    }
+                }
+
                 if (!paired) {
                     OutlinedTextField(
                         value = pairingCode,
@@ -164,7 +181,7 @@ private fun FlowBridgeScreen() {
                             val response = apiPost(context, "pair_exchange", JSONObject()
                                 .put("pairing_code", pairingCode)
                                 .put("device_name", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL)
-                                .put("app_version", "0.3.2"))
+                                .put("app_version", BuildConfig.VERSION_NAME))
                             val token = response.getString("device_token")
                             DeviceTokenVault.write(context, token, response.getString("intake_token"))
                             paired = true
@@ -562,6 +579,10 @@ private fun executeJob(context: Context, job: JSONObject): String {
         val result = JSONObject()
         when (cap) {
             "device.health_check" -> result.put("device_model", android.os.Build.MODEL).put("android_release", android.os.Build.VERSION.RELEASE)
+            "flow.generate_scene" -> {
+                FlowAutomationService.startScene(context, id, payload)
+                return "بدأ الهاتف تنفيذ مشهد Flow المرئي."
+            }
             "flow.copy_prompt" -> {
                 val text = payload.optString("prompt", "").take(12000)
                 if (text.isBlank()) throw IllegalArgumentException("prompt_empty")
