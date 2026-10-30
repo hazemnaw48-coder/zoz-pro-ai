@@ -713,7 +713,9 @@ class DevicePollWorker(context: Context, params: androidx.work.WorkerParameters)
             apiPostWithToken("heartbeat", JSONObject().put("app_version", "0.3.2"), token)
             for (index in 0 until 6) {
                 val job = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job") ?: break
+                val capability = job.optString("capability_id")
                 executeJob(applicationContext, job)
+                if (capability == "flow.generate_scene") break
             }
             Result.success()
         } catch (_: Exception) { Result.retry() }
