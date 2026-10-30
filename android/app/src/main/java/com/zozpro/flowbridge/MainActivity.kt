@@ -13,6 +13,7 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -56,7 +57,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 
-private data class ImportedClip(val uri: Uri, val name: String, val size: Long)
+data class ImportedClip(val uri: Uri, val name: String, val size: Long)
 private const val PREFS = "zoz_flow_bridge"
 private const val PREF_CLIPS = "saved_clips"
 private const val PREF_PROMPT = "scene_prompt"
@@ -151,6 +152,22 @@ private fun FlowBridgeScreen() {
                     }
                 }
 
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("تنفيذ Google Flow تلقائيًا", fontWeight = FontWeight.Bold)
+                        Text(if (FlowAutomationService.isEnabled(context)) "خدمة الوصول مفعّلة على هذا الهاتف." else "يلزم تفعيل خدمة ZOZ Flow Automation مرة واحدة من إعدادات Android للسماح بالتعامل المرئي مع Flow.")
+                        OutlinedButton(onClick = {
+                            try { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+                            catch (_: Exception) { lastAction = "تعذر فتح إعدادات إمكانية الوصول." }
+                        }, modifier = Modifier.fillMaxWidth()) { Text("فتح إعدادات إمكانية الوصول") }
+                        Button(enabled = !busy && paired && FlowAutomationService.isEnabled(context), onClick = { runAsync {
+                            val token = DeviceTokenVault.read(context) ?: throw IllegalStateException("الجهاز غير مقرون.")
+                            apiPostWithToken("enable_flow_automation", JSONObject(), token)
+                            "تم تفعيل قدرة تنفيذ مشاهد Flow للجهاز بعد تحقق التطبيق من تفعيل خدمة الوصول."
+                        } }, modifier = Modifier.fillMaxWidth()) { Text("تأكيد التفعيل وربط الوكيل") }
+                    }
+                }
+
                 if (!paired) {
                     OutlinedTextField(
                         value = pairingCode,
@@ -164,7 +181,7 @@ private fun FlowBridgeScreen() {
                             val response = apiPost(context, "pair_exchange", JSONObject()
                                 .put("pairing_code", pairingCode)
                                 .put("device_name", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL)
-                                .put("app_version", "0.3.2"))
+                                .put("app_version", BuildConfig.VERSION_NAME))
                             val token = response.getString("device_token")
                             DeviceTokenVault.write(context, token, response.getString("intake_token"))
                             paired = true
@@ -177,7 +194,7 @@ private fun FlowBridgeScreen() {
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(enabled = !busy, onClick = { runAsync {
-                            apiPost(context, "device_health", JSONObject().put("app_version", "0.3.2"))
+                            apiPost(context, "device_health", JSONObject().put("app_version", BuildConfig.VERSION_NAME))
                             var processed = 0
                             for (index in 0 until 6) {
                                 val job = apiPost(context, "poll_jobs", JSONObject()).optJSONObject("job") ?: break
@@ -347,7 +364,7 @@ private fun intakePost(action: String, body: JSONObject, token: String): JSONObj
     return result
 }
 
-private fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kids: Boolean): String {
+fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kids: Boolean, channelId: String = ""): String {
     val intakeToken = DeviceTokenVault.readIntake(context) ?: throw IllegalStateException("رمز استقبال الفيديو غير موجود. أعد اقتران الجهاز.")
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     val name = queryName(context, uri) ?: "ZOZ-final-video.mp4"
@@ -357,14 +374,15 @@ private fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Bool
     val savedId = prefs.getString("intake_upload_asset_id", null)
     val savedUri = prefs.getString("intake_upload_uri", null)
     val savedSize = prefs.getLong("intake_upload_size", -1L)
+    val savedChannel = prefs.getString("intake_upload_channel_id", "") ?: ""
     if (!savedId.isNullOrBlank()) {
-        if (savedUri != uri.toString() || savedSize != size) {
+        if (savedUri != uri.toString() || savedSize != size || (channelId.isNotBlank() && savedChannel.isNotBlank() && savedChannel != channelId)) {
             throw IllegalStateException("يوجد رفع سابق غير مكتمل. أعد اختيار الملف نفسه لاستكماله أولًا.")
         }
         val status = intakePost("intake_status", JSONObject().put("asset_id", savedId), intakeToken)
         asset = status.getJSONObject("asset")
         if (asset.optString("status") == "ready_for_review") {
-            prefs.edit().remove("intake_upload_asset_id").remove("intake_upload_uri").remove("intake_upload_size").apply()
+            prefs.edit().remove("intake_upload_asset_id").remove("intake_upload_uri").remove("intake_upload_size").remove("intake_upload_channel_id").apply()
             return "الفيديو موجود بالفعل في استقبال ZOZ وينتظر المراجعة. رقم الملف: $savedId"
         }
         if (asset.optString("status") != "uploading") {
@@ -372,6 +390,7 @@ private fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Bool
         }
     } else {
         val created = intakePost("intake_create", JSONObject()
+            .put("channel_id", channelId)
             .put("filename", name)
             .put("total_bytes", size)
             .put("content_type", "video/mp4")
@@ -383,9 +402,10 @@ private fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Bool
             .put("target_privacy_status", "public"), intakeToken)
         asset = created.getJSONObject("asset")
         prefs.edit().putString("intake_upload_asset_id", asset.getString("id"))
-            .putString("intake_upload_uri", uri.toString()).putLong("intake_upload_size", size).apply()
+             .putString("intake_upload_uri", uri.toString()).putLong("intake_upload_size", size).putString("intake_upload_channel_id", asset.optString("channel_id", channelId)).apply()
     }
     val assetId = asset.getString("id")
+    prefs.edit().putString("zoz_last_uploaded_asset_id", assetId).apply()
     val chunkSize = asset.optInt("chunk_size", 8388608)
     val chunkCount = asset.optInt("chunk_count", 0)
     if (chunkSize <= 0 || chunkCount <= 0) throw IllegalStateException("بيانات تقسيم الملف غير صالحة.")
@@ -441,7 +461,7 @@ private fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Bool
     return "اكتمل استقبال الفيديو النهائي في ZOZ. رقم الملف: $assetId. ينتظر موافقة المالك، ولم يُرفع إلى YouTube أو يُنشر بعد."
 }
 
-private fun assembleCompatibleClips(context: Context, clips: List<ImportedClip>, outputUri: Uri) {
+fun assembleCompatibleClips(context: Context, clips: List<ImportedClip>, outputUri: Uri) {
     if (clips.size < 2) throw IllegalStateException("اختر مقطعين على الأقل للتجميع.")
     val extractors = mutableListOf<MediaExtractor>()
     val temp = File(context.cacheDir, "zoz-final-${System.currentTimeMillis()}.mp4")
@@ -502,7 +522,14 @@ private fun assembleCompatibleClips(context: Context, clips: List<ImportedClip>,
                 val size = extractor.readSampleData(buffer, 0)
                 if (size < 0) break
                 val mime = extractor.getTrackFormat(sourceTrack).getString(MediaFormat.KEY_MIME) ?: break
-                info.set(0, size, offsetUs + extractor.sampleTime, extractor.sampleFlags)
+                val sampleFlags = extractor.sampleFlags
+                if ((sampleFlags and MediaExtractor.SAMPLE_FLAG_ENCRYPTED) != 0) {
+                    throw IllegalStateException("المقطع يحتوي عينات مشفرة؛ أوقفنا التجميع بدل إفساد الفيديو.")
+                }
+                var codecFlags = 0
+                if ((sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC) != 0) codecFlags = codecFlags or MediaCodec.BUFFER_FLAG_KEY_FRAME
+                if ((sampleFlags and MediaExtractor.SAMPLE_FLAG_PARTIAL_FRAME) != 0) codecFlags = codecFlags or MediaCodec.BUFFER_FLAG_PARTIAL_FRAME
+                info.set(0, size, offsetUs + extractor.sampleTime, codecFlags)
                 outputMuxer.writeSampleData(outputTracks[mime] ?: throw IllegalStateException("مسار غير معروف: $mime"), buffer, info)
                 maxSample = maxOf(maxSample, extractor.sampleTime)
                 if (!extractor.advance()) break
@@ -535,7 +562,7 @@ private fun apiPost(context: Context, action: String, body: JSONObject): JSONObj
     return apiPostWithToken(action, body, token)
 }
 
-private fun apiPostWithToken(action: String, body: JSONObject, token: String): JSONObject {
+fun apiPostWithToken(action: String, body: JSONObject, token: String): JSONObject {
     val conn = java.net.URL(API).openConnection() as java.net.HttpURLConnection
     conn.requestMethod = "POST"
     conn.connectTimeout = 15000
@@ -562,6 +589,10 @@ private fun executeJob(context: Context, job: JSONObject): String {
         val result = JSONObject()
         when (cap) {
             "device.health_check" -> result.put("device_model", android.os.Build.MODEL).put("android_release", android.os.Build.VERSION.RELEASE)
+            "flow.generate_scene" -> {
+                FlowAutomationService.startScene(context, id, payload)
+                return "بدأ الهاتف تنفيذ مشهد Flow المرئي."
+            }
             "flow.copy_prompt" -> {
                 val text = payload.optString("prompt", "").take(12000)
                 if (text.isBlank()) throw IllegalArgumentException("prompt_empty")
@@ -689,10 +720,12 @@ class DevicePollWorker(context: Context, params: androidx.work.WorkerParameters)
     override fun doWork(): Result {
         val token = DeviceTokenVault.read(applicationContext) ?: return Result.success()
         return try {
-            apiPostWithToken("heartbeat", JSONObject().put("app_version", "0.3.2"), token)
+            apiPostWithToken("heartbeat", JSONObject().put("app_version", BuildConfig.VERSION_NAME), token)
             for (index in 0 until 6) {
                 val job = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job") ?: break
+                val capability = job.optString("capability_id")
                 executeJob(applicationContext, job)
+                if (capability == "flow.generate_scene") break
             }
             Result.success()
         } catch (_: Exception) { Result.retry() }
