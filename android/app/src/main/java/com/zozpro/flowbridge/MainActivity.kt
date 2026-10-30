@@ -5,6 +5,9 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.media.MediaExtractor
+import android.media.MediaFormat
+import android.media.MediaMuxer
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.widget.Toast
@@ -43,6 +46,10 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 
 private data class ImportedClip(val uri: Uri, val name: String, val size: Long)
 private const val PREFS = "zoz_flow_bridge"
@@ -50,6 +57,7 @@ private const val PREF_CLIPS = "saved_clips"
 private const val PREF_PROMPT = "scene_prompt"
 private const val PREF_PENDING_PROMPT = "pending_agent_prompt"
 private const val API = "https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-device-agent"
+private const val INTAKE_API = "https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-youtube-analytics"
 private const val PUBLIC_KEY = "sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm"
 
 class MainActivity : ComponentActivity() {
@@ -72,6 +80,9 @@ private fun FlowBridgeScreen() {
     var busy by remember { mutableStateOf(false) }
     var lastAction by remember { mutableStateOf(if (paired) "الجهاز مقرون؛ جارٍ تجهيز الاتصال بالوكيل" else "أدخل رمز الاقتران من مركز ZOZ Pro") }
     var pendingPrompt by remember { mutableStateOf(prefs.getString(PREF_PENDING_PROMPT, "") ?: "") }
+    var finalVideoUri by remember { mutableStateOf(prefs.getString("final_video_uri", null)?.let { Uri.parse(it) }) }
+    var syntheticMedia by remember { mutableStateOf(true) }
+    var madeForKids by remember { mutableStateOf(false) }
 
     LaunchedEffect(prompt) { prefs.edit().putString(PREF_PROMPT, prompt).apply() }
     LaunchedEffect(clips) { saveClips(context, clips) }
@@ -83,6 +94,16 @@ private fun FlowBridgeScreen() {
             try { lastAction = withContext(Dispatchers.IO) { block() } }
             catch (e: Exception) { lastAction = e.message ?: "حدث خطأ في الاتصال" }
             finally { busy = false }
+        }
+    }
+
+    val outputPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { uri ->
+        if (uri != null) runAsync {
+            try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) } catch (_: Exception) {}
+            assembleCompatibleClips(context, clips, uri)
+            prefs.edit().putString("final_video_uri", uri.toString()).apply()
+            finalVideoUri = uri
+            "اكتمل تجميع ${clips.size} مقاطع في ملف MP4 جديد دون إعادة ترميز. الملفات الأصلية لم تتغير."
         }
     }
 
@@ -198,6 +219,27 @@ private fun FlowBridgeScreen() {
                     onClick = { picker.launch(arrayOf("video/mp4", "video/quicktime", "video/webm", "video/*")) },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("استيراد المقاطع الناتجة من Flow") }
+                if (clips.size >= 2) {
+                    OutlinedButton(
+                        enabled = !busy,
+                        onClick = { outputPicker.launch("ZOZ-final-video.mp4") },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("تجميع المقاطع بالترتيب دون إعادة ضغط") }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("محتوى اصطناعي واقعي")
+                    androidx.compose.material3.Switch(checked = syntheticMedia, onCheckedChange = { syntheticMedia = it })
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("محتوى موجّه للأطفال")
+                    androidx.compose.material3.Switch(checked = madeForKids, onCheckedChange = { madeForKids = it })
+                }
+                if (finalVideoUri != null) {
+                    Text("يوجد ملف نهائي جاهز للاستقبال.", style = MaterialTheme.typography.bodySmall)
+                    Button(enabled = !busy && paired, onClick = { runAsync {
+                        uploadFinalVideoToIntake(context, finalVideoUri!!, syntheticMedia, madeForKids)
+                    } }, modifier = Modifier.fillMaxWidth()) { Text("رفع الفيديو النهائي إلى استقبال ZOZ") }
+                }
 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("المقاطع المحفوظة: ${clips.size}", fontWeight = FontWeight.Bold)
@@ -223,6 +265,169 @@ private fun FlowBridgeScreen() {
                 Text("الرمز محفوظ عبر Android Keystore. مهام المواقع الخارجية تتطلب موافقة المالك عند الإرسال أو النشر.", style = MaterialTheme.typography.bodySmall)
             }
         }
+    }
+}
+
+private fun intakePost(action: String, body: JSONObject, token: String): JSONObject {
+    val conn = java.net.URL(INTAKE_API + "?action=" + action).openConnection() as java.net.HttpURLConnection
+    conn.requestMethod = "POST"
+    conn.connectTimeout = 20000
+    conn.readTimeout = 30000
+    conn.doOutput = true
+    conn.setRequestProperty("apikey", PUBLIC_KEY)
+    conn.setRequestProperty("x-zoz-intake-token", token)
+    conn.setRequestProperty("content-type", "application/json")
+    conn.outputStream.use { it.write(JSONObject(body.toString()).toString().toByteArray(Charsets.UTF_8)) }
+    val code = conn.responseCode
+    val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+    val text = stream.bufferedReader().use { it.readText() }
+    conn.disconnect()
+    val result = JSONObject(text)
+    if (code !in 200..299 || !result.optBoolean("ok", false)) throw IllegalStateException(result.optString("error", "HTTP $code"))
+    return result
+}
+
+private fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kids: Boolean): String {
+    val intakeToken = DeviceTokenVault.readIntake(context) ?: throw IllegalStateException("رمز استقبال الفيديو غير موجود. أعد اقتران الجهاز.")
+    val name = queryName(context, uri) ?: "ZOZ-final-video.mp4"
+    val size = querySize(context, uri)
+    if (size <= 0L) throw IllegalStateException("تعذر قراءة حجم الملف النهائي.")
+    val created = intakePost("intake_create", JSONObject()
+        .put("filename", name)
+        .put("total_bytes", size)
+        .put("content_type", "video/mp4")
+        .put("title", name.substringBeforeLast("."))
+        .put("description", "تم تجميع الفيديو محليًا على جهاز ZOZ Android؛ ينتظر مراجعة المالك.")
+        .put("tags", JSONArray())
+        .put("made_for_kids", kids)
+        .put("contains_synthetic_media", synthetic)
+        .put("target_privacy_status", "public"), intakeToken)
+    val asset = created.getJSONObject("asset")
+    val assetId = asset.getString("id")
+    val chunkSize = asset.optInt("chunk_size", 8388608)
+    val chunkCount = asset.optInt("chunk_count", 0)
+    if (chunkSize <= 0 || chunkCount <= 0) throw IllegalStateException("بيانات تقسيم الملف غير صالحة.")
+    context.contentResolver.openInputStream(uri).use { input ->
+        if (input == null) throw IllegalStateException("تعذر فتح الملف النهائي.")
+        for (part in 0 until chunkCount) {
+            val expected = minOf(chunkSize.toLong(), size - part.toLong() * chunkSize).toInt()
+            val buffer = ByteArrayOutputStream(expected)
+            val chunk = ByteArray(64 * 1024)
+            var remaining = expected
+            while (remaining > 0) {
+                val read = input.read(chunk, 0, minOf(chunk.size, remaining))
+                if (read < 0) throw IllegalStateException("الملف انتهى قبل اكتمال الجزء ${part + 1}.")
+                buffer.write(chunk, 0, read)
+                remaining -= read
+            }
+            val conn = java.net.URL(INTAKE_API + "?action=intake_upload_part&asset_id=" + assetId + "&part_index=" + part)
+                .openConnection() as java.net.HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.connectTimeout = 30000
+            conn.readTimeout = 60000
+            conn.doOutput = true
+            conn.setRequestProperty("apikey", PUBLIC_KEY)
+            conn.setRequestProperty("x-zoz-intake-token", intakeToken)
+            conn.setRequestProperty("content-type", "application/octet-stream")
+            conn.setFixedLengthStreamingMode(expected)
+            conn.outputStream.use { it.write(buffer.toByteArray()) }
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val response = stream.bufferedReader().use { it.readText() }
+            conn.disconnect()
+            val uploadResult = JSONObject(response)
+            if (code !in 200..299 || !uploadResult.optBoolean("ok", false)) {
+                throw IllegalStateException("فشل رفع الجزء ${part + 1}: " + uploadResult.optString("error", "HTTP $code"))
+            }
+            intakePost("intake_part_done", JSONObject().put("asset_id", assetId).put("part_index", part), intakeToken)
+        }
+    }
+    intakePost("intake_finalize", JSONObject().put("asset_id", assetId), intakeToken)
+    return "اكتمل استقبال الفيديو النهائي في ZOZ. رقم الملف: $assetId. ينتظر موافقة المالك، ولم يُرفع إلى YouTube أو يُنشر بعد."
+}
+
+private fun assembleCompatibleClips(context: Context, clips: List<ImportedClip>, outputUri: Uri) {
+    if (clips.size < 2) throw IllegalStateException("اختر مقطعين على الأقل للتجميع.")
+    val extractors = mutableListOf<MediaExtractor>()
+    val temp = File(context.cacheDir, "zoz-final-${System.currentTimeMillis()}.mp4")
+    var muxer: MediaMuxer? = null
+    var started = false
+    try {
+        clips.forEach { clip ->
+            val extractor = MediaExtractor()
+            extractor.setDataSource(context, clip.uri, null)
+            extractors.add(extractor)
+        }
+        fun tracks(extractor: MediaExtractor): Map<String, Pair<Int, MediaFormat>> {
+            val found = linkedMapOf<String, Pair<Int, MediaFormat>>()
+            for (i in 0 until extractor.trackCount) {
+                val format = extractor.getTrackFormat(i)
+                val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
+                if (mime.startsWith("video/") || mime.startsWith("audio/")) {
+                    if (found.containsKey(mime)) throw IllegalStateException("يوجد أكثر من مسار من النوع $mime؛ لم يتم التجميع لتجنب فقدان الصوت.")
+                    found[mime] = i to format
+                }
+            }
+            if (found.keys.none { it.startsWith("video/") }) throw IllegalStateException("أحد الملفات لا يحتوي مسار فيديو.")
+            return found
+        }
+        fun signature(f: MediaFormat): String {
+            val keys = listOf(MediaFormat.KEY_MIME, MediaFormat.KEY_WIDTH, MediaFormat.KEY_HEIGHT, MediaFormat.KEY_SAMPLE_RATE, MediaFormat.KEY_CHANNEL_COUNT, MediaFormat.KEY_PROFILE, MediaFormat.KEY_LEVEL)
+            return keys.joinToString("|") { key -> if (f.containsKey(key)) runCatching { f.getString(key) ?: f.getInteger(key).toString() }.getOrDefault("") else "" }
+        }
+        val firstTracks = tracks(extractors.first())
+        val maps = extractors.map { tracks(it) }
+        maps.forEachIndexed { index, map ->
+            if (map.keys != firstTracks.keys) throw IllegalStateException("اختلاف مسارات الصوت/الفيديو في المقطع ${index + 1}. يلزم توحيد الملفات قبل التجميع.")
+            firstTracks.forEach { (mime, pair) ->
+                if (signature(pair.second) != signature(map[mime]!!.second)) {
+                    throw IllegalStateException("ترميز أو أبعاد المسار $mime مختلفة في المقطع ${index + 1}. لم نعد ضغط الملفات تلقائيًا.")
+                }
+            }
+        }
+        muxer = MediaMuxer(temp.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        val outputTracks = firstTracks.mapValues { (_, pair) -> muxer.addTrack(pair.second) }
+        val rotation = firstTracks.values.firstOrNull { it.second.getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true }
+            ?.second?.let { if (it.containsKey("rotation-degrees")) runCatching { it.getInteger("rotation-degrees") }.getOrDefault(0) else 0 } ?: 0
+        if (rotation in listOf(0, 90, 180, 270)) muxer.setOrientationHint(rotation)
+        muxer.start()
+        started = true
+        val buffer = java.nio.ByteBuffer.allocate(16 * 1024 * 1024)
+        val info = MediaCodec.BufferInfo()
+        var offsetUs = 0L
+        extractors.forEachIndexed { index, extractor ->
+            val map = maps[index]
+            map.values.forEach { extractor.selectTrack(it.first) }
+            var maxSample = 0L
+            while (true) {
+                val sourceTrack = extractor.sampleTrackIndex
+                if (sourceTrack < 0) break
+                buffer.clear()
+                val size = extractor.readSampleData(buffer, 0)
+                if (size < 0) break
+                val mime = extractor.getTrackFormat(sourceTrack).getString(MediaFormat.KEY_MIME) ?: break
+                info.set(0, size, offsetUs + extractor.sampleTime, extractor.sampleFlags)
+                muxer.writeSampleData(outputTracks[mime] ?: throw IllegalStateException("مسار غير معروف: $mime"), buffer, info)
+                maxSample = maxOf(maxSample, extractor.sampleTime)
+                if (!extractor.advance()) break
+            }
+            val declaredDuration = extractor.duration
+            offsetUs += maxOf(declaredDuration, maxSample + 1L)
+        }
+        muxer.stop()
+        started = false
+        muxer.release()
+        muxer = null
+        context.contentResolver.openOutputStream(outputUri, "w").use { output ->
+            if (output == null) throw IllegalStateException("تعذر فتح ملف الإخراج.")
+            FileInputStream(temp).use { input -> input.copyTo(output) }
+            output.flush()
+        }
+    } finally {
+        if (started) runCatching { muxer?.stop() }
+        runCatching { muxer?.release() }
+        extractors.forEach { runCatching { it.release() } }
+        runCatching { temp.delete() }
     }
 }
 
