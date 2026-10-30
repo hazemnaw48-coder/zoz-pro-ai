@@ -27,7 +27,10 @@ jobs:
           java-version: "17"
       - uses: android-actions/setup-android@v3
         with:
-          packages: |\n            platform-tools\n            platforms;android-35\n            build-tools;35.0.0
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
