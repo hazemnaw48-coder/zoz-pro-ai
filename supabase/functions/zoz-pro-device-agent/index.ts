@@ -4,7 +4,7 @@ const URL = Deno.env.get("SUPABASE_URL") || "";
 function secret(name:string){try{const v=JSON.parse(Deno.env.get(name)||"{}");return typeof v?.default==="string"?v.default:"";}catch{return "";}}
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || secret("SUPABASE_SECRET_KEYS") || Deno.env.get("SUPABASE_SECRET_KEY") || "";
 const PUBLIC = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || secret("SUPABASE_PUBLISHABLE_KEYS") || Deno.env.get("SUPABASE_ANON_KEY") || "";
-const OWNER_EMAIL = "hazemnaw48@gmail.com";
+const OWNER_EMAIL = Deno.env.get("ZOZ_OWNER_EMAIL") || "";
 const CAPABILITIES = new Set(["device.health_check","flow.open","flow.copy_prompt"]);
 function json(data:unknown,status=200){return new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","access-control-allow-origin":"*","access-control-allow-headers":"authorization, apikey, content-type, x-zoz-device-token","access-control-allow-methods":"GET, POST, OPTIONS"}});}
 function fail(error:string,status=400){return json({ok:false,error},status);}
