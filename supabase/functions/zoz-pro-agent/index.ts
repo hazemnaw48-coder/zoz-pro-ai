@@ -2231,12 +2231,14 @@ Deno.serve(async (req: Request) => {
     if (action === "analyze") return await analyze(req, user, body);
     if (action === "evaluate_latest_video") return await evaluateLatestVideo(req, user, body);
     if (action === "create_draft") return await createDraft(req, user, body);
+    if (action === "propose_production") return await proposeProduction(req, user, body);
+    if (action === "approve_production_proposal") return await approveProductionProposal(user, body);
     if (action === "run_management_cycle") return await runManagementCycle(req, user, body);
     if (action === "books_monitor") return json(await monitorBooks(user.id));
     if (action === "record_book_snapshot") return json(await recordBookSnapshot(user.id, body));
     if (action === "update_book_record") return json(await updateBookRecord(user.id, body));
     if (action === "dispatch_flow_prompt") return await dispatchFlowPrompt(user, body);
-    return fail("إجراء غير مدعوم. استخدم analyze أو evaluate_latest_video أو create_draft أو run_management_cycle أو books_monitor أو record_book_snapshot أو update_book_record أو dispatch_flow_prompt.", 400);
+    return fail("إجراء غير مدعوم. استخدم analyze أو evaluate_latest_video أو create_draft أو propose_production أو approve_production_proposal أو run_management_cycle أو books_monitor أو record_book_snapshot أو update_book_record أو dispatch_flow_prompt.", 400);
   } catch (error) {
     return fail(error instanceof Error ? error.message : "تعذر تنفيذ الوكيل.", 502);
   }
