@@ -13,6 +13,10 @@ on:
       - ".github/workflows/android-flow-bridge.yml"
   workflow_dispatch:
 
+concurrency:
+  group: zoz-android-flow-bridge-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
