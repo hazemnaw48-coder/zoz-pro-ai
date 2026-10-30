@@ -41,6 +41,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import kotlinx.coroutines.Dispatchers
@@ -162,7 +164,7 @@ private fun FlowBridgeScreen() {
                             val response = apiPost(context, "pair_exchange", JSONObject()
                                 .put("pairing_code", pairingCode)
                                 .put("device_name", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL)
-                                .put("app_version", "0.3.1"))
+                                .put("app_version", "0.3.2"))
                             val token = response.getString("device_token")
                             DeviceTokenVault.write(context, token, response.getString("intake_token"))
                             paired = true
@@ -175,10 +177,15 @@ private fun FlowBridgeScreen() {
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(enabled = !busy, onClick = { runAsync {
-                            val health = apiPost(context, "device_health", JSONObject().put("app_version", "0.3.1"))
-                            val job = apiPost(context, "poll_jobs", JSONObject()).optJSONObject("job")
-                            if (job == null) "الاتصال سليم. لا توجد مهام جديدة."
-                            else executeJob(context, job)
+                            apiPost(context, "device_health", JSONObject().put("app_version", "0.3.2"))
+                            var processed = 0
+                            for (index in 0 until 6) {
+                                val job = apiPost(context, "poll_jobs", JSONObject()).optJSONObject("job") ?: break
+                                executeJob(context, job)
+                                processed++
+                            }
+                            if (processed == 0) "الاتصال سليم. لا توجد مهام جديدة."
+                            else "اكتمل الاتصال واستلام $processed مهمة من وكيل ZOZ."
                         } }) { Text("اتصال وفحص المهام") }
                         OutlinedButton(enabled = !busy, onClick = {
                             DeviceTokenVault.clear(context)
@@ -682,17 +689,22 @@ class DevicePollWorker(context: Context, params: androidx.work.WorkerParameters)
     override fun doWork(): Result {
         val token = DeviceTokenVault.read(applicationContext) ?: return Result.success()
         return try {
-            apiPostWithToken("heartbeat", JSONObject().put("app_version", "0.3.1"), token)
-            val job = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job")
-            if (job != null) executeJob(applicationContext, job)
+            apiPostWithToken("heartbeat", JSONObject().put("app_version", "0.3.2"), token)
+            for (index in 0 until 6) {
+                val job = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job") ?: break
+                executeJob(applicationContext, job)
+            }
             Result.success()
         } catch (_: Exception) { Result.retry() }
     }
 }
 
 private fun scheduleDeviceWorker(context: Context) {
+    val workManager = WorkManager.getInstance(context)
     val request = PeriodicWorkRequestBuilder<DevicePollWorker>(15, TimeUnit.MINUTES).build()
-    WorkManager.getInstance(context).enqueueUniquePeriodicWork("zoz-device-agent-poll", ExistingPeriodicWorkPolicy.UPDATE, request)
+    workManager.enqueueUniquePeriodicWork("zoz-device-agent-poll", ExistingPeriodicWorkPolicy.UPDATE, request)
+    val immediate = OneTimeWorkRequestBuilder<DevicePollWorker>().build()
+    workManager.enqueueUniqueWork("zoz-device-agent-initial-sync", ExistingWorkPolicy.REPLACE, immediate)
 }
 
 private fun importSharedVideos(context: Context, intent: Intent?) {
