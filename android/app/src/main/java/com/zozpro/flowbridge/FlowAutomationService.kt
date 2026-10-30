@@ -16,6 +16,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.util.concurrent.Executors
 
 /**
  * User-enabled, visible UI automation for Google Flow.
@@ -26,6 +27,7 @@ class FlowAutomationService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private var lastActionAt = 0L
     private var receiverRegistered = false
+    private val networkExecutor = Executors.newSingleThreadExecutor()
 
     private val downloadReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -107,7 +109,7 @@ class FlowAutomationService : AccessibilityService() {
                 }
             }
             "waiting_generate" -> {
-                val button = findButton(root, setOf("generate", "create", "إنشاء", "توليد"))
+                val button = findButton(root, setOf("generate", "generate video", "create video", "توليد", "إنشاء فيديو"))
                 if (button != null && System.currentTimeMillis() - lastActionAt > 1800) {
                     if (button.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
                         updatePhase(task, "waiting_download")
@@ -117,7 +119,7 @@ class FlowAutomationService : AccessibilityService() {
                 }
             }
             "waiting_download" -> {
-                val download = findButton(root, setOf("download", "تنزيل", "تحميل"))
+                val download = findButton(root, setOf("download", "download video", "تنزيل", "تحميل الفيديو"))
                 if (download != null && System.currentTimeMillis() - lastActionAt > 5000) {
                     if (download.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
                         updatePhase(task, "download_started")
@@ -147,16 +149,20 @@ class FlowAutomationService : AccessibilityService() {
     }
 
     private fun findEditor(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
-        val candidates = mutableListOf<AccessibilityNodeInfo>()
+        var found: AccessibilityNodeInfo? = null
         walk(root) { node ->
-            val cls = node.className?.toString().orEmpty()
-            val label = ((node.text?.toString() ?: "") + " " + (node.contentDescription?.toString() ?: "")).lowercase()
-            if (node.isEditable || cls.contains("EditText", true) ||
-                (node.isFocusable && (label.contains("prompt") || label.contains("describe") || label.contains("اكتب") || label.contains("وصف")))) {
-                candidates.add(node)
-            }
+            if (found != null) return@walk
+            val viewId = node.viewIdResourceName.orEmpty().lowercase()
+            if (viewId.contains("url_bar") || viewId.contains("omnibox") || viewId.contains("search_box")) return@walk
+            val label = ((node.text?.toString() ?: "") + " " +
+                (node.contentDescription?.toString() ?: "") + " " +
+                (node.hintText?.toString() ?: "")).trim().lowercase()
+            val isPromptField = listOf("prompt", "describe your video", "describe the scene",
+                "what do you want to create", "video description", "اكتب وصف", "وصف المشهد", "صف الفيديو")
+                .any(label::contains)
+            if (node.isEditable && isPromptField && node.isEnabled) found = node
         }
-        return candidates.firstOrNull { it.isEditable } ?: candidates.firstOrNull()
+        return found
     }
 
     private fun findButton(root: AccessibilityNodeInfo, labels: Set<String>): AccessibilityNodeInfo? {
@@ -165,7 +171,7 @@ class FlowAutomationService : AccessibilityService() {
             if (found != null) return@walk
             val label = ((node.text?.toString() ?: "") + " " + (node.contentDescription?.toString() ?: "")).trim().lowercase()
             val clickable = node.isClickable || node.parent?.isClickable == true
-            if (clickable && labels.any { label == it || label.contains(it) }) {
+            if (clickable && labels.any { label == it }) {
                 found = if (node.isClickable) node else node.parent
             }
         }
@@ -222,21 +228,28 @@ class FlowAutomationService : AccessibilityService() {
     private fun finishTask(task: JSONObject, success: Boolean, code: String, message: String, extra: JSONObject = JSONObject()) {
         val id = task.optString("job_id")
         val result = JSONObject(extra.toString()).put("phase", task.optString("phase"))
-        runCatching {
-            apiPostWithToken("complete_job", JSONObject().put("job_id", id)
-                .put("outcome", if (success) "succeeded" else "failed")
-                .put("error_code", code).put("error_message", message).put("result", result),
-                DeviceTokenVault.read(this) ?: "")
-        }
         prefs().edit().remove(KEY_ACTIVE_TASK).apply()
-        DeviceNotifications.show(this, if (success) "اكتمل مشهد Flow" else "توقف تنفيذ مشهد Flow",
-            if (success) "تم تنزيل المقطع وتسجيل نتيجة المهمة." else message)
-        val total = task.optInt("total_scenes", 0)
-        val index = task.optInt("scene_index", 0)
-        if (success && total > 0 && index >= total) {
-            handler.postDelayed({ assembleAndUpload(task.optString("campaign_id"), total) }, 800)
-        } else if (success) {
-            handler.postDelayed({ WorkManager.getInstance(this).enqueueUniqueWork("zoz-device-next-scene", ExistingWorkPolicy.REPLACE, OneTimeWorkRequestBuilder<DevicePollWorker>().build()) }, 1200)
+        networkExecutor.execute {
+            runCatching {
+                apiPostWithToken("complete_job", JSONObject().put("job_id", id)
+                    .put("outcome", if (success) "succeeded" else "failed")
+                    .put("error_code", code).put("error_message", message).put("result", result),
+                    DeviceTokenVault.read(this) ?: "")
+            }
+            handler.post {
+                DeviceNotifications.show(this, if (success) "اكتمل مشهد Flow" else "توقف تنفيذ مشهد Flow",
+                    if (success) "تم تنزيل المقطع وتسجيل نتيجة المهمة." else message)
+                val total = task.optInt("total_scenes", 0)
+                val index = task.optInt("scene_index", 0)
+                if (success && total > 0 && index >= total) {
+                    handler.postDelayed({ assembleAndUpload(task.optString("campaign_id"), total) }, 800)
+                } else if (success) {
+                    handler.postDelayed({
+                        WorkManager.getInstance(this).enqueueUniqueWork("zoz-device-next-scene",
+                            ExistingWorkPolicy.REPLACE, OneTimeWorkRequestBuilder<DevicePollWorker>().build())
+                    }, 1200)
+                }
+            }
         }
     }
 
