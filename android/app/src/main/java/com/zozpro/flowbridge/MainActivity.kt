@@ -57,7 +57,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 
-private data class ImportedClip(val uri: Uri, val name: String, val size: Long)
+data class ImportedClip(val uri: Uri, val name: String, val size: Long)
 private const val PREFS = "zoz_flow_bridge"
 private const val PREF_CLIPS = "saved_clips"
 private const val PREF_PROMPT = "scene_prompt"
@@ -364,7 +364,7 @@ private fun intakePost(action: String, body: JSONObject, token: String): JSONObj
     return result
 }
 
-private fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kids: Boolean): String {
+fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kids: Boolean): String {
     val intakeToken = DeviceTokenVault.readIntake(context) ?: throw IllegalStateException("رمز استقبال الفيديو غير موجود. أعد اقتران الجهاز.")
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     val name = queryName(context, uri) ?: "ZOZ-final-video.mp4"
@@ -458,7 +458,7 @@ private fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Bool
     return "اكتمل استقبال الفيديو النهائي في ZOZ. رقم الملف: $assetId. ينتظر موافقة المالك، ولم يُرفع إلى YouTube أو يُنشر بعد."
 }
 
-private fun assembleCompatibleClips(context: Context, clips: List<ImportedClip>, outputUri: Uri) {
+fun assembleCompatibleClips(context: Context, clips: List<ImportedClip>, outputUri: Uri) {
     if (clips.size < 2) throw IllegalStateException("اختر مقطعين على الأقل للتجميع.")
     val extractors = mutableListOf<MediaExtractor>()
     val temp = File(context.cacheDir, "zoz-final-${System.currentTimeMillis()}.mp4")
@@ -552,7 +552,7 @@ private fun apiPost(context: Context, action: String, body: JSONObject): JSONObj
     return apiPostWithToken(action, body, token)
 }
 
-private fun apiPostWithToken(action: String, body: JSONObject, token: String): JSONObject {
+fun apiPostWithToken(action: String, body: JSONObject, token: String): JSONObject {
     val conn = java.net.URL(API).openConnection() as java.net.HttpURLConnection
     conn.requestMethod = "POST"
     conn.connectTimeout = 15000
