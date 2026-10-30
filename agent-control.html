@@ -13,7 +13,7 @@
 <div id="health" class="notice">جارٍ التحقق من الخدمة…</div>
 <section id="login-panel" class="panel"><h2>دخول المالك</h2><p class="muted">استخدم حساب مالك ZOZ Pro المؤكد. لا تضع مفاتيح API هنا.</p><form id="login-form"><label for="email">البريد الإلكتروني</label><input id="email" type="email" autocomplete="username" required><label for="password">كلمة المرور</label><input id="password" type="password" autocomplete="current-password" required><button id="login-btn" type="submit">دخول</button></form><div id="login-message" class="notice hidden"></div></section>
 <section id="control-panel" class="hidden">
-<div class="panel"><h2>0 · لوحة المدير التنفيذي</h2><p>سجل القدرات، فحص الجاهزية، حالة القنوات والمهام والذاكرة والتكاملات. هذه اللوحة تقرأ بيانات الإنتاج فقط ولا تغيّر إعدادات الحسابات.</p><div class="grid"><div><button id="overview-btn">تحديث حالة النظام</button></div><div><button id="preflight-btn" class="secondary">فحص الجاهزية والصلاحيات</button></div><div><button id="tools-btn" class="secondary">عرض سجل الأدوات</button></div></div><div id="operator-status" class="notice hidden"></div><pre id="operator-result" class="hidden"></pre></div>
+<div class="panel"><h2>0 · لوحة المدير التنفيذي</h2><p>سجل القدرات، فحص الجاهزية، حالة القنوات والمهام والذاكرة والتكاملات. هذه اللوحة تقرأ بيانات الإنتاج فقط ولا تغيّر إعدادات الحسابات.</p><div class="grid"><div><button id="overview-btn">تحديث حالة النظام</button></div><div><button id="preflight-btn" class="secondary">فحص الجاهزية والصلاحيات</button></div><div><button id="tools-btn" class="secondary">عرض سجل الأدوات</button></div></div><div class="grid"><div><label for="operator-channel">القناة المستهدفة للدورة الآمنة</label><select id="operator-channel"><option value="">حمّل حالة النظام أولًا</option></select></div><div><button id="safe-cycle-btn" class="secondary">تشغيل دورة الإدارة الآمنة</button></div></div><p class="muted">الدورة تحدّث التحليلات وتراجع المعالجة وتنشئ توصية داخلية فقط؛ لا تنشر فيديو ولا تغيّر الخصوصية.</p><div id="operator-status" class="notice hidden"></div><pre id="operator-result" class="hidden"></pre></div>
 <div class="panel"><h2>1 · تحليل القناة</h2><p>يقرأ الوكيل حالة القناة والتحليلات والتقويم والمسودات وملفات الفيديو، ثم يعرض تشخيصًا وخطوات عملية. التحليل لا ينشر ولا يغيّر إعدادات الفيديو.</p><button id="analyze-btn">حلّل القناة الآن</button><div id="analysis-status" class="notice hidden"></div><pre id="analysis-result" class="hidden"></pre></div>
 <div class="panel"><h2>2 · إنشاء مسودة محتوى</h2><p>يختار المالك موضوعًا أو يكتب موضوعًا مقترحًا؛ يحفظ النظام السيناريو في مركز الإنتاج للمراجعة. لا يتم إنشاء فيديو أو رفعه أو نشره تلقائيًا.</p><label for="topic">موضوع الفيديو</label><input id="topic" maxlength="240" placeholder="مثال: كيف كان العمال ينظمون حياتهم في دير المدينة؟"><div class="grid"><div><label for="mode">نوع المحتوى</label><select id="mode" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit"><option value="short">Short</option><option value="long">فيديو طويل</option></select></div><div><label for="duration">المدة المقترحة بالثواني</label><input id="duration" type="number" min="20" max="180" value="45"></div></div><button id="draft-btn">أنشئ المسودة واحفظها</button><div id="draft-status" class="notice hidden"></div><pre id="draft-result" class="hidden"></pre></div>
 <div class="panel"><h2>3 · سجل التشغيل</h2><p class="muted">تُحفظ نتائج التحليل وإنشاء المسودات في سجل الأتمتة عند نجاح الكتابة. الموافقة على النشر تبقى للمالك.</p><button class="secondary" id="logout-btn">تسجيل الخروج</button></div>
@@ -35,20 +35,27 @@ function show(id,on){$(id).classList.toggle("hidden",!on)}
 function notice(id,msg,kind){$(id).className="notice"+(kind?" "+kind:"");$(id).textContent=msg;show(id,true)}
 function output(id,data){$(id).textContent=JSON.stringify(data,null,2);show(id,true)}
 async function ownerSession(){const {data,error}=await sb.auth.getSession();if(error)throw error;const s=data&&data.session;if(!s||!s.access_token)throw new Error("سجّل الدخول بحساب المالك.");const {data:ud,error:ue}=await sb.auth.getUser(s.access_token);if(ue)throw ue;const u=ud&&ud.user;if(!u||String(u.email||"").toLowerCase()!==OWNER||!u.email_confirmed_at){await sb.auth.signOut();throw new Error("هذا الحساب ليس حساب المالك المؤكد.");}return s}
-async function controlRequest(action){
+async function controlRequest(action,extra){
  const s=await ownerSession();
- const r=await fetch(CONTROL,{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+s.access_token,"Content-Type":"application/json"},body:JSON.stringify({action}),cache:"no-store"});
+ const r=await fetch(CONTROL,{method:"POST",headers:{apikey:KEY,Authorization:"Bearer "+s.access_token,"Content-Type":"application/json"},body:JSON.stringify(Object.assign({action},extra||{})),cache:"no-store"});
  const d=await r.json().catch(()=>({}));
  if(!r.ok||d.ok===false)throw new Error(d.error||("HTTP "+r.status));
  return d;
 }
 async function runControl(action,label){
  if(busy)return;busy=true;
- const buttons=["overview-btn","preflight-btn","tools-btn"].map(id=>$(id));buttons.forEach(b=>b.disabled=true);
+ const buttons=["overview-btn","preflight-btn","tools-btn","safe-cycle-btn"].map(id=>$(id));buttons.forEach(b=>b.disabled=true);
  notice("operator-status","جارٍ تنفيذ "+label+" من مشروع الإنتاج…");
  show("operator-result",false);
  try{
   const d=await controlRequest(action);output("operator-result",d);
+  if(action==="operator_overview"&&Array.isArray(d.channels?.rows)){
+   const sel=$("operator-channel");const prev=sel.value;
+   sel.innerHTML="";
+   for(const ch of d.channels.rows){const o=document.createElement("option");o.value=ch.channel_id;o.textContent=(ch.name||ch.channel_id)+" · "+(ch.connection_status||"غير محدد");sel.appendChild(o)}
+   if(prev&&[...sel.options].some(o=>o.value===prev))sel.value=prev;
+   if(!sel.options.length){const o=document.createElement("option");o.value="";o.textContent="لا توجد قنوات نشطة";sel.appendChild(o)}
+  }
   notice("operator-status","اكتمل "+label+" بنجاح. هذه قراءة مباشرة من بيانات الإنتاج.", "good");
  }catch(e){notice("operator-status","تعذر "+label+": "+(e.message||e),"bad")}
  finally{busy=false;buttons.forEach(b=>b.disabled=false)}
@@ -58,6 +65,17 @@ async function health(){try{const r=await fetch(AGENT+"?health=1",{headers:{apik
 async function syncLogin(){try{await ownerSession();show("login-panel",false);show("control-panel",true);notice("login-message","تم التحقق من حساب المالك.","good")}catch(e){show("login-panel",true);show("control-panel",false);notice("login-message",e.message||"سجّل الدخول.","warn")}}
 $("login-form").addEventListener("submit",async e=>{e.preventDefault();const b=$("login-btn");b.disabled=true;try{const {data,error}=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(error)throw error;const u=data&&data.user;if(!u||String(u.email||"").toLowerCase()!==OWNER||!u.email_confirmed_at){await sb.auth.signOut();throw new Error("الحساب ليس حساب المالك المؤكد.")}await syncLogin()}catch(e){notice("login-message",e.message||"تعذر تسجيل الدخول.","bad")}finally{b.disabled=false}});
 $("overview-btn").addEventListener("click",()=>runControl("operator_overview","تحديث حالة النظام"));
+$("safe-cycle-btn").addEventListener("click",async()=>{
+ const channelId=$("operator-channel").value;
+ if(!channelId){notice("operator-status","حمّل حالة النظام واختر قناة أولًا.","warn");return}
+ if(!confirm("تشغيل دورة الإدارة الآمنة للقناة المحددة؟ لن يتم نشر أي فيديو علنًا."))return;
+ if(busy)return;busy=true;
+ const buttons=["overview-btn","preflight-btn","tools-btn","safe-cycle-btn"].map(id=>$(id));buttons.forEach(b=>b.disabled=true);
+ notice("operator-status","جارٍ تشغيل دورة الإدارة الآمنة…");
+ try{const d=await controlRequest("run_safe_cycle",{channel_id:channelId});output("operator-result",d);notice("operator-status","اكتملت الدورة. راجع نتيجة التحليل ومهمة المتابعة المحفوظة.","good")}
+ catch(e){notice("operator-status","تعذر تشغيل الدورة: "+(e.message||e),"bad")}
+ finally{busy=false;buttons.forEach(b=>b.disabled=false)}
+});
 $("preflight-btn").addEventListener("click",()=>runControl("operator_preflight","فحص الجاهزية"));
 $("tools-btn").addEventListener("click",()=>runControl("tool_catalog","سجل الأدوات"));
 $("analyze-btn").addEventListener("click",async()=>{if(busy)return;busy=true;const b=$("analyze-btn");b.disabled=true;b.textContent="جارٍ التحليل…";notice("analysis-status","يقرأ الوكيل بيانات القناة ويحللها…");show("analysis-result",false);try{const d=await request("analyze");output("analysis-result",d);notice("analysis-status","اكتمل التحليل وحُفظ سجل التشغيل. راجع التشخيص والخطوات التالية.","good")}catch(e){notice("analysis-status","تعذر التحليل: "+(e.message||e),"bad")}finally{busy=false;b.disabled=false;b.textContent="حلّل القناة الآن"}});
