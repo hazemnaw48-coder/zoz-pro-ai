@@ -198,8 +198,10 @@ private fun FlowBridgeScreen() {
                             var processed = 0
                             for (index in 0 until 6) {
                                 val job = apiPost(context, "poll_jobs", JSONObject()).optJSONObject("job") ?: break
+                                val capability = job.optString("capability_id")
                                 executeJob(context, job)
                                 processed++
+                                if (capability == "flow.generate_scene") break
                             }
                             if (processed == 0) "الاتصال سليم. لا توجد مهام جديدة."
                             else "اكتمل الاتصال واستلام $processed مهمة من وكيل ZOZ."
@@ -544,8 +546,14 @@ fun assembleCompatibleClips(context: Context, clips: List<ImportedClip>, outputU
         started = false
         outputMuxer.release()
         muxer = null
-        context.contentResolver.openOutputStream(outputUri, "w").use { output ->
-            if (output == null) throw IllegalStateException("تعذر فتح ملف الإخراج.")
+        val outputStream = if (outputUri.scheme == "file") {
+            val path = outputUri.path ?: throw IllegalStateException("مسار ملف الإخراج غير صالح.")
+            FileOutputStream(File(path))
+        } else {
+            context.contentResolver.openOutputStream(outputUri, "w")
+                ?: throw IllegalStateException("تعذر فتح ملف الإخراج.")
+        }
+        outputStream.use { output ->
             FileInputStream(temp).use { input -> input.copyTo(output) }
             output.flush()
         }
