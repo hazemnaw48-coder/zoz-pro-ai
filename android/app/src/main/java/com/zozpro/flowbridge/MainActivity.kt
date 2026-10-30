@@ -198,8 +198,10 @@ private fun FlowBridgeScreen() {
                             var processed = 0
                             for (index in 0 until 6) {
                                 val job = apiPost(context, "poll_jobs", JSONObject()).optJSONObject("job") ?: break
+                                val capability = job.optString("capability_id")
                                 executeJob(context, job)
                                 processed++
+                                if (capability == "flow.generate_scene") break
                             }
                             if (processed == 0) "الاتصال سليم. لا توجد مهام جديدة."
                             else "اكتمل الاتصال واستلام $processed مهمة من وكيل ZOZ."
