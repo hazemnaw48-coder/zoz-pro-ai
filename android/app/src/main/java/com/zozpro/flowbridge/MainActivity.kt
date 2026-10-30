@@ -68,7 +68,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         scheduleDeviceWorker(this)
+        importSharedVideos(this, intent)
         setContent { FlowBridgeScreen() }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        importSharedVideos(this, intent)
     }
 }
 
@@ -236,7 +243,11 @@ private fun FlowBridgeScreen() {
                 OutlinedButton(
                     onClick = { picker.launch(arrayOf("video/mp4", "video/quicktime", "video/webm", "video/*")) },
                     modifier = Modifier.fillMaxWidth()
-                ) { Text("استيراد المقاطع الناتجة من Flow") }
+                ) { Text("اختيار المقاطع من الهاتف") }
+                OutlinedButton(onClick = {
+                    clips = loadSavedClips(context)
+                    lastAction = "تم تحديث قائمة المقاطع المستوردة أو المشتركة إلى ZOZ."
+                }, modifier = Modifier.fillMaxWidth()) { Text("تحديث المقاطع الواردة من Flow") }
                 if (clips.size >= 2) {
                     OutlinedButton(
                         enabled = !busy,
@@ -660,6 +671,35 @@ private fun scheduleDeviceWorker(context: Context) {
     WorkManager.getInstance(context).enqueueUniquePeriodicWork("zoz-device-agent-poll", ExistingPeriodicWorkPolicy.UPDATE, request)
 }
 
+private fun importSharedVideos(context: Context, intent: Intent?) {
+    if (intent == null || (intent.action != Intent.ACTION_SEND && intent.action != Intent.ACTION_SEND_MULTIPLE)) return
+    val incoming = linkedSetOf<Uri>()
+    if (intent.action == Intent.ACTION_SEND) {
+        (intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri)?.let { incoming.add(it) }
+    } else {
+        intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.forEach { incoming.add(it) }
+    }
+    intent.clipData?.let { clipData ->
+        for (i in 0 until clipData.itemCount) clipData.getItemAt(i).uri?.let { incoming.add(it) }
+    }
+    if (incoming.isEmpty()) return
+    val directory = File(context.filesDir, "zoz_imports").apply { mkdirs() }
+    val clips = loadSavedClips(context).toMutableList()
+    incoming.forEachIndexed { index, source ->
+        try {
+            val originalName = queryName(context, source) ?: "flow-clip-${System.currentTimeMillis()}-${index + 1}.mp4"
+            val extension = originalName.substringAfterLast('.', "mp4").lowercase().take(8).ifBlank { "mp4" }
+            val safeName = "shared-${System.currentTimeMillis()}-${index + 1}.$extension"
+            val target = File(directory, safeName)
+            context.contentResolver.openInputStream(source)?.use { input ->
+                FileOutputStream(target).use { output -> input.copyTo(output) }
+            } ?: throw IllegalStateException("تعذر فتح الملف المشترك.")
+            clips.add(ImportedClip(Uri.fromFile(target), originalName, target.length()))
+        } catch (_: Exception) { }
+    }
+    saveClips(context, clips.distinctBy { it.uri })
+}
+
 private fun loadPendingPrompts(prefs: android.content.SharedPreferences): List<String> {
     val raw = prefs.getString(PREF_PENDING_PROMPTS, null)
     if (raw != null) return try {
@@ -683,8 +723,9 @@ private fun loadSavedClips(context: Context): List<ImportedClip> {
             for (i in 0 until array.length()) {
                 val item = array.getJSONObject(i)
                 val uri = Uri.parse(item.getString("uri"))
-                val ok = context.contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
-                if (ok) add(ImportedClip(uri, item.optString("name", "video"), item.optLong("size", 0L)))
+                val localFile = uri.scheme == "file" && (uri.path ?: "").startsWith(context.filesDir.absolutePath) && File(uri.path ?: "").exists()
+                val permissionStillAvailable = context.contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
+                if (localFile || permissionStillAvailable) add(ImportedClip(uri, item.optString("name", "video"), item.optLong("size", 0L)))
             }
         }
     } catch (_: Exception) { emptyList() }
@@ -694,7 +735,11 @@ private fun saveClips(context: Context, clips: List<ImportedClip>) {
     clips.forEach { array.put(JSONObject().put("uri", it.uri.toString()).put("name", it.name).put("size", it.size)) }
     context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(PREF_CLIPS, array.toString()).apply()
 }
-private fun queryName(context: Context, uri: Uri): String? =
-    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null }
-private fun querySize(context: Context, uri: Uri): Long =
-    context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { if (it.moveToFirst()) it.getLong(0) else 0L } ?: 0L
+private fun queryName(context: Context, uri: Uri): String? {
+    if (uri.scheme == "file") return File(uri.path ?: return null).name
+    return context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null }
+}
+private fun querySize(context: Context, uri: Uri): Long {
+    if (uri.scheme == "file") return File(uri.path ?: return 0L).length()
+    return context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { if (it.moveToFirst()) it.getLong(0) else 0L } ?: 0L
+}
