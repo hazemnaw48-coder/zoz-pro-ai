@@ -1,5 +1,7 @@
 package com.zozpro.flowbridge
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -85,6 +87,13 @@ private fun FlowBridgeScreen() {
     var syntheticMedia by remember { mutableStateOf(true) }
     var madeForKids by remember { mutableStateOf(false) }
 
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     LaunchedEffect(prompt) { prefs.edit().putString(PREF_PROMPT, prompt).apply() }
     LaunchedEffect(clips) { saveClips(context, clips) }
 
