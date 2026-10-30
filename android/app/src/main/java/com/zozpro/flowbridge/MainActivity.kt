@@ -162,7 +162,7 @@ private fun FlowBridgeScreen() {
                             val response = apiPost(context, "pair_exchange", JSONObject()
                                 .put("pairing_code", pairingCode)
                                 .put("device_name", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL)
-                                .put("app_version", "0.2.0"))
+                                .put("app_version", BuildConfig.VERSION_NAME))
                             val token = response.getString("device_token")
                             DeviceTokenVault.write(context, token, response.getString("intake_token"))
                             paired = true
@@ -175,7 +175,7 @@ private fun FlowBridgeScreen() {
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(enabled = !busy, onClick = { runAsync {
-                            val health = apiPost(context, "device_health", JSONObject().put("app_version", "0.2.0"))
+                            val health = apiPost(context, "device_health", JSONObject().put("app_version", BuildConfig.VERSION_NAME))
                             val job = apiPost(context, "poll_jobs", JSONObject()).optJSONObject("job")
                             if (job == null) "الاتصال سليم. لا توجد مهام جديدة."
                             else executeJob(context, job)
