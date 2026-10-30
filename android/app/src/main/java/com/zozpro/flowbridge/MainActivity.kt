@@ -95,6 +95,7 @@ private fun FlowBridgeScreen() {
     var finalVideoUri by remember { mutableStateOf(prefs.getString("final_video_uri", null)?.let { Uri.parse(it) }) }
     var syntheticMedia by remember { mutableStateOf(true) }
     var madeForKids by remember { mutableStateOf(false) }
+    var showCleanupConfirm by remember { mutableStateOf(false) }
 
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(Unit) {
@@ -275,7 +276,30 @@ private fun FlowBridgeScreen() {
                     if (clips.isNotEmpty()) OutlinedButton(onClick = {
                         clips = emptyList()
                         lastAction = "أُزيلت القائمة فقط؛ الملفات الأصلية لم تُحذف."
-                    }) { Text("مسح القائمة") }
+                    }) { Text("مسح القائمة فقط") }
+                }
+                if (clips.any { it.uri.scheme == "file" && (it.uri.path ?: "").startsWith(File(context.filesDir, "zoz_imports").absolutePath) }) {
+                    OutlinedButton(onClick = { showCleanupConfirm = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text("تنظيف النسخ الداخلية المستوردة")
+                    }
+                }
+                if (showCleanupConfirm) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { showCleanupConfirm = false },
+                        title = { Text("تأكيد تنظيف الهاتف") },
+                        text = { Text("سيحذف التطبيق نسخه الداخلية التي نسخها من المشاركات فقط. لن يحذف الملفات الأصلية في التنزيلات أو المعرض أو أي ملفات خارج مجلد التطبيق.") },
+                        confirmButton = {
+                            Button(onClick = {
+                                val localDir = File(context.filesDir, "zoz_imports").absolutePath + File.separator
+                                val removable = clips.filter { it.uri.scheme == "file" && (it.uri.path ?: "").startsWith(localDir) }
+                                removable.forEach { runCatching { File(it.uri.path ?: "").delete() } }
+                                clips = clips.filterNot { removable.contains(it) }
+                                showCleanupConfirm = false
+                                lastAction = "تم تنظيف النسخ الداخلية للتطبيق فقط؛ الملفات الأصلية لم تتغير."
+                            }) { Text("حذف النسخ الداخلية") }
+                        },
+                        dismissButton = { OutlinedButton(onClick = { showCleanupConfirm = false }) { Text("إلغاء") } }
+                    )
                 }
                 LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(clips) { clip ->
