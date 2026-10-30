@@ -1179,6 +1179,8 @@ async function executeApprovedAgentTasks(user: any, token: string) {
           "&id=eq." + encodeURIComponent(assetId) + "&status=eq.ready_to_publish&select=id,channel_id,title,target_privacy_status,youtube_video_id&limit=1");
         const target = Array.isArray(before) ? before[0] : null;
         if (!target || target.channel_id !== channelId || !target.youtube_video_id) throw new Error("الفيديو ليس جاهزًا للنشر أو لا يطابق القناة المعتمدة.");
+        const approvedPrivacy = spec.target_privacy_status === "unlisted" ? "unlisted" : "public";
+        if (target.target_privacy_status !== approvedPrivacy) throw new Error("تغيرت خصوصية النشر المستهدفة بعد إنشاء مهمة الموافقة؛ أُوقف النشر واطلب موافقة جديدة.");
         output = await callAnalyticsTool(token, "intake_publish", { asset_id: assetId, publish_confirmed: true });
         if (!output?.ok || output.status !== "published") throw new Error(clean(output?.error || "لم يؤكد YouTube اكتمال النشر.", 300));
       } else if (operation === "books_monitor") {
