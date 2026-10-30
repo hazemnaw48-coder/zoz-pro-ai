@@ -34,8 +34,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import org.json.JSONArray
+import org.json.JSONObject
 
 private data class ImportedClip(val uri: Uri, val name: String, val size: Long)
+
+private const val PREFS = "zoz_flow_bridge"
+private const val PREF_CLIPS = "saved_clips"
+private const val PREF_PROMPT = "scene_prompt"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,9 +53,17 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun FlowBridgeScreen() {
     val context = LocalContext.current
-    var prompt by remember { mutableStateOf("") }
-    var clips by remember { mutableStateOf(listOf<ImportedClip>()) }
-    var lastAction by remember { mutableStateOf("جاهز — لم يتم الاتصال بالخادم بعد") }
+    val prefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
+    var prompt by remember { mutableStateOf(prefs.getString(PREF_PROMPT, "") ?: "") }
+    var clips by remember { mutableStateOf(loadSavedClips(context)) }
+    var lastAction by remember { mutableStateOf("جاهز — المقاطع والوصف يُحفظان محليًا على الهاتف") }
+
+    LaunchedEffect(prompt) {
+        prefs.edit().putString(PREF_PROMPT, prompt).apply()
+    }
+    LaunchedEffect(clips) {
+        saveClips(context, clips)
+    }
 
     val picker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
@@ -66,7 +80,7 @@ private fun FlowBridgeScreen() {
             ImportedClip(uri, name, size)
         }
         clips = (clips + added).distinctBy { it.uri }
-        lastAction = "تم اختيار ${added.size} ملف؛ لم يتم رفعها إلى ZOZ بعد"
+        lastAction = "تم اختيار ${added.size} ملف؛ حُفظت قائمة المقاطع محليًا ولم يتم رفعها بعد"
     }
 
     MaterialTheme {
@@ -79,8 +93,8 @@ private fun FlowBridgeScreen() {
                 Text("مساعد إنتاج الفيديو على الهاتف", style = MaterialTheme.typography.titleMedium)
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("حالة الاتصال", fontWeight = FontWeight.Bold)
-                        Text("المرحلة الأولية: تشغيل Flow ونقل المطالبات واستيراد المقاطع محليًا.")
+                        Text("حالة التشغيل", fontWeight = FontWeight.Bold)
+                        Text("وصف المشهد وقائمة الملفات يُحفظان محليًا ويستمران بعد إغلاق التطبيق.")
                         Text("اتصال وكيل ZOZ وتجميع الفيديو والرفع الآلي لم تُفعّل في هذا الإصدار.")
                     }
                 }
@@ -101,8 +115,8 @@ private fun FlowBridgeScreen() {
                 OutlinedTextField(
                     value = prompt,
                     onValueChange = { prompt = it },
-                    label = { Text("مطالبة المشهد من وكيل ZOZ") },
-                    placeholder = { Text("ضع وصف المشهد هنا") },
+                    label = { Text("مطالبة المشهد") },
+                    placeholder = { Text("اكتب أو الصق وصف المشهد الذي أعده وكيل ZOZ") },
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -124,7 +138,15 @@ private fun FlowBridgeScreen() {
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("استيراد المقاطع الناتجة من Flow") }
 
-                Text("المقاطع المختارة: ${clips.size}", fontWeight = FontWeight.Bold)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("المقاطع المحفوظة: ${clips.size}", fontWeight = FontWeight.Bold)
+                    if (clips.isNotEmpty()) {
+                        OutlinedButton(onClick = {
+                            clips = emptyList()
+                            lastAction = "أُزيلت قائمة المقاطع من التطبيق؛ الملفات الأصلية لم تُحذف"
+                        }) { Text("مسح القائمة") }
+                    }
+                }
                 LazyColumn(
                     modifier = Modifier.weight(1f, fill = true),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -139,16 +161,16 @@ private fun FlowBridgeScreen() {
                                     Text(clip.name, fontWeight = FontWeight.Medium)
                                     Text(if (clip.size > 0) "${clip.size / 1024} KB" else "الحجم غير متاح")
                                 }
-                                OutlinedButton(onClick = { clips = clips.filterNot { it.uri == clip.uri } }) {
-                                    Text("إزالة")
-                                }
+                                OutlinedButton(onClick = {
+                                    clips = clips.filterNot { it.uri == clip.uri }
+                                }) { Text("إزالة") }
                             }
                         }
                     }
                 }
                 Text(lastAction, style = MaterialTheme.typography.bodySmall)
                 Text(
-                    "وضع مساعد شفاف: لا نقرأ كلمات مرور Google ولا ننفذ نقرات مخفية ولا نتجاوز قيود Flow.",
+                    "وضع مساعد شفاف: لا نخزن كلمات مرور Google ولا ننفذ نقرات مخفية ولا نتجاوز قيود Flow.",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -156,14 +178,47 @@ private fun FlowBridgeScreen() {
     }
 }
 
+private fun loadSavedClips(context: Context): List<ImportedClip> {
+    val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        .getString(PREF_CLIPS, "[]") ?: "[]"
+    return try {
+        val array = JSONArray(raw)
+        buildList {
+            for (i in 0 until array.length()) {
+                val item = array.getJSONObject(i)
+                val uri = Uri.parse(item.getString("uri"))
+                val permissionStillAvailable = context.contentResolver.persistedUriPermissions
+                    .any { it.uri == uri && it.isReadPermission }
+                if (permissionStillAvailable) {
+                    add(ImportedClip(uri, item.optString("name", "video"), item.optLong("size", 0L)))
+                }
+            }
+        }
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+private fun saveClips(context: Context, clips: List<ImportedClip>) {
+    val array = JSONArray()
+    clips.forEach { clip ->
+        array.put(
+            JSONObject()
+                .put("uri", clip.uri.toString())
+                .put("name", clip.name)
+                .put("size", clip.size)
+        )
+    }
+    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putString(PREF_CLIPS, array.toString())
+        .apply()
+}
+
 private fun queryName(context: Context, uri: Uri): String? =
     context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-        ?.use { cursor ->
-            if (cursor.moveToFirst()) cursor.getString(0) else null
-        }
+        ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
 
 private fun querySize(context: Context, uri: Uri): Long =
     context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)
-        ?.use { cursor ->
-            if (cursor.moveToFirst()) cursor.getLong(0) else 0L
-        } ?: 0L
+        ?.use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else 0L } ?: 0L
