@@ -5,7 +5,7 @@ function secret(name:string){try{const v=JSON.parse(Deno.env.get(name)||"{}");re
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || secret("SUPABASE_SECRET_KEYS") || Deno.env.get("SUPABASE_SECRET_KEY") || "";
 const PUBLIC = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || secret("SUPABASE_PUBLISHABLE_KEYS") || Deno.env.get("SUPABASE_ANON_KEY") || "";
 const OWNER_EMAIL = Deno.env.get("ZOZ_OWNER_EMAIL") || "";
-const CAPABILITIES = new Set(["device.health_check","flow.open","flow.copy_prompt"]);
+const CAPABILITIES = new Set(["device.health_check","flow.open","flow.copy_prompt","flow.generate_scene"]);
 function json(data:unknown,status=200){return new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","access-control-allow-origin":"*","access-control-allow-headers":"authorization, apikey, content-type, x-zoz-device-token","access-control-allow-methods":"GET, POST, OPTIONS"}});}
 function fail(error:string,status=400){return json({ok:false,error},status);}
 function clean(v:unknown,max=1000){return String(v??"").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,"").trim().slice(0,max);}
@@ -39,9 +39,28 @@ Deno.serve(async(req:Request)=>{
    await log(ch.owner_id,dev.id,null,"device_paired",{device_name:deviceName,app_version:appVersion,intake_source_id:source.id});
    return json({ok:true,device_id:dev.id,device_token:raw,intake_token:intakeToken,device_name:deviceName,capabilities:dev.capabilities,paired_at:new Date().toISOString()});
   }
-  if(action==="device_health"||action==="heartbeat"||action==="poll_jobs"||action==="complete_job"){
+  if(action==="device_health"||action==="heartbeat"||action==="poll_jobs"||action==="complete_job"||action==="enable_flow_automation"||action==="production_intake_complete"){
    const d=await device(req);if(!d)return fail("الجهاز غير مقرون أو تم إلغاء صلاحياته.",401);
    const now=new Date().toISOString();
+   if(action==="production_intake_complete"){
+    const proposalId=clean(body?.proposal_id,40),assetId=clean(body?.asset_id,40),channelId=clean(body?.channel_id,80);
+    if(!/^[0-9a-f-]{36}$/i.test(proposalId)||!/^[0-9a-f-]{36}$/i.test(assetId)||!/^UC[A-Za-z0-9_-]{22}$/.test(channelId))return fail("Production completion identifiers are invalid.",400);
+    const proposals=await db("zoz_pro_agent_work_items?id=eq."+encodeURIComponent(proposalId)+"&owner_id=eq."+encodeURIComponent(d.owner_id)+"&kind=eq.flow_production_proposal&status=eq.in_progress&select=id,spec&limit=1");
+    const proposal=proposals?.[0];if(!proposal)return fail("مقترح الإنتاج غير موجود أو لم يعد قيد التنفيذ.",404);
+    const assets=await db("zoz_pro_video_intake_assets?id=eq."+encodeURIComponent(assetId)+"&owner_id=eq."+encodeURIComponent(d.owner_id)+"&channel_id=eq."+encodeURIComponent(channelId)+"&status=eq.ready_for_review&select=id,channel_id,status&limit=1");
+    const asset=assets?.[0];if(!asset)return fail("لم يتم التحقق من ملف الفيديو النهائي في استقبال القناة المطلوبة.",409);
+    const spec=proposal.spec&&typeof proposal.spec==="object"?proposal.spec:{};
+    if(String(spec.channel_id||"")!==channelId)return fail("ملف الفيديو لا يطابق قناة مقترح الإنتاج.",403);
+    await db("zoz_pro_agent_work_items?id=eq."+encodeURIComponent(proposalId)+"&owner_id=eq."+encodeURIComponent(d.owner_id)+"&status=eq.in_progress",{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({status:"completed",spec:{...spec,production_status:"ready_for_review",intake_asset_id:assetId,completed_at:now},updated_at:now})});
+    await log(d.owner_id,d.device_id,null,"flow_production_completed",{proposal_id:proposalId,asset_id:assetId,channel_id:channelId});
+    return json({ok:true,proposal_id:proposalId,asset_id:assetId,channel_id:channelId,production_status:"ready_for_review",publication_performed:false});
+   }
+   if(action==="enable_flow_automation"){
+    const capabilities=[...new Set([...(Array.isArray(d.device.capabilities)?d.device.capabilities:[]),"flow.generate_scene"])];
+    await db("zoz_pro_device_registry?id=eq."+encodeURIComponent(d.device_id)+"&owner_id=eq."+encodeURIComponent(d.owner_id),{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({capabilities,updated_at:now})});
+    await log(d.owner_id,d.device_id,null,"flow_automation_enabled",{capability_id:"flow.generate_scene"});
+    return json({ok:true,device_id:d.device_id,capabilities});
+   }
    if(action==="device_health"||action==="heartbeat"){
     await db("zoz_pro_device_registry?id=eq."+encodeURIComponent(d.device_id),{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({last_seen_at:now,last_heartbeat_at:now,updated_at:now,app_version:clean(body?.app_version||"0.1.0",30)})});
     return json({ok:true,device_id:d.device_id,status:"active",server_time:now,capabilities:d.device.capabilities});
@@ -58,7 +77,7 @@ Deno.serve(async(req:Request)=>{
     const rows=await db("zoz_pro_device_jobs?device_id=eq."+encodeURIComponent(d.device_id)+"&owner_id=eq."+encodeURIComponent(d.owner_id)+"&status=eq.queued&scheduled_at=lte."+encodeURIComponent(now)+"&select=id,capability_id,payload,attempts,max_attempts,created_at&order=priority.asc,created_at.asc&limit=1");
     const job=rows?.[0];if(!job)return json({ok:true,job:null,server_time:now});
     if(!CAPABILITIES.has(job.capability_id)||!(d.device.capabilities||[]).includes(job.capability_id))return json({ok:true,job:null,blocked:"capability_not_granted"});
-    const claimed=await db("zoz_pro_device_jobs?id=eq."+encodeURIComponent(job.id)+"&device_id=eq."+encodeURIComponent(d.device_id)+"&status=eq.queued",{method:"PATCH",headers:{prefer:"return=representation"},body:JSON.stringify({status:"running",attempts:Number(job.attempts||0)+1,started_at:now,lease_expires_at:new Date(Date.now()+5*60000).toISOString(),updated_at:now})});
+    const claimed=await db("zoz_pro_device_jobs?id=eq."+encodeURIComponent(job.id)+"&device_id=eq."+encodeURIComponent(d.device_id)+"&status=eq.queued",{method:"PATCH",headers:{prefer:"return=representation"},body:JSON.stringify({status:"running",attempts:Number(job.attempts||0)+1,started_at:now,lease_expires_at:new Date(Date.now()+30*60000).toISOString(),updated_at:now})});
     if(!claimed?.[0])return json({ok:true,job:null});
     await log(d.owner_id,d.device_id,job.id,"job_started",{capability_id:job.capability_id,attempt:job.attempts+1});
     return json({ok:true,job:{id:job.id,capability_id:job.capability_id,payload:job.payload,attempt:job.attempts+1},server_time:now});
