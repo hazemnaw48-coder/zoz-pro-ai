@@ -199,3 +199,16 @@ The center project `894a0e3a-85c4-43de-b8f7-205db24685b9` still uses browser `lo
 - Android workflow setup now successfully passed Android SDK setup and package installation in run 41018541159, but that run is still compiling. A newer run for the persistence changes is active.
 - No production Supabase schema or RLS changes have been made because the current authorized SQL path was previously blocked; do not create device pairing endpoints or claim server-side device execution until additive schema and owner-scope policies are safely implemented and verified.
 - Browser automation, autonomous Flow generation, local video assembly, direct KDP access/submission, device pairing, and Play Store release remain unimplemented and must not be described as live.
+
+
+## Android device execution — production work added 2026-10-30
+
+- Production project `oxyzxbkwhafzaztraowc` now has additive device/app factory tables from migrations `zoz_pro_device_runtime_and_android_app_factory`, `zoz_pro_device_pairing_challenges`, and `zoz_pro_device_intake_source_link`.
+- Deployed `zoz-pro-device-agent` ACTIVE v3. Owner-authenticated actions: create 5-minute one-time pairing code, list/revoke paired devices, enqueue typed allow-listed jobs, approve jobs, list job history. Device-authenticated actions: pair exchange, heartbeat, poll one job, and report completion. Tokens are stored as hashes server-side.
+- Pairing also issues a separate channel-scoped intake token for Hazem Ahmed. Device revocation disables both device credential and associated intake source.
+- `channel-control.html` on this feature branch now includes Android pairing, device list/revocation, prompt dispatch, job approval, and status display.
+- Android app now includes encrypted device/intake token storage, WorkManager 15-minute best-effort polling, visible Flow launch/prompt copy tasks, local MP4 stream-copy assembly with compatibility rejection, and chunked upload of final MP4 to existing ZOZ intake.
+- Existing ZOZ autonomous worker can advance an owner-approved intake asset through private YouTube upload. It does not publish publicly; public publication remains an owner-confirmed operation.
+- The current app does not autonomously press Generate in Google Flow, bypass Flow quotas, perform unrestricted UI control, or automate Amazon KDP. Flow generation is assisted by opening the signed-in site and copying prompts. KDP direct connector remains absent.
+- The latest Android build for commit `c13e46b77c259f00b7a3ee644b4d9b76c2130f90` is still under GitHub Actions validation at note time. Earlier scaffold builds succeeded, but do not distribute an earlier APK as if it contains current pairing/media functionality.
+- Real Android device pairing, real clip assembly, end-to-end intake upload, and private YouTube upload still need physical-device acceptance testing. No production YouTube public publishing or privacy/metadata changes were enabled.
