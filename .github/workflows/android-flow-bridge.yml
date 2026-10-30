@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: zoz-android-flow-bridge-${{ github.ref }}
+  group: zoz-android-flow-bridge-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 permissions:
