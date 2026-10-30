@@ -45,8 +45,9 @@ class FlowAutomationService : AccessibilityService() {
         super.onServiceConnected()
         if (!receiverRegistered) {
             val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
-            if (Build.VERSION.SDK_INT >= 33) registerReceiver(downloadReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            else @Suppress("DEPRECATION") registerReceiver(downloadReceiver, filter)
+            androidx.core.content.ContextCompat.registerReceiver(
+                this, downloadReceiver, filter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+            )
             receiverRegistered = true
         }
         handler.postDelayed({ inspectCurrentPage() }, 1200)
