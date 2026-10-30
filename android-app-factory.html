@@ -197,7 +197,7 @@ async function refresh(){
   if(String(userData?.user?.email||'').toLowerCase()!==OWNER)throw new Error('هذه الصفحة تتطلب جلسة مالك ZOZ Pro.');
   const res=await fetch(API,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({action:'app_factory_overview'}),cache:'no-store'});
   const d=await res.json().catch(()=>({}));if(!res.ok||d.ok!==true)throw new Error(d.error||('HTTP '+res.status));
-  const a=d.android_app_factory||{},projects=Array.isArray(a.projects)?a.projects:[],builds=Array.isArray(a.builds)?a.builds:[],devices=Array.isArray(d.android_devices?.devices)?d.android_devices.devices:[];
+  const a=d.android_app_factory||{},projects=Array.isArray(a.projects)?a.projects:[],builds=Array.isArray(a.builds)?a.builds:[],devices=Array.isArray(d.android_devices?.rows)?d.android_devices.rows:[];
   text(el('factory-project-count'),a.project_count??projects.length);text(el('factory-build-count'),a.build_count??builds.length);text(el('factory-device-count'),devices.length);
   const tbody=el('factory-project-rows');tbody.replaceChildren();
   if(!projects.length){const tr=document.createElement('tr');rowCell(tr,'لا توجد مشاريع مسجلة');rowCell(tr,'—');rowCell(tr,'—');rowCell(tr,'—');tbody.appendChild(tr);}
