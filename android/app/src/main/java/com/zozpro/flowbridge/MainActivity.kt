@@ -112,6 +112,7 @@ private fun FlowBridgeScreen() {
         if (paired && FlowAutomationService.isEnabled(context)) {
             withContext(Dispatchers.IO) {
                 runCatching { apiPost(context, "enable_phone_control", JSONObject()) }
+                runCatching { apiPost(context, "enable_flow_automation", JSONObject()) }
             }
         }
     }
