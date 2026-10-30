@@ -38,8 +38,8 @@ A native Android companion to the existing ZOZ Pro production project. It is an 
 - No public YouTube publication, privacy changes, purchases, destructive actions, or account security changes are performed automatically.
 
 ## Validation status
-- Android debug APK build succeeded for the earlier scaffold. A newer build containing device pairing, local assembly, and intake upload is being validated by GitHub Actions; do not distribute an APK until the matching latest workflow run is green and its artifact is verified.
-- General repository CI has passed for current feature branch commits.
+- Android debug APK build has succeeded previously for the earlier scaffold. A newer build containing device pairing, local assembly, and intake upload is currently being validated by GitHub Actions; do not distribute an APK until the matching latest workflow run is green and its artifact is verified.
+- General repository CI has passed for the current feature branch commits.
 - Production migrations were applied additively; device/credential/job schema and owner-read policies were verified. Service-only credentials/challenges have no client policy by design.
 - Real-device pairing, file assembly across actual Flow samples, end-to-end upload, notification permission behavior, and 15-minute background execution still require a physical Android device test.
 
