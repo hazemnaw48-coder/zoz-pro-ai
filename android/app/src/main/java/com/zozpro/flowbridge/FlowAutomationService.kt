@@ -222,7 +222,7 @@ class FlowAutomationService : AccessibilityService() {
                     walk(root) { node ->
                         if (captured >= 100 || !node.isVisibleToUser) return@walk
                         val label = controlNodeLabel(node)
-                        if (label.isBlank() || isSensitiveLabel(label) || label.matches(Regex("^\\d{4,8}$"))) return@walk
+                        if (label.isBlank() || node.isEditable || node.isPassword || isSensitiveLabel(label) || label.matches(Regex("^\\d{4,8}$"))) return@walk
                         val item = JSONObject().put("label", safeUiText(label))
                             .put("clickable", node.isClickable || node.parent?.isClickable == true)
                             .put("editable", node.isEditable)
@@ -827,7 +827,16 @@ class FlowAutomationService : AccessibilityService() {
             prefs.edit().putString(KEY_ACTIVE_CONTROL_TASK, task.toString()).apply()
             val service = activeService
             if (service != null) service.handler.post { service.scheduleControlInspection(300) }
-            else DeviceNotifications.show(context, "أمر تحكم بانتظار الشاشة", "افتح التطبيق المستهدف ليتمكن ZOZ من تنفيذ الأمر بعد ظهوره.")
+            val currentPackage = service?.rootInActiveWindow?.packageName?.toString().orEmpty()
+            if (currentPackage != target) {
+                val launch = context.packageManager.getLaunchIntentForPackage(target)
+                if (launch != null) {
+                    runCatching { context.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                        .onFailure { DeviceNotifications.show(context, "أمر تحكم بانتظار التطبيق", "تعذر فتح التطبيق من الخلفية؛ افتحه ليكمل الوكيل المهمة.") }
+                } else {
+                    DeviceNotifications.show(context, "التطبيق غير مثبت", "لم يعثر الهاتف على التطبيق المطلوب.")
+                }
+            }
         }
 
         fun startScene(context: Context, jobId: String, payload: JSONObject) {
