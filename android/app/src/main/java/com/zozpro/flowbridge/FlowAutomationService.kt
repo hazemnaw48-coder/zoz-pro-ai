@@ -32,6 +32,11 @@ class FlowAutomationService : AccessibilityService() {
     private var receiverRegistered = false
     private val networkExecutor = Executors.newSingleThreadExecutor()
 
+    private fun isFlowInForeground(): Boolean {
+        val pkg = rootInActiveWindow?.packageName?.toString().orEmpty()
+        return pkg == "com.android.chrome" || pkg == "com.google.android.googlequicksearchbox"
+    }
+
     private val downloadReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action != DownloadManager.ACTION_DOWNLOAD_COMPLETE) return
@@ -43,6 +48,7 @@ class FlowAutomationService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        activeService = this
         if (!receiverRegistered) {
             val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
             androidx.core.content.ContextCompat.registerReceiver(
@@ -74,6 +80,7 @@ class FlowAutomationService : AccessibilityService() {
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
         if (receiverRegistered) runCatching { unregisterReceiver(downloadReceiver) }
+        if (activeService === this) activeService = null
         super.onDestroy()
     }
 
@@ -148,7 +155,9 @@ class FlowAutomationService : AccessibilityService() {
 
     private fun containsGate(text: String): Boolean {
         val markers = listOf("sign in", "log in", "verify it's you", "verify you are", "captcha",
-            "two-step verification", "2-step verification", "تسجيل الدخول", "تحقق من هويتك", "رمز التحقق")
+            "two-step verification", "2-step verification", "quota exceeded", "limit reached",
+            "not enough credits", "daily limit", "تسجيل الدخول", "تحقق من هويتك", "رمز التحقق",
+            "تم استنفاد الرصيد", "تجاوز الحد", "لا توجد أرصدة كافية")
         return markers.any(text::contains)
     }
 
@@ -194,6 +203,7 @@ class FlowAutomationService : AccessibilityService() {
 
     private fun handleDownload(downloadId: Long) {
         val task = activeTask() ?: return
+        if (task.optString("phase") != "download_started") return
         val manager = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
         val query = DownloadManager.Query().setFilterById(downloadId)
         manager.query(query).use { cursor ->
@@ -292,6 +302,7 @@ class FlowAutomationService : AccessibilityService() {
     }
 
     companion object {
+        @Volatile private var activeService: FlowAutomationService? = null
         const val PREFS = "zoz_flow_bridge"
         const val PREF_CLIPS = "saved_clips"
         const val KEY_ACTIVE_TASK = "flow_active_scene_task"
@@ -309,8 +320,8 @@ class FlowAutomationService : AccessibilityService() {
             val duration = payload.optDouble("duration_seconds", 8.0)
             if (duration <= 0.0 || duration > 8.0) throw IllegalArgumentException("كل مشهد Google Flow يجب ألا يتجاوز 8 ثوانٍ.")
             val index = payload.optInt("scene_index", 0)
-            val total = payload.optInt("total_scenes", 0)
-            val campaign = payload.optString("campaign_id", "")
+            val total = payload.optInt("total_scenes", payload.optInt("scene_count", 0))
+            val campaign = payload.optString("campaign_id", payload.optString("proposal_id", ""))
             val prompt = payload.optString("prompt", "")
             if (index < 1 || total < 1 || index > total || campaign.isBlank() || prompt.isBlank()) {
                 throw IllegalArgumentException("بيانات المشهد أو الحملة غير مكتملة.")
@@ -318,18 +329,28 @@ class FlowAutomationService : AccessibilityService() {
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             if (prefs.getString(KEY_ACTIVE_TASK, null) != null) throw IllegalStateException("هناك مشهد آخر قيد التنفيذ على الهاتف.")
             if (index == 1) prefs.edit().putString(PREF_CLIPS, "[]").apply()
-            val task = JSONObject(payload.toString()).put("job_id", jobId).put("phase", "waiting_editor")
+            val task = JSONObject(payload.toString())
+                .put("campaign_id", campaign)
+                .put("total_scenes", total)
+                .put("job_id", jobId)
+                .put("phase", "waiting_editor")
             prefs.edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
             val url = payload.optString("url", "https://labs.google/fx/tools/flow")
             if (!url.startsWith("https://labs.google/")) {
                 prefs.edit().remove(KEY_ACTIVE_TASK).apply()
                 throw IllegalArgumentException("Flow URL is not allow-listed.")
             }
-            try {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            } catch (e: Exception) {
-                prefs.edit().remove(KEY_ACTIVE_TASK).apply()
-                throw IllegalStateException("تعذر فتح Google Flow من الخلفية؛ افتح التطبيق مرة واحدة ثم أعد المحاولة.", e)
+            val runningService = activeService
+            if (runningService != null && runningService.isFlowInForeground()) {
+                runningService.handler.postDelayed({ runningService.inspectCurrentPage() }, 250)
+            } else {
+                try {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                } catch (_: Exception) {
+                    // Android may block background activity launches. Keep the leased job and let the owner
+                    // open Flow from this notification; the accessibility service resumes the saved task.
+                    DeviceNotifications.showFlow(context, url)
+                }
             }
         }
     }
