@@ -245,7 +245,7 @@ class FlowAutomationService : AccessibilityService() {
                 val total = task.optInt("total_scenes", 0)
                 val index = task.optInt("scene_index", 0)
                 if (success && total > 0 && index >= total) {
-                    handler.postDelayed({ assembleAndUpload(task.optString("campaign_id"), total) }, 800)
+                    handler.postDelayed({ assembleAndUpload(task.optString("campaign_id"), total, task.optString("channel_id")) }, 800)
                 } else if (success) {
                     handler.postDelayed({
                         WorkManager.getInstance(this).enqueueUniqueWork("zoz-device-next-scene",
@@ -256,26 +256,37 @@ class FlowAutomationService : AccessibilityService() {
         }
     }
 
-    private fun assembleAndUpload(campaignId: String, expectedScenes: Int) {
-        try {
-            val arr = JSONArray(prefs().getString(FlowAutomationService.PREF_CLIPS, "[]") ?: "[]")
-            val entries = mutableListOf<Pair<Int, ImportedClip>>()
-            for (i in 0 until arr.length()) {
-                val o = arr.optJSONObject(i) ?: continue
-                val uri = Uri.parse(o.optString("uri"))
-                val index = o.optInt("scene_index", i + 1)
-                if (o.optString("campaign_id") == campaignId) entries.add(index to ImportedClip(uri, o.optString("name", "scene-$index.mp4"), o.optLong("size")))
+    private fun assembleAndUpload(campaignId: String, expectedScenes: Int, channelId: String) {
+        networkExecutor.execute {
+            try {
+                val arr = JSONArray(prefs().getString(PREF_CLIPS, "[]") ?: "[]")
+                val entries = mutableListOf<Pair<Int, ImportedClip>>()
+                for (i in 0 until arr.length()) {
+                    val o = arr.optJSONObject(i) ?: continue
+                    val uri = Uri.parse(o.optString("uri"))
+                    val index = o.optInt("scene_index", i + 1)
+                    if (o.optString("campaign_id") == campaignId) {
+                        entries.add(index to ImportedClip(uri, o.optString("name", "scene-$index.mp4"), o.optLong("size")))
+                    }
+                }
+                val uniqueIndexes = entries.map { it.first }.distinct()
+                if (uniqueIndexes.size != expectedScenes || uniqueIndexes.sorted() != (1..expectedScenes).toList()) {
+                    throw IllegalStateException("لم تصل كل مشاهد الحملة بترتيبها؛ وصل ${uniqueIndexes.size} من $expectedScenes.")
+                }
+                val ordered = entries.sortedBy { it.first }.map { it.second }
+                if (ordered.size < 2) throw IllegalStateException("At least two downloaded scenes are required.")
+                val output = File(getExternalFilesDir(null), "ZOZ-final-${System.currentTimeMillis()}.mp4")
+                assembleCompatibleClips(this, ordered, Uri.fromFile(output))
+                val uploadMessage = uploadFinalVideoToIntake(this, Uri.fromFile(output), true, false, channelId)
+                val assetId = prefs().getString("zoz_last_uploaded_asset_id", "") ?: ""
+                if (assetId.isBlank()) throw IllegalStateException("اكتمل الرفع لكن لم يُسجل معرّف ملف الاستقبال.")
+                apiPostWithToken("production_intake_complete",
+                    JSONObject().put("proposal_id", campaignId).put("asset_id", assetId).put("channel_id", channelId),
+                    DeviceTokenVault.read(this) ?: "")
+                handler.post { DeviceNotifications.show(this, "وصل الفيديو إلى ZOZ", uploadMessage) }
+            } catch (e: Exception) {
+                handler.post { DeviceNotifications.show(this, "تجميع الفيديو يحتاج مراجعة", e.message ?: "تعذر التجميع أو الرفع التلقائي.") }
             }
-            val uniqueIndexes = entries.map { it.first }.distinct()
-            if (uniqueIndexes.size != expectedScenes || uniqueIndexes.sorted() != (1..expectedScenes).toList()) throw IllegalStateException("لم تصل كل مشاهد الحملة بترتيبها؛ وصل ${uniqueIndexes.size} من $expectedScenes.")
-            val ordered = entries.sortedBy { it.first }.map { it.second }
-            if (ordered.size < 2) throw IllegalStateException("At least two downloaded scenes are required.")
-            val output = File(getExternalFilesDir(null), "ZOZ-final-${System.currentTimeMillis()}.mp4")
-            assembleCompatibleClips(this, ordered, Uri.fromFile(output))
-            val result = uploadFinalVideoToIntake(this, Uri.fromFile(output), true, false)
-            DeviceNotifications.show(this, "وصل الفيديو إلى ZOZ", result)
-        } catch (e: Exception) {
-            DeviceNotifications.show(this, "تجميع الفيديو يحتاج مراجعة", e.message ?: "تعذر التجميع أو الرفع التلقائي.")
         }
     }
 
