@@ -521,7 +521,14 @@ fun assembleCompatibleClips(context: Context, clips: List<ImportedClip>, outputU
                 val size = extractor.readSampleData(buffer, 0)
                 if (size < 0) break
                 val mime = extractor.getTrackFormat(sourceTrack).getString(MediaFormat.KEY_MIME) ?: break
-                info.set(0, size, offsetUs + extractor.sampleTime, extractor.sampleFlags)
+                val sampleFlags = extractor.sampleFlags
+                if ((sampleFlags and MediaExtractor.SAMPLE_FLAG_ENCRYPTED) != 0) {
+                    throw IllegalStateException("المقطع يحتوي عينات مشفرة؛ أوقفنا التجميع بدل إفساد الفيديو.")
+                }
+                var codecFlags = 0
+                if ((sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC) != 0) codecFlags = codecFlags or MediaCodec.BUFFER_FLAG_KEY_FRAME
+                if ((sampleFlags and MediaExtractor.SAMPLE_FLAG_PARTIAL_FRAME) != 0) codecFlags = codecFlags or MediaCodec.BUFFER_FLAG_PARTIAL_FRAME
+                info.set(0, size, offsetUs + extractor.sampleTime, codecFlags)
                 outputMuxer.writeSampleData(outputTracks[mime] ?: throw IllegalStateException("مسار غير معروف: $mime"), buffer, info)
                 maxSample = maxOf(maxSample, extractor.sampleTime)
                 if (!extractor.advance()) break
