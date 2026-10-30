@@ -172,3 +172,16 @@ The center project `894a0e3a-85c4-43de-b8f7-205db24685b9` still uses browser `lo
 - CI workflow is configured to build a debug APK on pushes/PRs affecting the Android module; its run result has not yet been independently verified from this handoff.
 - No production backend, database schema, existing function, OAuth credential, channel authorization, or publication policy was changed.
 - Latest known feature-branch commits include app scaffold and Compose compiler configuration; verify the branch head and CI result before distributing an APK.
+
+
+## Android App Factory section added — 2026-10-30
+
+- Added `docs/ANDROID_APP_FACTORY.md` defining the permanent Android App Factory: app portfolio, requirements, engineering, CI builds, test evidence, signing/release, operations, capability registry, risk-based owner approvals, security, and platform limits.
+- Added `android-app-factory.html` as a phone-first Arabic App Factory section with the current app portfolio, lifecycle, autonomy policy, and honest implementation status.
+- Updated `index.html` on the feature branch to add a dedicated **إنتاج تطبيقات Android** tab beside analysis/upload. This is not yet on the live production Pages branch.
+- Updated `sw.js` to cache the new App Factory page and updated the PWA manifest description.
+- Current portfolio entries: ZOZ Device Agent / Flow Bridge (initial code scaffold); ZOZ Browser Agent (planned); ZOZ Video Factory (planned); ZOZ KDP Workspace (planned).
+- The new section is a documentation/control-center UI only. It is not yet backed by a persistent app registry or build/test records in Supabase.
+- No production Supabase tables, RLS policies, secrets, existing YouTube flows, or publication permissions were changed.
+- No APK build, device pairing, browser automation, Flow automation, KDP submission, or Play Store release is claimed complete.
+- Next: inspect CI status for the latest feature branch head; verify APK build; then inspect production schema/RLS before designing additive app-project/device/job tables.
