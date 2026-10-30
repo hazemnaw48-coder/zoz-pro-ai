@@ -162,7 +162,7 @@ private fun FlowBridgeScreen() {
                             val response = apiPost(context, "pair_exchange", JSONObject()
                                 .put("pairing_code", pairingCode)
                                 .put("device_name", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL)
-                                .put("app_version", "0.2.0"))
+                                .put("app_version", "0.3.1"))
                             val token = response.getString("device_token")
                             DeviceTokenVault.write(context, token, response.getString("intake_token"))
                             paired = true
@@ -175,7 +175,7 @@ private fun FlowBridgeScreen() {
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(enabled = !busy, onClick = { runAsync {
-                            val health = apiPost(context, "device_health", JSONObject().put("app_version", "0.2.0"))
+                            val health = apiPost(context, "device_health", JSONObject().put("app_version", "0.3.1"))
                             val job = apiPost(context, "poll_jobs", JSONObject()).optJSONObject("job")
                             if (job == null) "الاتصال سليم. لا توجد مهام جديدة."
                             else executeJob(context, job)
@@ -682,7 +682,7 @@ class DevicePollWorker(context: Context, params: androidx.work.WorkerParameters)
     override fun doWork(): Result {
         val token = DeviceTokenVault.read(applicationContext) ?: return Result.success()
         return try {
-            apiPostWithToken("heartbeat", JSONObject().put("app_version", "0.2.0"), token)
+            apiPostWithToken("heartbeat", JSONObject().put("app_version", "0.3.1"), token)
             val job = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job")
             if (job != null) executeJob(applicationContext, job)
             Result.success()
