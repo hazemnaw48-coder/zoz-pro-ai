@@ -108,6 +108,13 @@ private fun FlowBridgeScreen() {
         }
     }
     LaunchedEffect(prompt) { prefs.edit().putString(PREF_PROMPT, prompt).apply() }
+    LaunchedEffect(paired) {
+        if (paired && FlowAutomationService.isEnabled(context)) {
+            withContext(Dispatchers.IO) {
+                runCatching { apiPost(context, "enable_phone_control", JSONObject()) }
+            }
+        }
+    }
     LaunchedEffect(clips) { saveClips(context, clips) }
 
     fun runAsync(block: suspend () -> String) {
@@ -147,8 +154,8 @@ private fun FlowBridgeScreen() {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(if (paired) "الجهاز مقرون بالوكيل" else "الجهاز غير مقرون", fontWeight = FontWeight.Bold)
-                        Text("المهام المسموحة الآن: فحص الجهاز، فتح Google Flow بطلب ظاهر، وتجهيز/نسخ مطالبة المشهد.")
-                        Text("لا توجد نقرات مخفية أو تجاوز لقيود Flow أو صلاحيات نشر تلقائي.")
+                        Text("قدرات الجهاز: تنفيذ مشاهد Flow والتحكم المرئي في التطبيقات المفتوحة بأوامر المالك.")
+                        Text("تُحجب حقول كلمات المرور ورموز التحقق. الإرسال والنشر والحذف والدفع والتحويل تتطلب موافقة مالك مستقلة.")
                     }
                 }
 
@@ -201,7 +208,7 @@ private fun FlowBridgeScreen() {
                                 val capability = job.optString("capability_id")
                                 executeJob(context, job)
                                 processed++
-                                if (capability == "flow.generate_scene") break
+                                if (capability == "flow.generate_scene" || capability == "device.ui_control") break
                             }
                             if (processed == 0) "الاتصال سليم. لا توجد مهام جديدة."
                             else "اكتمل الاتصال واستلام $processed مهمة من وكيل ZOZ."
@@ -601,6 +608,10 @@ private fun executeJob(context: Context, job: JSONObject): String {
                 FlowAutomationService.startScene(context, id, payload)
                 return "بدأ الهاتف تنفيذ مشهد Flow المرئي."
             }
+            "device.ui_control" -> {
+                FlowAutomationService.startUiControl(context, id, payload)
+                return "بدأ وسيط ZOZ التحكم المرئي في التطبيق المطلوب."
+            }
             "flow.copy_prompt" -> {
                 val text = payload.optString("prompt", "").take(12000)
                 if (text.isBlank()) throw IllegalArgumentException("prompt_empty")
@@ -733,7 +744,7 @@ class DevicePollWorker(context: Context, params: androidx.work.WorkerParameters)
                 val job = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job") ?: break
                 val capability = job.optString("capability_id")
                 executeJob(applicationContext, job)
-                if (capability == "flow.generate_scene") break
+                if (capability == "flow.generate_scene" || capability == "device.ui_control") break
             }
             Result.success()
         } catch (_: Exception) { Result.retry() }
