@@ -63,6 +63,17 @@ body.upload-mode .footer{font-size:11px}
 <section class="card" id="zoz-agent-panel" aria-label="وكيل الإدارة الذكي">
 <div class="row"><div><h2 style="margin:0 0 4px">وكيل الإدارة الذكي</h2><p style="margin:0">تشغيل مباشر داخل مركز التحكم الحالي — دون فتح صفحة منفصلة.</p></div><button type="button" class="secondary" id="zoz-agent-health-btn">فحص الخدمة</button></div>
 <div id="zoz-agent-health" class="notice" style="margin-top:10px">جارٍ فحص الوكيل التنفيذي في مشروع الإنتاج…</div>
+<div class="section-gap" id="zoz-agent-operator">
+ <h3>لوحة المدير التنفيذي · حالة النظام والصلاحيات</h3>
+ <p>قراءة مباشرة من قاعدة الإنتاج: القنوات، المهام، الفيديوهات، الذاكرة، التكاملات، وسجل أدوات الوكيل.</p>
+ <div class="actions">
+  <button type="button" class="secondary" id="zoz-agent-overview-btn">حالة النظام</button>
+  <button type="button" class="secondary" id="zoz-agent-preflight-btn">فحص الجاهزية</button>
+  <button type="button" class="secondary" id="zoz-agent-tools-btn">سجل الأدوات</button>
+ </div>
+ <div id="zoz-agent-operator-status" class="notice" style="display:none"></div>
+ <pre id="zoz-agent-operator-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:480px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre>
+</div>
 <div class="section-gap"><h3>١ · تحليل قناة Hazem Ahmed</h3><p>يقرأ حالة القناة والتحليلات والتقويم والمسودات وملفات الفيديو، ثم يعرض التشخيص والخطوات العملية. لا يغيّر الفيديوهات ولا ينشر.</p><div class="actions"><button type="button" id="zoz-agent-analyze-btn">حلّل القناة الآن</button><button type="button" class="secondary" id="zoz-agent-video-test-btn">اختبر نجاح آخر فيديو</button><button type="button" id="zoz-agent-cycle-btn">شغّل دورة الإدارة</button></div><div id="zoz-agent-analysis-status" class="notice" style="display:none"></div><pre id="zoz-agent-analysis-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre></div>
 <div class="section-gap"><h3>٢ · إنشاء مسودة محتوى</h3><p>المسودة تُحفظ في مركز الإنتاج للمراجعة. لا يتم إنشاء فيديو أو رفعه أو نشره تلقائيًا.</p><label for="zoz-agent-topic">موضوع المسودة</label><input id="zoz-agent-topic" maxlength="240" placeholder="مثال: كيف عاش العمال في دير المدينة؟"><div class="grid"><div><label for="zoz-agent-mode">نوع المحتوى</label><select id="zoz-agent-mode" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit"><option value="short">Short</option><option value="long">فيديو طويل</option></select></div><div><label for="zoz-agent-duration">المدة المقترحة بالثواني</label><input id="zoz-agent-duration" type="number" min="20" max="180" value="45"></div></div><div class="actions"><button type="button" id="zoz-agent-draft-btn">أنشئ المسودة واحفظها</button></div><div id="zoz-agent-draft-status" class="notice" style="display:none"></div><pre id="zoz-agent-draft-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre></div>
 </section>
@@ -277,6 +288,7 @@ const OWNER='hazemnaw48@gmail.com';
 const CHANNEL_ID='UCIael48cvwPG3gKj--c7HKw';
 const API=SUPABASE_URL+'/functions/v1/zoz-pro-youtube-analytics';
 const AGENT_API=SUPABASE_URL+'/functions/v1/zoz-pro-agent';
+const AGENT_CONTROL_API=SUPABASE_URL+'/functions/v1/zoz-pro-agent-control';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
 const $=id=>document.getElementById(id);
 let loadedVideos=[];
@@ -987,6 +999,25 @@ async function checkZozAgentHealth(){
  }catch(e){el.className='notice bad';el.textContent='تعذر فحص الوكيل: '+(e.message||e);}
  finally{if(b)b.disabled=false;}
 }
+async function callZozAgentControl(action){
+ const session=await ownerSession();
+ const response=await fetch(AGENT_CONTROL_API,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({action}),cache:'no-store'});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok||data.ok===false)throw new Error(data.error||('فشل طلب لوحة المدير HTTP '+response.status));
+ return data;
+}
+async function runZozAgentControl(action,label){
+ const bts=['zoz-agent-overview-btn','zoz-agent-preflight-btn','zoz-agent-tools-btn'].map(id=>$(id));
+ bts.forEach(b=>b.disabled=true);
+ const status=$('zoz-agent-operator-status'),out=$('zoz-agent-operator-result');
+ status.style.display='block';status.className='notice';status.textContent='جارٍ '+label+' من مشروع الإنتاج…';out.style.display='none';
+ try{
+  const d=await callZozAgentControl(action);
+  out.textContent=JSON.stringify(d,null,2);out.style.display='block';
+  status.className='notice good';status.textContent='اكتمل '+label+'؛ البيانات معروضة من مشروع الإنتاج.';
+ }catch(e){status.className='notice bad';status.textContent='تعذر '+label+': '+(e.message||e);}
+ finally{bts.forEach(b=>b.disabled=false)}
+}
 async function callZozAgent(action,extra){
  const session=await ownerSession();
  const response=await fetch(AGENT_API,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:action,channel_id:CHANNEL_ID},extra||{})),cache:'no-store'});
@@ -1025,6 +1056,10 @@ $('books-refresh')?.addEventListener('click',loadBooksDashboard);
 $('books-report-form')?.addEventListener('submit',async ev=>{ev.preventDefault();const button=$('books-report-save');button.disabled=true;notice('books-report-msg','جارٍ تسجيل بيانات التقرير…');try{const val=id=>$(id).value.trim(),d={book_id:val('books-report-book'),period_start:val('books-period-start'),period_end:val('books-period-end'),units_sold:val('books-units'),pages_read:val('books-pages'),royalties_amount:val('books-royalties'),ad_spend_amount:val('books-ad-spend'),notes:val('books-report-notes'),royalties_currency:'USD',ad_spend_currency:'USD',marketplace:'Amazon.com'};if(d.period_start>d.period_end)throw new Error('تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.');if(!d.book_id)throw new Error('اختر الكتاب أولًا.');if(!d.units_sold&&!d.pages_read&&!d.royalties_amount)throw new Error('أدخل قيمة واحدة على الأقل من التقرير؛ اترك القيم غير المتاحة فارغة.');const r=await callZozAgent('record_book_snapshot',d);notice('books-report-msg','تم حفظ التقرير في قاعدة الإنتاج. معرّف السجل: '+(r.snapshot_id||'تم الحفظ')+'. البيانات مدخلة من المالك وليست اتصالًا تلقائيًا بأمازون.','good');$('books-report-form').reset();await loadBooksDashboard()}catch(e){notice('books-report-msg','تعذر حفظ التقرير: '+(e.message||e),'bad')}finally{button.disabled=false}});
 
 $('zoz-agent-health-btn')?.addEventListener('click',checkZozAgentHealth);
+$('zoz-agent-overview-btn')?.addEventListener('click',()=>runZozAgentControl('operator_overview','تحديث حالة النظام'));
+$('zoz-agent-preflight-btn')?.addEventListener('click',()=>runZozAgentControl('operator_preflight','فحص الجاهزية'));
+$('zoz-agent-tools-btn')?.addEventListener('click',()=>runZozAgentControl('tool_catalog','قراءة سجل الأدوات'));
+
 $('zoz-agent-analyze-btn')?.addEventListener('click',async()=>{
  const b=$('zoz-agent-analyze-btn'),status=$('zoz-agent-analysis-status'),out=$('zoz-agent-analysis-result');
  b.disabled=true;b.textContent='جارٍ التحليل…';status.style.display='block';out.style.display='none';status.className='notice';status.textContent='يتحقق الوكيل من جلسة المالك ويقرأ بيانات قناة Hazem Ahmed…';
