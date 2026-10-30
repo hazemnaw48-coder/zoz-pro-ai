@@ -53,14 +53,23 @@ class FlowAutomationService : AccessibilityService() {
     private fun isVerifiedFlowPage(root: AccessibilityNodeInfo): Boolean {
         val pkg = root.packageName?.toString().orEmpty()
         if (pkg !in setOf("com.android.chrome", "com.google.android.googlequicksearchbox")) return false
-        val address = browserAddressBarText(root)?.lowercase() ?: return false
-        val normalized = address
-            .removePrefix("https://")
-            .removePrefix("http://")
-            .removePrefix("www.")
-            .substringBefore(' ')
-        val host = normalized.substringBefore('/').substringBefore(':').trim()
-        return host == "labs.google"
+        val address = browserAddressBarText(root)?.lowercase()
+        if (address != null) {
+            val normalized = address.removePrefix("https://").removePrefix("http://")
+                .removePrefix("www.").substringBefore(' ')
+            val host = normalized.substringBefore('/').substringBefore(':').trim()
+            if (host == "labs.google") return true
+            if (host.contains('.')) return false
+        }
+        val task = activeTask() ?: return false
+        val launchedAt = task.optLong("flow_launch_requested_at_ms", 0L)
+        val age = System.currentTimeMillis() - launchedAt
+        if (launchedAt <= 0L || age < 0L || age > 300000L) return false
+        if (!task.optString("url", "").startsWith("https://labs.google/fx/tools/flow")) return false
+        val pageText = collectText(root).joinToString(" ").lowercase()
+        val hasFlowBrand = pageText.contains("flow") || pageText.contains("labs.google")
+        val hasEditorControl = listOf("new project", "create project", "describe your idea", "generate video", "scene", "prompt").any(pageText::contains)
+        return hasFlowBrand && hasEditorControl
     }
 
     private fun isFlowInForeground(): Boolean {
