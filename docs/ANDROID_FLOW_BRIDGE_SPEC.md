@@ -65,3 +65,13 @@ A native Android companion to the existing ZOZ Pro production project. It is an 
 - Google Flow mobile app is supported in Egypt. The official Flow Agent feature is currently web/PC only; the Android app can prepare prompts, open Flow, accept shared clips, assemble and upload them, but it cannot run Flow Agent autonomously or bypass its credit/identity checks.
 - Physical-device acceptance tests still required: pair the owner's phone, verify heartbeat and prompt delivery, share real Flow clips, verify audio/order/duration after assembly, upload to intake, approve private upload, and approve the final publication task.
 - Repository Edge Function source replaces the private owner email with the server environment variable `ZOZ_OWNER_EMAIL`. Set this server-only secret before redeploying those source files; never commit the real email or any OAuth/service-role tokens.
+
+
+## Accessibility Flow execution milestone — 2026-10-30
+
+- The open PR `feature/flow-accessibility-runtime` adds an owner-enabled Android AccessibilityService limited to Chrome/Google browser packages. It fills a recognized Flow prompt editor, clicks only known visible Generate/Download labels, and stops for login, CAPTCHA, MFA, or identity verification.
+- Every scene remains a separate clip with an 8-second maximum. After the ordered downloads complete, the app uses the existing compatible-track stream-copy assembly and the existing channel-scoped private intake route.
+- The Android service is opt-in: the owner must enable Android Accessibility for ZOZ and confirm the capability from the paired app. This is not silent or unrestricted control.
+- CI previously failed on Android lint because the receiver registration uses an explicit not-exported flag through AndroidX. The PR is being corrected and must pass a fresh APK build, lint, and tests before any APK is installed.
+- The job payload carries both the proposal/campaign identifier and total scene count. The phone processes one Flow generation job at a time to avoid overlapping runs and lease races.
+- Status remains **not physically verified** until the APK is installed on the owner’s phone and an end-to-end real Flow test confirms prompt entry, visible generation, clip download, ordered assembly, private intake, and owner review. Public YouTube publishing remains a separate owner-approved step.
