@@ -374,14 +374,15 @@ fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kid
     val savedId = prefs.getString("intake_upload_asset_id", null)
     val savedUri = prefs.getString("intake_upload_uri", null)
     val savedSize = prefs.getLong("intake_upload_size", -1L)
+    val savedChannel = prefs.getString("intake_upload_channel_id", "") ?: ""
     if (!savedId.isNullOrBlank()) {
-        if (savedUri != uri.toString() || savedSize != size) {
+        if (savedUri != uri.toString() || savedSize != size || (channelId.isNotBlank() && savedChannel.isNotBlank() && savedChannel != channelId)) {
             throw IllegalStateException("يوجد رفع سابق غير مكتمل. أعد اختيار الملف نفسه لاستكماله أولًا.")
         }
         val status = intakePost("intake_status", JSONObject().put("asset_id", savedId), intakeToken)
         asset = status.getJSONObject("asset")
         if (asset.optString("status") == "ready_for_review") {
-            prefs.edit().remove("intake_upload_asset_id").remove("intake_upload_uri").remove("intake_upload_size").apply()
+            prefs.edit().remove("intake_upload_asset_id").remove("intake_upload_uri").remove("intake_upload_size").remove("intake_upload_channel_id").apply()
             return "الفيديو موجود بالفعل في استقبال ZOZ وينتظر المراجعة. رقم الملف: $savedId"
         }
         if (asset.optString("status") != "uploading") {
@@ -401,7 +402,7 @@ fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kid
             .put("target_privacy_status", "public"), intakeToken)
         asset = created.getJSONObject("asset")
         prefs.edit().putString("intake_upload_asset_id", asset.getString("id"))
-            .putString("intake_upload_uri", uri.toString()).putLong("intake_upload_size", size).apply()
+             .putString("intake_upload_uri", uri.toString()).putLong("intake_upload_size", size).putString("intake_upload_channel_id", asset.optString("channel_id", channelId)).apply()
     }
     val assetId = asset.getString("id")
     prefs.edit().putString("zoz_last_uploaded_asset_id", assetId).apply()
