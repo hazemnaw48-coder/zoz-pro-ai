@@ -8,7 +8,7 @@ android {
     namespace = "com.zozpro.flowbridge"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.zozpro.flowbridge"
+        applicationId = "com.zozpro.flowbridge.next"
         minSdk = 26
         targetSdk = 35
         versionCode = 10
