@@ -23,6 +23,41 @@ import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.Executors
 
+private val ZOZ_CONTROL_PACKAGES = setOf(
+    "com.android.chrome",
+    "com.google.android.googlequicksearchbox",
+    "com.google.android.youtube",
+    "com.google.android.apps.youtube.creator"
+)
+
+private val ZOZ_CONTROL_WEB_HOSTS = setOf(
+    "labs.google", "hazemnaw48-coder.github.io", "github.com", "supabase.com",
+    "oxyzxbkwhafzaztraowc.supabase.co", "youtube.com", "studio.youtube.com",
+    "kdp.amazon.com", "amazon.com", "draft2digital.com", "notion.so", "canva.com", "tiktok.com"
+)
+
+private val ZOZ_TEXT_PURPOSES = setOf("title", "description", "prompt", "tags", "comment", "business_copy", "search_query")
+
+private fun isAllowedZozWebUrl(raw: String): Boolean {
+    val uri = runCatching { Uri.parse(raw) }.getOrNull() ?: return false
+    if (uri.scheme != "https" || uri.userInfo != null || uri.port !in setOf(-1, 443)) return false
+    val host = uri.host?.lowercase()?.trimEnd('.') ?: return false
+    return ZOZ_CONTROL_WEB_HOSTS.any { host == it || host.endsWith(".$it") }
+}
+
+private fun containsSensitiveWorkValue(raw: String): Boolean {
+    val lower = raw.lowercase()
+    val patterns = listOf(
+        Regex("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"),
+        Regex("\\b(?:\\+?\\d[\\d ()-]{7,}\\d)\\b"),
+        Regex("\\b(?:AIza[0-9A-Za-z_-]{20,}|sb_secret_[0-9A-Za-z_-]+|gh[pousr]_[0-9A-Za-z_]{20,}|github_pat_[0-9A-Za-z_]{20,})\\b"),
+        Regex("\\b(?:Bearer\\s+|service[_ -]?role|api[_ -]?key|access[_ -]?token|password|secret)\\b", RegexOption.IGNORE_CASE),
+        Regex("\\b\\d{13,19}\\b")
+    )
+    return patterns.any { it.containsMatchIn(raw) } ||
+        listOf("مفتاح سري", "كلمة المرور", "رمز التحقق", "الرقم القومي", "رقم البطاقة").any(lower::contains)
+}
+
 /**
  * User-enabled, visible UI automation for Google Flow.
  * It never handles passwords, CAPTCHA, MFA, or account selection.
@@ -222,7 +257,8 @@ class FlowAutomationService : AccessibilityService() {
                     walk(root) { node ->
                         if (captured >= 100 || !node.isVisibleToUser) return@walk
                         val label = controlNodeLabel(node)
-                        if (label.isBlank() || node.isEditable || node.isPassword || isSensitiveLabel(label) || label.matches(Regex("^\\d{4,8}$"))) return@walk
+                        val interactive = node.isClickable || node.parent?.isClickable == true || node.isScrollable
+                        if (!interactive || label.isBlank() || node.isEditable || node.isPassword || isSensitiveLabel(label) || label.matches(Regex("^\\d{4,8}$"))) return@walk
                         val item = JSONObject().put("label", safeUiText(label))
                             .put("clickable", node.isClickable || node.parent?.isClickable == true)
                             .put("editable", node.isEditable)
@@ -255,11 +291,15 @@ class FlowAutomationService : AccessibilityService() {
                     val selected = findControlNode(root, step, requireEditable = true)
                         ?: throw IllegalStateException("ui_editor_not_unique_or_missing")
                     val label = controlNodeLabel(selected)
-                    if (selected.isPassword || isSensitiveLabel(label)) {
+                    if (selected.isPassword || label.isBlank() || isSensitiveLabel(label)) {
                         throw IllegalStateException("sensitive_input_field_blocked")
                     }
+                    val purpose = step.optString("input_purpose", "").lowercase()
+                    if (purpose !in ZOZ_TEXT_PURPOSES) throw IllegalStateException("business_content_purpose_required")
                     val value = step.optString("text", "")
-                    if (value.isBlank() || value.length > 3000) throw IllegalArgumentException("ui_text_invalid")
+                    if (value.isBlank() || value.length > 3000 || containsSensitiveWorkValue(value)) {
+                        throw IllegalArgumentException("sensitive_or_invalid_text_blocked")
+                    }
                     selected.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
                     val args = android.os.Bundle().apply {
                         putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value)
@@ -268,6 +308,17 @@ class FlowAutomationService : AccessibilityService() {
                         throw IllegalStateException("ui_text_entry_failed")
                     }
                     results.put(JSONObject().put("action", action).put("characters", value.length).put("entered", true))
+                }
+                "open_url" -> {
+                    val rawUrl = step.optString("url", "")
+                    if (targetPackage != "com.android.chrome" || !isAllowedZozWebUrl(rawUrl)) {
+                        throw IllegalStateException("business_url_not_allowlisted")
+                    }
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(rawUrl))
+                        .setPackage("com.android.chrome")
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(intent)
+                    results.put(JSONObject().put("action", action).put("host", Uri.parse(rawUrl).host).put("opened", true))
                 }
                 "scroll" -> {
                     val direction = step.optString("direction", "down").lowercase()
@@ -312,9 +363,13 @@ class FlowAutomationService : AccessibilityService() {
 
     private fun isSensitiveLabel(value: String): Boolean {
         val v = value.lowercase()
-        return listOf("password", "passcode", "one-time", "verification code", "security code", "otp", "pin code",
-            "cvv", "cvc", "كلمة المرور", "الرقم السري", "رمز التحقق", "كود التحقق", "رمز الأمان", "الرقم القومي",
-            "بيانات البطاقة", "رقم البطاقة").any(v::contains)
+        return listOf(
+            "password", "passcode", "one-time", "verification code", "security code", "otp", "pin code",
+            "cvv", "cvc", "email", "e-mail", "username", "user name", "account", "profile", "phone number",
+            "mobile number", "كلمة المرور", "كلمة السر", "الرقم السري", "رمز التحقق", "كود التحقق", "رمز الأمان",
+            "الرقم القومي", "بيانات البطاقة", "رقم البطاقة", "البريد الإلكتروني", "البريد الالكتروني",
+            "اسم المستخدم", "الحساب", "الملف الشخصي", "رقم الهاتف", "رقم الموبايل"
+        ).any(v::contains)
     }
 
     private fun isIrreversibleLabel(value: String): Boolean {
@@ -363,7 +418,8 @@ class FlowAutomationService : AccessibilityService() {
         networkExecutor.execute {
             runCatching {
                 val terminal = code in setOf(
-                    "owner_approval_required", "sensitive_authentication_control_blocked", "sensitive_input_field_blocked",
+                    "sensitive_authentication_control_blocked", "sensitive_input_field_blocked",
+                    "business_content_purpose_required", "sensitive_or_invalid_text_blocked",
                     "target_app_not_foreground", "screen_unavailable", "control_task_expired"
                 )
                 apiPostWithToken("complete_job", JSONObject().put("job_id", id)
@@ -802,17 +858,24 @@ class FlowAutomationService : AccessibilityService() {
         fun startUiControl(context: Context, jobId: String, payload: JSONObject) {
             if (!isEnabled(context)) throw IllegalStateException("خدمة الوصول غير مفعلة على الهاتف.")
             val target = payload.optString("target_package", "").trim()
-            if (!target.matches(Regex("^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+$")) ||
-                target in setOf("com.android.systemui", "com.android.settings", "com.google.android.inputmethod.latin")) {
-                throw IllegalArgumentException("target_package_not_allowed")
-            }
+            if (target !in ZOZ_CONTROL_PACKAGES) throw IllegalArgumentException("target_package_not_allowed")
             val steps = payload.optJSONArray("steps") ?: throw IllegalArgumentException("control_steps_missing")
             if (steps.length() !in 1..12) throw IllegalArgumentException("control_steps_limit")
-            val allowed = setOf("inspect", "tap", "type_text", "scroll", "back", "wait")
+            val allowed = setOf("inspect", "tap", "type_text", "scroll", "back", "wait", "open_url")
             for (i in 0 until steps.length()) {
                 val step = steps.optJSONObject(i) ?: throw IllegalArgumentException("control_step_invalid")
-                if (step.optString("action") !in allowed) throw IllegalArgumentException("unsupported_ui_action")
+                val action = step.optString("action")
+                if (action !in allowed) throw IllegalArgumentException("unsupported_ui_action")
                 if (step.optString("text").length > 3000) throw IllegalArgumentException("ui_text_invalid")
+                if (action == "type_text" &&
+                    (step.optString("input_purpose").lowercase() !in ZOZ_TEXT_PURPOSES ||
+                     containsSensitiveWorkValue(step.optString("text")))) {
+                    throw IllegalArgumentException("sensitive_or_nonbusiness_text_blocked")
+                }
+                if (action == "open_url" &&
+                    (target != "com.android.chrome" || !isAllowedZozWebUrl(step.optString("url")))) {
+                    throw IllegalArgumentException("business_url_not_allowlisted")
+                }
             }
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             if (prefs.getString(KEY_ACTIVE_TASK, null) != null || prefs.getString(KEY_ACTIVE_CONTROL_TASK, null) != null) {
