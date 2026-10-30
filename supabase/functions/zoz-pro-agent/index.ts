@@ -1047,6 +1047,35 @@ async function dispatchLatestDraftPrompt(userId:string,channelId:string) {
   return {status:jobs.length?"queued":"already_dispatched",jobs_queued:jobs.filter((x:any)=>x.status==="queued").length,scene_count:sceneCount,device_id:device.id,device_name:device.device_name,script_id:script.id,jobs,note:"Scene prompts are queued to the phone. The owner still generates each clip visibly in Google Flow; no quota or UI restrictions are bypassed."};
 }
 
+async function queuePublicPublishApprovals(userId:string) {
+  const assets=await db("zoz_pro_video_intake_assets?owner_id=eq."+encodeURIComponent(userId)+
+    "&status=eq.ready_to_publish&select=id,channel_id,title,target_privacy_status,youtube_video_id&order=updated_at.asc&limit=20");
+  const results:any[]=[];
+  for(const asset of (Array.isArray(assets)?assets:[])){
+    const existing=await db("zoz_pro_agent_work_items?owner_id=eq."+encodeURIComponent(userId)+
+      "&spec->>asset_id=eq."+encodeURIComponent(String(asset.id))+
+      "&spec->>operation=eq.publish_public_video&select=id,status&limit=1");
+    if(Array.isArray(existing)&&existing[0]){
+      results.push({asset_id:asset.id,status:"approval_task_exists",work_item_id:existing[0].id});
+      continue;
+    }
+    const rows=await db("zoz_pro_agent_work_items",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({
+      owner_id:userId,kind:"youtube_public_publish_approval",
+      title:"موافقة المالك على نشر الفيديو — "+clean(asset.title,140),
+      objective:"الفيديو اكتمل رفعه الخاص ومعالجته ومراجعته. يلزم قرار المالك قبل تحويله إلى "+(asset.target_privacy_status==="unlisted"?"غير مدرج":"عام")+".",
+      status:"awaiting_owner_approval",priority:1,
+      agent_decision:"request_owner_approval",
+      expected_outcome:"نشر الفيديو بعد موافقة صريحة محفوظة من المالك فقط.",
+      spec:{operation:"publish_public_video",asset_id:asset.id,channel_id:asset.channel_id,target_privacy_status:asset.target_privacy_status,youtube_video_id:asset.youtube_video_id},
+      next_actions:["راجع العنوان والصورة والوصف والخصوصية.","اضغط موافقة المالك فقط إذا كنت تريد إتمام النشر."],
+      approval_required:true,source_channel_id:asset.channel_id,created_by:"zoz-pro-agent"
+    })});
+    const task=rows?.[0];
+    if(task)results.push({asset_id:asset.id,status:"awaiting_owner_approval",work_item_id:task.id});
+  }
+  return {checked:Array.isArray(assets)?assets.length:0,tasks:results};
+}
+
 async function scheduledOwner(req: Request) {
   const token = req.headers.get("x-zoz-autopilot-token") || "";
   if (!token) return null;
@@ -1083,7 +1112,7 @@ function utcDay(offsetDays = 0) {
 async function executeApprovedAgentTasks(user: any, token: string) {
   const rows = await db(
     "zoz_pro_agent_work_items?owner_id=eq." + encodeURIComponent(user.id) +
-    "&status=eq.approved&select=id,kind,title,spec,source_channel_id,priority&order=priority.asc,created_at.asc&limit=5"
+    "&status=eq.approved&select=id,kind,title,spec,source_channel_id,priority,approval_required&order=priority.asc,created_at.asc&limit=5"
   );
   const results: any[] = [];
   for (const item of (Array.isArray(rows) ? rows : [])) {
@@ -1143,6 +1172,15 @@ async function executeApprovedAgentTasks(user: any, token: string) {
         if (!/^[0-9a-f-]{36}$/i.test(assetId)) throw new Error("المهمة تحتاج asset_id صالحًا.");
         output = await advanceApprovedYouTubeUpload(token, user.id, assetId);
         if (!output?.ok) throw new Error(clean(output?.error || "تعذر تقدم الرفع الخاص.", 300));
+      } else if (operation === "publish_public_video") {
+        if (item.approval_required !== true) throw new Error("النشر العام يتطلب مهمة محفوظة بموافقة مالك صريحة.");
+        if (!/^[0-9a-f-]{36}$/i.test(assetId) || !channelId) throw new Error("المهمة تحتاج asset_id وchannel_id صالحين.");
+        const before = await db("zoz_pro_video_intake_assets?owner_id=eq." + encodeURIComponent(user.id) +
+          "&id=eq." + encodeURIComponent(assetId) + "&status=eq.ready_to_publish&select=id,channel_id,title,target_privacy_status,youtube_video_id&limit=1");
+        const target = Array.isArray(before) ? before[0] : null;
+        if (!target || target.channel_id !== channelId || !target.youtube_video_id) throw new Error("الفيديو ليس جاهزًا للنشر أو لا يطابق القناة المعتمدة.");
+        output = await callAnalyticsTool(token, "intake_publish", { asset_id: assetId, publish_confirmed: true });
+        if (!output?.ok || output.status !== "published") throw new Error(clean(output?.error || "لم يؤكد YouTube اكتمال النشر.", 300));
       } else if (operation === "books_monitor") {
         output = await monitorBooks(user.id);
         if (!output?.ok) throw new Error(clean(output?.error || "تعذر تحليل الكتب وأمازون.", 300));
@@ -1931,6 +1969,13 @@ async function autonomousRun(req: Request, user: any, body: any) {
       results.push(result);
     }
 
+    let publicPublishApprovals:any={checked:0,tasks:[]};
+    try {
+      publicPublishApprovals=await queuePublicPublishApprovals(user.id);
+    } catch(publishQueueError) {
+      failures.push({tool:"youtube.public_publish_approval_queue",error:clean(publishQueueError instanceof Error?publishQueueError.message:"تعذر إنشاء مهام موافقة النشر.",250)});
+    }
+
     let androidDeviceDispatch:any={status:"skipped_no_recent_script_or_paired_device"};
     try {
       androidDeviceDispatch=await dispatchLatestDraftPrompt(user.id,TARGET_CHANNEL_ID);
@@ -1989,6 +2034,7 @@ async function autonomousRun(req: Request, user: any, body: any) {
       approved_tasks: approvedTasks,
       private_upload_progress: privateUploadProgress,
       android_device_dispatch: androidDeviceDispatch,
+      public_publish_approval_queue: publicPublishApprovals,
       channels: results,
       failures: allFailures,
       ai_analysis_done: Boolean(aiAnalysis.used),
