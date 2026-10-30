@@ -1,5 +1,7 @@
 package com.zozpro.flowbridge
 
+import android.annotation.SuppressLint
+
 import android.accessibilityservice.AccessibilityService
 import android.app.DownloadManager
 import android.content.BroadcastReceiver
@@ -41,6 +43,7 @@ class FlowAutomationService : AccessibilityService() {
         }
     }
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onServiceConnected() {
         super.onServiceConnected()
         if (!receiverRegistered) {
@@ -309,8 +312,8 @@ class FlowAutomationService : AccessibilityService() {
             val duration = payload.optDouble("duration_seconds", 8.0)
             if (duration <= 0.0 || duration > 8.0) throw IllegalArgumentException("كل مشهد Google Flow يجب ألا يتجاوز 8 ثوانٍ.")
             val index = payload.optInt("scene_index", 0)
-            val total = payload.optInt("total_scenes", 0)
-            val campaign = payload.optString("campaign_id", "")
+            val total = payload.optInt("total_scenes", payload.optInt("scene_count", 0))
+            val campaign = payload.optString("campaign_id", payload.optString("proposal_id", ""))
             val prompt = payload.optString("prompt", "")
             if (index < 1 || total < 1 || index > total || campaign.isBlank() || prompt.isBlank()) {
                 throw IllegalArgumentException("بيانات المشهد أو الحملة غير مكتملة.")
@@ -318,7 +321,11 @@ class FlowAutomationService : AccessibilityService() {
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             if (prefs.getString(KEY_ACTIVE_TASK, null) != null) throw IllegalStateException("هناك مشهد آخر قيد التنفيذ على الهاتف.")
             if (index == 1) prefs.edit().putString(PREF_CLIPS, "[]").apply()
-            val task = JSONObject(payload.toString()).put("job_id", jobId).put("phase", "waiting_editor")
+            val task = JSONObject(payload.toString())
+                .put("campaign_id", campaign)
+                .put("total_scenes", total)
+                .put("job_id", jobId)
+                .put("phase", "waiting_editor")
             prefs.edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
             val url = payload.optString("url", "https://labs.google/fx/tools/flow")
             if (!url.startsWith("https://labs.google/")) {
