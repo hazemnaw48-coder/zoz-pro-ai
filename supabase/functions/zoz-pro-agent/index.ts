@@ -1030,7 +1030,7 @@ async function approveProductionProposal(user:any,body:any) {
   for(const scene of scenes){
     const index=Number(scene.scene_index);
     const payload={proposal_id:id,script_id:spec.script_id||null,channel_id:spec.channel_id,title:spec.title,scene_index:index,scene_count:scenes.length,duration_seconds:8,aspect_ratio:"9:16",prompt:clean(scene.prompt,12000),narration:clean(scene.narration,240)};
-    const created=await db("zoz_pro_device_jobs",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({owner_id:user.id,device_id:device.id,capability_id:"flow.generate_scene",payload,status:"queued",approval_required:false,approval_status:"approved",idempotency_key:"flow-proposal-"+id+"-scene-"+index,priority:2})});
+    const created=await db("zoz_pro_device_jobs",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({owner_id:user.id,device_id:device.id,capability_id:"flow.generate_scene",payload,status:"queued",approval_required:false,approval_status:"not_required",idempotency_key:"flow-proposal-"+id+"-scene-"+index,priority:2})});
     const job=created?.[0];if(!job)throw new Error("تعذر إنشاء مهمة المشهد "+index+". راجع الطابور قبل إعادة المحاولة.");
     jobs.push({job_id:job.id,scene_index:index,status:job.status});
   }
