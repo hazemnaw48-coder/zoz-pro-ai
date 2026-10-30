@@ -19,6 +19,7 @@ const tools = [
   {id:"books.monitor",adapter:"zoz-pro-agent:books_monitor",risk:"read_only",approval:false,automatic:true,enabled:true,scope:["zoz_pro.books.read"],description:"مراقبة بيانات الكتب والتقارير المدخلة، دون اتصال مباشر بـ KDP."},
   {id:"youtube.private_upload",adapter:"zoz-pro-agent:approve_video_for_private_upload + upload_private_video",risk:"external_upload",approval:true,automatic:false,enabled:true,scope:["youtube.video.upload.private"],description:"رفع خاص فقط بعد موافقة صريحة محفوظة من المالك."},
   {id:"android.device_status",adapter:"zoz-pro-agent-control:android_device_status",risk:"read_only",approval:false,automatic:true,enabled:true,scope:["android.device.read"],description:"قراءة حالة أجهزة Android المقرونة وآخر اتصال وطابور المهام."},
+  {id:"apps.factory_portfolio",adapter:"zoz-pro-agent-control:app_factory_overview",risk:"read_only",approval:false,automatic:true,enabled:true,scope:["android.apps.read"],description:"قراءة محفظة التطبيقات وإصدارات APK وسجلات البناء الفعلية."},
   {id:"android.flow_prompt_dispatch",adapter:"zoz-pro-agent:dispatch_flow_prompt",risk:"internal_write",approval:false,automatic:true,enabled:true,scope:["android.device.dispatch_flow_prompt"],description:"إرسال مطالبة مشهد إلى هاتف المالك لنسخها وفتح Flow بلمسة ظاهرة."},
   {id:"youtube.public_publish",adapter:"zoz-pro-agent:publish_public_video",risk:"high_impact_external",approval:true,automatic:true,enabled:true,scope:["youtube.video.publish.public"],description:"ينشر فيديو تمت مراجعته فقط بعد موافقة مالك صريحة محفوظة في مهمة مستقلة."},
   {id:"youtube.privacy_edit",adapter:null,risk:"high_impact_external",approval:true,automatic:false,enabled:false,scope:["youtube.video.privacy.write"],description:"تغيير الخصوصية معطّل."},
@@ -42,7 +43,7 @@ async function authenticate(req:Request){
 }
 async function overview(ownerId:string,preflight=false){
  const f="owner_id=eq."+encodeURIComponent(ownerId);
- const [channels,credentials,assets,scripts,tasks,runs,books,memory,devices,deviceJobs]=await Promise.all([
+ const [channels,credentials,assets,scripts,tasks,runs,books,memory,devices,deviceJobs,appProjects,appBuilds]=await Promise.all([
   db("zoz_pro_managed_channels?"+f+"&is_active=eq.true&select=channel_id,display_name,channel_title,niche,connection_status,last_synced_at"),
   db("zoz_pro_managed_channel_credentials?"+f+"&select=channel_id,status,token_expires_at,updated_at"),
   db("zoz_pro_video_intake_assets?"+f+"&select=id,status,channel_id,updated_at&order=updated_at.desc&limit=250"),
@@ -52,10 +53,12 @@ async function overview(ownerId:string,preflight=false){
   db("zoz_pro_books?"+f+"&select=id,title,kdp_status,format,updated_at&order=updated_at.desc&limit=100"),
   db("zoz_pro_agent_memory?"+f+"&memory_key=eq.primary_checkpoint&status=eq.active&select=content,updated_at,notion_sync_status,notion_page_id&order=updated_at.desc&limit=1"),
   db("zoz_pro_device_registry?"+f+"&select=id,device_name,device_status,app_version,last_heartbeat_at,capabilities&order=created_at.desc&limit=50"),
-  db("zoz_pro_device_jobs?"+f+"&select=id,device_id,capability_id,status,created_at,updated_at,completed_at&order=created_at.desc&limit=100")
+  db("zoz_pro_device_jobs?"+f+"&select=id,device_id,capability_id,status,created_at,updated_at,completed_at&order=created_at.desc&limit=100"),
+  db("zoz_pro_android_app_projects?"+f+"&select=id,project_key,display_name,package_name,purpose,repository,branch,lifecycle_status,current_version,updated_at&order=updated_at.desc&limit=100"),
+  db("zoz_pro_android_app_builds?"+f+"&select=id,project_id,version_name,version_code,branch,commit_sha,workflow_run_id,workflow_run_url,build_status,artifact_name,artifact_id,artifact_sha256,created_at,completed_at&order=created_at.desc&limit=100")
  ]);
  const count=(rows:any[],key:string)=>rows.reduce((a:any,x:any)=>{const k=String(x?.[key]||"unknown");a[k]=(a[k]||0)+1;return a;},{});
- const cr=Array.isArray(credentials)?credentials:[], ch=Array.isArray(channels)?channels:[], ar=Array.isArray(assets)?assets:[], tr=Array.isArray(tasks)?tasks:[], br=Array.isArray(books)?books:[], mr=Array.isArray(memory)?memory[0]||null:null, rr=Array.isArray(runs)?runs:[], dr=Array.isArray(devices)?devices:[], dj=Array.isArray(deviceJobs)?deviceJobs:[], latest=rr[0]||null, details=latest?.details||{};
+ const cr=Array.isArray(credentials)?credentials:[], ch=Array.isArray(channels)?channels:[], ar=Array.isArray(assets)?assets:[], tr=Array.isArray(tasks)?tasks:[], br=Array.isArray(books)?books:[], mr=Array.isArray(memory)?memory[0]||null:null, rr=Array.isArray(runs)?runs:[], dr=Array.isArray(devices)?devices:[], dj=Array.isArray(deviceJobs)?deviceJobs:[], ap=Array.isArray(appProjects)?appProjects:[], ab=Array.isArray(appBuilds)?appBuilds:[], latest=rr[0]||null, details=latest?.details||{};
  const checks=[
   {id:"production_database",status:"passed",detail:"تمت قراءة جداول الإنتاج بنجاح."},
   {id:"owner_scope",status:"passed",detail:"القراءات مقيدة بمعرّف مالك الجلسة."},
@@ -76,6 +79,7 @@ async function overview(ownerId:string,preflight=false){
   memory:{present:Boolean(mr?.content),updated_at:mr?.updated_at||null,notion_sync_status:mr?.notion_sync_status||"unknown",notion_page_saved:Boolean(mr?.notion_page_id)},
   android_devices:{total:dr.length,active:dr.filter((x:any)=>x.device_status==="active").length,rows:dr.map((x:any)=>({id:x.id,name:x.device_name,status:x.device_status,app_version:x.app_version,last_heartbeat_at:x.last_heartbeat_at,capabilities:x.capabilities}))},
   android_device_jobs:{total:dj.length,by_status:count(dj,"status"),recent:dj.slice(0,15)},
+  android_app_factory:{projects:ap.map((x:any)=>({id:x.id,project_key:x.project_key,name:x.display_name,package_name:x.package_name,purpose:x.purpose,repository:x.repository,branch:x.branch,status:x.lifecycle_status,version:x.current_version,updated_at:x.updated_at})),builds:ab.map((x:any)=>({id:x.id,project_id:x.project_id,version:x.version_name,version_code:x.version_code,branch:x.branch,commit_sha:x.commit_sha,workflow_run_id:x.workflow_run_id,workflow_run_url:x.workflow_run_url,status:x.build_status,artifact_name:x.artifact_name,artifact_id:x.artifact_id,sha256:x.artifact_sha256,created_at:x.created_at,completed_at:x.completed_at})),project_count:ap.length,build_count:ab.length,build_status_counts:count(ab,"build_status"),latest_build:ab[0]?{version:ab[0].version_name,status:ab[0].build_status,workflow_run_url:ab[0].workflow_run_url,artifact_id:ab[0].artifact_id,sha256:ab[0].artifact_sha256,completed_at:ab[0].completed_at}:null},
   connectors:{youtube:{credential_status:count(cr,"status")},gemini:{configured:GEMINI_KEYS.length>0,key_count:GEMINI_KEYS.length},notion:{configured:Boolean(Deno.env.get("NOTION_API_KEY")),last_sync:mr?.notion_sync_status||"unknown"},kdp:{connected:false},canva_make_runway:{connected:false}},
   tool_registry:{version:"1.0.0",total:tools.length,enabled:tools.filter(x=>x.enabled).length,tools},
   ...(preflight?{preflight:checks,ready_for_safe_internal_operations:!checks.some(x=>["missing","missing_channel_credentials"].includes(x.status))}: {})
@@ -92,6 +96,7 @@ Deno.serve(async(req:Request)=>{
   const body=await req.json().catch(()=>({}));const action=String(body?.action||"");
   if(action==="tool_catalog")return json({ok:true,version:"1.0.0",tools,policy:{automatic_internal_operations:true,owner_approval_required_for_private_upload:true,public_publication:false,privacy_edits:false,metadata_edits:false,file_deletion:false,spending:false}});
   if(action==="operator_overview")return json(await overview(user.id,false));
+  if(action==="app_factory_overview"){const d=await overview(user.id,false);return json({ok:true,environment:d.environment,android_app_factory:d.android_app_factory,android_devices:d.android_devices,android_device_jobs:d.android_device_jobs});}
   if(action==="operator_preflight")return json(await overview(user.id,true));
   if(action==="android_device_status"){
    const [devices,jobs]=await Promise.all([
