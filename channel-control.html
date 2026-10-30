@@ -74,6 +74,21 @@ body.upload-mode .footer{font-size:11px}
  <div id="zoz-agent-operator-status" class="notice" style="display:none"></div>
  <pre id="zoz-agent-operator-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:480px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre>
 </div>
+<div class="section-gap" id="zoz-device-agent">
+ <h3>وكيل أجهزة Android · ربط الهاتف التنفيذي</h3>
+ <p>أنشئ رمز اقتران مؤقتًا، أدخله مرة واحدة في تطبيق ZOZ Flow Bridge، ثم أرسل مهام محددة إلى الهاتف. لا تُرسل كلمات مرور أو مفاتيح إلى التطبيق.</p>
+ <div class="actions">
+  <button type="button" id="zoz-device-pair-code-btn">إنشاء رمز اقتران للهاتف</button>
+  <button type="button" class="secondary" id="zoz-device-refresh-btn">تحديث الأجهزة والمهام</button>
+ </div>
+ <div id="zoz-device-status" class="notice" style="margin-top:8px">لا يوجد جهاز Android معروض بعد.</div>
+ <pre id="zoz-device-pair-code" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:18px;letter-spacing:2px"></pre>
+ <div id="zoz-device-list" class="stack"></div>
+ <label for="zoz-device-prompt">مهمة إعداد مطالبة Google Flow</label>
+ <input id="zoz-device-prompt" maxlength="12000" placeholder="اكتب وصف المشهد الذي تريد إرساله إلى الهاتف">
+ <div class="actions"><button type="button" id="zoz-device-send-prompt-btn" class="secondary">إرسال المطالبة للجهاز</button></div>
+ <div id="zoz-device-jobs" class="stack"></div>
+</div>
 <div class="section-gap"><h3>١ · تحليل قناة Hazem Ahmed</h3><p>يقرأ حالة القناة والتحليلات والتقويم والمسودات وملفات الفيديو، ثم يعرض التشخيص والخطوات العملية. لا يغيّر الفيديوهات ولا ينشر.</p><div class="actions"><button type="button" id="zoz-agent-analyze-btn">حلّل القناة الآن</button><button type="button" class="secondary" id="zoz-agent-video-test-btn">اختبر نجاح آخر فيديو</button><button type="button" id="zoz-agent-cycle-btn">شغّل دورة الإدارة</button></div><div id="zoz-agent-analysis-status" class="notice" style="display:none"></div><pre id="zoz-agent-analysis-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre></div>
 <div class="section-gap"><h3>٢ · إنشاء مسودة محتوى</h3><p>المسودة تُحفظ في مركز الإنتاج للمراجعة. لا يتم إنشاء فيديو أو رفعه أو نشره تلقائيًا.</p><label for="zoz-agent-topic">موضوع المسودة</label><input id="zoz-agent-topic" maxlength="240" placeholder="مثال: كيف عاش العمال في دير المدينة؟"><div class="grid"><div><label for="zoz-agent-mode">نوع المحتوى</label><select id="zoz-agent-mode" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit"><option value="short">Short</option><option value="long">فيديو طويل</option></select></div><div><label for="zoz-agent-duration">المدة المقترحة بالثواني</label><input id="zoz-agent-duration" type="number" min="20" max="180" value="45"></div></div><div class="actions"><button type="button" id="zoz-agent-draft-btn">أنشئ المسودة واحفظها</button></div><div id="zoz-agent-draft-status" class="notice" style="display:none"></div><pre id="zoz-agent-draft-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre></div>
 </section>
@@ -1018,6 +1033,73 @@ async function runZozAgentControl(action,label){
  }catch(e){status.className='notice bad';status.textContent='تعذر '+label+': '+(e.message||e);}
  finally{bts.forEach(b=>b.disabled=false)}
 }
+async function callDeviceAgent(action,extra){
+ const session=await ownerSession();
+ const response=await fetch(SUPABASE_URL+'/functions/v1/zoz-pro-device-agent',{
+  method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},
+  body:JSON.stringify(Object.assign({action},extra||{})),cache:'no-store'
+ });
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok||data.ok===false)throw new Error(data.error||('فشل اتصال جهاز Android HTTP '+response.status));
+ return data;
+}
+async function refreshDeviceAgent(){
+ const status=$('zoz-device-status'),list=$('zoz-device-list'),jobs=$('zoz-device-jobs');
+ status.textContent='جارٍ قراءة الأجهزة والمهام…';list.innerHTML='';jobs.innerHTML='';
+ try{
+  const [d,j]=await Promise.all([callDeviceAgent('device_list'),callDeviceAgent('job_list')]);
+  const devices=Array.isArray(d.devices)?d.devices:[];
+  if(!devices.length)list.textContent='لم يتم اقتران هاتف بعد.';
+  devices.forEach(device=>{
+   const card=document.createElement('div');card.className='metric';
+   const name=document.createElement('strong');name.textContent=device.device_name||'Android';
+   const info=document.createElement('div');info.className='small';info.textContent='الحالة: '+device.device_status+' · آخر اتصال: '+(device.last_heartbeat_at||'لم يتصل بعد')+' · إصدار: '+(device.app_version||'—');
+   card.append(name,info);
+   if(device.device_status==='active'){
+    const revoke=document.createElement('button');revoke.type='button';revoke.className='secondary';revoke.textContent='إلغاء اقتران هذا الجهاز';
+    revoke.addEventListener('click',async()=>{if(!confirm('إلغاء صلاحية هذا الهاتف؟ لن يستطيع تنفيذ مهام جديدة.'))return;try{await callDeviceAgent('device_revoke',{device_id:device.id});await refreshDeviceAgent()}catch(e){status.textContent=e.message}});
+    card.append(revoke);
+   }
+   list.append(card);
+  });
+  const tasks=Array.isArray(j.jobs)?j.jobs:[];
+  if(!tasks.length)jobs.textContent='لا توجد مهام أجهزة مسجلة.';
+  tasks.slice(0,12).forEach(task=>{
+   const card=document.createElement('div');card.className='metric';
+   const title=document.createElement('strong');title.textContent=task.capability_id+' · '+task.status;
+   const details=document.createElement('div');details.className='small';details.textContent='المهمة: '+task.id+' · '+task.created_at;
+   card.append(title,details);
+   if(task.status==='awaiting_owner_approval'){
+    const approve=document.createElement('button');approve.type='button';approve.textContent='موافقة على المهمة';approve.addEventListener('click',async()=>{try{await callDeviceAgent('job_approve',{job_id:task.id});await refreshDeviceAgent()}catch(e){status.textContent=e.message}});card.append(approve);
+   }
+   jobs.append(card);
+  });
+  status.className='notice good';status.textContent='تمت قراءة '+devices.length+' جهاز و'+tasks.length+' مهمة من قاعدة الإنتاج.';
+ }catch(e){status.className='notice bad';status.textContent='تعذر قراءة الأجهزة: '+(e.message||e);}
+}
+async function createDevicePairCode(){
+ const button=$('zoz-device-pair-code-btn'),status=$('zoz-device-status'),out=$('zoz-device-pair-code');
+ button.disabled=true;status.textContent='جارٍ إنشاء رمز اقتران صالح لخمس دقائق…';out.style.display='none';
+ try{
+  const d=await callDeviceAgent('pair_code_create');
+  out.textContent=d.pairing_code;out.style.display='block';
+  status.className='notice good';status.textContent='أدخل الرمز في تطبيق Android الآن. صالح لمدة خمس دقائق ولمرة واحدة.';
+  await refreshDeviceAgent();
+ }catch(e){status.className='notice bad';status.textContent='تعذر إنشاء الرمز: '+(e.message||e);}
+ finally{button.disabled=false;}
+}
+async function sendDevicePrompt(){
+ const input=$('zoz-device-prompt'),prompt=input.value.trim(),status=$('zoz-device-status');
+ if(!prompt){status.textContent='اكتب المطالبة أولًا.';return;}
+ try{
+  const devices=await callDeviceAgent('device_list');
+  const device=(devices.devices||[]).find(x=>x.device_status==='active');
+  if(!device){status.textContent='لا يوجد جهاز نشط. اقترن بالهاتف أولًا.';return;}
+  const d=await callDeviceAgent('job_enqueue',{device_id:device.id,capability_id:'flow.copy_prompt',payload:{prompt},idempotency_key:'flow-prompt-'+crypto.randomUUID(),approval_required:false});
+  status.className='notice good';status.textContent='أُرسلت المهمة إلى الهاتف. سيستلمها عند اتصال التطبيق أو دورة الفحص التالية.';
+  await refreshDeviceAgent();
+ }catch(e){status.className='notice bad';status.textContent='تعذر إرسال المهمة: '+(e.message||e);}
+}
 async function callZozAgent(action,extra){
  const session=await ownerSession();
  const response=await fetch(AGENT_API,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:action,channel_id:CHANNEL_ID},extra||{})),cache:'no-store'});
@@ -1055,6 +1137,9 @@ async function loadBooksDashboard(){
 $('books-refresh')?.addEventListener('click',loadBooksDashboard);
 $('books-report-form')?.addEventListener('submit',async ev=>{ev.preventDefault();const button=$('books-report-save');button.disabled=true;notice('books-report-msg','جارٍ تسجيل بيانات التقرير…');try{const val=id=>$(id).value.trim(),d={book_id:val('books-report-book'),period_start:val('books-period-start'),period_end:val('books-period-end'),units_sold:val('books-units'),pages_read:val('books-pages'),royalties_amount:val('books-royalties'),ad_spend_amount:val('books-ad-spend'),notes:val('books-report-notes'),royalties_currency:'USD',ad_spend_currency:'USD',marketplace:'Amazon.com'};if(d.period_start>d.period_end)throw new Error('تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.');if(!d.book_id)throw new Error('اختر الكتاب أولًا.');if(!d.units_sold&&!d.pages_read&&!d.royalties_amount)throw new Error('أدخل قيمة واحدة على الأقل من التقرير؛ اترك القيم غير المتاحة فارغة.');const r=await callZozAgent('record_book_snapshot',d);notice('books-report-msg','تم حفظ التقرير في قاعدة الإنتاج. معرّف السجل: '+(r.snapshot_id||'تم الحفظ')+'. البيانات مدخلة من المالك وليست اتصالًا تلقائيًا بأمازون.','good');$('books-report-form').reset();await loadBooksDashboard()}catch(e){notice('books-report-msg','تعذر حفظ التقرير: '+(e.message||e),'bad')}finally{button.disabled=false}});
 
+$('zoz-device-pair-code-btn')?.addEventListener('click',createDevicePairCode);
+$('zoz-device-refresh-btn')?.addEventListener('click',refreshDeviceAgent);
+$('zoz-device-send-prompt-btn')?.addEventListener('click',sendDevicePrompt);
 $('zoz-agent-health-btn')?.addEventListener('click',checkZozAgentHealth);
 $('zoz-agent-overview-btn')?.addEventListener('click',()=>runZozAgentControl('operator_overview','تحديث حالة النظام'));
 $('zoz-agent-preflight-btn')?.addEventListener('click',()=>runZozAgentControl('operator_preflight','فحص الجاهزية'));
