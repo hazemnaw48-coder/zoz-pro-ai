@@ -330,24 +330,23 @@ private fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Bool
                 buffer.write(chunk, 0, read)
                 remaining -= read
             }
-            val conn = java.net.URL(INTAKE_API + "?action=intake_upload_part&asset_id=" + assetId + "&part_index=" + part)
-                .openConnection() as java.net.HttpURLConnection
-            conn.requestMethod = "POST"
+            val signed = intakePost("intake_signed_part", JSONObject().put("asset_id", assetId).put("part_index", part), intakeToken)
+            val uploadUrl = signed.getString("upload_url")
+            val conn = java.net.URL(uploadUrl).openConnection() as java.net.HttpURLConnection
+            conn.requestMethod = "PUT"
             conn.connectTimeout = 30000
             conn.readTimeout = 60000
             conn.doOutput = true
-            conn.setRequestProperty("apikey", PUBLIC_KEY)
-            conn.setRequestProperty("x-zoz-intake-token", intakeToken)
             conn.setRequestProperty("content-type", "application/octet-stream")
+            conn.setRequestProperty("x-upsert", "true")
             conn.setFixedLengthStreamingMode(expected)
             conn.outputStream.use { it.write(buffer.toByteArray()) }
             val code = conn.responseCode
             val stream = if (code in 200..299) conn.inputStream else conn.errorStream
             val response = stream.bufferedReader().use { it.readText() }
             conn.disconnect()
-            val uploadResult = JSONObject(response)
-            if (code !in 200..299 || !uploadResult.optBoolean("ok", false)) {
-                throw IllegalStateException("فشل رفع الجزء ${part + 1}: " + uploadResult.optString("error", "HTTP $code"))
+            if (code !in 200..299) {
+                throw IllegalStateException("فشل رفع الجزء ${part + 1}: HTTP $code — " + response.take(300))
             }
             intakePost("intake_part_done", JSONObject().put("asset_id", assetId).put("part_index", part), intakeToken)
         }
