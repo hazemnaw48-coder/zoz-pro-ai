@@ -124,7 +124,8 @@ class FlowAutomationService : AccessibilityService() {
                     editor.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
                     val set = editor.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
                     if (set) {
-                        updatePhase(task, "waiting_generate")
+                        task.put("prompt_entered", true)
+                        updatePhase(task, "waiting_send")
                         lastActionAt = System.currentTimeMillis()
                         handler.postDelayed({ inspectCurrentPage() }, 1300)
                     } else {
@@ -132,29 +133,42 @@ class FlowAutomationService : AccessibilityService() {
                     }
                 } else {
                     if (!task.optBoolean("flow_setup_clicked", false)) {
-                        val setup = findButton(root, setOf(
-                            "new project", "create new project", "start new project", "new video",
-                            "create a video", "text to video", "describe your idea", "describe your video",
-                            "what would you like to create", "مشروع جديد", "إنشاء مشروع", "فيديو جديد",
-                            "وصف الفيديو", "صف فكرتك"
-                        ))
+                        val setup = findNewProjectButton(root)
                         if (setup != null && setup.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
                             task.put("flow_setup_clicked", true)
+                            task.put("setup_clicked_at_ms", System.currentTimeMillis())
                             prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
                             lastActionAt = System.currentTimeMillis()
+                            handler.postDelayed({ inspectCurrentPage() }, 1800)
+                        } else {
+                            retryEditorScan(task)
                         }
+                    } else {
+                        retryEditorScan(task)
                     }
-                    retryEditorScan(task)
                 }
             }
-            "waiting_generate" -> {
-                val button = findButton(root, setOf("generate", "generate video", "create video", "توليد", "إنشاء فيديو"))
-                if (button != null && System.currentTimeMillis() - lastActionAt > 1800) {
-                    if (button.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+            "waiting_send" -> {
+                if (!task.optBoolean("prompt_entered", false)) {
+                    finishTask(task, false, "prompt_not_entered", "لم يؤكد التطبيق إدخال وصف المشهد داخل محرر Google Flow.")
+                    return
+                }
+                val send = findButton(root, setOf(
+                    "send", "send prompt", "send message", "submit", "submit prompt",
+                    "arrow up", "arrow_upward", "send arrow", "generate", "generate video",
+                    "create video", "إرسال", "إرسال الرسالة", "توليد", "إنشاء فيديو"
+                ))
+                if (send != null && System.currentTimeMillis() - lastActionAt > 1800) {
+                    if (send.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                        task.put("send_clicked", true)
                         updatePhase(task, "waiting_download")
                         lastActionAt = System.currentTimeMillis()
                         handler.postDelayed({ inspectCurrentPage() }, 5000)
+                    } else {
+                        retrySendScan(task)
                     }
+                } else {
+                    retrySendScan(task)
                 }
             }
             "waiting_download" -> {
@@ -234,6 +248,39 @@ class FlowAutomationService : AccessibilityService() {
         if (now - phaseStarted > 60000L) {
             finishTask(task, false, "flow_editor_not_found",
                 "وصل الهاتف إلى Google Flow، لكن لم يظهر حقل إدخال قابل للوصول خلال 60 ثانية. تم إيقاف المهمة دون الضغط على توليد.")
+            return
+        }
+        handler.removeCallbacksAndMessages(null)
+        handler.postDelayed({ inspectCurrentPage() }, 1200)
+    }
+
+    private fun findNewProjectButton(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        var found: AccessibilityNodeInfo? = null
+        walk(root) { node ->
+            if (found != null) return@walk
+            val label = ((node.text?.toString() ?: "") + " " +
+                (node.contentDescription?.toString() ?: "")).trim().lowercase()
+            val clickable = node.isClickable || node.parent?.isClickable == true
+            val explicitPlus = label == "+" || label == "plus" || label == "add"
+            val newProject = listOf("new project", "create project", "create new project",
+                "start a project", "new chat", "new video", "مشروع جديد", "إنشاء مشروع",
+                "محادثة جديدة", "فيديو جديد").any(label::contains)
+            if (clickable && (explicitPlus || newProject)) {
+                found = if (node.isClickable) node else node.parent
+            }
+        }
+        return found
+    }
+
+    private fun retrySendScan(task: JSONObject) {
+        val now = System.currentTimeMillis()
+        val phaseStarted = task.optLong("phase_started_at_ms", now)
+        val attempts = task.optInt("send_scan_attempts", 0) + 1
+        task.put("send_scan_attempts", attempts)
+        prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+        if (now - phaseStarted > 45000L) {
+            finishTask(task, false, "flow_send_button_not_found",
+                "تم إدخال وصف المشهد، لكن لم يظهر زر إرسال/توليد قابل للوصول خلال 45 ثانية. لم يتم الضغط على عنصر غير معروف.")
             return
         }
         handler.removeCallbacksAndMessages(null)
