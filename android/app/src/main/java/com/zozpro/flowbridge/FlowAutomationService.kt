@@ -32,9 +32,38 @@ class FlowAutomationService : AccessibilityService() {
     private var receiverRegistered = false
     private val networkExecutor = Executors.newSingleThreadExecutor()
 
+    private fun browserAddressBarText(root: AccessibilityNodeInfo): String? {
+        var address: String? = null
+        walk(root) { node ->
+            val id = node.viewIdResourceName.orEmpty().lowercase()
+            if (id.contains("url_bar") || id.contains("omnibox")) {
+                val candidate = listOf(
+                    node.text?.toString(),
+                    node.contentDescription?.toString(),
+                    node.hintText?.toString()
+                ).firstOrNull { !it.isNullOrBlank() }?.trim()
+                if (!candidate.isNullOrBlank()) address = candidate
+            }
+        }
+        return address
+    }
+
+    private fun isVerifiedFlowPage(root: AccessibilityNodeInfo): Boolean {
+        val pkg = root.packageName?.toString().orEmpty()
+        if (pkg !in setOf("com.android.chrome", "com.google.android.googlequicksearchbox")) return false
+        val address = browserAddressBarText(root)?.lowercase() ?: return false
+        val normalized = address
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .removePrefix("www.")
+            .substringBefore(' ')
+        val host = normalized.substringBefore('/').substringBefore(':').trim()
+        return host == "labs.google"
+    }
+
     private fun isFlowInForeground(): Boolean {
-        val pkg = rootInActiveWindow?.packageName?.toString().orEmpty()
-        return pkg == "com.android.chrome" || pkg == "com.google.android.googlequicksearchbox"
+        val root = rootInActiveWindow ?: return false
+        return isVerifiedFlowPage(root)
     }
 
     private val downloadReceiver = object : BroadcastReceiver() {
@@ -57,9 +86,14 @@ class FlowAutomationService : AccessibilityService() {
             receiverRegistered = true
         }
         val legacyTask = activeTask()
-        if (legacyTask != null && legacyTask.optLong("started_at_ms", 0L) <= 0L) {
-            finishTask(legacyTask, false, "stale_legacy_task",
-                "تم إيقاف مهمة قديمة لم تُدخل وصف المشهد؛ أُعيد تجهيز الهاتف للمهمة الجديدة.")
+        if (legacyTask != null) {
+            val ageMs = System.currentTimeMillis() - legacyTask.optLong("started_at_ms", 0L)
+            if (ageMs <= 0L || ageMs > 30L * 60L * 1000L) {
+                finishTask(legacyTask, false, "manual_intervention_required",
+                    "تم إيقاف مهمة Flow محلية قديمة أو عالقة بعد انتهاء مهلة التنفيذ؛ لم يُرسل نص إلى محرر غير متحقق.")
+            } else {
+                handler.postDelayed({ inspectCurrentPage() }, 1200)
+            }
         } else {
             handler.postDelayed({ inspectCurrentPage() }, 1200)
         }
@@ -103,6 +137,16 @@ class FlowAutomationService : AccessibilityService() {
             if (phase == "waiting_editor") retryEditorScan(task)
             return
         }
+        if (phase == "waiting_editor" || phase == "waiting_send") {
+            if (!isVerifiedFlowPage(root)) {
+                retryFlowOriginScan(task)
+                return
+            }
+        } else if (phase == "waiting_download" && !isVerifiedFlowPage(root)) {
+            handler.postDelayed({ inspectCurrentPage() }, 4000)
+            return
+        }
+
         val allText = collectText(root).joinToString(" ").lowercase()
         if (containsGate(allText)) {
             finishTask(task, false, "manual_intervention_required",
@@ -230,13 +274,24 @@ class FlowAutomationService : AccessibilityService() {
         if (marked != null) return marked
         val editTexts = candidates.filter { it.first >= 30 }
         if (editTexts.size == 1) return editTexts.single().second
-        if (candidates.size == 1) {
-            val pageText = collectText(root).joinToString(" ").lowercase()
-            val flowContext = listOf("flow", "video", "generate", "create", "scene", "فيديو", "إنشاء")
-                .any(pageText::contains)
-            if (flowContext) return candidates.single().second
-        }
+        // Fail closed: never guess a generic chat/editor field. Only a field with an
+        // explicit video-prompt label is eligible after the labs.google origin check.
         return null
+    }
+
+    private fun retryFlowOriginScan(task: JSONObject) {
+        val now = System.currentTimeMillis()
+        val phaseStarted = task.optLong("phase_started_at_ms", task.optLong("started_at_ms", now))
+        val attempts = task.optInt("origin_scan_attempts", 0) + 1
+        task.put("origin_scan_attempts", attempts)
+        prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+        if (now - phaseStarted > 60000L) {
+            finishTask(task, false, "manual_intervention_required",
+                "توقف التنفيذ الآلي بأمان: لم يتمكن التطبيق من التحقق أن الصفحة المفتوحة هي labs.google. لم يُلصق النص في أي دردشة أخرى ولم يتم الضغط على توليد.")
+            return
+        }
+        handler.removeCallbacksAndMessages(null)
+        handler.postDelayed({ inspectCurrentPage() }, 1600)
     }
 
     private fun retryEditorScan(task: JSONObject) {
@@ -263,8 +318,7 @@ class FlowAutomationService : AccessibilityService() {
             val clickable = node.isClickable || node.parent?.isClickable == true
             val explicitPlus = label == "+" || label == "plus" || label == "add"
             val newProject = listOf("new project", "create project", "create new project",
-                "start a project", "new chat", "new video", "مشروع جديد", "إنشاء مشروع",
-                "محادثة جديدة", "فيديو جديد").any(label::contains)
+                "start a project", "new video", "مشروع جديد", "إنشاء مشروع", "فيديو جديد").any(label::contains)
             if (clickable && (explicitPlus || newProject)) {
                 found = if (node.isClickable) node else node.parent
             }
