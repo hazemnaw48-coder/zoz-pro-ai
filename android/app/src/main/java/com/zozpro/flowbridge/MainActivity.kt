@@ -118,7 +118,7 @@ private fun FlowBridgeScreen() {
                     Button(
                         enabled = !busy && pairingCode.length == 32,
                         onClick = { runAsync {
-                            val response = apiPost("pair_exchange", JSONObject()
+                            val response = apiPost(context, "pair_exchange", JSONObject()
                                 .put("pairing_code", pairingCode)
                                 .put("device_name", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL)
                                 .put("app_version", "0.2.0"))
@@ -134,7 +134,7 @@ private fun FlowBridgeScreen() {
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(enabled = !busy, onClick = { runAsync {
-                            val health = apiPost("device_health", JSONObject().put("app_version", "0.2.0"))
+                            val health = apiPost(context, "device_health", JSONObject().put("app_version", "0.2.0"))
                             val job = apiPost("poll_jobs", JSONObject()).optJSONObject("job")
                             if (job == null) "الاتصال سليم. لا توجد مهام جديدة."
                             else executeJob(context, job)
@@ -226,12 +226,10 @@ private fun FlowBridgeScreen() {
     }
 }
 
-private fun apiPost(action: String, body: JSONObject): JSONObject {
-    val token = DeviceTokenVault.read(appContextHolder) ?: ""
+private fun apiPost(context: Context, action: String, body: JSONObject): JSONObject {
+    val token = DeviceTokenVault.read(context) ?: ""
     return apiPostWithToken(action, body, token)
 }
-
-private lateinit var appContextHolder: Context
 
 private fun apiPostWithToken(action: String, body: JSONObject, token: String): JSONObject {
     val conn = java.net.URL(API).openConnection() as java.net.HttpURLConnection
