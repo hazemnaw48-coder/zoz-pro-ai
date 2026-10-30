@@ -147,3 +147,17 @@ A ready-to-use draft package was prepared for channel **فكرة**:
 ### Current implementation limitation
 
 The center project `894a0e3a-85c4-43de-b8f7-205db24685b9` still uses browser `localStorage` for project state and no cross-device cloud sync was verified. This affects durable project continuity, not the fact that the owner has previously exported/published a video successfully. Keep the project as the dedicated production UI; later source changes should decouple the production artifact ledger and queue from editor/build quotas and store history/assets durably, without removing the existing working path.
+
+
+## New task — Android Flow Bridge (2026-10-30)
+
+- Owner requested a phone-based Android companion that connects the existing ZOZ Pro agent to the three existing Google Flow accounts, receives generated clips, assembles the video, and returns it to the existing intake/review/publishing path.
+- Feature branch created from `main`: `feature/zoz-android-flow-bridge`.
+- Architecture and safety gates recorded in `docs/ANDROID_FLOW_BRIDGE_SPEC.md` (commit `187137dbdaa212d8a0558b024e847924d274ab93`).
+- No APK, native Android module, backend queue, Flow UI automation, or real device test exists yet. Do not imply otherwise.
+- Existing production `zoz-pro-agent` v32 and `zoz-pro-agent-control` v5 remain untouched.
+- Existing `zoz-pro-ai-video-studio` v5 was inspected: it calls a public Hugging Face LTX Video Space for a single six-second clip and uses Gemini TTS. It is a separate experimental generator, not Google Flow integration and not proof of full video assembly.
+- The three Flow accounts recorded in the web UI are not proof of a supported Flow API or reusable Google OAuth access for programmatic control. Reuse the already signed-in Flow sessions on the owner's Android device; never collect Google passwords, cookies, browser storage, or API keys in the bridge.
+- First implementation sequence: inspect exact current intake endpoint contract and repo Android/build conventions; create a minimal Android app + CI APK artifact on this feature branch; implement owner-authenticated job receipt; then assisted Flow prompt handoff, clip import, on-device assembly, and resumable return to intake.
+- Full Flow UI automation through AccessibilityService is a separate policy-gated milestone. Keep assisted/manual mode available; do not bypass quotas, CAPTCHA, account security, payment prompts, or consent screens.
+- Constraints: free-only; no billing activation, paid generation, paid hosting, new project, destructive changes, public publication, or weakening existing owner approvals.
