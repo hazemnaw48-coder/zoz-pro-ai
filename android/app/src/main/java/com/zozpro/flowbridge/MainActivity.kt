@@ -123,7 +123,7 @@ private fun FlowBridgeScreen() {
                                 .put("device_name", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL)
                                 .put("app_version", "0.2.0"))
                             val token = response.getString("device_token")
-                            DeviceTokenVault.write(context, token)
+                            DeviceTokenVault.write(context, token, response.getString("intake_token"))
                             paired = true
                             pairingCode = ""
                             scheduleDeviceWorker(context)
@@ -289,8 +289,10 @@ class DeviceTokenVault {
         private const val PREF = "zoz_secure_device"
         private const val TOKEN = "encrypted_device_token"
         private const val IV = "device_token_iv"
+        private const val INTAKE_TOKEN = "encrypted_intake_token"
+        private const val INTAKE_IV = "intake_token_iv"
 
-        fun write(context: Context, token: String) {
+        fun write(context: Context, token: String, intakeToken: String) {
             val ks = java.security.KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
             if (!ks.containsAlias(KEY_ALIAS)) {
                 val generator = javax.crypto.KeyGenerator.getInstance(android.security.keystore.KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
@@ -304,9 +306,27 @@ class DeviceTokenVault {
             val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key)
             val encrypted = cipher.doFinal(token.toByteArray(Charsets.UTF_8))
+            val intakeCipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+            intakeCipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key)
+            val encryptedIntake = intakeCipher.doFinal(intakeToken.toByteArray(Charsets.UTF_8))
             context.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit()
                 .putString(TOKEN, android.util.Base64.encodeToString(encrypted, android.util.Base64.NO_WRAP))
-                .putString(IV, android.util.Base64.encodeToString(cipher.iv, android.util.Base64.NO_WRAP)).apply()
+                .putString(IV, android.util.Base64.encodeToString(cipher.iv, android.util.Base64.NO_WRAP))
+                .putString(INTAKE_TOKEN, android.util.Base64.encodeToString(encryptedIntake, android.util.Base64.NO_WRAP))
+                .putString(INTAKE_IV, android.util.Base64.encodeToString(intakeCipher.iv, android.util.Base64.NO_WRAP)).apply()
+        }
+
+        fun readIntake(context: Context): String? {
+            return try {
+                val p = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+                val encrypted = android.util.Base64.decode(p.getString(INTAKE_TOKEN, null), android.util.Base64.NO_WRAP)
+                val iv = android.util.Base64.decode(p.getString(INTAKE_IV, null), android.util.Base64.NO_WRAP)
+                val ks = java.security.KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+                val key = (ks.getEntry(KEY_ALIAS, null) as java.security.KeyStore.SecretKeyEntry).secretKey
+                val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+                cipher.init(javax.crypto.Cipher.DECRYPT_MODE, key, javax.crypto.spec.GCMParameterSpec(128, iv))
+                String(cipher.doFinal(encrypted), Charsets.UTF_8)
+            } catch (_: Exception) { null }
         }
 
         fun read(context: Context): String? {
