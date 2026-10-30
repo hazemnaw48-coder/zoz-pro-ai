@@ -99,6 +99,21 @@ footer{padding:16px 3px 28px;color:#8295ad;font-size:12px}
  </div>
 </section>
 
+
+<section class="card" id="factory-live">
+ <div class="row"><h2>حالة المصنع الحية من مشروع الإنتاج</h2><button id="factory-refresh" type="button">تحديث البيانات</button></div>
+ <p id="factory-live-status">جارٍ تجهيز الاتصال الآمن بقاعدة الإنتاج…</p>
+ <div class="kpis">
+  <div class="kpi"><strong id="factory-project-count">—</strong><span>مشاريع مسجلة</span></div>
+  <div class="kpi"><strong id="factory-build-count">—</strong><span>عمليات بناء مسجلة</span></div>
+  <div class="kpi"><strong id="factory-device-count">—</strong><span>أجهزة Android</span></div>
+ </div>
+ <h3 style="margin-top:16px">المشاريع والإصدارات</h3>
+ <div class="tablewrap"><table><thead><tr><th>المشروع</th><th>الإصدار</th><th>حالة آخر بناء</th><th>الدليل</th></tr></thead><tbody id="factory-project-rows"><tr><td colspan="4">بانتظار قراءة قاعدة الإنتاج</td></tr></tbody></table></div>
+ <h3 style="margin-top:16px">الأجهزة والمهام</h3>
+ <div id="factory-device-details" class="grid"><article class="project">بانتظار قراءة الأجهزة المسجلة.</article></div>
+ <p class="small">تُعرض حالات البناء من سجل الإنتاج الفعلي. لا يظهر APK كرابط تنزيل إلا بعد وجود Artifact مسجل من GitHub Actions.</p>
+</section>
 <section class="card">
  <h2>عقد تشغيل جهاز Android</h2>
  <p>التطبيق لا يحصل على صلاحية تحكم مفتوحة. لكل جهاز اقتران مستقل، ولكل مهمة نوع معروف ونطاق محدد، مع إمكانية الإيقاف والإلغاء وسجل نتائج.</p>
@@ -159,5 +174,53 @@ footer{padding:16px 3px 28px;color:#8295ad;font-size:12px}
 
 <footer>ZOZ Pro · Android App Factory · إدارة التطوير والاختبارات والإصدارات ضمن صلاحيات المالك</footer>
 </main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+'use strict';
+const URL='https://oxyzxbkwhafzaztraowc.supabase.co';
+const KEY='sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm';
+const OWNER='hazemnaw48@gmail.com';
+const API=URL+'/functions/v1/zoz-pro-agent-control';
+const sb=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+const el=id=>document.getElementById(id);
+const text=(node,value)=>{node.textContent=value==null?'—':String(value);};
+function rowCell(tr,value){const td=document.createElement('td');td.textContent=value||'—';tr.appendChild(td);return td;}
+async function refresh(){
+ const btn=el('factory-refresh'),status=el('factory-live-status');
+ btn.disabled=true;text(status,'جارٍ قراءة بيانات المشاريع والبناء والأجهزة من الإنتاج…');
+ try{
+  const {data:{session},error}=await sb.auth.getSession();if(error)throw error;
+  if(!session?.access_token)throw new Error('جلسة المالك غير موجودة. افتح مركز ZOZ Pro وسجّل الدخول أولًا؛ ستُستخدم الجلسة نفسها هنا.');
+  const {data:userData,error:userError}=await sb.auth.getUser(session.access_token);if(userError)throw userError;
+  if(String(userData?.user?.email||'').toLowerCase()!==OWNER)throw new Error('هذه الصفحة تتطلب جلسة مالك ZOZ Pro.');
+  const res=await fetch(API,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({action:'app_factory_overview'}),cache:'no-store'});
+  const d=await res.json().catch(()=>({}));if(!res.ok||d.ok!==true)throw new Error(d.error||('HTTP '+res.status));
+  const a=d.android_app_factory||{},projects=Array.isArray(a.projects)?a.projects:[],builds=Array.isArray(a.builds)?a.builds:[],devices=Array.isArray(d.android_devices?.rows)?d.android_devices.rows:[];
+  text(el('factory-project-count'),a.project_count??projects.length);text(el('factory-build-count'),a.build_count??builds.length);text(el('factory-device-count'),devices.length);
+  const tbody=el('factory-project-rows');tbody.replaceChildren();
+  if(!projects.length){const tr=document.createElement('tr');rowCell(tr,'لا توجد مشاريع مسجلة');rowCell(tr,'—');rowCell(tr,'—');rowCell(tr,'—');tbody.appendChild(tr);}
+  projects.forEach(p=>{
+   const b=builds.find(x=>x.project_id===p.id)||null,tr=document.createElement('tr');
+   rowCell(tr,p.name||p.project_key);rowCell(tr,p.version||b?.version||'لم يصدر بعد');rowCell(tr,b?.status||'لا يوجد بناء');
+   const td=document.createElement('td');
+   if(b?.workflow_run_url){const a=document.createElement('a');a.href=b.workflow_run_url;a.target='_blank';a.rel='noopener';a.textContent='سجل البناء';td.appendChild(a);}
+   else td.textContent='لا يوجد دليل بناء بعد';
+   if(b?.sha256){const small=document.createElement('div');small.className='small';small.textContent='SHA-256: '+b.sha256.slice(0,16)+'…';td.appendChild(small);}
+   tr.appendChild(td);tbody.appendChild(tr);
+  });
+  const host=el('factory-device-details');host.replaceChildren();
+  if(!devices.length){const card=document.createElement('article');card.className='project';card.textContent='لا يوجد جهاز مسجل في قراءة الإنتاج الحالية.';host.appendChild(card);}
+  devices.forEach(x=>{const card=document.createElement('article');card.className='project';const h=document.createElement('h3');h.textContent=x.device_name||'جهاز Android';const p=document.createElement('p');p.textContent='الحالة: '+(x.device_status||'غير معروفة')+' · الإصدار: '+(x.app_version||'غير معروف');const meta=document.createElement('div');meta.className='meta';meta.textContent='آخر اتصال: '+(x.last_heartbeat_at||'غير متاح')+' · القدرات: '+(Array.isArray(x.capabilities)?x.capabilities.join('، '):'غير معلنة');card.append(h,p,meta);host.appendChild(card);});
+  text(status,'تم تحديث البيانات مباشرة من قاعدة الإنتاج. آخر قراءة: '+new Date().toLocaleString('ar-EG'));
+ }catch(e){text(status,'تعذر تحميل البيانات الحية: '+(e.message||e));}
+ finally{btn.disabled=false;}
+}
+el('factory-refresh')?.addEventListener('click',refresh);
+refresh();
+})();
+</script>
+
 </body>
 </html>
