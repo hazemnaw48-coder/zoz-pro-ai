@@ -56,7 +56,13 @@ class FlowAutomationService : AccessibilityService() {
             )
             receiverRegistered = true
         }
-        handler.postDelayed({ inspectCurrentPage() }, 1200)
+        val legacyTask = activeTask()
+        if (legacyTask != null && legacyTask.optLong("started_at_ms", 0L) <= 0L) {
+            finishTask(legacyTask, false, "stale_legacy_task",
+                "تم إيقاف مهمة قديمة لم تُدخل وصف المشهد؛ أُعيد تجهيز الهاتف للمهمة الجديدة.")
+        } else {
+            handler.postDelayed({ inspectCurrentPage() }, 1200)
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -91,14 +97,18 @@ class FlowAutomationService : AccessibilityService() {
 
     private fun inspectCurrentPage() {
         val task = activeTask() ?: return
-        val root = rootInActiveWindow ?: return
+        val phase = task.optString("phase", "waiting_editor")
+        val root = rootInActiveWindow
+        if (root == null) {
+            if (phase == "waiting_editor") retryEditorScan(task)
+            return
+        }
         val allText = collectText(root).joinToString(" ").lowercase()
         if (containsGate(allText)) {
             finishTask(task, false, "manual_intervention_required",
                 "Google Flow requested sign-in, verification, CAPTCHA, or account confirmation. The automation stopped without interacting with the security challenge.")
             return
         }
-        val phase = task.optString("phase", "waiting_editor")
         when (phase) {
             "waiting_editor" -> {
                 val editor = findEditor(root)
@@ -111,12 +121,30 @@ class FlowAutomationService : AccessibilityService() {
                     val args = android.os.Bundle().apply {
                         putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, prompt)
                     }
+                    editor.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
                     val set = editor.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
                     if (set) {
                         updatePhase(task, "waiting_generate")
                         lastActionAt = System.currentTimeMillis()
                         handler.postDelayed({ inspectCurrentPage() }, 1300)
+                    } else {
+                        retryEditorScan(task)
                     }
+                } else {
+                    if (!task.optBoolean("flow_setup_clicked", false)) {
+                        val setup = findButton(root, setOf(
+                            "new project", "create new project", "start new project", "new video",
+                            "create a video", "text to video", "describe your idea", "describe your video",
+                            "what would you like to create", "مشروع جديد", "إنشاء مشروع", "فيديو جديد",
+                            "وصف الفيديو", "صف فكرتك"
+                        ))
+                        if (setup != null && setup.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                            task.put("flow_setup_clicked", true)
+                            prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+                            lastActionAt = System.currentTimeMillis()
+                        }
+                    }
+                    retryEditorScan(task)
                 }
             }
             "waiting_generate" -> {
@@ -162,20 +190,54 @@ class FlowAutomationService : AccessibilityService() {
     }
 
     private fun findEditor(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
-        var found: AccessibilityNodeInfo? = null
+        val candidates = mutableListOf<Pair<Int, AccessibilityNodeInfo>>()
+        val promptMarkers = listOf(
+            "prompt", "describe", "your idea", "video description", "scene description",
+            "what do you want to create", "what would you like to create", "write your prompt",
+            "enter prompt", "type a prompt", "create a video", "اكتب وصف", "وصف المشهد",
+            "صف الفيديو", "صف فكرتك", "وصف الفيديو", "اكتب مطالبة"
+        )
         walk(root) { node ->
-            if (found != null) return@walk
             val viewId = node.viewIdResourceName.orEmpty().lowercase()
-            if (viewId.contains("url_bar") || viewId.contains("omnibox") || viewId.contains("search_box")) return@walk
+            if (viewId.contains("url_bar") || viewId.contains("omnibox") ||
+                viewId.contains("search_box") || viewId.contains("address")) return@walk
+            if (!node.isEditable || !node.isEnabled || !node.isVisibleToUser) return@walk
             val label = ((node.text?.toString() ?: "") + " " +
                 (node.contentDescription?.toString() ?: "") + " " +
                 (node.hintText?.toString() ?: "")).trim().lowercase()
-            val isPromptField = listOf("prompt", "describe your video", "describe the scene",
-                "what do you want to create", "video description", "اكتب وصف", "وصف المشهد", "صف الفيديو")
-                .any(label::contains)
-            if (node.isEditable && isPromptField && node.isEnabled) found = node
+            if (label.contains("search") || label.contains("google")) return@walk
+            val marker = promptMarkers.any(label::contains)
+            val editText = node.className?.toString()?.contains("EditText", ignoreCase = true) == true
+            val score = (if (marker) 100 else 0) + (if (editText) 30 else 0) +
+                (if (!node.hintText.isNullOrBlank()) 10 else 0)
+            candidates.add(score to node)
         }
-        return found
+        val marked = candidates.filter { it.first >= 100 }.maxByOrNull { it.first }?.second
+        if (marked != null) return marked
+        val editTexts = candidates.filter { it.first >= 30 }
+        if (editTexts.size == 1) return editTexts.single().second
+        if (candidates.size == 1) {
+            val pageText = collectText(root).joinToString(" ").lowercase()
+            val flowContext = listOf("flow", "video", "generate", "create", "scene", "فيديو", "إنشاء")
+                .any(pageText::contains)
+            if (flowContext) return candidates.single().second
+        }
+        return null
+    }
+
+    private fun retryEditorScan(task: JSONObject) {
+        val now = System.currentTimeMillis()
+        val phaseStarted = task.optLong("phase_started_at_ms", task.optLong("started_at_ms", now))
+        val attempts = task.optInt("editor_scan_attempts", 0) + 1
+        task.put("editor_scan_attempts", attempts)
+        prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+        if (now - phaseStarted > 60000L) {
+            finishTask(task, false, "flow_editor_not_found",
+                "وصل الهاتف إلى Google Flow، لكن لم يظهر حقل إدخال قابل للوصول خلال 60 ثانية. تم إيقاف المهمة دون الضغط على توليد.")
+            return
+        }
+        handler.removeCallbacksAndMessages(null)
+        handler.postDelayed({ inspectCurrentPage() }, 1200)
     }
 
     private fun findButton(root: AccessibilityNodeInfo, labels: Set<String>): AccessibilityNodeInfo? {
@@ -184,7 +246,7 @@ class FlowAutomationService : AccessibilityService() {
             if (found != null) return@walk
             val label = ((node.text?.toString() ?: "") + " " + (node.contentDescription?.toString() ?: "")).trim().lowercase()
             val clickable = node.isClickable || node.parent?.isClickable == true
-            if (clickable && labels.any { label == it }) {
+            if (clickable && labels.any { label == it || (it.length >= 8 && label.contains(it)) }) {
                 found = if (node.isClickable) node else node.parent
             }
         }
@@ -198,6 +260,7 @@ class FlowAutomationService : AccessibilityService() {
 
     private fun updatePhase(task: JSONObject, phase: String) {
         task.put("phase", phase)
+        task.put("phase_started_at_ms", System.currentTimeMillis())
         prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
     }
 
@@ -246,7 +309,7 @@ class FlowAutomationService : AccessibilityService() {
         networkExecutor.execute {
             runCatching {
                 apiPostWithToken("complete_job", JSONObject().put("job_id", id)
-                    .put("outcome", if (success) "succeeded" else if (code == "manual_intervention_required") "cancelled" else "failed")
+                    .put("outcome", if (success) "succeeded" else if (code in setOf("manual_intervention_required", "stale_legacy_task")) "cancelled" else "failed")
                     .put("error_code", code).put("error_message", message).put("result", result),
                     DeviceTokenVault.read(this) ?: "")
             }
@@ -329,11 +392,15 @@ class FlowAutomationService : AccessibilityService() {
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             if (prefs.getString(KEY_ACTIVE_TASK, null) != null) throw IllegalStateException("هناك مشهد آخر قيد التنفيذ على الهاتف.")
             if (index == 1) prefs.edit().putString(PREF_CLIPS, "[]").apply()
+            val startedAt = System.currentTimeMillis()
             val task = JSONObject(payload.toString())
                 .put("campaign_id", campaign)
                 .put("total_scenes", total)
                 .put("job_id", jobId)
                 .put("phase", "waiting_editor")
+                .put("started_at_ms", startedAt)
+                .put("phase_started_at_ms", startedAt)
+                .put("editor_scan_attempts", 0)
             prefs.edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
             val url = payload.optString("url", "https://labs.google/fx/tools/flow")
             if (!url.startsWith("https://labs.google/")) {
