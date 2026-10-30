@@ -161,3 +161,14 @@ The center project `894a0e3a-85c4-43de-b8f7-205db24685b9` still uses browser `lo
 - First implementation sequence: inspect exact current intake endpoint contract and repo Android/build conventions; create a minimal Android app + CI APK artifact on this feature branch; implement owner-authenticated job receipt; then assisted Flow prompt handoff, clip import, on-device assembly, and resumable return to intake.
 - Full Flow UI automation through AccessibilityService is a separate policy-gated milestone. Keep assisted/manual mode available; do not bypass quotas, CAPTCHA, account security, payment prompts, or consent screens.
 - Constraints: free-only; no billing activation, paid generation, paid hosting, new project, destructive changes, public publication, or weakening existing owner approvals.
+
+
+### Android foundation implementation update — 2026-10-30
+
+- Feature branch now contains a standalone Android Gradle/Compose app scaffold under `android/`, package `com.zozpro.flowbridge`, plus GitHub Actions workflow `.github/workflows/android-flow-bridge.yml`.
+- Prototype UI currently opens the Flow web entry, copies a scene prompt to clipboard, and imports multiple local video files via Android's document picker while preserving read permission where granted.
+- Kotlin Compose compiler plugin was explicitly added for Kotlin 2.0.21.
+- This is only a local assisted-mode shell. It does not yet authenticate to Supabase, receive agent jobs, automate Flow, download clips from Flow, assemble video, or upload to intake.
+- CI workflow is configured to build a debug APK on pushes/PRs affecting the Android module; its run result has not yet been independently verified from this handoff.
+- No production backend, database schema, existing function, OAuth credential, channel authorization, or publication policy was changed.
+- Latest known feature-branch commits include app scaffold and Compose compiler configuration; verify the branch head and CI result before distributing an APK.
