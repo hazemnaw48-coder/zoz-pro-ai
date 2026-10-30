@@ -194,7 +194,7 @@ private fun FlowBridgeScreen() {
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(enabled = !busy, onClick = { runAsync {
-                            apiPost(context, "device_health", JSONObject().put("app_version", "0.3.2"))
+                            apiPost(context, "device_health", JSONObject().put("app_version", BuildConfig.VERSION_NAME))
                             var processed = 0
                             for (index in 0 until 6) {
                                 val job = apiPost(context, "poll_jobs", JSONObject()).optJSONObject("job") ?: break
@@ -710,7 +710,7 @@ class DevicePollWorker(context: Context, params: androidx.work.WorkerParameters)
     override fun doWork(): Result {
         val token = DeviceTokenVault.read(applicationContext) ?: return Result.success()
         return try {
-            apiPostWithToken("heartbeat", JSONObject().put("app_version", "0.3.2"), token)
+            apiPostWithToken("heartbeat", JSONObject().put("app_version", BuildConfig.VERSION_NAME), token)
             for (index in 0 until 6) {
                 val job = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job") ?: break
                 val capability = job.optString("capability_id")
