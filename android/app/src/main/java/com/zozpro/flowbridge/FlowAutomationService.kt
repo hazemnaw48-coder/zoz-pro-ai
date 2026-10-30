@@ -205,27 +205,54 @@ class FlowAutomationService : AccessibilityService() {
                     finishTask(task, false, "prompt_not_entered", "لم يؤكد التطبيق إدخال وصف المشهد داخل محرر Google Flow.")
                     return
                 }
-                // Do not stop at paste: find one unambiguous Flow generation/send control,
-                // focus it so Android visibly identifies it, then click that exact control.
+                // Identify and visibly focus the unique generation action first.
+                // The click is deliberately deferred to a separate inspection cycle.
                 val generate = findGenerateButton(root)
                 if (generate != null && System.currentTimeMillis() - lastActionAt > 1800) {
-                    val buttonLabel = accessibleLabel(generate)
-                    val focused = generate.performAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS)
-                    val clicked = generate.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                    if (clicked) {
+                    val label = accessibleLabel(generate)
+                    val accessibilityFocused = generate.performAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS)
+                    val keyboardFocused = generate.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                    if (accessibilityFocused || keyboardFocused) {
                         task.put("generate_button_identified", true)
-                        task.put("generate_button_label", buttonLabel)
-                        task.put("generate_button_focused", focused)
+                        task.put("generate_button_label", label)
+                        task.put("generate_button_focused", true)
+                        updatePhase(task, "confirming_generate")
+                        lastActionAt = System.currentTimeMillis()
+                        handler.postDelayed({ inspectCurrentPage() }, 1200)
+                    } else {
+                        retrySendScan(task)
+                    }
+                } else {
+                    retrySendScan(task)
+                }
+            }
+            "confirming_generate" -> {
+                val confirmed = findGenerateButton(root)
+                val expected = task.optString("generate_button_label", "")
+                val actual = confirmed?.let(::accessibleLabel) ?: ""
+                if (confirmed == null || expected.isBlank() || !actual.equals(expected, ignoreCase = true)) {
+                    finishTask(task, false, "flow_generate_button_changed",
+                        "تم تحديد زر التوليد أولًا، لكن تعذر التحقق من بقاء الزر نفسه قبل الضغط؛ لم يُنفذ الإرسال.")
+                    return
+                }
+                if (System.currentTimeMillis() - lastActionAt > 900) {
+                    val stillFocused = confirmed.performAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS) ||
+                        confirmed.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                    if (!stillFocused) {
+                        finishTask(task, false, "flow_generate_button_focus_lost",
+                            "فُقد التركيز على زر التوليد قبل الضغط؛ أوقف التطبيق الإرسال بأمان.")
+                        return
+                    }
+                    if (confirmed.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
                         task.put("generate_button_clicked", true)
                         task.put("send_clicked", true)
+                        task.put("generate_clicked_at_ms", System.currentTimeMillis())
                         updatePhase(task, "waiting_download")
                         lastActionAt = System.currentTimeMillis()
                         handler.postDelayed({ inspectCurrentPage() }, 5000)
                     } else {
                         retrySendScan(task)
                     }
-                } else {
-                    retrySendScan(task)
                 }
             }
             "waiting_download" -> {
