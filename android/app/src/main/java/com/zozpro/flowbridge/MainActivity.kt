@@ -154,8 +154,8 @@ private fun FlowBridgeScreen() {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(if (paired) "الجهاز مقرون بالوكيل" else "الجهاز غير مقرون", fontWeight = FontWeight.Bold)
-                        Text("قدرات الجهاز: تنفيذ مشاهد Flow والتحكم المرئي في التطبيقات المفتوحة بأوامر المالك.")
-                        Text("تُحجب حقول كلمات المرور ورموز التحقق. الإرسال والنشر والحذف والدفع والتحويل تتطلب موافقة مالك مستقلة.")
+                        Text("قدرات الجهاز: تنفيذ مشاهد Flow والتحكم المرئي في Chrome وYouTube وYouTube Studio لأعمال ZOZ فقط.")
+                        Text("التطبيقات الشخصية خارج النطاق. لا تُقرأ الحسابات أو البيانات الخاصة؛ الكتابة لمحتوى العمل غير الحساس فقط. النشر والحذف والدفع والتحويل تتطلب موافقتك المستقلة.")
                     }
                 }
 
