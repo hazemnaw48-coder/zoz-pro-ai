@@ -1023,7 +1023,7 @@ async function dispatchLatestDraftPrompt(userId:string,channelId:string) {
       "Use historically grounded ancient Egyptian material culture, architecture, clothing, tools and landscape. Realistic cinematic reconstruction, coherent motion, natural light, detailed textures, documentary visual quality.",
       "No visible text, captions, subtitles, labels, logos, watermarks, or added music. Preserve a clean visual-only clip. Avoid modern objects and anachronisms."
     ].filter(Boolean).join("\n");
-    const idem="auto-flow-"+String(script.id)+"-scene-"+(index+1);
+    const idem="auto-flow-"+String(script.id)+"-"+String(device.id)+"-scene-"+(index+1);
     try{
       const rows=await db("zoz_pro_device_jobs",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({
         owner_id:userId,device_id:device.id,capability_id:"flow.copy_prompt",
