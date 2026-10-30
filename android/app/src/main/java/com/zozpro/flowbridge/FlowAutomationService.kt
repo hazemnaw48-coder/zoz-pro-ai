@@ -205,13 +205,18 @@ class FlowAutomationService : AccessibilityService() {
                     finishTask(task, false, "prompt_not_entered", "لم يؤكد التطبيق إدخال وصف المشهد داخل محرر Google Flow.")
                     return
                 }
-                val send = findButton(root, setOf(
-                    "send", "send prompt", "send message", "submit", "submit prompt",
-                    "arrow up", "arrow_upward", "send arrow", "generate", "generate video",
-                    "create video", "إرسال", "إرسال الرسالة", "توليد", "إنشاء فيديو"
-                ))
-                if (send != null && System.currentTimeMillis() - lastActionAt > 1800) {
-                    if (send.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                // Do not stop at paste: find one unambiguous Flow generation/send control,
+                // focus it so Android visibly identifies it, then click that exact control.
+                val generate = findGenerateButton(root)
+                if (generate != null && System.currentTimeMillis() - lastActionAt > 1800) {
+                    val buttonLabel = accessibleLabel(generate)
+                    val focused = generate.performAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS)
+                    val clicked = generate.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    if (clicked) {
+                        task.put("generate_button_identified", true)
+                        task.put("generate_button_label", buttonLabel)
+                        task.put("generate_button_focused", focused)
+                        task.put("generate_button_clicked", true)
                         task.put("send_clicked", true)
                         updatePhase(task, "waiting_download")
                         lastActionAt = System.currentTimeMillis()
@@ -341,19 +346,52 @@ class FlowAutomationService : AccessibilityService() {
         task.put("send_scan_attempts", attempts)
         prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
         if (now - phaseStarted > 45000L) {
-            finishTask(task, false, "flow_send_button_not_found",
-                "تم إدخال وصف المشهد، لكن لم يظهر زر إرسال/توليد قابل للوصول خلال 45 ثانية. لم يتم الضغط على عنصر غير معروف.")
+            finishTask(task, false, "flow_generate_button_not_found",
+                "تم لصق وصف المشهد في Google Flow، لكن لم يظهر زر إرسال/توليد واضح وفريد خلال 45 ثانية؛ لم يضغط التطبيق أي زر غير مؤكد.")
             return
         }
         handler.removeCallbacksAndMessages(null)
         handler.postDelayed({ inspectCurrentPage() }, 1200)
     }
 
+    private fun accessibleLabel(node: AccessibilityNodeInfo): String =
+        ((node.text?.toString() ?: "") + " " +
+            (node.contentDescription?.toString() ?: "")).trim().replace(Regex("\\s+"), " ")
+
+    private fun findGenerateButton(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val acceptedLabels = setOf(
+            "generate", "generate video", "create video", "send", "send prompt",
+            "send arrow", "arrow up", "arrow upward", "submit", "submit prompt",
+            "توليد", "إنشاء", "إنشاء فيديو", "إرسال", "إرسال للتوليد"
+        )
+        val candidates = mutableListOf<AccessibilityNodeInfo>()
+        walk(root) { node ->
+            if (!node.isVisibleToUser || !node.isEnabled) return@walk
+            val label = accessibleLabel(node).lowercase()
+                .replace('_', ' ')
+                .replace(Regex("\\s+"), " ")
+                .trim()
+            if (label !in acceptedLabels) return@walk
+            val target = when {
+                node.isClickable -> node
+                node.parent?.isClickable == true -> node.parent
+                else -> null
+            } ?: return@walk
+            val bounds = android.graphics.Rect().also(target::getBoundsInScreen)
+            val duplicate = candidates.any { existing ->
+                android.graphics.Rect().also(existing::getBoundsInScreen) == bounds
+            }
+            if (!duplicate) candidates.add(target)
+        }
+        // Require one and only one recognized action. Ambiguity stops safely.
+        return candidates.singleOrNull()
+    }
+
     private fun findButton(root: AccessibilityNodeInfo, labels: Set<String>): AccessibilityNodeInfo? {
         var found: AccessibilityNodeInfo? = null
         walk(root) { node ->
             if (found != null) return@walk
-            val label = ((node.text?.toString() ?: "") + " " + (node.contentDescription?.toString() ?: "")).trim().lowercase()
+            val label = accessibleLabel(node).lowercase()
             val clickable = node.isClickable || node.parent?.isClickable == true
             if (clickable && labels.any { label == it || (it.length >= 8 && label.contains(it)) }) {
                 found = if (node.isClickable) node else node.parent
