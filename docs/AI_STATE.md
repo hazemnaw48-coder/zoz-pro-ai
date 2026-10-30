@@ -227,3 +227,18 @@ The center project `894a0e3a-85c4-43de-b8f7-205db24685b9` still uses browser `lo
 - Additive SQL migrations are versioned under `supabase/migrations/`.
 - Remaining physical-device acceptance tests: pair phone, verify heartbeat and queued prompts, test a real set of Flow clips through assembly, verify audio/order/duration, upload final file to intake, approve private upload, then test the owner-approval task before public publication.
 - Explicit boundaries: Flow generation itself still requires a visible action in Google Flow because no authorized generation API is configured; KDP direct access/submission is not implemented; WorkManager is best-effort and not an always-on daemon.
+
+
+## ZOZ Android Device Agent — production integration update 2026-10-30
+
+- Android App Factory and device controls are merged into `main` (PR #34, merge commit `1b1a4d0fd520f141aa8f4a9931c619560f8cf447`).
+- Android app v0.3.0 debug APK built successfully in GitHub Actions run `41022918443`; artifact ID `12962297162`; SHA-256 `19fb654c4d91284d1e48375cd89b94f6000f8f097c1fa22c0209e68381b8b5a7`.
+- Production Supabase Edge Function versions: `zoz-pro-device-agent` v5, `zoz-pro-agent` v42, `zoz-pro-agent-control` v7, `zoz-pro-youtube-analytics` v47.
+- Phone runtime: owner-bound pairing, hashed device credential, separate Hazem Ahmed channel intake token, Android Keystore AES-GCM storage, WorkManager best-effort polling, and durable scene-prompt queue.
+- Agent automatically queues up to six Flow scene prompts for a recent saved script to a paired device. The app can open Flow, copy the next prompt, receive one or multiple clips via Android Share, stream-copy compatible MP4 clips locally, and upload the final MP4 in signed chunks with resume support.
+- App-owned imported copies can be removed only after explicit confirmation; original files outside the app are not deleted.
+- Intake upload remains owner-reviewed. The agent can privately upload after owner approval. Once the video is processed and ready, it creates a separate owner-approval task for public/unlisted publication. The new publish adapter runs only after that task is approved and the approved privacy target remains unchanged. Public publication without approval is disabled.
+- Physical Android acceptance testing is still outstanding: pairing, heartbeat, prompt delivery, share import, local assembly, upload, private YouTube upload, and final approval-gated publication.
+- Flow limitation: Google Flow's normal mobile app is supported in Egypt, but the official Flow Agent is currently web/PC only. The phone app cannot make unattended Flow generations through a documented API. It prepares and delivers prompts; generation still requires a visible owner action in Flow. No credit/region/MFA/CAPTCHA bypass is used.
+- Direct KDP connector and automated KDP submission remain unimplemented.
+- Function source in the repository uses server-only `ZOZ_OWNER_EMAIL` as the owner allowlist setting; configure it in Supabase Edge Function secrets before redeploying source files. Do not commit the real owner email or OAuth/service-role credentials.
