@@ -212,3 +212,18 @@ The center project `894a0e3a-85c4-43de-b8f7-205db24685b9` still uses browser `lo
 - The current app does not autonomously press Generate in Google Flow, bypass Flow quotas, perform unrestricted UI control, or automate Amazon KDP. Flow generation is assisted by opening the signed-in site and copying prompts. KDP direct connector remains absent.
 - The latest Android build for commit `c13e46b77c259f00b7a3ee644b4d9b76c2130f90` is still under GitHub Actions validation at note time. Earlier scaffold builds succeeded, but do not distribute an earlier APK as if it contains current pairing/media functionality.
 - Real Android device pairing, real clip assembly, end-to-end intake upload, and private YouTube upload still need physical-device acceptance testing. No production YouTube public publishing or privacy/metadata changes were enabled.
+
+
+## Android device runtime and media workflow — verified update 2026-10-30
+
+- Production Supabase project `oxyzxbkwhafzaztraowc` now contains owner-scoped Android device registry, hashed device credentials, pairing challenges, typed device jobs, job events, app project/build tracking, and the per-device intake-source link.
+- Production Edge Function versions: `zoz-pro-device-agent` v5, `zoz-pro-agent` v41, `zoz-pro-agent-control` v7, `zoz-pro-youtube-analytics` v46.
+- The main agent queues up to six scene-specific Flow prompts from a recent saved script to an active paired Android device. The phone stores them in a persistent local queue. Android WorkManager polls at the 15-minute minimum, subject to OS scheduling.
+- Android v0.2.0 debug APK successfully built in run `41021980836`, artifact `12962435799`, app commit `458c23206de2f59020799cf6372b8c8b3e371f1c`. APK SHA-256: `e1bb1588b7f6c6fc2e23b07b8416d645c01a4ca944e1fe3c2efaa52b600e6c8b`.
+- App supports secure pairing, prompt queue, Flow launch handoff, local stream-copy MP4 assembly with compatibility checks, signed chunk upload, server-recorded chunk resume, and intake finalization to `ready_for_review`.
+- Owner-approved intake assets can be privately uploaded through the existing YouTube pipeline. When an asset reaches `ready_to_publish`, the main agent creates an `awaiting_owner_approval` work item. The new `youtube.public_publish` adapter is enabled only for an approved work item with `approval_required=true`; the worker sends `publish_confirmed=true` only after that saved owner approval. No public publication occurs without approval.
+- `zoz-pro-agent-control` now exposes Android device status and registers `android.flow_prompt_dispatch` and approval-gated `youtube.public_publish`.
+- Source for the device agent, main agent, control endpoint, and video intake endpoint is versioned under `supabase/functions/`; real owner email is redacted from repository source and documented as the server-only `ZOZ_OWNER_EMAIL` setting.
+- Additive SQL migrations are versioned under `supabase/migrations/`.
+- Remaining physical-device acceptance tests: pair phone, verify heartbeat and queued prompts, test a real set of Flow clips through assembly, verify audio/order/duration, upload final file to intake, approve private upload, then test the owner-approval task before public publication.
+- Explicit boundaries: Flow generation itself still requires a visible action in Google Flow because no authorized generation API is configured; KDP direct access/submission is not implemented; WorkManager is best-effort and not an always-on daemon.
