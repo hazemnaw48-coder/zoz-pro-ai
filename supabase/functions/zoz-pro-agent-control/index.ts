@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const SUPABASE_URL_VALUE = Deno.env.get("SUPABASE_URL") || "";
-const OWNER_EMAIL = "hazemnaw48@gmail.com";
+const OWNER_EMAIL = Deno.env.get("ZOZ_OWNER_EMAIL") || "";
 function defaultKey(name: string): string {
   try { const v = JSON.parse(Deno.env.get(name) || "{}"); return typeof v?.default === "string" ? v.default : ""; }
   catch { return ""; }
