@@ -2,6 +2,7 @@ const CACHE_NAME = "zoz-pro-shell-v30";
 const APP_FILES = [
   "./",
   "./index.html",
+  "./android-app-factory.html",
   "./production-center.html",
   "./production-workbench.html",
   "./production-workbench.js?v=20261027-same-session-1",

@@ -147,3 +147,83 @@ A ready-to-use draft package was prepared for channel **فكرة**:
 ### Current implementation limitation
 
 The center project `894a0e3a-85c4-43de-b8f7-205db24685b9` still uses browser `localStorage` for project state and no cross-device cloud sync was verified. This affects durable project continuity, not the fact that the owner has previously exported/published a video successfully. Keep the project as the dedicated production UI; later source changes should decouple the production artifact ledger and queue from editor/build quotas and store history/assets durably, without removing the existing working path.
+
+
+## New task — Android Flow Bridge (2026-10-30)
+
+- Owner requested a phone-based Android companion that connects the existing ZOZ Pro agent to the three existing Google Flow accounts, receives generated clips, assembles the video, and returns it to the existing intake/review/publishing path.
+- Feature branch created from `main`: `feature/zoz-android-flow-bridge`.
+- Architecture and safety gates recorded in `docs/ANDROID_FLOW_BRIDGE_SPEC.md` (commit `187137dbdaa212d8a0558b024e847924d274ab93`).
+- No APK, native Android module, backend queue, Flow UI automation, or real device test exists yet. Do not imply otherwise.
+- Existing production `zoz-pro-agent` v32 and `zoz-pro-agent-control` v5 remain untouched.
+- Existing `zoz-pro-ai-video-studio` v5 was inspected: it calls a public Hugging Face LTX Video Space for a single six-second clip and uses Gemini TTS. It is a separate experimental generator, not Google Flow integration and not proof of full video assembly.
+- The three Flow accounts recorded in the web UI are not proof of a supported Flow API or reusable Google OAuth access for programmatic control. Reuse the already signed-in Flow sessions on the owner's Android device; never collect Google passwords, cookies, browser storage, or API keys in the bridge.
+- First implementation sequence: inspect exact current intake endpoint contract and repo Android/build conventions; create a minimal Android app + CI APK artifact on this feature branch; implement owner-authenticated job receipt; then assisted Flow prompt handoff, clip import, on-device assembly, and resumable return to intake.
+- Full Flow UI automation through AccessibilityService is a separate policy-gated milestone. Keep assisted/manual mode available; do not bypass quotas, CAPTCHA, account security, payment prompts, or consent screens.
+- Constraints: free-only; no billing activation, paid generation, paid hosting, new project, destructive changes, public publication, or weakening existing owner approvals.
+
+
+### Android foundation implementation update — 2026-10-30
+
+- Feature branch now contains a standalone Android Gradle/Compose app scaffold under `android/`, package `com.zozpro.flowbridge`, plus GitHub Actions workflow `.github/workflows/android-flow-bridge.yml`.
+- Prototype UI currently opens the Flow web entry, copies a scene prompt to clipboard, and imports multiple local video files via Android's document picker while preserving read permission where granted.
+- Kotlin Compose compiler plugin was explicitly added for Kotlin 2.0.21.
+- This is only a local assisted-mode shell. It does not yet authenticate to Supabase, receive agent jobs, automate Flow, download clips from Flow, assemble video, or upload to intake.
+- CI workflow is configured to build a debug APK on pushes/PRs affecting the Android module; its run result has not yet been independently verified from this handoff.
+- No production backend, database schema, existing function, OAuth credential, channel authorization, or publication policy was changed.
+- Latest known feature-branch commits include app scaffold and Compose compiler configuration; verify the branch head and CI result before distributing an APK.
+
+
+## Android App Factory section added — 2026-10-30
+
+- Added `docs/ANDROID_APP_FACTORY.md` defining the permanent Android App Factory: app portfolio, requirements, engineering, CI builds, test evidence, signing/release, operations, capability registry, risk-based owner approvals, security, and platform limits.
+- Added `android-app-factory.html` as a phone-first Arabic App Factory section with the current app portfolio, lifecycle, autonomy policy, and honest implementation status.
+- Updated `index.html` on the feature branch to add a dedicated **إنتاج تطبيقات Android** tab beside analysis/upload. This is not yet on the live production Pages branch.
+- Updated `sw.js` to cache the new App Factory page and updated the PWA manifest description.
+- Current portfolio entries: ZOZ Device Agent / Flow Bridge (initial code scaffold); ZOZ Browser Agent (planned); ZOZ Video Factory (planned); ZOZ KDP Workspace (planned).
+- The new section is a documentation/control-center UI only. It is not yet backed by a persistent app registry or build/test records in Supabase.
+- No production Supabase tables, RLS policies, secrets, existing YouTube flows, or publication permissions were changed.
+- No APK build, device pairing, browser automation, Flow automation, KDP submission, or Play Store release is claimed complete.
+- Next: inspect CI status for the latest feature branch head; verify APK build; then inspect production schema/RLS before designing additive app-project/device/job tables.
+
+
+## Extended Android execution design — 2026-10-30
+
+- Added `docs/ZOZ_DEVICE_AGENT_SPEC.md`: owner-bound device pairing, short-lived scoped grants, typed job envelopes, idempotency, local queue, cancellation, revocation, and acceptance tests.
+- Added `docs/ZOZ_BROWSER_AGENT_SPEC.md`: on-device sessions, origin allowlists, capability levels, approval before submissions, and explicit prohibition on bypassing MFA/CAPTCHA/quotas.
+- Added `docs/ZOZ_VIDEO_FACTORY_SPEC.md`: local import, metadata inspection, stream-copy remux when compatible, explicit transcode fallback, source preservation, integrity checks, and resumable private upload.
+- Added `docs/ZOZ_KDP_WORKSPACE_SPEC.md`: automated manuscript/package preparation and owner-controlled KDP submission.
+- Expanded Android App Factory page with links to all four specifications.
+- Updated Flow Bridge app to persist scene prompt and selected content URI references locally, restoring only files for which Android still grants persisted read permission. Clearing the in-app list does not delete source files.
+- Latest successful general ZOZ Pro CI on the branch: run 41018546263 (before the newest Android persistence commit). Android build workflow run 41018671491 is queued/in progress at the time of this note; no APK artifact has yet been verified.
+- Android workflow setup now successfully passed Android SDK setup and package installation in run 41018541159, but that run is still compiling. A newer run for the persistence changes is active.
+- No production Supabase schema or RLS changes have been made because the current authorized SQL path was previously blocked; do not create device pairing endpoints or claim server-side device execution until additive schema and owner-scope policies are safely implemented and verified.
+- Browser automation, autonomous Flow generation, local video assembly, direct KDP access/submission, device pairing, and Play Store release remain unimplemented and must not be described as live.
+
+
+## Android device execution — production work added 2026-10-30
+
+- Production project `oxyzxbkwhafzaztraowc` now has additive device/app factory tables from migrations `zoz_pro_device_runtime_and_android_app_factory`, `zoz_pro_device_pairing_challenges`, and `zoz_pro_device_intake_source_link`.
+- Deployed `zoz-pro-device-agent` ACTIVE v3. Owner-authenticated actions: create 5-minute one-time pairing code, list/revoke paired devices, enqueue typed allow-listed jobs, approve jobs, list job history. Device-authenticated actions: pair exchange, heartbeat, poll one job, and report completion. Tokens are stored as hashes server-side.
+- Pairing also issues a separate channel-scoped intake token for Hazem Ahmed. Device revocation disables both device credential and associated intake source.
+- `channel-control.html` on this feature branch now includes Android pairing, device list/revocation, prompt dispatch, job approval, and status display.
+- Android app now includes encrypted device/intake token storage, WorkManager 15-minute best-effort polling, visible Flow launch/prompt copy tasks, local MP4 stream-copy assembly with compatibility rejection, and chunked upload of final MP4 to existing ZOZ intake.
+- Existing ZOZ autonomous worker can advance an owner-approved intake asset through private YouTube upload. It does not publish publicly; public publication remains an owner-confirmed operation.
+- The current app does not autonomously press Generate in Google Flow, bypass Flow quotas, perform unrestricted UI control, or automate Amazon KDP. Flow generation is assisted by opening the signed-in site and copying prompts. KDP direct connector remains absent.
+- The latest Android build for commit `c13e46b77c259f00b7a3ee644b4d9b76c2130f90` is still under GitHub Actions validation at note time. Earlier scaffold builds succeeded, but do not distribute an earlier APK as if it contains current pairing/media functionality.
+- Real Android device pairing, real clip assembly, end-to-end intake upload, and private YouTube upload still need physical-device acceptance testing. No production YouTube public publishing or privacy/metadata changes were enabled.
+
+
+## Android device runtime and media workflow — verified update 2026-10-30
+
+- Production Supabase project `oxyzxbkwhafzaztraowc` now contains owner-scoped Android device registry, hashed device credentials, pairing challenges, typed device jobs, job events, app project/build tracking, and the per-device intake-source link.
+- Production Edge Function versions: `zoz-pro-device-agent` v5, `zoz-pro-agent` v41, `zoz-pro-agent-control` v7, `zoz-pro-youtube-analytics` v46.
+- The main agent queues up to six scene-specific Flow prompts from a recent saved script to an active paired Android device. The phone stores them in a persistent local queue. Android WorkManager polls at the 15-minute minimum, subject to OS scheduling.
+- Android v0.2.0 debug APK successfully built in run `41021980836`, artifact `12962435799`, app commit `458c23206de2f59020799cf6372b8c8b3e371f1c`. APK SHA-256: `e1bb1588b7f6c6fc2e23b07b8416d645c01a4ca944e1fe3c2efaa52b600e6c8b`.
+- App supports secure pairing, prompt queue, Flow launch handoff, local stream-copy MP4 assembly with compatibility checks, signed chunk upload, server-recorded chunk resume, and intake finalization to `ready_for_review`.
+- Owner-approved intake assets can be privately uploaded through the existing YouTube pipeline. When an asset reaches `ready_to_publish`, the main agent creates an `awaiting_owner_approval` work item. The new `youtube.public_publish` adapter is enabled only for an approved work item with `approval_required=true`; the worker sends `publish_confirmed=true` only after that saved owner approval. No public publication occurs without approval.
+- `zoz-pro-agent-control` now exposes Android device status and registers `android.flow_prompt_dispatch` and approval-gated `youtube.public_publish`.
+- Source for the device agent, main agent, control endpoint, and video intake endpoint is versioned under `supabase/functions/`; real owner email is redacted from repository source and documented as the server-only `ZOZ_OWNER_EMAIL` setting.
+- Additive SQL migrations are versioned under `supabase/migrations/`.
+- Remaining physical-device acceptance tests: pair phone, verify heartbeat and queued prompts, test a real set of Flow clips through assembly, verify audio/order/duration, upload final file to intake, approve private upload, then test the owner-approval task before public publication.
+- Explicit boundaries: Flow generation itself still requires a visible action in Google Flow because no authorized generation API is configured; KDP direct access/submission is not implemented; WorkManager is best-effort and not an always-on daemon.

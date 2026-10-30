@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<meta name="description" content="ZOZ Pro — إدارة مشاريع تطبيقات Android وبنائها واختبارها وإصدارها">
+<title>ZOZ Pro — إنتاج تطبيقات Android</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#122139;--panel2:#0e1b2d;--line:#304763;--text:#eef4ff;--muted:#a9bad0;--blue:#3978c3;--green:#52d6a0;--amber:#ffc36e}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(160deg,#0b1422,#101c2d);color:var(--text);font:15px/1.7 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1120px;margin:auto;padding:12px}
+header{padding:10px 2px 14px}
+.brand,.muted,.small{color:var(--muted)}
+.brand{font-size:12px;color:#a9c8f1}
+h1{font-size:clamp(25px,5vw,36px);line-height:1.25;margin:4px 0}
+h2{font-size:20px;margin:0 0 10px}
+h3{font-size:17px;margin:0 0 7px}
+p{margin:5px 0 10px;color:var(--muted)}
+a{color:#9ec2ff;text-decoration:none}
+a:hover{text-decoration:underline}
+.card{border:1px solid var(--line);background:var(--panel);border-radius:15px;padding:15px;margin:12px 0}
+.hero{background:linear-gradient(120deg,#142945,#102036);border-color:#466995}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.badge{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:3px 9px;font-size:12px;color:#dce8fb;background:#172940}
+.badge.good{border-color:#28745d;color:var(--green)}
+.badge.warn{border-color:#806031;color:var(--amber)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:10px}
+.project{border:1px solid var(--line);border-radius:12px;padding:13px;background:var(--panel2);min-width:0}
+.project p{font-size:13px}
+.project .meta{font-size:12px;color:var(--muted);margin:8px 0}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+button,.button{display:inline-block;border:1px solid #416fe0;border-radius:10px;padding:10px 13px;background:#315fc4;color:white;font:inherit;font-weight:700;cursor:pointer}
+button.secondary,.button.secondary{background:#263954;border-color:var(--line);color:var(--text)}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.kpi{border:1px solid var(--line);border-radius:11px;padding:11px;background:#0d192a}
+.kpi strong{display:block;font-size:22px}
+.kpi span{font-size:12px;color:var(--muted)}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.step{border:1px solid var(--line);border-radius:10px;padding:10px;background:#0d192a}
+.step strong{display:block;font-size:13px}
+.step small{color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:9px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+th{color:#d8e5f8;background:#192b43}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
+.note{padding:12px;border:1px solid #806031;background:#2c2418;border-radius:11px;color:#ffe0ad}
+footer{padding:16px 3px 28px;color:#8295ad;font-size:12px}
+@media(max-width:480px){main{padding:9px}.card{padding:12px}.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.kpi{padding:8px}.kpi strong{font-size:19px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+ <div class="brand">ZOZ PRO · مصنع التطبيقات والأدوات المحلية</div>
+ <h1>إنتاج تطبيقات Android</h1>
+ <p>قسم دائم لتصميم تطبيقاتنا وبنائها واختبارها وربطها بوكيل ZOZ Pro، بهدف تنفيذ أعمال أكثر محليًا وتقليل الاعتماد على أدوات التشغيل الخارجية.</p>
+ <div class="actions">
+  <a class="button secondary" href="./index.html">العودة إلى مركز ZOZ Pro</a>
+  <a class="button secondary" href="https://github.com/hazemnaw48-coder/zoz-pro-ai/tree/feature/zoz-android-flow-bridge">مستودع التطوير</a>
+ </div>
+</header>
+
+<section class="card hero">
+ <div class="row"><h2>منهج المصنع</h2><span class="badge good">قسم تطوير مستقل</span></div>
+ <p>الوكيل يحدد الحاجة ويكتب المواصفات وينشئ مهام التطوير، ثم تُبنى التطبيقات في CI وتُختبر قبل تثبيتها. لا نعتبر التطبيق جاهزًا لمجرد وجود الكود أو نجاح البناء.</p>
+ <div class="kpis">
+  <div class="kpi"><strong>1</strong><span>مشروع تأسيسي بدأ</span></div>
+  <div class="kpi"><strong>0</strong><span>تطبيقات ثبت اختبارها نهائيًا في هذا القسم</span></div>
+  <div class="kpi"><strong>7</strong><span>بوابات تحقق قبل الإصدار</span></div>
+ </div>
+</section>
+
+<section class="card">
+ <div class="row"><h2>محفظة التطبيقات</h2><span class="badge warn">الحالة من سجل التطوير</span></div>
+ <div class="grid">
+  <article class="project">
+   <div class="row"><h3>ZOZ Device Agent / Flow Bridge</h3><span class="badge good">APK 0.2.0 جاهز للاختبار</span></div>
+   <p>تطبيق الهاتف الرئيسي لاستلام مهام الوكيل، تجهيز أوامر Flow، استقبال الملفات، وإدارة المهام المحلية.</p>
+   <div class="meta">الحزمة: com.zozpro.flowbridge · Kotlin + Compose · الإصدار 0.2.0</div>
+   <div class="actions"><a href="https://github.com/hazemnaw48-coder/zoz-pro-ai/tree/feature/zoz-android-flow-bridge/android">ملفات Android</a><a href="https://github.com/hazemnaw48-coder/zoz-pro-ai/actions/runs/41021980836">بناء APK الناجح</a><a href="https://github.com/hazemnaw48-coder/zoz-pro-ai/blob/feature/zoz-android-flow-bridge/docs/ANDROID_FLOW_BRIDGE_SPEC.md">المواصفات</a></div>
+  </article>
+  <article class="project">
+   <div class="row"><h3>ZOZ Browser Agent</h3><span class="badge">مخطط</span></div>
+   <p>محرك متصفح محلي بمواقع مسموحة وجلسات معزولة وقدرات محددة، لإدارة المهام الخارجية حيث تسمح المنصة.</p>
+   <div class="meta">تصميم الأمان والجلسات ونطاقات المواقع.</div><div class="actions"><a href="https://github.com/hazemnaw48-coder/zoz-pro-ai/blob/feature/zoz-android-flow-bridge/docs/ZOZ_BROWSER_AGENT_SPEC.md">مواصفات المتصفح</a></div>
+  </article>
+  <article class="project">
+   <div class="row"><h3>ZOZ Video Factory</h3><span class="badge">مخطط</span></div>
+   <p>استيراد المقاطع، التحقق منها، ترتيبها وتجميعها على الجهاز، ثم إعادتها إلى استقبال ZOZ Pro.</p>
+   <div class="meta">تجميع محلي مع الحفاظ على المصدر ومنع التحويل الصامت.</div><div class="actions"><a href="https://github.com/hazemnaw48-coder/zoz-pro-ai/blob/feature/zoz-android-flow-bridge/docs/ZOZ_VIDEO_FACTORY_SPEC.md">مواصفات الفيديو</a></div>
+  </article>
+  <article class="project">
+   <div class="row"><h3>ZOZ KDP Workspace</h3><span class="badge">مخطط</span></div>
+   <p>إعداد المخطوطات والأغلفة والبيانات، وفحص ملفات الكتب، وتجهيز حزمة النشر ومتابعة حالة KDP.</p>
+   <div class="meta">إعداد الحزمة وفحصها؛ لا إرسال أو تغيير بيانات مالية دون موافقتك.</div><div class="actions"><a href="https://github.com/hazemnaw48-coder/zoz-pro-ai/blob/feature/zoz-android-flow-bridge/docs/ZOZ_KDP_WORKSPACE_SPEC.md">مواصفات KDP</a></div>
+  </article>
+ </div>
+</section>
+
+<section class="card">
+ <h2>عقد تشغيل جهاز Android</h2>
+ <p>التطبيق لا يحصل على صلاحية تحكم مفتوحة. لكل جهاز اقتران مستقل، ولكل مهمة نوع معروف ونطاق محدد، مع إمكانية الإيقاف والإلغاء وسجل نتائج.</p>
+ <div class="actions"><a href="https://github.com/hazemnaw48-coder/zoz-pro-ai/blob/feature/zoz-android-flow-bridge/docs/ZOZ_DEVICE_AGENT_SPEC.md">مواصفات اقتران الجهاز والمهام</a></div>
+</section>
+
+<section class="card">
+ <h2>دورة إنتاج التطبيق</h2>
+ <div class="steps">
+  <div class="step"><strong>1 · الفكرة والمواصفات</strong><small>الوكيل يحلل الحاجة ويضع معايير القبول.</small></div>
+  <div class="step"><strong>2 · التطوير</strong><small>كود على فرع مستقل ومراجعة التغييرات.</small></div>
+  <div class="step"><strong>3 · البناء</strong><small>APK تجريبي من GitHub Actions.</small></div>
+  <div class="step"><strong>4 · الاختبارات</strong><small>اختبارات آلية وسجلات وأدلة.</small></div>
+  <div class="step"><strong>5 · اختبار الهاتف</strong><small>تثبيت وتجربة فعلية على الجهاز.</small></div>
+  <div class="step"><strong>6 · موافقة الإصدار</strong><small>مراجعة الصلاحيات والخصوصية.</small></div>
+  <div class="step"><strong>7 · الإصدار والصيانة</strong><small>توقيع وتوزيع وتحديثات قابلة للتراجع.</small></div>
+ </div>
+</section>
+
+<section class="card">
+ <h2>مهام يستطيع الوكيل إنجازها دون إزعاجك</h2>
+ <div class="tablewrap"><table>
+  <thead><tr><th>العملية</th><th>صلاحية الوكيل</th></tr></thead>
+  <tbody>
+   <tr><td>تحليل متطلبات التطبيق وكتابة المواصفات</td><td><span class="badge good">تلقائي</span></td></tr>
+   <tr><td>كتابة الكود على فرع تطوير منفصل</td><td><span class="badge good">تلقائي مع سجل تغييرات</span></td></tr>
+   <tr><td>تشغيل الاختبارات وبناء APK تجريبي</td><td><span class="badge good">تلقائي</span></td></tr>
+   <tr><td>تشخيص أخطاء البناء وإعداد إصلاحات</td><td><span class="badge good">تلقائي ضمن النطاق</span></td></tr>
+   <tr><td>إضافة صلاحيات حساسة أو الوصول لحساب خارجي</td><td><span class="badge warn">موافقتك</span></td></tr>
+   <tr><td>توقيع إصدار نهائي أو نشر التطبيق للعامة</td><td><span class="badge warn">موافقتك</span></td></tr>
+   <tr><td>شراء خدمة أو تفعيل فوترة أو حذف بيانات</td><td><span class="badge warn">موافقتك</span></td></tr>
+  </tbody>
+ </table></div>
+</section>
+
+<section class="card">
+ <h2>الحدود التي يحترمها المصنع</h2>
+ <p>التطبيقات المحلية تقلل الاعتماد على أرصدة متصفح وأدوات أتمتة خارجية، لكنها لا تلغي حصص الخدمات التي نتصل بها.</p>
+ <ul>
+  <li>حصص إنشاء الفيديو في Google Flow واستخدام نماذج Gemini.</li>
+  <li>حدود GitHub Actions والبناء والاحتفاظ بالملفات.</li>
+  <li>سياسات KDP والتحقق من الحساب وحدود النشر.</li>
+  <li>قيود Android على العمل في الخلفية والبطارية والذاكرة.</li>
+  <li>قيود المواقع الخارجية والتحقق البشري والمصادقة الثنائية.</li>
+ </ul>
+ <div class="note">لن نخزن كلمات مرور Google أو Amazon أو Cookies أو مفاتيح الخدمة داخل APK أو ملفات GitHub. ولن نتجاوز CAPTCHA أو MFA أو طلبات الدفع أو موافقات المنصات.</div>
+</section>
+
+<section class="card">
+ <h2>الحالة التنفيذية الحالية</h2>
+ <p>نجح بناء APK 0.2.0. واجهة الاقتران وإدارة الهاتف موجودة في فرع التطوير، وتنتظر الدمج النهائي واختبار الاقتران والرفع على هاتف فعلي.</p>
+ <div class="actions">
+  <a class="button" href="https://github.com/hazemnaw48-coder/zoz-pro-ai/tree/feature/zoz-android-flow-bridge">فتح فرع العمل</a>
+  <a class="button secondary" href="https://github.com/hazemnaw48-coder/zoz-pro-ai/blob/feature/zoz-android-flow-bridge/docs/ANDROID_APP_FACTORY.md">وثيقة قسم المصنع</a>
+ </div>
+ <p class="small">تم نشر طبقة اقتران الأجهزة وطابور المهام في مشروع الإنتاج. تطبيق Android 0.2.0 يتضمن الاقتران الآمن، استقبال طابور حتى ست مطالبات مشاهد، فتح Flow ونسخ المطالبات، تجميع MP4 محليًا دون إعادة ضغط عند توافق الترميزات، ورفع الملف النهائي إلى استقبال ZOZ مع استكمال الأجزاء بعد انقطاع الاتصال. بناء APK نجح؛ اختبار الهاتف الفعلي ما زال مطلوبًا.</p>
+</section>
+
+<footer>ZOZ Pro · Android App Factory · إدارة التطوير والاختبارات والإصدارات ضمن صلاحيات المالك</footer>
+</main>
+</body>
+</html>
