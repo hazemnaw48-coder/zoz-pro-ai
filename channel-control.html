@@ -89,6 +89,21 @@ body.upload-mode .footer{font-size:11px}
  <div class="actions"><button type="button" id="zoz-device-send-prompt-btn" class="secondary">إرسال المطالبة للجهاز</button></div>
  <div id="zoz-device-jobs" class="stack"></div>
 </div>
+
+<div class="section-gap" id="zoz-flow-production">
+ <h3>وكيل إنتاج الفيديو · خطة ثم موافقة ثم تنفيذ</h3>
+ <p>يختار الوكيل القناة المناسبة، ويعد السيناريو والهوية البصرية، ويقسم العمل إلى مقاطع منفصلة لا تتجاوز 8 ثوانٍ. لن يبدأ الإنتاج قبل موافقتك.</p>
+ <div class="grid">
+  <div><label for="zoz-flow-channel">القناة</label><select id="zoz-flow-channel" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit"><option value="">اختيار الوكيل حسب الموضوع</option><option value="UC9fr5B0SZZkmVAApfCqEO3w">فِكرة — أفكار وذكاء اصطناعي</option><option value="UCIael48cvwPG3gKj--c7HKw">Hazem Ahmed — مصر القديمة</option></select></div>
+  <div><label for="zoz-flow-topic">موضوع الفيديو (اختياري)</label><input id="zoz-flow-topic" maxlength="240" placeholder="يختار الوكيل موضوعًا من التقويم إذا تركته فارغًا"></div>
+ </div>
+ <label for="zoz-flow-style">الهوية البصرية المطلوبة (اختياري)</label>
+ <input id="zoz-flow-style" maxlength="700" placeholder="يختار الوكيل الهوية المناسبة للقناة ويحافظ عليها في كل المشاهد">
+ <div class="actions"><button type="button" id="zoz-flow-propose">حلّل وأنشئ مقترح الإنتاج</button></div>
+ <div id="zoz-flow-proposal-status" class="notice" style="display:none"></div>
+ <div id="zoz-flow-proposal-view" style="display:none"></div>
+ <div class="actions"><button type="button" id="zoz-flow-approve" disabled>أوافق على الخطة وابدأ التنفيذ</button></div>
+</div>
 <div class="section-gap"><h3>١ · تحليل قناة Hazem Ahmed</h3><p>يقرأ حالة القناة والتحليلات والتقويم والمسودات وملفات الفيديو، ثم يعرض التشخيص والخطوات العملية. لا يغيّر الفيديوهات ولا ينشر.</p><div class="actions"><button type="button" id="zoz-agent-analyze-btn">حلّل القناة الآن</button><button type="button" class="secondary" id="zoz-agent-video-test-btn">اختبر نجاح آخر فيديو</button><button type="button" id="zoz-agent-cycle-btn">شغّل دورة الإدارة</button></div><div id="zoz-agent-analysis-status" class="notice" style="display:none"></div><pre id="zoz-agent-analysis-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre></div>
 <div class="section-gap"><h3>٢ · إنشاء مسودة محتوى</h3><p>المسودة تُحفظ في مركز الإنتاج للمراجعة. لا يتم إنشاء فيديو أو رفعه أو نشره تلقائيًا.</p><label for="zoz-agent-topic">موضوع المسودة</label><input id="zoz-agent-topic" maxlength="240" placeholder="مثال: كيف عاش العمال في دير المدينة؟"><div class="grid"><div><label for="zoz-agent-mode">نوع المحتوى</label><select id="zoz-agent-mode" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit"><option value="short">Short</option><option value="long">فيديو طويل</option></select></div><div><label for="zoz-agent-duration">المدة المقترحة بالثواني</label><input id="zoz-agent-duration" type="number" min="20" max="180" value="45"></div></div><div class="actions"><button type="button" id="zoz-agent-draft-btn">أنشئ المسودة واحفظها</button></div><div id="zoz-agent-draft-status" class="notice" style="display:none"></div><pre id="zoz-agent-draft-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre></div>
 </section>
@@ -1100,6 +1115,44 @@ async function sendDevicePrompt(){
   await refreshDeviceAgent();
  }catch(e){status.className='notice bad';status.textContent='تعذر إرسال المهمة: '+(e.message||e);}
 }
+
+let activeFlowProposal=null;
+function renderFlowProposal(data){
+ const host=$('zoz-flow-proposal-view');host.replaceChildren();host.style.display='block';
+ const p=data.proposal||{};activeFlowProposal=p.id||null;
+ const h=document.createElement('h3');h.textContent=p.title||'مقترح الإنتاج';host.append(h);
+ const meta=document.createElement('p');meta.className='notice';meta.textContent='القناة: '+(p.channel_name||p.channel_id)+' · '+p.aspect_ratio+' · '+p.scene_count+' مشاهد × '+p.scene_seconds+' ثوانٍ = '+p.total_duration_seconds+' ثانية';host.append(meta);
+ const style=document.createElement('p');style.textContent='الهوية البصرية: '+(p.visual_style||'—');host.append(style);
+ const script=p.script||{};
+ const hook=document.createElement('p');hook.textContent='العنوان: '+(script.title||p.title||'—')+'\nالمقدمة: '+(script.hook||'—');host.append(hook);
+ (p.scenes||[]).forEach(scene=>{
+  const card=document.createElement('article');card.className='metric';card.style.margin='8px 0';
+  const title=document.createElement('strong');title.textContent='المشهد '+scene.scene_index+' · 8 ثوانٍ';
+  const visual=document.createElement('p');visual.textContent=scene.visual||'';
+  const voice=document.createElement('p');voice.textContent='التعليق: '+(scene.narration||'لا يوجد');
+  const prompt=document.createElement('details');const sum=document.createElement('summary');sum.textContent='عرض مطالبة Google Flow';const pre=document.createElement('pre');pre.style.whiteSpace='pre-wrap';pre.style.overflowWrap='anywhere';pre.textContent=scene.prompt||'';prompt.append(sum,pre);
+  card.append(title,visual,voice,prompt);host.append(card);
+ });
+ $('zoz-flow-approve').disabled=!activeFlowProposal;
+}
+$('zoz-flow-propose')?.addEventListener('click',async()=>{
+ const button=$('zoz-flow-propose'),status=$('zoz-flow-proposal-status'),host=$('zoz-flow-proposal-view');
+ button.disabled=true;status.style.display='block';status.className='notice';status.textContent='الوكيل يراجع القنوات والتقويم ويعد السيناريو ومطالبات المشاهد…';host.style.display='none';activeFlowProposal=null;$('zoz-flow-approve').disabled=true;
+ try{
+  const d=await callZozAgent('propose_production',{channel_id:$('zoz-flow-channel').value,topic:$('zoz-flow-topic').value.trim(),visual_style:$('zoz-flow-style').value.trim()});
+  renderFlowProposal(d);status.className='notice good';status.textContent='اكتمل المقترح وحُفظ للمراجعة. لم يبدأ الإنتاج ولم تُرسل مهام إلى الهاتف.';
+ }catch(e){status.className='notice bad';status.textContent='تعذر إعداد المقترح: '+(e.message||e);}
+ finally{button.disabled=false;}
+});
+$('zoz-flow-approve')?.addEventListener('click',async()=>{
+ if(!activeFlowProposal)return;
+ const button=$('zoz-flow-approve'),status=$('zoz-flow-proposal-status');button.disabled=true;status.className='notice';status.textContent='يسجل الوكيل موافقتك ويفحص قدرة الهاتف قبل إرسال المشاهد…';
+ try{
+  const d=await callZozAgent('approve_production_proposal',{proposal_id:activeFlowProposal});
+  status.className='notice good';status.textContent='تمت الموافقة وإرسال '+d.scene_count+' مشاهد منفصلة إلى الهاتف.';
+  await refreshDeviceAgent();
+ }catch(e){status.className='notice bad';status.textContent='لم يبدأ التنفيذ: '+(e.message||e);button.disabled=false;}
+});
 async function callZozAgent(action,extra){
  const session=await ownerSession();
  const response=await fetch(AGENT_API,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:action,channel_id:CHANNEL_ID},extra||{})),cache:'no-store'});
