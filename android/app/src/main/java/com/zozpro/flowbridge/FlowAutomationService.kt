@@ -71,7 +71,7 @@ class FlowAutomationService : AccessibilityService() {
         super.onDestroy()
     }
 
-    private fun prefs() = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun prefs() = getSharedPreferences(FlowAutomationService.PREFS, Context.MODE_PRIVATE)
     private fun activeTask(): JSONObject? = runCatching {
         prefs().getString(KEY_ACTIVE_TASK, null)?.let(::JSONObject)
     }.getOrNull()
@@ -201,22 +201,22 @@ class FlowAutomationService : AccessibilityService() {
             }
             val name = cursor.getString(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TITLE)) ?: "flow-scene-${task.optInt("scene_index", 1)}.mp4"
             val size = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)).coerceAtLeast(0L)
-            appendClip(uri, name, size, task.optInt("scene_index", 1))
+            appendClip(uri, name, size, task.optInt("scene_index", 1), task.optString("campaign_id"))
             val result = JSONObject().put("downloaded", true).put("uri", uri.toString()).put("name", name)
                 .put("size_bytes", size).put("scene_index", task.optInt("scene_index", 1))
             finishTask(task, true, "", "", result)
         }
     }
 
-    private fun appendClip(uri: Uri, name: String, size: Long, sceneIndex: Int) {
-        val raw = prefs().getString(PREF_CLIPS, "[]") ?: "[]"
+    private fun appendClip(uri: Uri, name: String, size: Long, sceneIndex: Int, campaignId: String) {
+        val raw = prefs().getString(FlowAutomationService.PREF_CLIPS, "[]") ?: "[]"
         val arr = JSONArray(raw)
         val item = JSONObject().put("uri", uri.toString()).put("name", name)
-            .put("size", size).put("scene_index", sceneIndex)
+            .put("size", size).put("scene_index", sceneIndex).put("campaign_id", campaignId)
         var exists = false
         for (i in 0 until arr.length()) if (arr.optJSONObject(i)?.optString("uri") == uri.toString()) exists = true
         if (!exists) arr.put(item)
-        prefs().edit().putString(PREF_CLIPS, arr.toString()).apply()
+        prefs().edit().putString(FlowAutomationService.PREF_CLIPS, arr.toString()).apply()
     }
 
     private fun finishTask(task: JSONObject, success: Boolean, code: String, message: String, extra: JSONObject = JSONObject()) {
@@ -234,22 +234,24 @@ class FlowAutomationService : AccessibilityService() {
         val total = task.optInt("total_scenes", 0)
         val index = task.optInt("scene_index", 0)
         if (success && total > 0 && index >= total) {
-            handler.postDelayed({ assembleAndUpload() }, 800)
+            handler.postDelayed({ assembleAndUpload(task.optString("campaign_id"), total) }, 800)
+        } else if (success) {
+            handler.postDelayed({ WorkManager.getInstance(this).enqueueUniqueWork("zoz-device-next-scene", ExistingWorkPolicy.REPLACE, OneTimeWorkRequestBuilder<DevicePollWorker>().build()) }, 1200)
         }
     }
 
-    private fun assembleAndUpload() {
+    private fun assembleAndUpload(campaignId: String, expectedScenes: Int) {
         try {
-            val arr = JSONArray(prefs().getString(PREF_CLIPS, "[]") ?: "[]")
+            val arr = JSONArray(prefs().getString(FlowAutomationService.PREF_CLIPS, "[]") ?: "[]")
             val entries = mutableListOf<Pair<Int, ImportedClip>>()
             for (i in 0 until arr.length()) {
                 val o = arr.optJSONObject(i) ?: continue
                 val uri = Uri.parse(o.optString("uri"))
                 val index = o.optInt("scene_index", i + 1)
-                entries.add(index to ImportedClip(uri, o.optString("name", "scene-$index.mp4"), o.optLong("size")))
+                if (o.optString("campaign_id") == campaignId) entries.add(index to ImportedClip(uri, o.optString("name", "scene-$index.mp4"), o.optLong("size")))
             }
-            val expected = activeTask()?.optInt("total_scenes", 0) ?: 0
-            if (expected > 0 && entries.size < expected) throw IllegalStateException("Not all scene downloads are present.")
+            val uniqueIndexes = entries.map { it.first }.distinct()
+            if (uniqueIndexes.size != expectedScenes || uniqueIndexes.sorted() != (1..expectedScenes).toList()) throw IllegalStateException("لم تصل كل مشاهد الحملة بترتيبها؛ وصل ${uniqueIndexes.size} من $expectedScenes.")
             val ordered = entries.sortedBy { it.first }.map { it.second }
             if (ordered.size < 2) throw IllegalStateException("At least two downloaded scenes are required.")
             val output = File(getExternalFilesDir(null), "ZOZ-final-${System.currentTimeMillis()}.mp4")
@@ -262,12 +264,12 @@ class FlowAutomationService : AccessibilityService() {
     }
 
     companion object {
-        const val PREFS = "zoz_flow_bridge"
-        const val PREF_CLIPS = "saved_clips"
+        const val FlowAutomationService.PREFS = "zoz_flow_bridge"
+        const val FlowAutomationService.PREF_CLIPS = "saved_clips"
         const val KEY_ACTIVE_TASK = "flow_active_scene_task"
 
         fun startScene(context: Context, jobId: String, payload: JSONObject) {
-            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val prefs = context.getSharedPreferences(FlowAutomationService.PREFS, Context.MODE_PRIVATE)
             if (prefs.getString(KEY_ACTIVE_TASK, null) != null) throw IllegalStateException("هناك مشهد آخر قيد التنفيذ على الهاتف.")
             val task = JSONObject(payload.toString()).put("job_id", jobId).put("phase", "waiting_editor")
             prefs.edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
