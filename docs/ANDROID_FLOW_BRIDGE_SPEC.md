@@ -16,10 +16,12 @@ A native Android companion to the existing ZOZ Pro production project. It is an 
   - `zoz_pro_android_app_builds`
 - A device pairing challenge is 32 hexadecimal characters, expires in five minutes, and is atomically consumed once.
 - Pair exchange creates a device-bound credential and a separate intake-only token scoped to the Hazem Ahmed channel. Only hashes are stored server-side.
+- Production function versions: `zoz-pro-device-agent` v5, `zoz-pro-agent` v39, `zoz-pro-agent-control` v6, `zoz-pro-youtube-analytics` v46.
 - Device credentials and intake tokens are stored in Android Keystore AES-GCM encrypted preferences.
 - Owner can list/revoke devices and enqueue typed tasks from the current control center. Revocation also disables the device's associated intake source.
 - Job capabilities currently allow only `device.health_check`, `flow.open`, and `flow.copy_prompt`; the app does not accept arbitrary code, shell commands, JavaScript, or tap coordinates.
 - Device polling is scheduled with Android WorkManager at the platform minimum interval of 15 minutes and can also be triggered while the app is open. Android may defer background work due to Doze, battery optimization, or vendor policies.
+- ZOZ agent v39 can queue up to six scene-specific Flow prompts for a recent saved draft to a paired device. The phone stores them as a durable local prompt queue, avoiding overwrite when more than one scene is waiting.
 - Upload capability is separate from the job queue: the paired app can transfer a completed MP4 through the existing resumable ZOZ intake API using its channel-scoped intake token. The asset enters `ready_for_review`; the existing ZOZ owner review and private-upload pipeline remains in force.
 
 ## Android app implementation
