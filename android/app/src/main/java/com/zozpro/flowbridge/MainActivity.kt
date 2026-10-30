@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
@@ -373,7 +374,7 @@ private fun assembleCompatibleClips(context: Context, clips: List<ImportedClip>,
         }
         fun signature(f: MediaFormat): String {
             val keys = listOf(MediaFormat.KEY_MIME, MediaFormat.KEY_WIDTH, MediaFormat.KEY_HEIGHT, MediaFormat.KEY_SAMPLE_RATE, MediaFormat.KEY_CHANNEL_COUNT, MediaFormat.KEY_PROFILE, MediaFormat.KEY_LEVEL)
-            return keys.joinToString("|") { key -> if (f.containsKey(key)) runCatching { f.getString(key) ?: f.getInteger(key).toString() }.getOrDefault("") else "" }
+            return keys.joinToString("|") { key -> if (!f.containsKey(key)) "" else if (key == MediaFormat.KEY_MIME) f.getString(key) ?: "" else runCatching { f.getInteger(key).toString() }.getOrDefault("") }
         }
         val firstTracks = tracks(extractors.first())
         val maps = extractors.map { tracks(it) }
@@ -385,12 +386,13 @@ private fun assembleCompatibleClips(context: Context, clips: List<ImportedClip>,
                 }
             }
         }
-        muxer = MediaMuxer(temp.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-        val outputTracks = firstTracks.mapValues { (_, pair) -> muxer.addTrack(pair.second) }
+        val outputMuxer = MediaMuxer(temp.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        muxer = outputMuxer
+        val outputTracks = firstTracks.mapValues { (_, pair) -> outputMuxer.addTrack(pair.second) }
         val rotation = firstTracks.values.firstOrNull { it.second.getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true }
             ?.second?.let { if (it.containsKey("rotation-degrees")) runCatching { it.getInteger("rotation-degrees") }.getOrDefault(0) else 0 } ?: 0
-        if (rotation in listOf(0, 90, 180, 270)) muxer.setOrientationHint(rotation)
-        muxer.start()
+        if (rotation in listOf(0, 90, 180, 270)) outputMuxer.setOrientationHint(rotation)
+        outputMuxer.start()
         started = true
         val buffer = java.nio.ByteBuffer.allocate(16 * 1024 * 1024)
         val info = MediaCodec.BufferInfo()
@@ -407,16 +409,19 @@ private fun assembleCompatibleClips(context: Context, clips: List<ImportedClip>,
                 if (size < 0) break
                 val mime = extractor.getTrackFormat(sourceTrack).getString(MediaFormat.KEY_MIME) ?: break
                 info.set(0, size, offsetUs + extractor.sampleTime, extractor.sampleFlags)
-                muxer.writeSampleData(outputTracks[mime] ?: throw IllegalStateException("مسار غير معروف: $mime"), buffer, info)
+                outputMuxer.writeSampleData(outputTracks[mime] ?: throw IllegalStateException("مسار غير معروف: $mime"), buffer, info)
                 maxSample = maxOf(maxSample, extractor.sampleTime)
                 if (!extractor.advance()) break
             }
-            val declaredDuration = extractor.duration
+            val declaredDuration = maps[index].values.mapNotNull { pair ->
+                val format = pair.second
+                if (format.containsKey(MediaFormat.KEY_DURATION)) runCatching { format.getLong(MediaFormat.KEY_DURATION) }.getOrNull() else null
+            }.maxOrNull() ?: 0L
             offsetUs += maxOf(declaredDuration, maxSample + 1L)
         }
-        muxer.stop()
+        outputMuxer.stop()
         started = false
-        muxer.release()
+        outputMuxer.release()
         muxer = null
         context.contentResolver.openOutputStream(outputUri, "w").use { output ->
             if (output == null) throw IllegalStateException("تعذر فتح ملف الإخراج.")
