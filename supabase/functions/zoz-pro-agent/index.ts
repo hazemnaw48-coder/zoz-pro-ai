@@ -999,7 +999,7 @@ async function dispatchLatestDraftPrompt(userId:string,channelId:string) {
     "&created_at=gte."+encodeURIComponent(recentSince)+
     "&select=id,title,production_package,shot_plan,narration,created_at&order=created_at.desc&limit=1");
   const script=scripts?.[0];
-  if(!script)return {status:"skipped_no_saved_script"};
+  if(!script)return {status:"skipped_no_recent_script"};
   const devices=await db("zoz_pro_device_registry?owner_id=eq."+encodeURIComponent(userId)+
     "&device_status=eq.active&select=id,device_name,capabilities,last_heartbeat_at&order=last_heartbeat_at.desc.nullslast&limit=10");
   const device=(Array.isArray(devices)?devices:[]).find((x:any)=>Array.isArray(x.capabilities)&&x.capabilities.includes("flow.copy_prompt"));
@@ -1007,34 +1007,44 @@ async function dispatchLatestDraftPrompt(userId:string,channelId:string) {
   const pkg=script.production_package&&typeof script.production_package==="object"?script.production_package:{};
   const shots=Array.isArray(pkg.shot_plan)?pkg.shot_plan:(Array.isArray(script.shot_plan)?script.shot_plan:[]);
   const narration=Array.isArray(pkg.narration)?pkg.narration:(Array.isArray(script.narration)?script.narration:[]);
-  const firstNarration=narration[0]&&typeof narration[0]==="object"?clean(narration[0].text,600):"";
-  const firstShot=clean(shots[0]||"المشهد الافتتاحي المرتبط بموضوع الحلقة",500);
+  const sceneCount=Math.max(1,Math.min(6,shots.length||narration.length||1));
   const title=clean(script.title||pkg.title||"موضوع الحلقة",180);
-  const prompt=[
-    "Create ONE 8-second vertical 9:16 cinematic video clip for a YouTube Short.",
-    "Subject: "+title+".",
-    "Shot direction: "+firstShot+".",
-    firstNarration?"Narrative context: "+firstNarration+".":"",
-    "Use historically grounded ancient Egyptian material culture, architecture, clothing, tools and landscape. Realistic cinematic reconstruction, coherent motion, natural light, detailed textures, documentary visual quality.",
-    "No visible text, captions, subtitles, labels, logos, watermarks, or added music. Preserve a clean visual-only clip. Avoid modern objects and anachronisms."
-  ].filter(Boolean).join("\n");
-  const idem="auto-flow-"+String(script.id)+"-scene-1";
-  const rows=await db("zoz_pro_device_jobs",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({
-    owner_id:userId,device_id:device.id,capability_id:"flow.copy_prompt",
-    payload:{prompt,source:"zoz-pro-agent-autonomous-worker",script_id:script.id,script_title:title,scene_index:1},
-    status:"queued",approval_required:false,approval_status:"not_required",
-    idempotency_key:idem,priority:2
-  })});
-  const job=rows?.[0];
-  if(!job){
-    const existing=await db("zoz_pro_device_jobs?owner_id=eq."+encodeURIComponent(userId)+"&idempotency_key=eq."+encodeURIComponent(idem)+"&select=id,status&limit=1");
-    return existing?.[0]?{status:"already_dispatched",job_id:existing[0].id,job_status:existing[0].status}:{status:"dispatch_failed"};
+  const jobs:any[]=[];
+  for(let index=0;index<sceneCount;index++){
+    const shotRaw=shots[index]??"المشهد "+(index+1)+" المرتبط بموضوع الحلقة";
+    const shot=typeof shotRaw==="string"?clean(shotRaw,500):clean(shotRaw?.visual||shotRaw?.description||shotRaw?.scene||JSON.stringify(shotRaw),500);
+    const narrationRaw=narration[index];
+    const narrationText=typeof narrationRaw==="string"?clean(narrationRaw,600):clean(narrationRaw?.text||narrationRaw?.narration||"",600);
+    const prompt=[
+      "Create ONE 8-second vertical 9:16 cinematic video clip for a YouTube Short.",
+      "This is scene "+(index+1)+" of a coherent multi-clip episode. Subject: "+title+".",
+      "Shot direction: "+shot+".",
+      narrationText?"Narrative context: "+narrationText+".":"",
+      "Use historically grounded ancient Egyptian material culture, architecture, clothing, tools and landscape. Realistic cinematic reconstruction, coherent motion, natural light, detailed textures, documentary visual quality.",
+      "No visible text, captions, subtitles, labels, logos, watermarks, or added music. Preserve a clean visual-only clip. Avoid modern objects and anachronisms."
+    ].filter(Boolean).join("\n");
+    const idem="auto-flow-"+String(script.id)+"-scene-"+(index+1);
+    try{
+      const rows=await db("zoz_pro_device_jobs",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({
+        owner_id:userId,device_id:device.id,capability_id:"flow.copy_prompt",
+        payload:{prompt,source:"zoz-pro-agent-autonomous-worker",script_id:script.id,script_title:title,scene_index:index+1,scene_count:sceneCount},
+        status:"queued",approval_required:false,approval_status:"not_required",
+        idempotency_key:idem,priority:2
+      })});
+      const job=rows?.[0];
+      if(job){
+        await db("zoz_pro_device_job_events",{method:"POST",headers:{prefer:"return=minimal"},body:JSON.stringify({
+          owner_id:userId,device_id:device.id,job_id:job.id,event_type:"autonomous_flow_prompt_dispatched",
+          details:{script_id:script.id,channel_id:channelId,scene_index:index+1,scene_count:sceneCount}
+        })});
+        jobs.push({job_id:job.id,scene_index:index+1,status:"queued"});
+      }
+    }catch(_){
+      const existing=await db("zoz_pro_device_jobs?owner_id=eq."+encodeURIComponent(userId)+"&idempotency_key=eq."+encodeURIComponent(idem)+"&select=id,status&limit=1");
+      if(existing?.[0])jobs.push({job_id:existing[0].id,scene_index:index+1,status:"already_exists",job_status:existing[0].status});
+    }
   }
-  await db("zoz_pro_device_job_events",{method:"POST",headers:{prefer:"return=minimal"},body:JSON.stringify({
-    owner_id:userId,device_id:device.id,job_id:job.id,event_type:"autonomous_flow_prompt_dispatched",
-    details:{script_id:script.id,channel_id:channelId,scene_index:1}
-  })});
-  return {status:"queued",job_id:job.id,device_id:device.id,device_name:device.device_name,script_id:script.id,note:"The phone will receive the scene prompt. Flow generation itself still requires a visible owner action in the Flow app."};
+  return {status:jobs.length?"queued":"already_dispatched",jobs_queued:jobs.filter((x:any)=>x.status==="queued").length,scene_count:sceneCount,device_id:device.id,device_name:device.device_name,script_id:script.id,jobs,note:"Scene prompts are queued to the phone. The owner still generates each clip visibly in Google Flow; no quota or UI restrictions are bypassed."};
 }
 
 async function scheduledOwner(req: Request) {
@@ -1892,14 +1902,6 @@ async function autonomousRun(req: Request, user: any, body: any) {
                     method: clean(made.script_engine || made.method || made.script?.generation_method || "unknown", 80)
                   };
                   result.tools.push({ tool: "studio_generate", status: "executed", output: "draft_saved_not_published" });
-                  try {
-                    result.device_dispatch = await dispatchLatestDraftPrompt(user.id, channelId);
-                    if (result.device_dispatch?.status === "queued" || result.device_dispatch?.status === "already_dispatched") {
-                      result.tools.push({ tool: "android.flow_prompt_dispatch", status: result.device_dispatch.status });
-                    }
-                  } catch (deviceError) {
-                    result.device_dispatch = { status: "failed", error: clean(deviceError instanceof Error ? deviceError.message : "تعذر إرسال مطالبة المشهد إلى الهاتف.", 250) };
-                  }
                 } else {
                   result.draft = { status: "failed", error: "لم يرجع مولّد المحتوى مسودة قابلة للحفظ." };
                 }
