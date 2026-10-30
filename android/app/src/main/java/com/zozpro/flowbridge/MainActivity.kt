@@ -364,7 +364,7 @@ private fun intakePost(action: String, body: JSONObject, token: String): JSONObj
     return result
 }
 
-fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kids: Boolean): String {
+fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kids: Boolean, channelId: String = ""): String {
     val intakeToken = DeviceTokenVault.readIntake(context) ?: throw IllegalStateException("رمز استقبال الفيديو غير موجود. أعد اقتران الجهاز.")
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     val name = queryName(context, uri) ?: "ZOZ-final-video.mp4"
@@ -389,6 +389,7 @@ fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kid
         }
     } else {
         val created = intakePost("intake_create", JSONObject()
+            .put("channel_id", channelId)
             .put("filename", name)
             .put("total_bytes", size)
             .put("content_type", "video/mp4")
@@ -403,6 +404,7 @@ fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kid
             .putString("intake_upload_uri", uri.toString()).putLong("intake_upload_size", size).apply()
     }
     val assetId = asset.getString("id")
+    prefs.edit().putString("zoz_last_uploaded_asset_id", assetId).apply()
     val chunkSize = asset.optInt("chunk_size", 8388608)
     val chunkCount = asset.optInt("chunk_count", 0)
     if (chunkSize <= 0 || chunkCount <= 0) throw IllegalStateException("بيانات تقسيم الملف غير صالحة.")
