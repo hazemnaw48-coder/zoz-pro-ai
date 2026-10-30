@@ -15,7 +15,7 @@ const PUBLISHABLE_KEY =
   Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ||
   defaultKey("SUPABASE_PUBLISHABLE_KEYS") ||
   Deno.env.get("SUPABASE_ANON_KEY") || "";
-const OWNER_EMAIL = "hazemnaw48@gmail.com";
+const OWNER_EMAIL = Deno.env.get("ZOZ_OWNER_EMAIL") || "";
 const TARGET_CHANNEL_ID = "UCIael48cvwPG3gKj--c7HKw";
 const SELF = SUPABASE_URL + "/functions/v1/zoz-pro-youtube-analytics";
 const GEMINI_KEYS = [
