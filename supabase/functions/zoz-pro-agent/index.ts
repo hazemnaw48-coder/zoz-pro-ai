@@ -966,6 +966,78 @@ async function createDraft(req: Request, user: any, body: any) {
   }
 }
 
+
+async function chooseProductionChannel(userId:string,requestedId:string,topic:string) {
+  const rows=await db("zoz_pro_managed_channels?owner_id=eq."+encodeURIComponent(userId)+"&is_active=eq.true&select=channel_id,display_name,channel_title,niche,connection_status,last_synced_at&order=last_synced_at.desc.nullslast");
+  const channels=(Array.isArray(rows)?rows:[]).filter((x:any)=>safeUrlId(x.channel_id)&&x.channel_id!=="UC-FimUUFXRd0MOSoikzczcQ"&&!String(x.niche||"").includes("قيد التحقق"));
+  if(requestedId){const exact=channels.find((x:any)=>x.channel_id===requestedId);if(!exact)throw new Error("القناة المطلوبة غير مسجلة أو قيد التحقق؛ لم يتم تحويل المحتوى إلى قناة أخرى.");return exact;}
+  if(!channels.length)throw new Error("لا توجد قناة موثقة صالحة للإنتاج.");
+  const t=topic.toLowerCase();
+  if(/مصر القديمة|الفراعنة|الآثار|دير المدينة/.test(t)){const x=channels.find((c:any)=>/مصر القديمة|آثار/.test(String(c.niche||"")+" "+String(c.display_name||"")));if(x)return x;}
+  const fekra=channels.find((c:any)=>/فِ?كره|فكره|ذكاء اصطناعي|أفكار/.test(String(c.display_name||"")+" "+String(c.channel_title||"")+" "+String(c.niche||"")));
+  return fekra||channels[0];
+}
+function buildFlowScenes(script:any,styleInput:string) {
+  const pkg=script?.production_package&&typeof script.production_package==="object"?script.production_package:{};
+  const shots=Array.isArray(pkg.shot_plan)?pkg.shot_plan:(Array.isArray(script?.shot_plan)?script.shot_plan:(Array.isArray(script?.scenes)?script.scenes:[]));
+  const narr=Array.isArray(pkg.narration)?pkg.narration:(Array.isArray(script?.narration)?script.narration:[]);
+  const title=clean(script?.title||pkg.title||script?.topic||"حلقة جديدة",180);
+  const style=clean(styleInput||pkg.visual_style||pkg.visual_identity||script?.visual_style||"هوية بصرية موحدة، إضاءة احترافية، ألوان وتكوين متناسقان بين جميع المقاطع.",700);
+  const count=Math.min(24,Math.max(1,shots.length||narr.length||6));
+  const scenes:any[]=[];
+  for(let i=0;i<count;i++){
+    const raw=shots[i]??"";
+    const visual=typeof raw==="string"?clean(raw,1200):clean(raw?.visual||raw?.description||raw?.scene||raw?.action||JSON.stringify(raw),1200);
+    const nr=narr[i]??raw?.narration??raw?.voiceover??"";
+    const voice=typeof nr==="string"?clean(nr,240):clean(nr?.text||nr?.narration||"",240);
+    const prompt=["GOOGLE FLOW: Generate exactly ONE separate clip, maximum duration 8 seconds, target 8 seconds. Portrait 9:16. Never generate a longer video or multiple scenes in one clip.","Episode: "+title+". Scene "+(i+1)+" of "+count+".","Consistent visual identity: "+style,"Visual action: "+(visual||"Create a clear visual beat supporting the episode topic."),voice?"Exact Egyptian Arabic voiceover for this clip: "+voice:"","Keep the same characters, narrator, palette, lighting and visual continuity across all clips. One continuous shot, professional composition and clean audio.","No unrelated scenes, captions, random text, logos, watermarks or background music. Export this scene as its own clip."].filter(Boolean).join("\n\n");
+    scenes.push({scene_index:i+1,duration_seconds:8,prompt,narration:voice,visual});
+  }
+  return {title,style,scenes};
+}
+async function proposeProduction(req:Request,user:any,body:any) {
+  const topic=clean(body?.topic,240);
+  const channel=await chooseProductionChannel(user.id,clean(body?.channel_id,80),topic);
+  let chosenTopic=topic;
+  if(!chosenTopic){
+    const rows=await db("zoz_pro_managed_channel_content_calendar?owner_id=eq."+encodeURIComponent(user.id)+"&channel_id=eq."+encodeURIComponent(channel.channel_id)+"&status=eq.draft&planned_date=gte."+encodeURIComponent(new Date().toISOString().slice(0,10))+"&select=working_title&order=planned_date.asc,sequence_no.asc&limit=1");
+    chosenTopic=clean(rows?.[0]?.working_title,240);
+  }
+  if(!chosenTopic)chosenTopic=/فِ?كره|فكره|ذكاء اصطناعي|أفكار/.test(String(channel.display_name||"")+" "+String(channel.niche||""))?"كيف تكتب مطالبة دقيقة للذكاء الاصطناعي لتحصل على فيديو أفضل؟":"كيف كانت الحياة اليومية للناس العاديين في مصر القديمة؟";
+  const auth=req.headers.get("authorization")||"";
+  const response=await fetch(SELF+"?action=studio_generate",{method:"POST",headers:{apikey:PUBLISHABLE_KEY,authorization:auth,"content-type":"application/json"},body:JSON.stringify({channel_id:channel.channel_id,topic:chosenTopic,mode:"short",duration_seconds:48}),signal:AbortSignal.timeout(60000)});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||data?.ok===false||!data?.script)throw new Error(clean(data?.error||"تعذر إعداد السيناريو من مركز الإنتاج.",500));
+  const built=buildFlowScenes(data.script,clean(body?.visual_style,700));
+  const rows=await db("zoz_pro_agent_work_items",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({owner_id:user.id,kind:"flow_production_proposal",title:"مقترح إنتاج فيديو — "+built.title,objective:"مراجعة القناة والسيناريو والهوية البصرية ومطالبات المشاهد. كل مقطع مستقل لا يتجاوز 8 ثوانٍ. لا يبدأ التوليد قبل موافقة المالك.",status:"awaiting_owner_approval",priority:1,agent_decision:"propose_then_wait_for_owner",expected_outcome:"مقاطع منفصلة ثم تجميعها واستقبال MP4 للمراجعة دون نشر تلقائي.",spec:{operation:"generate_flow_production",channel_id:channel.channel_id,channel_name:clean(channel.display_name||channel.channel_title,140),script_id:clean(data.script.id,80),topic:chosenTopic,title:built.title,visual_style:built.style,aspect_ratio:"9:16",scene_seconds:8,scene_count:built.scenes.length,total_duration_seconds:built.scenes.length*8,scenes:built.scenes,production_status:"awaiting_owner_approval",generation_provider:"Google Flow",automatic_publication:false},next_actions:["راجع السيناريو والهوية البصرية ومطالبات المشاهد.","بعد الموافقة، أرسل المشاهد بالتتابع إلى الهاتف التنفيذي.","استقبل المقاطع واجمعها ثم ارفع الملف إلى استقبال الفيديو للمراجعة."],approval_required:true,source_channel_id:channel.channel_id,created_by:"zoz-pro-agent"})});
+  const proposal=rows?.[0];if(!proposal?.id)throw new Error("تعذر حفظ مقترح الإنتاج للموافقة.");
+  return json({ok:true,action:"propose_production",proposal:{id:proposal.id,title:built.title,topic:chosenTopic,channel_id:channel.channel_id,channel_name:clean(channel.display_name||channel.channel_title,140),visual_style:built.style,aspect_ratio:"9:16",scene_seconds:8,scene_count:built.scenes.length,total_duration_seconds:built.scenes.length*8,scenes:built.scenes,script:data.script,method:data.method||data.script_engine||"unknown"},requires_owner_approval:true,production_started:false,publication_performed:false});
+}
+async function approveProductionProposal(user:any,body:any) {
+  const id=clean(body?.proposal_id,40);
+  if(!/^[0-9a-f-]{36}$/i.test(id))return fail("معرّف المقترح غير صالح.",400);
+  const rows=await db("zoz_pro_agent_work_items?id=eq."+encodeURIComponent(id)+"&owner_id=eq."+encodeURIComponent(user.id)+"&kind=eq.flow_production_proposal&status=eq.awaiting_owner_approval&select=id,spec&limit=1");
+  const proposal=rows?.[0];if(!proposal)return fail("المقترح غير موجود أو تمت معالجته بالفعل.",409);
+  const spec=proposal.spec&&typeof proposal.spec==="object"?proposal.spec:{};
+  const scenes=Array.isArray(spec.scenes)?spec.scenes:[];
+  if(!scenes.length||scenes.length>24||scenes.some((x:any)=>Number(x.duration_seconds)!==8||clean(x.prompt,12000).length<80))return fail("مخطط المشاهد لا يطابق شرط مقطع مستقل مدته 8 ثوانٍ.",422);
+  const devices=await db("zoz_pro_device_registry?owner_id=eq."+encodeURIComponent(user.id)+"&device_status=eq.active&select=id,device_name,capabilities,last_heartbeat_at&order=last_heartbeat_at.desc.nullslast&limit=10");
+  const device=(Array.isArray(devices)?devices:[]).find((x:any)=>Array.isArray(x.capabilities)&&x.capabilities.includes("flow.generate_scene"));
+  if(!device)return json({ok:false,error:"نسخة الهاتف الحالية لا تدعم بعد توليد مشهد Flow تلقائيًا. يلزم تحديث التطبيق وإثبات القدرة قبل بدء التوليد.",device_update_required:true,proposal_id:id},409);
+  const claimed=await db("zoz_pro_agent_work_items?id=eq."+encodeURIComponent(id)+"&owner_id=eq."+encodeURIComponent(user.id)+"&status=eq.awaiting_owner_approval",{method:"PATCH",headers:{prefer:"return=representation"},body:JSON.stringify({status:"in_progress",updated_at:new Date().toISOString(),owner_note:"وافق المالك على هذا المقترح المحدد."})});
+  if(!claimed?.[0])return fail("المقترح قيد المعالجة؛ لم يتم إنشاء مهام مكررة.",409);
+  const jobs:any[]=[];
+  for(const scene of scenes){
+    const index=Number(scene.scene_index);
+    const payload={proposal_id:id,script_id:spec.script_id||null,channel_id:spec.channel_id,title:spec.title,scene_index:index,scene_count:scenes.length,duration_seconds:8,aspect_ratio:"9:16",prompt:clean(scene.prompt,12000),narration:clean(scene.narration,240)};
+    const created=await db("zoz_pro_device_jobs",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({owner_id:user.id,device_id:device.id,capability_id:"flow.generate_scene",payload,status:"queued",approval_required:false,approval_status:"approved",idempotency_key:"flow-proposal-"+id+"-scene-"+index,priority:2})});
+    const job=created?.[0];if(!job)throw new Error("تعذر إنشاء مهمة المشهد "+index+". راجع الطابور قبل إعادة المحاولة.");
+    jobs.push({job_id:job.id,scene_index:index,status:job.status});
+  }
+  await db("zoz_pro_agent_work_items?id=eq."+encodeURIComponent(id)+"&owner_id=eq."+encodeURIComponent(user.id),{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({spec:{...spec,production_status:"queued",approved_at:new Date().toISOString(),device_id:device.id,device_jobs:jobs},updated_at:new Date().toISOString()})});
+  return json({ok:true,proposal_id:id,scene_count:jobs.length,jobs,production_status:"queued",owner_approval_recorded:true});
+}
+
 async function dispatchFlowPrompt(user:any,body:any) {
   const deviceId=clean(body?.device_id,40);
   const prompt=clean(body?.prompt,12000);
