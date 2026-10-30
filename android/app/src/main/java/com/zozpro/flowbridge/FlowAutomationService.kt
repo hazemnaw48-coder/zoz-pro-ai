@@ -3,6 +3,8 @@ package com.zozpro.flowbridge
 import android.accessibilityservice.AccessibilityService
 import android.app.DownloadManager
 import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -87,10 +89,11 @@ class FlowAutomationService : AccessibilityService() {
         }
         val legacyTask = activeTask()
         if (legacyTask != null) {
+            val isGuardedTask = legacyTask.optInt("flow_origin_guard_version", 0) == 1
             val ageMs = System.currentTimeMillis() - legacyTask.optLong("started_at_ms", 0L)
-            if (ageMs <= 0L || ageMs > 30L * 60L * 1000L) {
+            if (!isGuardedTask || ageMs <= 0L || ageMs > 30L * 60L * 1000L) {
                 finishTask(legacyTask, false, "manual_intervention_required",
-                    "تم إيقاف مهمة Flow محلية قديمة أو عالقة بعد انتهاء مهلة التنفيذ؛ لم يُرسل نص إلى محرر غير متحقق.")
+                    "أُوقفت المهمة القديمة قبل إعادة المحاولة؛ يجب أن تبدأ المهمة من جديد بنص عربي وحماية التحقق من صفحة Google Flow.")
             } else {
                 handler.postDelayed({ inspectCurrentPage() }, 1200)
             }
@@ -162,13 +165,18 @@ class FlowAutomationService : AccessibilityService() {
                         finishTask(task, false, "prompt_empty", "The scene prompt is empty.")
                         return
                     }
+                    val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("وصف مشهد Google Flow", prompt))
+                    editor.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                    val pasted = editor.performAction(AccessibilityNodeInfo.ACTION_PASTE)
                     val args = android.os.Bundle().apply {
                         putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, prompt)
                     }
-                    editor.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-                    val set = editor.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+                    val set = pasted || editor.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
                     if (set) {
                         task.put("prompt_entered", true)
+                        task.put("prompt_language", "ar")
+                        task.put("prompt_chars", prompt.length)
                         updatePhase(task, "waiting_send")
                         lastActionAt = System.currentTimeMillis()
                         handler.postDelayed({ inspectCurrentPage() }, 1300)
@@ -250,10 +258,10 @@ class FlowAutomationService : AccessibilityService() {
     private fun findEditor(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
         val candidates = mutableListOf<Pair<Int, AccessibilityNodeInfo>>()
         val promptMarkers = listOf(
-            "prompt", "describe", "your idea", "video description", "scene description",
+            "prompt", "describe your video", "describe your scene", "your idea", "video description", "scene description",
             "what do you want to create", "what would you like to create", "write your prompt",
-            "enter prompt", "type a prompt", "create a video", "اكتب وصف", "وصف المشهد",
-            "صف الفيديو", "صف فكرتك", "وصف الفيديو", "اكتب مطالبة"
+            "enter prompt", "type a prompt", "create a video", "اكتب وصف الفيديو", "اكتب وصف المشهد",
+            "وصف المشهد", "صف الفيديو", "صف فكرتك", "وصف الفيديو", "اكتب مطالبة", "اكتب وصفك هنا"
         )
         walk(root) { node ->
             val viewId = node.viewIdResourceName.orEmpty().lowercase()
@@ -501,6 +509,7 @@ class FlowAutomationService : AccessibilityService() {
                 .put("phase", "waiting_editor")
                 .put("started_at_ms", startedAt)
                 .put("phase_started_at_ms", startedAt)
+                .put("flow_origin_guard_version", 1)
                 .put("editor_scan_attempts", 0)
             prefs.edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
             val url = payload.optString("url", "https://labs.google/fx/tools/flow")
