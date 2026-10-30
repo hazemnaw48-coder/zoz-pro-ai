@@ -235,7 +235,7 @@ class FlowAutomationService : AccessibilityService() {
         networkExecutor.execute {
             runCatching {
                 apiPostWithToken("complete_job", JSONObject().put("job_id", id)
-                    .put("outcome", if (success) "succeeded" else "failed")
+                    .put("outcome", if (success) "succeeded" else if (code == "manual_intervention_required") "cancelled" else "failed")
                     .put("error_code", code).put("error_message", message).put("result", result),
                     DeviceTokenVault.read(this) ?: "")
             }
@@ -304,8 +304,8 @@ class FlowAutomationService : AccessibilityService() {
                 throw IllegalArgumentException("بيانات المشهد أو الحملة غير مكتملة.")
             }
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            if (index == 1) prefs.edit().putString(PREF_CLIPS, "[]").apply()
             if (prefs.getString(KEY_ACTIVE_TASK, null) != null) throw IllegalStateException("هناك مشهد آخر قيد التنفيذ على الهاتف.")
+            if (index == 1) prefs.edit().putString(PREF_CLIPS, "[]").apply()
             val task = JSONObject(payload.toString()).put("job_id", jobId).put("phase", "waiting_editor")
             prefs.edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
             val url = payload.optString("url", "https://labs.google/fx/tools/flow")
