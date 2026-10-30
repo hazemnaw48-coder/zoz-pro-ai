@@ -1,0 +1,13 @@
+project_id = "oxyzxbkwhafzaztraowc"
+
+[functions.zoz-pro-agent]
+verify_jwt = false
+
+[functions.zoz-pro-agent-control]
+verify_jwt = true
+
+[functions.zoz-pro-device-agent]
+verify_jwt = false
+
+[functions.zoz-pro-youtube-analytics]
+verify_jwt = false
