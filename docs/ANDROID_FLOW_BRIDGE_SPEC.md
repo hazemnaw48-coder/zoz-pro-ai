@@ -51,3 +51,17 @@ A native Android companion to the existing ZOZ Pro production project. It is an 
 3. Test stream-copy assembly with real Flow clips; verify audio, duration, order, and output playback.
 4. Upload a test output to intake, approve it, and confirm the existing private YouTube upload pipeline.
 5. Only then extend approved device capabilities and evaluate a policy-compliant browser workflow for Flow/KDP.
+
+
+## Release v0.3.0 — 2026-10-30
+
+- Latest verified Android debug APK: v0.3.0, versionCode 3.
+- GitHub Actions build: [run 41022918443](https://github.com/hazemnaw48-coder/zoz-pro-ai/actions/runs/41022918443), artifact `zoz-flow-bridge-debug-apk` (ID `12962297162`).
+- APK SHA-256: `19fb654c4d91284d1e48375cd89b94f6000f8f097c1fa22c0209e68381b8b5a7`.
+- App accepts one or multiple video files through Android Share intents and copies only app-owned working copies into private app storage. It provides owner-confirmed cleanup of those internal copies; original Gallery/Downloads files are not deleted.
+- Production function versions: device agent v5, main agent v42, control v7, video intake v47. The video intake function has `verify_jwt=false` at the platform edge so scoped intake tokens can be used; all owner, device and intake-token actions are explicitly authenticated and owner/channel-scoped inside the function.
+- The main agent queues up to six scene prompts from a recent script to a paired Android device. The phone persists them locally and retrieves jobs through WorkManager (15-minute minimum, best effort).
+- After an owner approves the intake asset, the server can upload it privately. Once YouTube processing completes, the agent creates an `awaiting_owner_approval` task for public/unlisted release. The public-publish adapter executes only after that exact task is approved and the saved privacy target still matches; unapproved public publishing remains disabled.
+- Google Flow mobile app is supported in Egypt. The official Flow Agent feature is currently web/PC only; the Android app can prepare prompts, open Flow, accept shared clips, assemble and upload them, but it cannot run Flow Agent autonomously or bypass its credit/identity checks.
+- Physical-device acceptance tests still required: pair the owner's phone, verify heartbeat and prompt delivery, share real Flow clips, verify audio/order/duration after assembly, upload to intake, approve private upload, and approve the final publication task.
+- Repository Edge Function source replaces the private owner email with the server environment variable `ZOZ_OWNER_EMAIL`. Set this server-only secret before redeploying those source files; never commit the real email or any OAuth/service-role tokens.
