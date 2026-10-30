@@ -3,6 +3,7 @@ name: ZOZ Flow Bridge Android APK
 on:
   push:
     branches:
+      - main
       - feature/zoz-android-flow-bridge
     paths:
       - "android/**"
