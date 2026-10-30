@@ -166,7 +166,7 @@ private fun FlowBridgeScreen() {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(enabled = !busy, onClick = { runAsync {
                             val health = apiPost(context, "device_health", JSONObject().put("app_version", "0.2.0"))
-                            val job = apiPost("poll_jobs", JSONObject()).optJSONObject("job")
+                            val job = apiPost(context, "poll_jobs", JSONObject()).optJSONObject("job")
                             if (job == null) "الاتصال سليم. لا توجد مهام جديدة."
                             else executeJob(context, job)
                         } }) { Text("اتصال وفحص المهام") }
