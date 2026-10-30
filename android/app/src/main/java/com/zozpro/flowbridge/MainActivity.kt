@@ -59,6 +59,7 @@ private const val PREFS = "zoz_flow_bridge"
 private const val PREF_CLIPS = "saved_clips"
 private const val PREF_PROMPT = "scene_prompt"
 private const val PREF_PENDING_PROMPT = "pending_agent_prompt"
+private const val PREF_PENDING_PROMPTS = "pending_agent_prompts"
 private const val API = "https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-device-agent"
 private const val INTAKE_API = "https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-youtube-analytics"
 private const val PUBLIC_KEY = "sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm"
@@ -82,7 +83,8 @@ private fun FlowBridgeScreen() {
     var paired by remember { mutableStateOf(DeviceTokenVault.read(context) != null) }
     var busy by remember { mutableStateOf(false) }
     var lastAction by remember { mutableStateOf(if (paired) "الجهاز مقرون؛ جارٍ تجهيز الاتصال بالوكيل" else "أدخل رمز الاقتران من مركز ZOZ Pro") }
-    var pendingPrompt by remember { mutableStateOf(prefs.getString(PREF_PENDING_PROMPT, "") ?: "") }
+    var pendingPrompts by remember { mutableStateOf(loadPendingPrompts(prefs)) }
+    val pendingPrompt = pendingPrompts.firstOrNull() ?: ""
     var finalVideoUri by remember { mutableStateOf(prefs.getString("final_video_uri", null)?.let { Uri.parse(it) }) }
     var syntheticMedia by remember { mutableStateOf(true) }
     var madeForKids by remember { mutableStateOf(false) }
@@ -178,19 +180,25 @@ private fun FlowBridgeScreen() {
                     }
                 }
 
-                if (pendingPrompt.isNotBlank()) {
+                if (pendingPrompts.isNotEmpty()) {
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("مطالبة استلمها الوكيل", fontWeight = FontWeight.Bold)
+                            Text("مطالبات المشاهد من وكيل ZOZ · المتبقي ${pendingPrompts.size}", fontWeight = FontWeight.Bold)
                             Text(pendingPrompt)
-                            Button(onClick = {
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(ClipData.newPlainText("ZOZ Flow prompt", pendingPrompt))
-                                prompt = pendingPrompt
-                                prefs.edit().remove(PREF_PENDING_PROMPT).apply()
-                                pendingPrompt = ""
-                                lastAction = "تم نسخ المطالبة إلى الحافظة. افتح Flow والصقها."
-                            }) { Text("نسخ المطالبة إلى Flow") }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("ZOZ Flow prompt", pendingPrompt))
+                                    prompt = pendingPrompt
+                                    pendingPrompts = pendingPrompts.drop(1)
+                                    savePendingPrompts(prefs, pendingPrompts)
+                                    lastAction = "تم نسخ المطالبة إلى الحافظة. افتح Flow والصقها. تبقى ${pendingPrompts.size} مطالبة."
+                                }) { Text("نسخ المشهد التالي") }
+                                OutlinedButton(onClick = {
+                                    pendingPrompts = loadPendingPrompts(prefs)
+                                    lastAction = "تم تحديث قائمة مطالبات المشاهد."
+                                }) { Text("تحديث القائمة") }
+                            }
                         }
                     }
                 }
@@ -515,8 +523,10 @@ private fun executeJob(context: Context, job: JSONObject): String {
             "flow.copy_prompt" -> {
                 val text = payload.optString("prompt", "").take(12000)
                 if (text.isBlank()) throw IllegalArgumentException("prompt_empty")
-                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(PREF_PENDING_PROMPT, text).apply()
-                result.put("prompt_saved_locally", true).put("requires_user_tap_to_copy", true)
+                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                val queuedPrompts = loadPendingPrompts(prefs)
+                if (!queuedPrompts.contains(text)) savePendingPrompts(prefs, queuedPrompts + text)
+                result.put("prompt_saved_locally", true).put("pending_prompt_count", loadPendingPrompts(prefs).size).put("requires_user_tap_to_copy", true)
                 DeviceNotifications.show(context, "مهمة جديدة من وكيل ZOZ", "وصل وصف مشهد. افتح التطبيق لنسخه إلى Flow.")
             }
             "flow.open" -> {
@@ -648,6 +658,21 @@ class DevicePollWorker(context: Context, params: androidx.work.WorkerParameters)
 private fun scheduleDeviceWorker(context: Context) {
     val request = PeriodicWorkRequestBuilder<DevicePollWorker>(15, TimeUnit.MINUTES).build()
     WorkManager.getInstance(context).enqueueUniquePeriodicWork("zoz-device-agent-poll", ExistingPeriodicWorkPolicy.UPDATE, request)
+}
+
+private fun loadPendingPrompts(prefs: android.content.SharedPreferences): List<String> {
+    val raw = prefs.getString(PREF_PENDING_PROMPTS, null)
+    if (raw != null) return try {
+        val array = JSONArray(raw)
+        buildList { for (i in 0 until array.length()) array.optString(i).takeIf { it.isNotBlank() }?.let { add(it) } }
+    } catch (_: Exception) { emptyList() }
+    val legacy = prefs.getString(PREF_PENDING_PROMPT, "") ?: ""
+    return if (legacy.isNotBlank()) listOf(legacy) else emptyList()
+}
+private fun savePendingPrompts(prefs: android.content.SharedPreferences, prompts: List<String>) {
+    val array = JSONArray()
+    prompts.forEach { array.put(it) }
+    prefs.edit().putString(PREF_PENDING_PROMPTS, array.toString()).remove(PREF_PENDING_PROMPT).apply()
 }
 
 private fun loadSavedClips(context: Context): List<ImportedClip> {
