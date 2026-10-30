@@ -1095,8 +1095,8 @@ async function sendDevicePrompt(){
   const devices=await callDeviceAgent('device_list');
   const device=(devices.devices||[]).find(x=>x.device_status==='active');
   if(!device){status.textContent='لا يوجد جهاز نشط. اقترن بالهاتف أولًا.';return;}
-  const d=await callDeviceAgent('job_enqueue',{device_id:device.id,capability_id:'flow.copy_prompt',payload:{prompt},idempotency_key:'flow-prompt-'+crypto.randomUUID(),approval_required:false});
-  status.className='notice good';status.textContent='أُرسلت المهمة إلى الهاتف. سيستلمها عند اتصال التطبيق أو دورة الفحص التالية.';
+  const d=await callZozAgent('dispatch_flow_prompt',{device_id:device.id,prompt,idempotency_key:'flow-prompt-'+crypto.randomUUID()});
+  status.className='notice good';status.textContent='أرسل وكيل ZOZ المطالبة إلى الهاتف. سيستلمها عند اتصال التطبيق أو دورة الفحص التالية.';
   await refreshDeviceAgent();
  }catch(e){status.className='notice bad';status.textContent='تعذر إرسال المهمة: '+(e.message||e);}
 }
