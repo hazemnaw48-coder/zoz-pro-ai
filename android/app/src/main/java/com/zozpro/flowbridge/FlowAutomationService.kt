@@ -264,12 +264,31 @@ class FlowAutomationService : AccessibilityService() {
     }
 
     companion object {
-        const val FlowAutomationService.PREFS = "zoz_flow_bridge"
-        const val FlowAutomationService.PREF_CLIPS = "saved_clips"
+        const val PREFS = "zoz_flow_bridge"
+        const val PREF_CLIPS = "saved_clips"
         const val KEY_ACTIVE_TASK = "flow_active_scene_task"
 
+        fun isEnabled(context: Context): Boolean {
+            val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
+            return enabled.split(':').any { raw ->
+                val component = android.content.ComponentName.unflattenFromString(raw)
+                component?.packageName == context.packageName && component.className == FlowAutomationService::class.java.name
+            }
+        }
+
         fun startScene(context: Context, jobId: String, payload: JSONObject) {
-            val prefs = context.getSharedPreferences(FlowAutomationService.PREFS, Context.MODE_PRIVATE)
+            if (!isEnabled(context)) throw IllegalStateException("فعّل خدمة ZOZ Flow Automation مرة واحدة من إعدادات إمكانية الوصول.")
+            val duration = payload.optDouble("duration_seconds", 8.0)
+            if (duration <= 0.0 || duration > 8.0) throw IllegalArgumentException("كل مشهد Google Flow يجب ألا يتجاوز 8 ثوانٍ.")
+            val index = payload.optInt("scene_index", 0)
+            val total = payload.optInt("total_scenes", 0)
+            val campaign = payload.optString("campaign_id", "")
+            val prompt = payload.optString("prompt", "")
+            if (index < 1 || total < 1 || index > total || campaign.isBlank() || prompt.isBlank()) {
+                throw IllegalArgumentException("بيانات المشهد أو الحملة غير مكتملة.")
+            }
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            if (index == 1) prefs.edit().putString(PREF_CLIPS, "[]").apply()
             if (prefs.getString(KEY_ACTIVE_TASK, null) != null) throw IllegalStateException("هناك مشهد آخر قيد التنفيذ على الهاتف.")
             val task = JSONObject(payload.toString()).put("job_id", jobId).put("phase", "waiting_editor")
             prefs.edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
@@ -278,7 +297,12 @@ class FlowAutomationService : AccessibilityService() {
                 prefs.edit().remove(KEY_ACTIVE_TASK).apply()
                 throw IllegalArgumentException("Flow URL is not allow-listed.")
             }
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            try {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (e: Exception) {
+                prefs.edit().remove(KEY_ACTIVE_TASK).apply()
+                throw IllegalStateException("تعذر فتح Google Flow من الخلفية؛ افتح التطبيق مرة واحدة ثم أعد المحاولة.", e)
+            }
         }
     }
 }
