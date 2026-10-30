@@ -32,6 +32,7 @@ class FlowAutomationService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private var lastActionAt = 0L
     private var receiverRegistered = false
+    private var controlInspectionScheduled = false
     private val networkExecutor = Executors.newSingleThreadExecutor()
 
     private fun browserAddressBarText(root: AccessibilityNodeInfo): String? {
@@ -96,9 +97,14 @@ class FlowAutomationService : AccessibilityService() {
             )
             receiverRegistered = true
         }
+        val control = activeControlTask()
+        if (control != null) {
+            scheduleControlInspection(900)
+            return
+        }
         val legacyTask = activeTask()
         if (legacyTask != null) {
-            val isGuardedTask = legacyTask.optInt("flow_origin_guard_version", 0) == 1
+            val isGuardedTask = legacyTask.optInt("flow_origin_guard_version", 0) >= 2
             val ageMs = System.currentTimeMillis() - legacyTask.optLong("started_at_ms", 0L)
             if (!isGuardedTask || ageMs <= 0L || ageMs > 30L * 60L * 1000L) {
                 finishTask(legacyTask, false, "manual_intervention_required",
@@ -112,6 +118,18 @@ class FlowAutomationService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        val control = activeControlTask()
+        if (control != null) {
+            val pkg = event?.packageName?.toString().orEmpty()
+            if (pkg.isNotBlank() && pkg != control.optString("target_package")) return
+            if (event?.eventType in listOf(
+                    AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
+                    AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+                    AccessibilityEvent.TYPE_VIEW_SCROLLED,
+                    AccessibilityEvent.TYPE_VIEW_FOCUSED
+                )) scheduleControlInspection(350)
+            return
+        }
         val active = activeTask() ?: return
         val pkg = event?.packageName?.toString().orEmpty()
         if (pkg.isNotBlank() && pkg !in setOf("com.android.chrome", "com.google.android.googlequicksearchbox")) return
@@ -140,6 +158,225 @@ class FlowAutomationService : AccessibilityService() {
     private fun activeTask(): JSONObject? = runCatching {
         prefs().getString(KEY_ACTIVE_TASK, null)?.let(::JSONObject)
     }.getOrNull()
+
+    private fun activeControlTask(): JSONObject? = runCatching {
+        prefs().getString(KEY_ACTIVE_CONTROL_TASK, null)?.let(::JSONObject)
+    }.getOrNull()
+
+    private fun scheduleControlInspection(delayMs: Long = 350L) {
+        if (controlInspectionScheduled) return
+        controlInspectionScheduled = true
+        handler.postDelayed({
+            controlInspectionScheduled = false
+            inspectControlTask()
+        }, delayMs)
+    }
+
+    private fun inspectControlTask() {
+        val task = activeControlTask() ?: return
+        val now = System.currentTimeMillis()
+        val createdAt = task.optLong("created_at_ms", 0L)
+        if (createdAt <= 0L || now - createdAt > 90000L) {
+            finishControlTask(task, false, "control_task_expired", "انتهت صلاحية أمر التحكم قبل اكتماله.")
+            return
+        }
+        val root = rootInActiveWindow
+        if (root == null) {
+            if (now - createdAt > 25000L) {
+                finishControlTask(task, false, "screen_unavailable", "لم تتوفر شجرة عناصر الشاشة للتطبيق المستهدف.")
+            } else scheduleControlInspection(500)
+            return
+        }
+        val targetPackage = task.optString("target_package")
+        val currentPackage = root.packageName?.toString().orEmpty()
+        if (currentPackage != targetPackage) {
+            if (now - createdAt > 25000L) {
+                finishControlTask(task, false, "target_app_not_foreground", "التطبيق المطلوب ليس في مقدمة الشاشة؛ لم ينفذ الهاتف نقرات في تطبيق آخر.")
+            } else scheduleControlInspection(700)
+            return
+        }
+        val steps = task.optJSONArray("steps") ?: run {
+            finishControlTask(task, false, "control_steps_missing", "قائمة أوامر التحكم غير موجودة.")
+            return
+        }
+        val index = task.optInt("step_index", 0)
+        if (index >= steps.length()) {
+            val completed = task.optJSONArray("step_results") ?: JSONArray()
+            finishControlTask(task, true, "", "", JSONObject()
+                .put("target_package", targetPackage)
+                .put("steps_completed", index)
+                .put("step_results", completed))
+            return
+        }
+        val step = steps.optJSONObject(index) ?: run {
+            finishControlTask(task, false, "control_step_invalid", "أحد أوامر التحكم غير صالح.")
+            return
+        }
+        val action = step.optString("action", "").lowercase()
+        val results = task.optJSONArray("step_results") ?: JSONArray()
+        try {
+            when (action) {
+                "inspect" -> {
+                    val nodes = JSONArray()
+                    var captured = 0
+                    walk(root) { node ->
+                        if (captured >= 100 || !node.isVisibleToUser) return@walk
+                        val label = controlNodeLabel(node)
+                        if (label.isBlank() || isSensitiveLabel(label) || label.matches(Regex("^\\d{4,8}$"))) return@walk
+                        val item = JSONObject().put("label", safeUiText(label))
+                            .put("clickable", node.isClickable || node.parent?.isClickable == true)
+                            .put("editable", node.isEditable)
+                            .put("scrollable", node.isScrollable)
+                        node.viewIdResourceName?.takeIf { it.isNotBlank() }?.let { item.put("view_id", it) }
+                        node.className?.toString()?.takeIf { it.isNotBlank() }?.let { item.put("class_name", it.take(100)) }
+                        nodes.put(item)
+                        captured++
+                    }
+                    results.put(JSONObject().put("action", action).put("nodes", nodes))
+                }
+                "tap" -> {
+                    val selected = findControlNode(root, step, requireEditable = false)
+                        ?: throw IllegalStateException("ui_selector_not_unique_or_missing")
+                    val label = controlNodeLabel(selected)
+                    val idLabel = selected.viewIdResourceName.orEmpty()
+                    if (isSensitiveLabel(label)) throw IllegalStateException("sensitive_authentication_control_blocked")
+                    if ((isIrreversibleLabel(label) || isIrreversibleLabel(idLabel)) && !task.optBoolean("owner_approved", false)) {
+                        throw IllegalStateException("owner_approval_required")
+                    }
+                    val clickTarget = if (selected.isClickable) selected else selected.parent
+                        ?: throw IllegalStateException("ui_target_not_clickable")
+                    if (!clickTarget.isVisibleToUser || !clickTarget.isEnabled ||
+                        !clickTarget.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                        throw IllegalStateException("ui_click_failed")
+                    }
+                    results.put(JSONObject().put("action", action).put("target", safeUiText(label)).put("clicked", true))
+                }
+                "type_text" -> {
+                    val selected = findControlNode(root, step, requireEditable = true)
+                        ?: throw IllegalStateException("ui_editor_not_unique_or_missing")
+                    val label = controlNodeLabel(selected)
+                    if (selected.isPassword || isSensitiveLabel(label)) {
+                        throw IllegalStateException("sensitive_input_field_blocked")
+                    }
+                    val value = step.optString("text", "")
+                    if (value.isBlank() || value.length > 3000) throw IllegalArgumentException("ui_text_invalid")
+                    selected.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                    val args = android.os.Bundle().apply {
+                        putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value)
+                    }
+                    if (!selected.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) {
+                        throw IllegalStateException("ui_text_entry_failed")
+                    }
+                    results.put(JSONObject().put("action", action).put("characters", value.length).put("entered", true))
+                }
+                "scroll" -> {
+                    val direction = step.optString("direction", "down").lowercase()
+                    val scrollNode = findScrollableNode(root) ?: throw IllegalStateException("ui_scroll_container_not_found")
+                    val scrollAction = if (direction == "up") AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
+                        else AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+                    if (!scrollNode.performAction(scrollAction)) throw IllegalStateException("ui_scroll_failed")
+                    results.put(JSONObject().put("action", action).put("direction", direction).put("scrolled", true))
+                }
+                "back" -> {
+                    if (!performGlobalAction(GLOBAL_ACTION_BACK)) throw IllegalStateException("ui_back_failed")
+                    results.put(JSONObject().put("action", action).put("performed", true))
+                }
+                "wait" -> {
+                    val delay = step.optLong("milliseconds", 800L).coerceIn(100L, 5000L)
+                    task.put("step_index", index + 1)
+                    task.put("step_results", results.put(JSONObject().put("action", action).put("waited_ms", delay)))
+                    prefs().edit().putString(KEY_ACTIVE_CONTROL_TASK, task.toString()).apply()
+                    scheduleControlInspection(delay)
+                    return
+                }
+                else -> throw IllegalArgumentException("unsupported_ui_action")
+            }
+            task.put("step_index", index + 1)
+            task.put("step_results", results)
+            prefs().edit().putString(KEY_ACTIVE_CONTROL_TASK, task.toString()).apply()
+            scheduleControlInspection(650)
+        } catch (e: Exception) {
+            val code = e.message ?: "ui_control_failed"
+            finishControlTask(task, false, code, code)
+        }
+    }
+
+    private fun controlNodeLabel(node: AccessibilityNodeInfo): String =
+        listOf(node.text?.toString(), node.contentDescription?.toString(), node.hintText?.toString())
+            .filterNot { it.isNullOrBlank() }.joinToString(" ").replace(Regex("\\s+"), " ").trim()
+
+    private fun safeUiText(value: String): String {
+        val emailRedacted = value.replace(Regex("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"), "[email]")
+        return emailRedacted.replace(Regex("\\b\\+?\\d[\\d ()-]{7,}\\d\\b"), "[number]").take(100)
+    }
+
+    private fun isSensitiveLabel(value: String): Boolean {
+        val v = value.lowercase()
+        return listOf("password", "passcode", "one-time", "verification code", "security code", "otp", "pin code",
+            "cvv", "cvc", "كلمة المرور", "الرقم السري", "رمز التحقق", "كود التحقق", "رمز الأمان", "الرقم القومي",
+            "بيانات البطاقة", "رقم البطاقة").any(v::contains)
+    }
+
+    private fun isIrreversibleLabel(value: String): Boolean {
+        val v = value.lowercase()
+        return listOf("publish", "post", "send", "share", "delete", "remove", "buy", "purchase", "pay", "transfer",
+            "confirm", "submit", "نشر", "إرسال", "ارسال", "مشاركة", "حذف", "شراء", "دفع", "تحويل", "تأكيد", "تاكيد").any(v::contains)
+    }
+
+    private fun findControlNode(root: AccessibilityNodeInfo, selector: JSONObject, requireEditable: Boolean): AccessibilityNodeInfo? {
+        val viewId = selector.optString("view_id", "").trim()
+        val wantedText = selector.optString("text", "").trim()
+        val wantedDescription = selector.optString("content_description", "").trim()
+        val wantedHint = selector.optString("hint", "").trim()
+        if (viewId.isBlank() && wantedText.isBlank() && wantedDescription.isBlank() && wantedHint.isBlank()) return null
+        val matches = mutableListOf<AccessibilityNodeInfo>()
+        walk(root) { node ->
+            if (!node.isVisibleToUser || !node.isEnabled) return@walk
+            if (requireEditable && !node.isEditable) return@walk
+            val idMatch = viewId.isNotBlank() && node.viewIdResourceName.orEmpty().equals(viewId, ignoreCase = true)
+            val textMatch = wantedText.isNotBlank() && node.text?.toString()?.trim().equals(wantedText, ignoreCase = true)
+            val descMatch = wantedDescription.isNotBlank() && node.contentDescription?.toString()?.trim().equals(wantedDescription, ignoreCase = true)
+            val hintMatch = wantedHint.isNotBlank() && node.hintText?.toString()?.trim().equals(wantedHint, ignoreCase = true)
+            if (idMatch || textMatch || descMatch || hintMatch) matches.add(node)
+        }
+        val unique = matches.distinctBy { node ->
+            val bounds = android.graphics.Rect().also(node::getBoundsInScreen)
+            (node.viewIdResourceName ?: "") + "|" + bounds.flattenToString()
+        }
+        return unique.singleOrNull()
+    }
+
+    private fun findScrollableNode(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        var found: AccessibilityNodeInfo? = null
+        walk(root) { node -> if (found == null && node.isVisibleToUser && node.isScrollable) found = node }
+        return found
+    }
+
+    private fun finishControlTask(task: JSONObject, success: Boolean, code: String, message: String, extra: JSONObject = JSONObject()) {
+        val id = task.optString("job_id")
+        val result = JSONObject(extra.toString())
+            .put("target_package", task.optString("target_package"))
+            .put("steps_completed", task.optInt("step_index", 0))
+            .put("phase", if (success) "completed" else "stopped")
+        prefs().edit().remove(KEY_ACTIVE_CONTROL_TASK).apply()
+        controlInspectionScheduled = false
+        networkExecutor.execute {
+            runCatching {
+                val terminal = code in setOf(
+                    "owner_approval_required", "sensitive_authentication_control_blocked", "sensitive_input_field_blocked",
+                    "target_app_not_foreground", "screen_unavailable", "control_task_expired"
+                )
+                apiPostWithToken("complete_job", JSONObject().put("job_id", id)
+                    .put("outcome", if (success) "succeeded" else if (terminal) "cancelled" else "failed")
+                    .put("error_code", code).put("error_message", message).put("result", result),
+                    DeviceTokenVault.read(this) ?: "")
+            }
+            handler.post {
+                DeviceNotifications.show(this, if (success) "اكتمل أمر التحكم في الهاتف" else "توقف أمر التحكم في الهاتف",
+                    if (success) "تم تنفيذ " + task.optInt("step_index", 0) + " خطوة في التطبيق المستهدف." else message)
+            }
+        }
+    }
 
     private fun inspectCurrentPage() {
         val task = activeTask() ?: return
@@ -552,6 +789,7 @@ class FlowAutomationService : AccessibilityService() {
         const val PREFS = "zoz_flow_bridge"
         const val PREF_CLIPS = "saved_clips"
         const val KEY_ACTIVE_TASK = "flow_active_scene_task"
+        const val KEY_ACTIVE_CONTROL_TASK = "phone_control_task"
 
         fun isEnabled(context: Context): Boolean {
             val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
@@ -559,6 +797,37 @@ class FlowAutomationService : AccessibilityService() {
                 val component = android.content.ComponentName.unflattenFromString(raw)
                 component?.packageName == context.packageName && component.className == FlowAutomationService::class.java.name
             }
+        }
+
+        fun startUiControl(context: Context, jobId: String, payload: JSONObject) {
+            if (!isEnabled(context)) throw IllegalStateException("خدمة الوصول غير مفعلة على الهاتف.")
+            val target = payload.optString("target_package", "").trim()
+            if (!target.matches(Regex("^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+$")) ||
+                target in setOf("com.android.systemui", "com.android.settings", "com.google.android.inputmethod.latin")) {
+                throw IllegalArgumentException("target_package_not_allowed")
+            }
+            val steps = payload.optJSONArray("steps") ?: throw IllegalArgumentException("control_steps_missing")
+            if (steps.length() !in 1..12) throw IllegalArgumentException("control_steps_limit")
+            val allowed = setOf("inspect", "tap", "type_text", "scroll", "back", "wait")
+            for (i in 0 until steps.length()) {
+                val step = steps.optJSONObject(i) ?: throw IllegalArgumentException("control_step_invalid")
+                if (step.optString("action") !in allowed) throw IllegalArgumentException("unsupported_ui_action")
+                if (step.optString("text").length > 3000) throw IllegalArgumentException("ui_text_invalid")
+            }
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            if (prefs.getString(KEY_ACTIVE_TASK, null) != null || prefs.getString(KEY_ACTIVE_CONTROL_TASK, null) != null) {
+                throw IllegalStateException("هناك أمر آخر قيد التنفيذ على الهاتف.")
+            }
+            val now = System.currentTimeMillis()
+            val task = JSONObject(payload.toString())
+                .put("job_id", jobId)
+                .put("created_at_ms", now)
+                .put("step_index", 0)
+                .put("step_results", JSONArray())
+            prefs.edit().putString(KEY_ACTIVE_CONTROL_TASK, task.toString()).apply()
+            val service = activeService
+            if (service != null) service.handler.post { service.scheduleControlInspection(300) }
+            else DeviceNotifications.show(context, "أمر تحكم بانتظار الشاشة", "افتح التطبيق المستهدف ليتمكن ZOZ من تنفيذ الأمر بعد ظهوره.")
         }
 
         fun startScene(context: Context, jobId: String, payload: JSONObject) {
