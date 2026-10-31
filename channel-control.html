@@ -153,6 +153,18 @@ body.upload-mode .footer{font-size:11px}
  <div id="managed-channel-live-result" class="section-gap"></div>
  <p class="small">لإكمال التفويض: اضغط ربط Google للقناة المطلوبة، واختر حساب Google الذي يديرها ووافق على الصلاحيات. بعد العودة إلى المركز اضغط «مزامنة التحليلات الآن». لا يمكن تجاوز موافقة Google أو منح صلاحية لا يملكها الحساب.</p>
 </section>
+<section class="card" id="vidiq-accounts-card">
+ <h2>حسابات vidIQ المستقلة</h2>
+ <p>ثلاث مساحات منفصلة. تُحفظ مفاتيح MCP مشفرة في Supabase Vault، ولا تظهر مرة أخرى بعد الحفظ. اختر الحساب ثم أدخل مفتاحه الخاص من صفحة إعدادات vidIQ الرسمية.</p>
+ <div class="grid">
+  <div><label for="vidiq-account-slot">مساحة الحساب</label><select id="vidiq-account-slot"><option value="zoz_hazem">ZOZ Hazem</option><option value="hazem_now">Hazem Now</option><option value="zoz_manager">ZOZ Manager</option></select></div>
+  <div><label for="vidiq-account-key">مفتاح vidIQ MCP</label><input id="vidiq-account-key" type="password" autocomplete="off" placeholder="الصق المفتاح هنا داخل جلسة المالك الآمنة"></div>
+ </div>
+ <div class="actions"><button id="vidiq-account-save">حفظ وربط الحساب</button><button id="vidiq-account-refresh" class="secondary">فحص الأرصدة الثلاثة</button></div>
+ <div id="vidiq-account-msg" class="notice">لم يتم فحص الحسابات بعد.</div>
+ <div id="vidiq-account-status" class="grid section-gap"></div>
+ <p class="small">اختيار vidIQ يخص البحث وتوليد العناوين والتحليل المستهلك للرصيد فقط. رفع الفيديو ونشره يعتمدان على تفويض YouTube للقناة ولا يحتاجان رصيد vidIQ.</p>
+</section>
 </div>
  <div class="page-panel" data-page="analytics" id="page-analytics">
 <section class="card">
@@ -1211,6 +1223,37 @@ async function loadBooksDashboard(){
 }
 $('books-refresh')?.addEventListener('click',loadBooksDashboard);
 $('books-report-form')?.addEventListener('submit',async ev=>{ev.preventDefault();const button=$('books-report-save');button.disabled=true;notice('books-report-msg','جارٍ تسجيل بيانات التقرير…');try{const val=id=>$(id).value.trim(),d={book_id:val('books-report-book'),period_start:val('books-period-start'),period_end:val('books-period-end'),units_sold:val('books-units'),pages_read:val('books-pages'),royalties_amount:val('books-royalties'),ad_spend_amount:val('books-ad-spend'),notes:val('books-report-notes'),royalties_currency:'USD',ad_spend_currency:'USD',marketplace:'Amazon.com'};if(d.period_start>d.period_end)throw new Error('تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.');if(!d.book_id)throw new Error('اختر الكتاب أولًا.');if(!d.units_sold&&!d.pages_read&&!d.royalties_amount)throw new Error('أدخل قيمة واحدة على الأقل من التقرير؛ اترك القيم غير المتاحة فارغة.');const r=await callZozAgent('record_book_snapshot',d);notice('books-report-msg','تم حفظ التقرير في قاعدة الإنتاج. معرّف السجل: '+(r.snapshot_id||'تم الحفظ')+'. البيانات مدخلة من المالك وليست اتصالًا تلقائيًا بأمازون.','good');$('books-report-form').reset();await loadBooksDashboard()}catch(e){notice('books-report-msg','تعذر حفظ التقرير: '+(e.message||e),'bad')}finally{button.disabled=false}});
+
+async function refreshVidiqAccounts(){
+ const host=$('vidiq-account-status');if(!host)return;
+ notice('vidiq-account-msg','جارٍ فحص الحسابات الثلاثة من vidIQ…');
+ try{
+  const d=await call('vidiq_status',{});
+  host.innerHTML='';
+  for(const a of (d.accounts||[])){
+   const card=document.createElement('article');card.className='video-card';
+   const h=document.createElement('h3');h.textContent=a.label;card.appendChild(h);
+   const p=document.createElement('p');p.textContent='الحالة: '+(a.connected?'متصل — الرصيد مؤكد':a.status==='needs_api_key'?'لم يُربط بعد':a.status==='connection_error'?'تعذر الاتصال':'الرصيد غير متاح');card.appendChild(p);
+   const c=document.createElement('p');c.textContent='الرصيد المتاح: '+(a.credits_remaining==null?'غير معروف':fmt(a.credits_remaining));card.appendChild(c);
+   if(a.resets_at){const reset=document.createElement('p');reset.textContent='موعد التجديد: '+new Date(a.resets_at).toLocaleString('ar-EG');card.appendChild(reset);}
+   host.appendChild(card);
+  }
+  notice('vidiq-account-msg','اكتمل الفحص: '+(d.connected_accounts||0)+' من '+(d.accounts||[]).length+' حسابات متصلة.','good');
+ }catch(e){notice('vidiq-account-msg','تعذر فحص الحسابات: '+(e.message||e),'bad');}
+}
+$('vidiq-account-save')?.addEventListener('click',async()=>{
+ const b=$('vidiq-account-save'),key=$('vidiq-account-key').value,slot=$('vidiq-account-slot').value;
+ if(!key||key.length<16){notice('vidiq-account-msg','أدخل مفتاح MCP الصحيح للحساب المحدد.','warn');return;}
+ b.disabled=true;
+ try{
+  const d=await call('vidiq_account_save',{account_key:slot,api_key:key});
+  $('vidiq-account-key').value='';
+  notice('vidiq-account-msg',d.message||'تم حفظ المفتاح.','good');
+  await refreshVidiqAccounts();
+ }catch(e){notice('vidiq-account-msg','تعذر حفظ المفتاح: '+(e.message||e),'bad');}
+ finally{b.disabled=false;}
+});
+$('vidiq-account-refresh')?.addEventListener('click',refreshVidiqAccounts);
 
 $('zoz-device-pair-code-btn')?.addEventListener('click',createDevicePairCode);
 $('zoz-device-refresh-btn')?.addEventListener('click',refreshDeviceAgent);
