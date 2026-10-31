@@ -294,7 +294,7 @@
     ctx.drawImage(image, sx, sy, dw, dh);
   }
   function recordImageMontage(images, scenes, audioBlob, targetSeconds, id, onProgress) {
-    const W = 720, H = 1280, FPS = 24, BITRATE = 2400000;
+    const W = 1920, H = 1080, FPS = 30, BITRATE = 2200000;
     return new Promise(async (resolve, reject) => {
       let audioContext, canvasStream, mergedStream, recorder, animation, source;
       const urls = [];
@@ -316,7 +316,7 @@
         }
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const audioBuffer = await audioContext.decodeAudioData(await audioBlob.arrayBuffer());
-        const total = clamp(Math.max(Number(targetSeconds) || 45, audioBuffer.duration), 20, 150);
+        const total = 90;
         const audioSource = audioContext.createBufferSource();
         source = audioSource; source.buffer = audioBuffer;
         const audioDestination = audioContext.createMediaStreamDestination();
@@ -363,6 +363,13 @@
             drawCover(ctx, loaded[index + 1], W, H, 0, 0);
             ctx.restore();
           }
+          ctx.save();
+          ctx.fillStyle = "rgba(3,10,20,.70)";
+          ctx.fillRect(28, H - 112, W - 56, 78);
+          ctx.direction = "rtl"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.font = "bold 34px system-ui, sans-serif"; ctx.fillStyle = "#fff1f2";
+          ctx.fillText("محاكاة داخلية · غير صالح للنشر أو لمراجعة TikTok", W / 2, H - 72, W - 100);
+          ctx.restore();
           if (onProgress) onProgress(Math.min(65, Math.floor(elapsed / total * 65)));
           if (elapsed >= total) {
             if (animation) cancelAnimationFrame(animation);
@@ -386,7 +393,7 @@
       mod = await import("https://esm.sh/mediabunny@1.61.3");
       aac = await import("https://esm.sh/@mediabunny/aac-encoder@1.61.3");
     } catch (_) { throw new Error("تعذر تحميل محول MP4 المفتوح المصدر؛ لم يُرفع فيديو غير مكتمل."); }
-    const canAvc = await mod.canEncodeVideo("avc", { width: 720, height: 1280, bitrate: 2400000, frameRate: 24 });
+    const canAvc = await mod.canEncodeVideo("avc", { width: 1920, height: 1080, bitrate: 2200000, frameRate: 30 });
     if (!canAvc) throw new Error("هذا الجهاز لا يتيح ترميز H.264 اللازم لإخراج MP4؛ لم يُنشأ ملف زائف.");
     if (!(await mod.canEncodeAudio("aac"))) aac.registerAacEncoder();
     const input = new mod.Input({ source: new mod.BlobSource(webmBlob), formats: mod.ALL_FORMATS });
@@ -399,7 +406,7 @@
       output = new mod.Output({ format: new mod.Mp4OutputFormat(), target: new mod.BufferTarget() });
       const config = {
         input, output, tracks: "primary",
-        video: { codec: "avc", bitrate: 2400000, frameRate: 24, forceTranscode: true },
+        video: { codec: "avc", bitrate: 2200000, width: 1920, height: 1080, frameRate: 30, forceTranscode: true },
         audio: { codec: "aac", bitrate: 128000, forceTranscode: true }
       };
       const conversion = await mod.Conversion.init(config);
