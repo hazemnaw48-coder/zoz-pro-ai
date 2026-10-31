@@ -138,7 +138,12 @@ body.upload-mode .footer{font-size:11px}
 <section class="card">
   <div class="row"><h2>٢. حالة الربط المحفوظ</h2><button id="refresh" class="secondary">فحص الاتصال وقراءة البيانات</button></div>
   <div id="channel-status" class="notice">سيتم اختبار الاتصال من خلال طلب تحليلات للقراءة فقط.</div>
-  <p class="small">معرّف القناة المثبّت: <b dir="ltr">UCIael48cvwPG3gKj--c7HKw</b>. لا يتم تغيير القناة المستهدفة.</p>
+  <label for="managed-channel-selector">القناة النشطة لكل أقسام التحليل والفيديو والتقويم والتوصيات</label>
+ <select id="managed-channel-selector" style="width:100%;padding:12px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;font:inherit">
+ <option value="UCIael48cvwPG3gKj--c7HKw">Hazem Ahmed — مصر القديمة</option>
+ <option value="UC9fr5B0SZZkmVAApfCqEO3w">فكره 🗣️ — أفكار وذكاء اصطناعي</option>
+ </select>
+ <p class="small">فكره كيدز متوقفة حتى تأكيد وجهتها. كل قناة تستخدم تفويضها المستقل.</p>
  </section>
 <section class="card" id="managed-channels-card">
  <div class="row"><h2>إدارة القنوات والتفويض المستقل</h2><div class="actions"><button type="button" id="managed-channels-refresh" class="secondary">تحديث حالة القنوات</button><button type="button" id="managed-channels-sync-all">مزامنة كل القنوات المفوضة</button></div></div>
@@ -315,7 +320,8 @@ if(uploadMode)document.body.classList.add('upload-mode');
 const SUPABASE_URL='https://oxyzxbkwhafzaztraowc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm';
 const OWNER='hazemnaw48@gmail.com';
-const CHANNEL_ID='UCIael48cvwPG3gKj--c7HKw';
+let CHANNEL_ID='UCIael48cvwPG3gKj--c7HKw';
+function selectedChannelId(){return String($('managed-channel-selector')?.value||CHANNEL_ID);}
 const API=SUPABASE_URL+'/functions/v1/zoz-pro-youtube-analytics';
 const AGENT_API=SUPABASE_URL+'/functions/v1/zoz-pro-agent';
 const AGENT_CONTROL_API=SUPABASE_URL+'/functions/v1/zoz-pro-agent-control';
@@ -355,11 +361,21 @@ async function ownerSession(){
  return session;
 }
 async function call(action,body){
- const session=await ownerSession();
- const response=await fetch(API+'?action='+encodeURIComponent(action),{
+ const session=await ownerSession(),channelId=selectedChannelId(),payload=Object.assign({channel_id:channelId},body||{});
+ let route=action;
+ if(action==='analytics'||action==='videos')route='managed_channel_sync';
+ else if(action==='video_analytics'){route='managed_channel_video_analytics';payload.video_ids=(loadedVideos||[]).map(v=>v.video_id).filter(Boolean);}
+ else if(action==='save_snapshot')route='managed_channel_snapshot_status';
+ else if(action==='history')route='managed_channel_history';
+ else if(action==='recommendations')route='managed_channel_recommendations';
+ else if(action==='review_recommendation')route='managed_channel_review_recommendation';
+ else if(action==='content_calendar')route='managed_channel_calendar';
+ else if(action==='generate_content_calendar')route='managed_channel_calendar_generate';
+ else if(action==='review_calendar_item')route='managed_channel_review_calendar_item';
+ const response=await fetch(API+'?action='+encodeURIComponent(route),{
   method:'POST',
   headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},
-  body:JSON.stringify(Object.assign({channel_id:CHANNEL_ID},body||{})),
+  body:JSON.stringify(payload),
   cache:'no-store'
  });
  const data=await response.json().catch(()=>({}));
@@ -796,6 +812,12 @@ $('managed-channels-sync-all')?.addEventListener('click',async()=>{
 });
 
 $('managed-channels-refresh')?.addEventListener('click',loadManagedChannels);
+$('managed-channel-selector')?.addEventListener('change',async()=>{
+ CHANNEL_ID=selectedChannelId();loadedVideos=[];lastAnalytics=null;lastVideoAnalytics=null;
+ notice('channel-status','تم اختيار القناة الجديدة. جارٍ تحديث بياناتها…');
+ try{await loadManagedChannels();await loadAnalytics(false);await loadVideos();await loadContentCalendar();await loadHistory();await loadRecommendations();}
+ catch(e){notice('channel-status',e.message||'تعذر تحميل بيانات القناة المختارة.','bad');}
+});
 $('login').addEventListener('click',async()=>{
  $('login').disabled=true;notice('login-msg','جارٍ التحقق من حساب مالك ZOZ Pro…');
  try{
