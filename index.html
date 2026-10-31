@@ -4,87 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1220">
-<meta name="description" content="Active Pro — مركز التحليل ورفع الفيديو ومصنع تطبيقات Android">
-<title>Active Pro — مركز العمل الموحد</title>
-<style>
-*{box-sizing:border-box}
-:root{color-scheme:dark;--bg:#0b1220;--panel:#122139;--line:#304763;--text:#eef4ff;--muted:#a9bad0}
-html{background:var(--bg);scroll-behavior:smooth}
-body{margin:0;background:linear-gradient(160deg,#0b1422,#101c2d);color:var(--text);font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}
-.shell{max-width:1450px;margin:auto;padding:12px}
-header{padding:8px 4px 14px}.brand{font-size:12px;color:#a9c8f1}
-h1{font-size:clamp(23px,5vw,34px);line-height:1.25;margin:3px 0 7px}
-header p{margin:0;color:var(--muted);font-size:14px}
-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
-nav button{font:inherit;font-weight:750;cursor:pointer;color:var(--text);background:#122139;border:1px solid var(--line);border-radius:12px;padding:11px 10px;min-height:48px}
-nav button[aria-selected="true"]{background:#19365a;border-color:#5386c5;box-shadow:inset 0 0 0 1px #5386c5}
-.frame-wrap{border:1px solid var(--line);background:#0b1220;border-radius:15px;overflow:hidden;min-height:78vh}
-iframe{display:block;width:100%;height:1000px;min-height:78vh;border:0;background:#0b1220}
-footer{text-align:center;color:#8295ad;font-size:12px;padding:12px 5px 20px}
-@media(max-width:560px){.shell{padding:9px}header{padding:5px 2px 10px}nav{grid-template-columns:1fr 1fr}nav button{padding:10px 6px;font-size:13px}.frame-wrap{border-radius:11px}}
-@media(max-width:360px){nav{grid-template-columns:1fr}nav button{min-height:42px}}
-</style>
+<meta name="description" content="Active Pro — مركز الإنتاج والتحكم بالقنوات">
+<meta http-equiv="refresh" content="0; url=./studio.html">
+<link rel="manifest" href="./manifest.webmanifest">
+<title>Active Pro — فتح مركز التحكم</title>
+<script>location.replace(new URL("./studio.html",location.href).href);</script>
 </head>
-<body>
-<main class="shell">
-<header>
-<div class="brand">ACTIVE PRO · مركز العمل الموحد</div>
-<h1>مركز التحليل والإنتاج والتطوير</h1>
-<p>إدارة القنوات والفيديوهات، وتطوير تطبيقات Android التي توسّع قدرات التنفيذ المحلية للوكيل.</p>
-</header>
-<nav aria-label="أقسام مركز العمل">
-<button type="button" id="analysis-tab" data-page="analysis" aria-selected="true">١ · التحليل ورفع الفيديو</button>
-<button type="button" id="factory-tab" data-page="factory" aria-selected="false">٢ · إنتاج تطبيقات Android</button>
-<button type="button" id="upload-tab" data-page="upload" aria-selected="false">رفع الفيديو مباشرة</button>
-</nav>
-<section class="frame-wrap" aria-label="مساحة العمل">
-<iframe id="workspace" title="مركز Active Pro" src="./channel-dashboard.html" loading="eager" referrerpolicy="same-origin"></iframe>
-</section>
-<footer>Active Pro · صلاحيات محددة · موافقات المالك للإجراءات الحساسة والعامة</footer>
-</main>
-<script>
-(function(){
-"use strict";
-const frame=document.getElementById("workspace");
-const tabs=[...document.querySelectorAll("nav button[data-page]")];
-const routes={analysis:"./channel-dashboard.html",factory:"./android-app-factory.html",upload:"./channel-control.html"};
-function resizeFrame(){
- try{
-  const doc=frame.contentDocument;if(!doc)return;
-  const body=doc.body,root=doc.documentElement;
-  const height=Math.max(window.innerHeight*.78,body?body.scrollHeight:0,root?root.scrollHeight:0)+12;
-  frame.style.height=Math.ceil(height)+"px";
- }catch(_){}
-}
-function show(which,updateUrl){
- const page=routes[which]?which:"analysis";
- for(const tab of tabs)tab.setAttribute("aria-selected",String(tab.dataset.page===page));
- const next=routes[page];
- if(!frame.getAttribute("src").endsWith(next.replace("./","")) && !frame.src.endsWith(next)){
-  frame.src=next;
- }
- if(updateUrl){
-  const url=new URL(window.location.href);
-  if(page==="analysis")url.searchParams.delete("tab");else url.searchParams.set("tab",page);
-  window.history.replaceState({},"",url.pathname+(url.search?url.search:"")+url.hash);
- }
- resizeFrame();
-}
-tabs.forEach(tab=>tab.addEventListener("click",()=>show(tab.dataset.page,true)));
-frame.addEventListener("load",()=>{
- resizeFrame();
- try{
-  const doc=frame.contentDocument;
-  if(doc&&doc.documentElement&&"MutationObserver" in window){
-   new MutationObserver(resizeFrame).observe(doc.documentElement,{childList:true,subtree:true,attributes:true});
-  }
- }catch(_){}
- setTimeout(resizeFrame,250);setTimeout(resizeFrame,1000);
-});
-window.addEventListener("resize",resizeFrame);
-const initial=new URLSearchParams(window.location.search).get("tab");
-show(initial==="factory"?"factory":initial==="upload"?"upload":"analysis",false);
-})();
-</script>
+<body style="margin:0;background:#0b1220;color:#eef4ff;font:16px system-ui;padding:24px">
+جارٍ فتح مركز Active Pro…
+<p><a href="./studio.html" style="color:#7dd3fc">اضغط هنا إذا لم يفتح تلقائيًا</a></p>
 </body>
 </html>
