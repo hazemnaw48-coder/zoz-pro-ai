@@ -1,11 +1,11 @@
-const CACHE_NAME = "zoz-pro-shell-v33";
+const CACHE_NAME = "zoz-pro-shell-v34";
 const APP_FILES = [
   "./",
   "./index.html",
   "./studio.html",
   "./proof-studio.html",
   "./studio.css?v=20261031-active-pro-live-1",
-  "./studio.js?v=20261031-active-pro-live-2",
+  "./studio.js?v=20261031-tiktok-oauth-fix-1",
   "./visual-production.js?v=20261031-active-pro-live-2",
   "./android-app-factory.html",
   "./production-center.html",
