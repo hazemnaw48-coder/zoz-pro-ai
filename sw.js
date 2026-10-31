@@ -1,4 +1,4 @@
-const CACHE_NAME = "zoz-pro-shell-v31";
+const CACHE_NAME = "zoz-pro-shell-v32";
 const APP_FILES = [
   "./",
   "./index.html",
