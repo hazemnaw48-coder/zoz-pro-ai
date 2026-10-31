@@ -20,11 +20,11 @@ small{color:#9fb8d0}.status{min-height:26px;color:#bde3ff}
 <div class="panel"><b>المواصفات المخططة</b><p>16:9 · 1920×1080 · 30 FPS · 90 ثانية · خمسة مشاهد. التسجيل المحلي يعتمد على دعم المتصفح؛ الصيغة المتاحة تظهر قبل التنزيل ولا نضمن MP4 على كل الأجهزة.</p></div>
 <div class="panel">
 <label>صورة صغيرة اختيارية<input id="pic" type="file" accept="image/*"></label>
-<label>ملف التعليق الصوتي<input id="voice" type="file" accept="audio/*"></label>
+<label>ملف التعليق الصوتي (اختياري)<input id="voice" type="file" accept="audio/*"></label><button id="makeVoice">إنشاء تعليق صوتي عربي من النص</button>
 <label>النص الظاهر على الفيديو<textarea id="copy" style="width:100%;min-height:110px;background:#091321;color:white;border:1px solid #456;padding:10px">هذا عرض تجريبي داخلي لنظام ZOZ Pro. تسجيل الدخول المعروض محاكاة ولا يفتح TikTok. الحسابان Hazem Now وZOZ Manager يظهران كمثالين فقط. عبارة SENT_TO_INBOX توضيحية وليست استجابة حقيقية. صاحب الحساب يراجع أي مسودة حقيقية ويقرر النشر بنفسه.</textarea></label>
 <canvas id="screen" width="1920" height="1080"></canvas>
 <button id="preview">تشغيل معاينة 90 ثانية</button><button id="stop">إيقاف</button><button id="export">تسجيل ملف تجريبي 90 ثانية</button>
-<p id="status" class="status">اختر الصوت والصورة ثم ابدأ المعاينة أو التسجيل.</p><a id="download" hidden download="ZOZ-DEMO-NOT-FOR-PUBLISHING.webm">تنزيل الفيديو التجريبي</a>
+<p id="status" class="status">اكتب النص ثم أنشئ التعليق الصوتي أو اختر ملفًا جاهزًا، وبعدها ابدأ التسجيل المحلي.</p><a id="download" hidden download="ZOZ-DEMO-NOT-FOR-PUBLISHING.webm">تنزيل الفيديو التجريبي</a>
 </div>
 <p><small>مهم: فيديو App Review المقبول يجب أن يكون تسجيل شاشة حقيقيًا لتدفق تكامل فعلي. لا تستخدم هذا النموذج بدل التسجيل الحقيقي.</small></p>
 </main>
@@ -39,7 +39,7 @@ const scenes=[
 ];
 let photo=null,audio=null,raf=0,urls=[];
 $("#pic").onchange=e=>{const f=e.target.files[0];if(!f)return;photo=new Image();photo.src=URL.createObjectURL(f);photo.onload=()=>draw(0)};
-$("#voice").onchange=e=>audio=e.target.files[0];
+$("#voice").onchange=e=>audio=e.target.files[0];\n$("#makeVoice").onclick=async()=>{const b=$("#makeVoice");b.disabled=true;$("#status").textContent="جارٍ تحميل محرك الصوت العربي وإنشاء التعليق...";try{const mod=await import("https://cdn.jsdelivr.net/npm/nabra-tts@0/+esm");const Engine=mod.NabraTTS||mod.default?.NabraTTS||mod.default;if(!Engine||typeof Engine.load!=="function")throw new Error("محرك الصوت العربي غير متاح.");const engine=await Engine.load();const result=await engine.generate($("#copy").value.trim());const wav=engine.toWav(result.audio);audio=wav instanceof Blob?wav:(wav instanceof ArrayBuffer||ArrayBuffer.isView(wav))?new Blob([wav],{type:"audio/wav"}):null;if(!audio||audio.size<2000)throw new Error("لم ينتج ملف صوت صالح.");$("#status").textContent="تم إنشاء التعليق الصوتي العربي محليًا ("+(audio.size/1048576).toFixed(1)+" MB).";}catch(e){$("#status").textContent="تعذر إنشاء الصوت: "+e.message+" — يمكنك اختيار ملف صوتي جاهز.";}finally{b.disabled=false}};
 function draw(t){let i=scenes.findIndex(s=>t>=s[3]&&t<s[4]);if(i<0)i=4;const s=scenes[i];
 const g=x.createLinearGradient(0,0,1920,1080);g.addColorStop(0,"#183452");g.addColorStop(1,"#07111e");x.fillStyle=g;x.fillRect(0,0,1920,1080);
 x.fillStyle="#10243a";x.fillRect(55,45,1810,125);x.strokeStyle="#4c6a89";x.strokeRect(55,45,1810,125);
