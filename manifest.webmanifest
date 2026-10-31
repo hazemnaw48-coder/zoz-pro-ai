@@ -5,7 +5,7 @@
   "description": "مركز ZOZ Pro للتحليل والإنتاج وتطوير تطبيقات Android",
   "lang": "ar",
   "dir": "rtl",
-  "start_url": "./index.html",
+  "start_url": "./analysis-production.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
