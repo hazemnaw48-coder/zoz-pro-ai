@@ -2,14 +2,16 @@
 
 Independent Business Operating System. This repository does not depend on the legacy ZOZ AI project.
 
-## Current production studio (2026-10-20)
+## Current production architecture (2026-10-31)
 
-- The primary ZOZ Pro studio is served directly by the Supabase Edge Function at https://vjnwojrqduoxhetutxrs.supabase.co/functions/v1/zoz-pro-studio-ui.
-- Supabase owns the content jobs, media storage, integration registry, channel OAuth token store, and direct publishing adapter.
-- The studio source of truth is studio.html, studio.css, and studio.js in this GitHub repository; the live UI is hosted by Supabase, not GitHub Pages, Render, Vercel, or Floot.
-- Make and Runway are optional providers only. They are not required for normal operation.
-- Direct YouTube/TikTok OAuth still requires provider-issued client credentials and platform scope approval. Claude requires an Anthropic API key stored as a Supabase secret. Do not put any secret in GitHub or the browser.
-- Video generation is configured through the Supabase video engine, but a successful paid video generation and direct channel publishing must be verified before claiming end-to-end production is complete.
+- The public and installed PWA entry point is `analysis-production.html`, which opens the unified `channel-control.html` workspace.
+- The live analysis/agent backend is the production Supabase project `oxyzxbkwhafzaztraowc`; the channel workspace uses its production YouTube analytics, agent and agent-control Edge Functions.
+- The GitHub Pages deployment serves the PWA shell and production channel workspace. The separate `studio.html` / `studio.js` runtime still targets the preview Supabase project `vjnwojrqduoxhetutxrs` and is not the production entry point.
+- Do not point the preview studio at production by changing only its URL: its Edge Function and database contracts are not yet aligned with the production schema.
+- Production agent automation and YouTube analytics are active. Public publishing remains owner-approval gated.
+- TikTok is not connected yet: Developer app review, approved scopes, credentials stored as Supabase secrets, and the owner's OAuth authorization are still required. Do not represent the placeholder account slots as connected.
+- Amazon KDP monitoring currently uses manually recorded reports; direct KDP connection is not configured.
+- Make and Runway are optional. Do not add paid services or expose secrets in GitHub or browser code.
 
 ## Legacy runtime notes
 
