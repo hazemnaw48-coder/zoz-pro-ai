@@ -741,9 +741,9 @@ function vidiqToolValue(result:any){
  }
  return result?.result??result??{};
 }
-async function vidiqCallTool(session:any,name:string,args:any,id:number){
+async function vidiqCallTool(apiKey:string,session:any,name:string,args:any,id:number){
  if(!session.tools.some((t:any)=>t?.name===name))throw new Error("The connected vidIQ MCP account does not expose "+name+".");
- const call=await vidiqMcpRpc(VIDIQ_MCP_API_KEY,"tools/call",{name,arguments:args},id,session.sessionId,session.protocolVersion);
+ const call=await vidiqMcpRpc(apiKey,"tools/call",{name,arguments:args},id,session.sessionId,session.protocolVersion);
  const result=call.payload?.result??call.payload;
  if(result?.isError)throw new Error("vidIQ tool "+name+" returned an error.");
  return {value:vidiqToolValue(result),sessionId:call.sessionId};
@@ -754,6 +754,36 @@ function vidiqCredits(value:any):number|null{
  const textValue=typeof value?.text==="string"?value.text:"";
  const match=textValue.match(/(\d+)\s*(?:credits?|رصيد)/i);
  return match?Number(match[1]):null;
+}
+const VIDIQ_ACCOUNT_SLOTS=[
+ {key:"zoz_hazem",label:"ZOZ Hazem",apiKey:()=>Deno.env.get("VIDIQ_MCP_API_KEY_ZOZ_HAZEM")||VIDIQ_MCP_API_KEY},
+ {key:"hazem_now",label:"Hazem Now",apiKey:()=>Deno.env.get("VIDIQ_MCP_API_KEY_HAZEM_NOW")||""},
+ {key:"zoz_manager",label:"ZOZ Manager",apiKey:()=>Deno.env.get("VIDIQ_MCP_API_KEY_ZOZ_MANAGER")||""}
+];
+async function vidiqReadAccountBalance(account:any){
+ const apiKey=account.apiKey();
+ if(!apiKey)return {key:account.key,label:account.label,configured:false,connected:false,status:"needs_api_key",credits_remaining:null};
+ try{
+  const session=await vidiqMcpStart(apiKey);
+  const result=await vidiqCallTool(apiKey,session,"vidiq_balance",{},3);
+  const balance=result.value||{};
+  const credits=vidiqCredits(balance);
+  return {key:account.key,label:account.label,configured:true,connected:credits!==null,status:credits===null?"balance_unavailable":"connected",
+   credits_remaining:credits,renewable_credits:typeof balance.renewableCredits==="number"?balance.renewableCredits:null,
+   max_renewable_credits:typeof balance.maxRenewableCredits==="number"?balance.maxRenewableCredits:null,
+   add_on_credits:typeof balance.addOnCredits==="number"?balance.addOnCredits:null,
+   resets_at:balance.renewableResetsAt||null};
+ }catch(error){
+  return {key:account.key,label:account.label,configured:true,connected:false,status:"connection_error",credits_remaining:null,
+   error:(error instanceof Error?error.message:"vidIQ account check failed").slice(0,220)};
+ }
+}
+async function vidiqAccountBalances(){
+ return await Promise.all(VIDIQ_ACCOUNT_SLOTS.map(account=>vidiqReadAccountBalance(account)));
+}
+function chooseVidiqAccount(balances:any[],minimumCredits:number){
+ return balances.filter(x=>x.connected&&typeof x.credits_remaining==="number"&&x.credits_remaining>=minimumCredits)
+  .sort((a,b)=>b.credits_remaining-a.credits_remaining)[0]||null;
 }
 
 
@@ -965,42 +995,61 @@ async function listLocalContentStudio(req:Request,u:any){
 }
 
 async function vidiqStatus(req:Request,u:any){
- if(!VIDIQ_MCP_API_KEY)return json({ok:true,configured:false,connected:false,provider:"vidIQ MCP",channel_id:CHANNEL_ID,required_secret:"VIDIQ_MCP_API_KEY",message:"أضف مفتاح vidIQ MCP في Secrets بوظيفة Supabase؛ لا تضع المفتاح في الصفحة أو GitHub. هذا المفتاح للبحث والتحليل فقط، أما تعديل الفيديو والنشر فيمر عبر تفويض YouTube المحفوظ."});
- try{
-  const session=await vidiqMcpStart(VIDIQ_MCP_API_KEY);
-  const bal=await vidiqCallTool(session,"vidiq_balance",{},3);
-  const credits=vidiqCredits(bal.value);
-  return json({ok:true,configured:true,connected:true,provider:"vidIQ MCP",channel_id:CHANNEL_ID,available_tools:session.tools.map((t:any)=>String(t.name)).filter((n:string)=>/^vidiq_(keyword_research|generate_titles|channel_analytics|trending_videos|outliers|user_channels|balance)$/.test(n)),credits_remaining:credits,message:credits===0?"الاتصال صالح، لكن رصيد vidIQ صفر حاليًا؛ البحث المدفوع لن يعمل حتى يتجدد الرصيد.":"تم التحقق من اتصال vidIQ MCP."});
- }catch(e){return json({ok:true,configured:true,connected:false,provider:"vidIQ MCP",channel_id:CHANNEL_ID,message:e instanceof Error?e.message:"تعذر التحقق من vidIQ MCP."});}
+ const accounts=await vidiqAccountBalances();
+ const connected=accounts.filter(x=>x.connected);
+ const configured=accounts.filter(x=>x.configured);
+ return json({ok:true,provider:"vidIQ MCP",accounts,configured_accounts:configured.length,connected_accounts:connected.length,
+  selection_policy:"For credit-consuming vidIQ research, use the connected account with the highest live balance that meets the task's minimum credit cost. This does not choose or perform YouTube publishing.",
+  required_secrets:["VIDIQ_MCP_API_KEY_ZOZ_HAZEM","VIDIQ_MCP_API_KEY_HAZEM_NOW","VIDIQ_MCP_API_KEY_ZOZ_MANAGER"],
+  message:connected.length===0?"لم يتم إعداد مفاتيح vidIQ الثلاثة في أسرار مشروع الإنتاج بعد.":"تم فحص كل حساب تم إعداد مفتاحه؛ الحسابات غير المهيأة ستظل معلّمة بانتظار المفتاح."});
 }
 async function vidiqResearch(req:Request,u:any){
- if(!VIDIQ_MCP_API_KEY)return fail("vidIQ is not connected to the production function yet. Add VIDIQ_MCP_API_KEY under Supabase Edge Function secrets.",503);
  const body=await req.json().catch(()=>({}));
  const mode=String(body.mode||"keyword")==="titles"?"titles":"keyword";
  const topic=intakeText(body.topic,250),description=intakeText(body.description,3500);
  if(!topic)return fail("Provide a topic or draft title for vidIQ research.",400);
+ const minimumCredits=5;
+ const balances=await vidiqAccountBalances();
+ const selected=chooseVidiqAccount(balances,minimumCredits);
+ if(!selected){
+  const summary=balances.map(x=>({account:x.label,status:x.status,credits_remaining:x.credits_remaining}));
+  await db("zoz_pro_vidiq_research_runs",{method:"POST",headers:{prefer:"return=minimal"},body:JSON.stringify({
+   owner_id:u.id,channel_id:CHANNEL_ID,topic,research_mode:mode,status:"blocked_no_eligible_account",
+   request_payload:{mode,topic,minimum_credits:minimumCredits,account_balances:summary},result_payload:{},error_message:"No configured vidIQ account had enough confirmed credits."
+  })}).catch(()=>null);
+  return json({ok:false,error:"لا يوجد حساب vidIQ متصل برصيد مؤكد يكفي لهذه العملية. لم يُستهلك أي رصيد.",minimum_credits:minimumCredits,accounts:balances},402);
+ }
+ const slot=VIDIQ_ACCOUNT_SLOTS.find(x=>x.key===selected.key);
+ const apiKey=slot?.apiKey()||"";
  try{
-  const session=await vidiqMcpStart(VIDIQ_MCP_API_KEY);
-  const balance=await vidiqCallTool(session,"vidiq_balance",{},3);
-  const credits=vidiqCredits(balance.value);
-  if(credits!==null&&credits<5){
-   const run={owner_id:u.id,channel_id:CHANNEL_ID,topic,research_mode:mode,status:"blocked_no_credits",request_payload:{mode,topic},result_payload:{credits_remaining:credits},error_message:"No vidIQ research credits available."};
-   await db("zoz_pro_vidiq_research_runs",{method:"POST",headers:{prefer:"return=minimal"},body:JSON.stringify(run)}).catch(()=>null);
-   return fail("اتصال vidIQ موجود، لكن الرصيد المتاح "+credits+"؛ لم نستهلك أي رصيد بحثي. استخدم تحليلات YouTube المحفوظة الآن أو أعد المحاولة بعد تجدد رصيد vidIQ.",402);
-  }
+  const session=await vidiqMcpStart(apiKey);
   const toolName=mode==="titles"?"vidiq_generate_titles":"vidiq_keyword_research";
   const args=mode==="titles"
    ?{title:topic,description:description||undefined,numTitles:5,type:"short",language:"ar",regionCode:"EG"}
    :{mode:"research",keyword:topic,includeRelated:true,country:"EG",limit:10,language:"ar"};
-  const called=await vidiqCallTool(session,toolName,args,4);
+  const called=await vidiqCallTool(apiKey,session,toolName,args,4);
   const resultValue=called.value;
-  const savedRows=await db("zoz_pro_vidiq_research_runs",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({owner_id:u.id,channel_id:CHANNEL_ID,topic,research_mode:mode,status:"succeeded",request_payload:{mode,topic,tool_name:toolName,description:description||null},result_payload:resultValue,error_message:null})});
+  const afterBalance=await vidiqCallTool(apiKey,session,"vidiq_balance",{},5).catch(()=>null);
+  const remaining=afterBalance?vidiqCredits(afterBalance.value):null;
+  const savedRows=await db("zoz_pro_vidiq_research_runs",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({
+   owner_id:u.id,channel_id:CHANNEL_ID,topic,research_mode:mode,status:"succeeded",
+   request_payload:{mode,topic,tool_name:toolName,description:description||null,account_key:selected.key,account_label:selected.label,credits_before:selected.credits_remaining,minimum_credits:minimumCredits},
+   result_payload:resultValue,error_message:null
+  })});
   const saved=savedRows?.[0]||null;
-  await db("zoz_pro_automation_runs",{method:"POST",headers:{prefer:"return=minimal"},body:JSON.stringify({workflow:"vidiq_"+mode,channel_id:CHANNEL_ID,status:"succeeded",details:{research_run_id:saved?.id||null,topic,tool_name:toolName}})}).catch(()=>null);
-  return json({ok:true,connected:true,research_run_id:saved?.id||null,topic,mode,tool_name:toolName,result:resultValue,credits_remaining:credits,message:"تم حفظ نتيجة vidIQ في سجل الأبحاث دون تعديل القناة أو نشر أي فيديو."});
+  await db("zoz_pro_automation_runs",{method:"POST",headers:{prefer:"return=minimal"},body:JSON.stringify({
+   workflow:"vidiq_"+mode,channel_id:CHANNEL_ID,status:"succeeded",
+   details:{research_run_id:saved?.id||null,topic,tool_name:toolName,vidiq_account:selected.key,credits_before:selected.credits_remaining,credits_after:remaining}
+  })}).catch(()=>null);
+  return json({ok:true,connected:true,research_run_id:saved?.id||null,topic,mode,tool_name:toolName,
+   selected_account:{key:selected.key,label:selected.label},credits_before:selected.credits_remaining,credits_remaining:remaining,
+   result:resultValue,message:"تم اختيار الحساب ذي الرصيد المؤكد الأعلى وتنفيذ بحث vidIQ واحد عليه. لم يحدث أي رفع أو نشر."});
  }catch(e){
   const message=e instanceof Error?e.message:"vidIQ research failed.";
-  await db("zoz_pro_vidiq_research_runs",{method:"POST",headers:{prefer:"return=minimal"},body:JSON.stringify({owner_id:u.id,channel_id:CHANNEL_ID,topic,research_mode:mode,status:"failed",request_payload:{mode,topic},result_payload:{},error_message:message.slice(0,500)})}).catch(()=>null);
+  await db("zoz_pro_vidiq_research_runs",{method:"POST",headers:{prefer:"return=minimal"},body:JSON.stringify({
+   owner_id:u.id,channel_id:CHANNEL_ID,topic,research_mode:mode,status:"failed",
+   request_payload:{mode,topic,account_key:selected.key,account_label:selected.label},result_payload:{},error_message:message.slice(0,500)
+  })}).catch(()=>null);
   return fail(message,502);
  }
 }
@@ -1440,7 +1489,7 @@ Deno.serve(async (req: Request) => {
   if(action==="intake_archive")return await intakeArchive(req,u);
   if(action==="studio_generate")return await localContentStudio(req,u);
   if(action==="studio_list")return await listLocalContentStudio(req,u);
-  if(action==="vidiq_status")return await vidiqStatus(req,u);
+  if(action==="vidiq_status"||action==="vidiq_accounts_status")return await vidiqStatus(req,u);
   if(action==="vidiq_research")return await vidiqResearch(req,u);
   if(action==="vidiq_research_runs")return await vidiqResearchRuns(u);
   if (action === "connect") return await connect(u);
