@@ -1,11 +1,11 @@
-/* ZOZ Pro visual-first production: free AI image queue + Arabic local TTS + browser MP4 rendering.
+/* Active Pro visual-first production: free AI image queue + Arabic local TTS + browser MP4 rendering.
    No paid API keys are used. AI Horde is a volunteer queue; Wikimedia Commons is a free-image fallback.
    All generated assets are stored privately in the task's Supabase media bucket before final review.
 */
 (() => {
   "use strict";
   const HORDE = "https://aihorde.net/api/v2";
-  const OWNER_AGENT = "ZOZ-Pro-Visual-Studio:1.0:https://github.com/hazemnaw48-coder/zoz-pro-ai";
+  const OWNER_AGENT = "Active-Pro-Visual-Studio:1.0:https://github.com/hazemnaw48-coder/zoz-pro-ai";
   const IMAGE_MODEL_HINTS = [
     "ancient egyptian art side profile frontal eye painted relief",
     "Egyptian wall painting profile face eye close detail",
@@ -62,8 +62,8 @@
     if (note) note.textContent = "معاينة MP4 محلية — الفيديو لم يُنشر علنًا.";
   }
   function titleFor(job) {
-    return String(job?.script_json?.title || job?.topic || "ZOZ-Pro-video")
-      .replace(/[^\p{L}\p{N}_-]+/gu, "-").slice(0, 54) || "ZOZ-Pro-video";
+    return String(job?.script_json?.title || job?.topic || "Active-Pro-video")
+      .replace(/[^\p{L}\p{N}_-]+/gu, "-").slice(0, 54) || "Active-Pro-video";
   }
   function imagePrompt(job, scene, index) {
     const topic = String(job?.topic || "");
@@ -422,7 +422,7 @@
   }
   async function uploadMedia(id, blob, filename, mime, sourceMetadata = {}) {
     const b = bridge();
-    if (!b?.call || !b?.MEDIA || !b?.sb) throw new Error("اتصال محرك الإنتاج بورشة ZOZ Pro غير جاهز. أعد تحميل الصفحة.");
+    if (!b?.call || !b?.MEDIA || !b?.sb) throw new Error("اتصال محرك الإنتاج بورشة Active Pro غير جاهز. أعد تحميل الصفحة.");
     const prepared = await b.call(b.MEDIA, {
       action: "prepare_upload", job_id: id, filename, mime_type: mime, size: blob.size,
       source_tool: "zoz-pro-free-image-audio"
@@ -536,7 +536,7 @@
       });
       say(id, "حفظ الفيديو النهائي والتحقق منه في Supabase…", "warn");
       const b = bridge();
-      if (!b?.call || !b?.MEDIA) throw new Error("اتصال محرك الإنتاج بورشة ZOZ Pro غير جاهز.");
+      if (!b?.call || !b?.MEDIA) throw new Error("اتصال محرك الإنتاج بورشة Active Pro غير جاهز.");
       await b.call(b.MEDIA, {
         action: "save_prompt", job_id: id,
         prompt: String(job.script_json.original_prompt || job.script_json.script || job.topic || ""),
