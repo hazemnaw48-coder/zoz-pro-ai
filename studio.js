@@ -166,3 +166,21 @@ window.ZOZVisualProductionBridge = {
   msg: (selector, text, kind) => msg(selector, text, kind || "warn"),
   refresh: () => refresh()
 };
+
+document.addEventListener("DOMContentLoaded",()=>{
+ const b=document.querySelector("#create-proof-demo");
+ if(!b)return;
+ b.addEventListener("click",async()=>{
+  b.disabled=true;msg("#proof-demo-message","جارٍ إنشاء مهمة الاختبار داخل قاعدة البيانات…","warn");
+  try{
+   const d=await call(CONTENT,{action:"create_proof_demo"});
+   if(!d?.job?.id||!d.internal_demo_only)throw Error("لم يؤكد النظام إنشاء مهمة الاختبار الداخلية.");
+   await refresh();
+   const run=document.querySelector('[data-visual-production="'+d.job.id+'"]');
+   if(!run)throw Error("تم حفظ المهمة، لكن لم يظهر زر الإنتاج. اضغط تحديث المهام.");
+   msg("#proof-demo-message","تم إنشاء المهمة "+d.job.id+"؛ اضغط تأكيد بدء الإنتاج في النافذة التالية وأبقِ الصفحة مفتوحة.","good");
+   run.click();
+  }catch(e){msg("#proof-demo-message","تعذر بدء الإنتاج: "+(e.message||String(e)),"bad")}
+  finally{b.disabled=false}
+ });
+});
