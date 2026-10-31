@@ -1,1 +1,73 @@
-<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ZOZ Pro TikTok Proof Studio</title><body style="background:#08111f;color:#eef4ff;font:16px system-ui;padding:24px"><h1>استوديو فيديو إثبات TikTok</h1><p>عرض تجريبي داخلي فقط. غير صالح للنشر أو لتقديمه كإثبات مراجعة TikTok.</p></body></html>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ZOZ Pro | استوديو المحاكاة</title>
+<style>
+body{margin:0;background:#091321;color:#edf6ff;font:16px system-ui;padding:18px}main{max-width:900px;margin:auto}
+.panel{background:#14243a;border:1px solid #34506e;border-radius:16px;padding:16px;margin:14px 0}
+h1{font-size:25px}p{color:#b7c9dc;line-height:1.7}
+.warning{background:#40212b;border:1px solid #a64d61;padding:14px;border-radius:12px;color:#ffe2e8}
+canvas{width:100%;height:auto;aspect-ratio:16/9;background:#050b12;border-radius:12px}
+label{display:block;margin:12px 0}input{display:block;margin-top:7px;max-width:100%}
+button,a{display:inline-block;padding:11px 15px;margin:6px 4px;border:1px solid #47749c;border-radius:10px;background:#17446b;color:white;font:inherit;text-decoration:none}
+small{color:#9fb8d0}.status{min-height:26px;color:#bde3ff}
+</style></head>
+<body><main>
+<h1>ZOZ Pro — استوديو فيديو TikTok التجريبي</h1>
+<p>معاينة محلية بخمس مشاهد، صورة مصغرة، تعليق صوتي ونصوص متداخلة.</p>
+<div class="warning"><b>محاكاة داخلية فقط — غير صالح للنشر أو لمراجعة TikTok.</b><br>لا يتصل هذا الاستوديو بـ TikTok ولا ينفذ تفويضًا أو رفعًا حقيقيًا. كل حالات الحسابات والرفع الظاهرة رسوم توضيحية وليست نتائج API.</div>
+<div class="panel"><b>المواصفات المخططة</b><p>16:9 · 1920×1080 · 30 FPS · 90 ثانية · خمسة مشاهد. التسجيل المحلي يعتمد على دعم المتصفح؛ الصيغة المتاحة تظهر قبل التنزيل ولا نضمن MP4 على كل الأجهزة.</p></div>
+<div class="panel">
+<label>صورة صغيرة اختيارية<input id="pic" type="file" accept="image/*"></label>
+<label>ملف التعليق الصوتي<input id="voice" type="file" accept="audio/*"></label>
+<label>النص الظاهر على الفيديو<textarea id="copy" style="width:100%;min-height:110px;background:#091321;color:white;border:1px solid #456;padding:10px">هذا عرض تجريبي داخلي لنظام ZOZ Pro. تسجيل الدخول المعروض محاكاة ولا يفتح TikTok. الحسابان Hazem Now وZOZ Manager يظهران كمثالين فقط. عبارة SENT_TO_INBOX توضيحية وليست استجابة حقيقية. صاحب الحساب يراجع أي مسودة حقيقية ويقرر النشر بنفسه.</textarea></label>
+<canvas id="screen" width="1920" height="1080"></canvas>
+<button id="preview">تشغيل معاينة 90 ثانية</button><button id="stop">إيقاف</button><button id="export">تسجيل ملف تجريبي 90 ثانية</button>
+<p id="status" class="status">اختر الصوت والصورة ثم ابدأ المعاينة أو التسجيل.</p><a id="download" hidden download="ZOZ-DEMO-NOT-FOR-PUBLISHING.webm">تنزيل الفيديو التجريبي</a>
+</div>
+<p><small>مهم: فيديو App Review المقبول يجب أن يكون تسجيل شاشة حقيقيًا لتدفق تكامل فعلي. لا تستخدم هذا النموذج بدل التسجيل الحقيقي.</small></p>
+</main>
+<script>
+const $=s=>document.querySelector(s),c=$("#screen"),x=c.getContext("2d");
+const scenes=[
+["التعريف","إدارة المحتوى والقنوات من مكان واحد","لوحة تحكم تجريبية — لا يوجد اتصال حقيقي",0,10],
+["تسجيل الدخول","واجهة تسجيل TikTok","محاكاة مرئية فقط — لم يتم فتح TikTok",10,30],
+["الحسابات","Hazem Now  ·  ZOZ Manager","حسابان توضيحيان — لا توجد رموز وصول",30,50],
+["رفع الفيديو","SENT_TO_INBOX","نص تمثيلي — ليست استجابة API حقيقية",50,75],
+["قرار المالك","المراجعة قبل النشر","لا يوجد نشر في هذا العرض التجريبي",75,90]
+];
+let photo=null,audio=null,raf=0,urls=[];
+$("#pic").onchange=e=>{const f=e.target.files[0];if(!f)return;photo=new Image();photo.src=URL.createObjectURL(f);photo.onload=()=>draw(0)};
+$("#voice").onchange=e=>audio=e.target.files[0];
+function draw(t){let i=scenes.findIndex(s=>t>=s[3]&&t<s[4]);if(i<0)i=4;const s=scenes[i];
+const g=x.createLinearGradient(0,0,1920,1080);g.addColorStop(0,"#183452");g.addColorStop(1,"#07111e");x.fillStyle=g;x.fillRect(0,0,1920,1080);
+x.fillStyle="#10243a";x.fillRect(55,45,1810,125);x.strokeStyle="#4c6a89";x.strokeRect(55,45,1810,125);
+x.fillStyle="#d9edff";x.font="bold 32px system-ui";x.textAlign="right";x.fillText("ZOZ Pro",1740,115);
+x.fillStyle="#142b46";x.fillRect(80,225,1760,560);x.strokeStyle="#426381";x.strokeRect(80,225,1760,560);
+x.fillStyle="#9bdcff";x.font="bold 30px system-ui";x.fillText("المشهد "+(i+1)+" من 5",1740,300);
+x.fillStyle="#fff";x.font="bold 58px system-ui";x.fillText(s[0],1740,420);
+x.font="bold 42px system-ui";x.fillText(s[1],1740,515);
+x.fillStyle="#b6cde4";x.font="30px system-ui";x.fillText(s[2],1740,590);
+if(photo){x.save();x.beginPath();x.arc(250,360,95,0,Math.PI*2);x.clip();x.drawImage(photo,155,265,190,190);x.restore()}else{x.fillStyle="#1d4b70";x.beginPath();x.arc(250,360,95,0,Math.PI*2);x.fill();x.fillStyle="#7dd3fc";x.font="bold 100px system-ui";x.textAlign="center";x.fillText("Z",250,395)}
+x.save();x.translate(960,700);x.rotate(-.12);x.fillStyle="#71303b";x.fillRect(-700,-35,1400,70);x.fillStyle="#fff0f2";x.textAlign="center";x.font="bold 32px system-ui";x.fillText("محاكاة داخلية — غير صالح للنشر أو لمراجعة TikTok",0,12);x.restore();
+x.fillStyle="#28415c";x.fillRect(90,850,1740,16);x.fillStyle="#38bdf8";x.fillRect(90,850,1740*Math.min(1,t/90),16);
+x.fillStyle="#eaf5ff";x.font="28px system-ui";x.textAlign="right";x.fillText($("#copy").value.slice(0,110),1780,940);
+}
+function stop(){cancelAnimationFrame(raf);raf=0}
+$("#stop").onclick=stop;
+$("#preview").onclick=()=>{stop();const start=performance.now();function tick(now){const t=(now-start)/1000;draw(Math.min(89.9,t));if(t<90)raf=requestAnimationFrame(tick)}raf=requestAnimationFrame(tick)};
+$("#export").onclick=async()=>{stop();const b=$("#export");b.disabled=true;$("#status").textContent="جارٍ تسجيل 90 ثانية. اترك الصفحة مفتوحة.";
+try{if(!c.captureStream||!window.MediaRecorder)throw Error("تسجيل الفيديو غير مدعوم في هذا المتصفح.");
+const stream=c.captureStream(30);let audioCtx=null,src=null;
+if(audio){audioCtx=new(window.AudioContext||window.webkitAudioContext)();await audioCtx.resume();const buf=await audioCtx.decodeAudioData(await audio.arrayBuffer());src=audioCtx.createBufferSource();src.buffer=buf;const dest=audioCtx.createMediaStreamDestination();src.connect(dest);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t))}
+const mime=["video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm"].find(t=>MediaRecorder.isTypeSupported(t));
+if(!mime)throw Error("صيغة تسجيل متوافقة غير متاحة.");
+const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:1800000});const chunks=[];rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+const done=new Promise(resolve=>rec.onstop=()=>resolve(new Blob(chunks,{type:mime})));
+rec.start(1000);src?.start();const start=performance.now();await new Promise(resolve=>{function tick(now){const t=(now-start)/1000;draw(Math.min(89.9,t));$("#status").textContent="تسجيل المحاكاة: "+Math.floor(t)+" / 90 ثانية";if(t<90)requestAnimationFrame(tick);else resolve()}requestAnimationFrame(tick)});
+rec.stop();const out=await done;stream.getTracks().forEach(t=>t.stop());audioCtx?.close();if(out.size>50*1024*1024)throw Error("حجم الملف تجاوز 50 ميجابايت. لم نوفر رابط تنزيل.");
+const url=URL.createObjectURL(out);urls.push(url);$("#download").href=url;$("#download").hidden=false;$("#status").textContent="اكتمل ملف محاكاة WebM محلي ("+(out.size/1048576).toFixed(1)+" MB). ليس MP4 ولا إثبات TikTok حقيقي.";
+}catch(e){$("#status").textContent="تعذر التسجيل: "+e.message}finally{b.disabled=false}};
+draw(0);
+</script></body></html>
