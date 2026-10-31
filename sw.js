@@ -1,7 +1,11 @@
-const CACHE_NAME = "zoz-pro-shell-v30";
+const CACHE_NAME = "zoz-pro-shell-v31";
 const APP_FILES = [
   "./",
   "./index.html",
+  "./studio.html",
+  "./studio.css?v=20261031-active-pro-live-1",
+  "./studio.js?v=20261031-active-pro-live-2",
+  "./visual-production.js?v=20261031-active-pro-live-2",
   "./android-app-factory.html",
   "./production-center.html",
   "./production-workbench.html",
