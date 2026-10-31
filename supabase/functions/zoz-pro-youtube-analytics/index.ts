@@ -22,7 +22,7 @@ const PUBLISHABLE_KEY =
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
 const VIDIQ_MCP_API_KEY = Deno.env.get("VIDIQ_MCP_API_KEY") || "";
-const OWNER_EMAIL = Deno.env.get("ZOZ_OWNER_EMAIL") || "";
+const OWNER_EMAIL = (Deno.env.get("ZOZ_OWNER_EMAIL") || "hazemnaw48@gmail.com").trim().toLowerCase();
 const SELF = SUPABASE_URL + "/functions/v1/zoz-pro-youtube-analytics";
 const CALLBACK_URL = SUPABASE_URL + "/functions/v1/zoz-pro-youtube-oauth-callback";
 const CHANNEL_ID = "UCIael48cvwPG3gKj--c7HKw";
@@ -65,11 +65,15 @@ async function owner(req: Request) {
     } catch { return null; }
   }
   const auth = req.headers.get("authorization") || "";
-  if (!auth.toLowerCase().startsWith("bearer ") || !PUBLISHABLE_KEY) return null;
-  const r = await fetch(SUPABASE_URL + "/auth/v1/user", { headers: { apikey: PUBLISHABLE_KEY, authorization: auth } });
+  // Use the same public project key sent by the authenticated browser client.
+  // This avoids a stale/missing Edge Function publishable-key secret rejecting
+  // an otherwise valid Supabase owner session.
+  const requestApiKey = req.headers.get("apikey") || PUBLISHABLE_KEY;
+  if (!auth.toLowerCase().startsWith("bearer ") || !requestApiKey || !OWNER_EMAIL) return null;
+  const r = await fetch(SUPABASE_URL + "/auth/v1/user", { headers: { apikey: requestApiKey, authorization: auth } });
   if (!r.ok) return null;
   const u = await r.json().catch(() => ({}));
-  return String(u.email || "").toLowerCase() === OWNER_EMAIL && u.email_confirmed_at ? u : null;
+  return String(u.email || "").trim().toLowerCase() === OWNER_EMAIL && u.email_confirmed_at ? u : null;
 }
 async function sha(s: string) {
   const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
