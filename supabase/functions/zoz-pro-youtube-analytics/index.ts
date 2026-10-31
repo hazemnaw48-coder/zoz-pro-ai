@@ -756,12 +756,21 @@ function vidiqCredits(value:any):number|null{
  return match?Number(match[1]):null;
 }
 const VIDIQ_ACCOUNT_SLOTS=[
- {key:"zoz_hazem",label:"ZOZ Hazem",apiKey:()=>Deno.env.get("VIDIQ_MCP_API_KEY_ZOZ_HAZEM")||VIDIQ_MCP_API_KEY},
- {key:"hazem_now",label:"Hazem Now",apiKey:()=>Deno.env.get("VIDIQ_MCP_API_KEY_HAZEM_NOW")||""},
- {key:"zoz_manager",label:"ZOZ Manager",apiKey:()=>Deno.env.get("VIDIQ_MCP_API_KEY_ZOZ_MANAGER")||""}
+ {key:"zoz_hazem",label:"ZOZ Hazem"},
+ {key:"hazem_now",label:"Hazem Now"},
+ {key:"zoz_manager",label:"ZOZ Manager"}
 ];
-async function vidiqReadAccountBalance(account:any){
- const apiKey=account.apiKey();
+async function vidiqAccountSecret(ownerId:string,accountKey:string){
+ const stored=await db("rpc/zoz_vidiq_get_account_secret",{method:"POST",body:JSON.stringify({p_owner_id:ownerId,p_account_key:accountKey})}).catch(()=>null);
+ if(typeof stored==="string"&&stored)return stored;
+ if(accountKey==="zoz_hazem")return Deno.env.get("VIDIQ_MCP_API_KEY_ZOZ_HAZEM")||VIDIQ_MCP_API_KEY||"";
+ return Deno.env.get(accountKey==="hazem_now"?"VIDIQ_MCP_API_KEY_HAZEM_NOW":"VIDIQ_MCP_API_KEY_ZOZ_MANAGER")||"";
+}
+async function vidiqSaveAccountSecret(ownerId:string,accountKey:string,secret:string){
+ return await db("rpc/zoz_vidiq_set_account_secret",{method:"POST",body:JSON.stringify({p_owner_id:ownerId,p_account_key:accountKey,p_secret:secret})});
+}
+async function vidiqReadAccountBalance(account:any,ownerId:string){
+ const apiKey=await vidiqAccountSecret(ownerId,account.key);
  if(!apiKey)return {key:account.key,label:account.label,configured:false,connected:false,status:"needs_api_key",credits_remaining:null};
  try{
   const session=await vidiqMcpStart(apiKey);
@@ -995,7 +1004,7 @@ async function listLocalContentStudio(req:Request,u:any){
 }
 
 async function vidiqStatus(req:Request,u:any){
- const accounts=await vidiqAccountBalances();
+ const accounts=await vidiqAccountBalances(u.id);
  const connected=accounts.filter(x=>x.connected);
  const configured=accounts.filter(x=>x.configured);
  return json({ok:true,provider:"vidIQ MCP",accounts,configured_accounts:configured.length,connected_accounts:connected.length,
@@ -1009,7 +1018,7 @@ async function vidiqResearch(req:Request,u:any){
  const topic=intakeText(body.topic,250),description=intakeText(body.description,3500);
  if(!topic)return fail("Provide a topic or draft title for vidIQ research.",400);
  const minimumCredits=5;
- const balances=await vidiqAccountBalances();
+ const balances=await vidiqAccountBalances(u.id);
  const selected=chooseVidiqAccount(balances,minimumCredits);
  if(!selected){
   const summary=balances.map(x=>({account:x.label,status:x.status,credits_remaining:x.credits_remaining}));
@@ -1020,7 +1029,7 @@ async function vidiqResearch(req:Request,u:any){
   return json({ok:false,error:"لا يوجد حساب vidIQ متصل برصيد مؤكد يكفي لهذه العملية. لم يُستهلك أي رصيد.",minimum_credits:minimumCredits,accounts:balances},402);
  }
  const slot=VIDIQ_ACCOUNT_SLOTS.find(x=>x.key===selected.key);
- const apiKey=slot?.apiKey()||"";
+ const apiKey=slot?await vidiqAccountSecret(u.id,slot.key):"";
  try{
   const session=await vidiqMcpStart(apiKey);
   const toolName=mode==="titles"?"vidiq_generate_titles":"vidiq_keyword_research";
@@ -1489,7 +1498,16 @@ Deno.serve(async (req: Request) => {
   if(action==="intake_archive")return await intakeArchive(req,u);
   if(action==="studio_generate")return await localContentStudio(req,u);
   if(action==="studio_list")return await listLocalContentStudio(req,u);
-  if(action==="vidiq_status"||action==="vidiq_accounts_status")return await vidiqStatus(req,u);
+  if(action==="vidiq_account_save"){
+ const b=await req.json().catch(()=>({}));
+ const accountKey=String(b.account_key||"");
+ const secret=String(b.api_key||"");
+ if(!VIDIQ_ACCOUNT_SLOTS.some(x=>x.key===accountKey))return fail("Unknown vidIQ account slot.",400);
+ if(secret.length<16||secret.length>4096)return fail("مفتاح vidIQ غير صالح.",400);
+ try{await vidiqSaveAccountSecret(u.id,accountKey,secret);return json({ok:true,account_key:accountKey,configured:true,message:"تم حفظ المفتاح مشفرًا في Vault. جارٍ التحقق من الحساب."});}
+ catch(e){return fail(e instanceof Error?e.message:"تعذر حفظ مفتاح الحساب.",500);}
+}
+if(action==="vidiq_status"||action==="vidiq_accounts_status")return await vidiqStatus(req,u);
   if(action==="vidiq_research")return await vidiqResearch(req,u);
   if(action==="vidiq_research_runs")return await vidiqResearchRuns(u);
   if (action === "connect") return await connect(u);
