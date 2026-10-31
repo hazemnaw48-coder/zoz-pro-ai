@@ -204,12 +204,6 @@ body.upload-mode .footer{font-size:11px}
  <div class="page-panel" data-page="studio" id="page-studio">
 <section class="card" id="zoz-content-studio">
  <h2>مركز صناعة المحتوى والتحكم متعدد القنوات</h2>
- <label for="managed-channel-selector">القناة النشطة — تُستخدم للقوائم والمسودات واستقبال الفيديو</label>
- <select id="managed-channel-selector" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px">
- <option value="UCIael48cvwPG3gKj--c7HKw">Hazem Ahmed — مصر القديمة</option>
- <option value="UC9fr5B0SZZkmVAApfCqEO3w">فكره 🗣️ — أفكار ومعلومات وذكاء اصطناعي</option>
- <option value="UC-FimUUFXRd0MOSoikzczcQ">القناة السياسية — الاسم قيد الاختيار</option>
- </select>
  <div class="actions"><button id="managed-news-refresh" class="secondary">بحث الأخبار السياسية الحديثة</button><button id="managed-calendar-load" class="secondary">عرض تقويم القناة</button><button id="managed-calendar-generate" class="secondary">إنشاء خطة أسبوعية</button></div>
  <div id="managed-news-status" class="notice">الأخبار السياسية تظهر للقناة السياسية فقط، وتظل بحاجة لمراجعة المصادر.</div>
  <div id="managed-news-list" class="stack"></div>
@@ -365,7 +359,7 @@ async function call(action,body){
  let route=action;
  if(action==='analytics'||action==='videos')route='managed_channel_sync';
  else if(action==='video_analytics'){route='managed_channel_video_analytics';payload.video_ids=(loadedVideos||[]).map(v=>v.video_id).filter(Boolean);}
- else if(action==='save_snapshot')route='managed_channel_snapshot_status';
+ else if(action==='save_snapshot')route='managed_channel_save_snapshot';
  else if(action==='history')route='managed_channel_history';
  else if(action==='recommendations')route='managed_channel_recommendations';
  else if(action==='review_recommendation')route='managed_channel_review_recommendation';
@@ -459,7 +453,7 @@ async function loadAnalytics(fromStatus){
  if(!start||!end||start>end)throw new Error('تحقق من تاريخ البداية والنهاية.');
  const d=await call('analytics',{start_date:start,end_date:end});
  lastAnalytics=d;
- if(d.channel_id!==CHANNEL_ID)throw new Error('معرّف القناة في الرد لا يطابق القناة المثبتة.');
+ if(d.channel_id!==selectedChannelId())throw new Error('معرّف القناة في الرد لا يطابق القناة المختارة.');
  showMetrics(d.metrics||{});
  table('daily-wrap',['التاريخ','المشاهدات','دقائق المشاهدة','متوسط مدة المشاهدة (ثانية)','مشتركون مكتسبون','مشتركون مفقودون'],(d.daily||[]).map(x=>[x.date,fmt(x.views),fmt(x.estimated_minutes_watched),fmt(x.average_view_duration_seconds),fmt(x.subscribers_gained),fmt(x.subscribers_lost)]));
  table('traffic-wrap',['التاريخ','مصدر الزيارة','المشاهدات'],(d.traffic_sources_daily||[]).slice(0,150).map(x=>[x.date,x.source,fmt(x.views)]));
@@ -479,7 +473,7 @@ function calendarActionLabel(status){
  return map[status]||status||'—';
 }
 async function loadContentCalendar(){
- const d=await call('content_calendar',{channel_id:CHANNEL_ID});
+ const d=await call('content_calendar',{channel_id:selectedChannelId()});
  const host=$('calendar-list');host.innerHTML='';
  if(!Array.isArray(d.calendar)||!d.calendar.length){
   host.textContent='لا توجد خطة لهذه اللقطة بعد. اضغط «إنشاء خطة أسبوعية من التحليلات».';
@@ -663,7 +657,7 @@ async function loadVideoAnalytics(){
  if(!loadedVideos.length)throw new Error('حمّل قائمة الفيديوهات أولًا؛ لم توجد قائمة صالحة للتحليل.');
  const d=await call('video_analytics',{start_date:startDate,end_date:endDate});
  lastVideoAnalytics=d;
- if(d.channel_id!==CHANNEL_ID)throw new Error('معرّف القناة في الرد لا يطابق القناة المثبتة.');
+ if(d.channel_id!==selectedChannelId())throw new Error('معرّف القناة في الرد لا يطابق القناة المختارة.');
  const byId=new Map((Array.isArray(d.videos)?d.videos:[]).map(v=>[v.video_id,v]));
  const rows=loadedVideos.map(v=>({video:v,stats:byId.get(v.video_id)||null}))
   .sort((a,b)=>(Number(b.stats?.views||0)-Number(a.stats?.views||0)));
@@ -705,7 +699,7 @@ async function saveSnapshot(){
  notice('video-analytics-msg','جارٍ تحديث التحليلات وتجهيز اللقطة التاريخية والتوصيات…');
  try{
   const a=await call('analytics',{start_date:start,end_date:end});lastAnalytics=a;
-  if(a.channel_id!==CHANNEL_ID)throw new Error('معرّف القناة لا يطابق القناة المثبتة.');
+  if(a.channel_id!==selectedChannelId())throw new Error('معرّف القناة لا يطابق القناة المختارة.');
   if(!loadedVideos.length)await loadVideos();
   if(!loadedVideos.length)throw new Error('لم تُحمّل قائمة الفيديوهات من القناة.');
   const va=await call('video_analytics',{start_date:start,end_date:end});lastVideoAnalytics=va;
@@ -771,7 +765,7 @@ async function loadVideos(){
  $('load-videos').disabled=true;notice('videos-msg','جارٍ تحميل الفيديوهات من القناة المحددة…');
  try{
   const d=await call('videos',{});
-  if(d.channel_id!==CHANNEL_ID)throw new Error('معرّف القناة في الرد لا يطابق القناة المثبتة.');
+  if(d.channel_id!==selectedChannelId())throw new Error('معرّف القناة في الرد لا يطابق القناة المختارة.');
   const host=$('videos-list');host.innerHTML='';
   const list=Array.isArray(d.videos)?d.videos:[];
   loadedVideos=list;
@@ -812,6 +806,12 @@ $('managed-channels-sync-all')?.addEventListener('click',async()=>{
 });
 
 $('managed-channels-refresh')?.addEventListener('click',loadManagedChannels);
+$('managed-channel-selector')?.addEventListener('change',async()=>{
+ CHANNEL_ID=selectedChannelId();loadedVideos=[];lastAnalytics=null;lastVideoAnalytics=null;
+ notice('channel-status','تم اختيار القناة الجديدة. جارٍ تحديث بياناتها…');
+ try{await loadManagedChannels();await loadAnalytics(false);await loadVideos();await loadContentCalendar();await loadHistory();await loadRecommendations();}
+ catch(e){notice('channel-status',e.message||'تعذر تحميل بيانات القناة المختارة.','bad');}
+});
 $('managed-channel-selector')?.addEventListener('change',async()=>{
  CHANNEL_ID=selectedChannelId();loadedVideos=[];lastAnalytics=null;lastVideoAnalytics=null;
  notice('channel-status','تم اختيار القناة الجديدة. جارٍ تحديث بياناتها…');
