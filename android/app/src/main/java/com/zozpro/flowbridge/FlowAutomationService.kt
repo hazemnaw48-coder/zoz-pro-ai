@@ -228,7 +228,7 @@ class FlowAutomationService : AccessibilityService() {
         }
         networkExecutor.execute {
             val job = runCatching {
-                apiPostWithToken("poll_ui_jobs", JSONObject(), deviceToken).optJSONObject("job")
+                apiPostWithToken("poll_jobs", JSONObject(), deviceToken).optJSONObject("job")
             }.getOrNull()
             handler.post {
                 if (job != null && activeControlTask() == null) {
@@ -948,7 +948,7 @@ class FlowAutomationService : AccessibilityService() {
             val target = payload.optString("target_package", "").trim()
             if (target !in ZOZ_CONTROL_PACKAGES) throw IllegalArgumentException("target_package_not_allowed")
             val steps = payload.optJSONArray("steps") ?: throw IllegalArgumentException("control_steps_missing")
-            if (steps.length() !in 1..30) throw IllegalArgumentException("control_steps_limit")
+            if (steps.length() !in 1..12) throw IllegalArgumentException("control_steps_limit")
             val allowed = setOf("inspect", "read_screen", "tap", "type_text", "scroll", "wait", "back")
             for (i in 0 until steps.length()) {
                 val step = steps.optJSONObject(i) ?: throw IllegalArgumentException("control_step_invalid")
