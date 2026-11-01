@@ -360,7 +360,9 @@ body.upload-mode .footer{font-size:11px}
 <script>
 (function(){
 'use strict';
-const uploadMode=new URLSearchParams(window.location.search).get('mode')!=='full';
+const pageParams=new URLSearchParams(window.location.search);
+const requestedPage=pageParams.get('page')||'';
+const uploadMode=pageParams.get('mode')!=='full';
 if(uploadMode)document.body.classList.add('upload-mode');
 const SUPABASE_URL='https://oxyzxbkwhafzaztraowc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm';
@@ -396,7 +398,7 @@ function showPage(pageKey, scrollTop=true){
  if(indicator)indicator.textContent='القسم الحالي: '+label+' · '+step+' من '+tabs.length;
  if(scrollTop)window.scrollTo(0,0);
 }
-function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage(uploadMode?'intake':'connection',false);notice('intake-msg',uploadMode?'الجلسة متصلة. اختر ملف الفيديو ثم اضغط «رفع الفيديو للمراجعة والنشر».':'جلسة المالك متصلة بمشروع الإنتاج.','good');if(!uploadMode)loadManagedChannels();}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
+function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage(uploadMode?'intake':(requestedPage==='tiktok'?'tiktok':'connection'),false);notice('intake-msg',uploadMode?'الجلسة متصلة. اختر ملف الفيديو ثم اضغط «رفع الفيديو للمراجعة والنشر».':'جلسة المالك متصلة بمشروع الإنتاج.','good');if(!uploadMode){if(requestedPage==='tiktok')loadTikTokAccounts();else loadManagedChannels();}}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
 async function ownerSession(){
  const {data,error}=await sb.auth.getSession();if(error)throw error;const session=data&&data.session;
  if(!session||!session.access_token)throw new Error('لا توجد جلسة مالك محفوظة. سجّل الدخول بحساب مالك ZOZ Pro.');
@@ -1475,9 +1477,8 @@ $('tiktok-send')?.addEventListener('click',async()=>{
  finally{b.disabled=false;}
 });
 document.querySelector('[data-page-target="tiktok"]')?.addEventListener('click',()=>{loadTikTokAccounts();});
-if(new URLSearchParams(window.location.search).get('page')==='tiktok'){
+if(requestedPage==='tiktok'){
  showPage('tiktok',false);
- loadTikTokAccounts();
 }
 
 checkZozAgentHealth();
