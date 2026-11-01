@@ -23,12 +23,33 @@ import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.Executors
 
+private const val TIKTOK_STUDIO_PACKAGE = "com.ss.android.tt.creator"
+
 private val ZOZ_CONTROL_PACKAGES = setOf(
     "com.android.chrome",
     "com.google.android.googlequicksearchbox",
     "com.google.android.youtube",
-    "com.google.android.apps.youtube.creator"
+    "com.google.android.apps.youtube.creator",
+    TIKTOK_STUDIO_PACKAGE
 )
+
+private val TIKTOK_STUDIO_NAV_LABELS = listOf(
+    "analytics", "overview", "insights", "content", "posts", "videos", "audience", "engagement",
+    "التحليلات", "نظرة عامة", "الرؤى", "المحتوى", "المنشورات", "الفيديوهات", "الجمهور", "التفاعل"
+)
+
+private fun isTikTokStudioNavigationLabel(value: String): Boolean {
+    val label = value.lowercase().trim()
+    return label.isNotBlank() && TIKTOK_STUDIO_NAV_LABELS.any(label::contains)
+}
+
+private fun isSensitiveTikTokStudioText(value: String): Boolean {
+    val lower = value.lowercase()
+    return Regex("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}").containsMatchIn(value) ||
+        Regex("\\b\\+?\\d[\\d ()-]{7,}\\d\\b").containsMatchIn(value) ||
+        listOf("password", "passcode", "verification code", "security code", "one-time", "otp", "pin code",
+            "كلمة المرور", "كلمة السر", "رمز التحقق", "كود التحقق", "رقم الهاتف", "رقم الموبايل").any(lower::contains)
+}
 
 private val ZOZ_CONTROL_WEB_HOSTS = setOf(
     "labs.google", "hazemnaw48-coder.github.io", "github.com", "supabase.com",
@@ -270,12 +291,20 @@ class FlowAutomationService : AccessibilityService() {
                     }
                     results.put(JSONObject().put("action", action).put("nodes", nodes))
                 }
+                "read_screen" -> {
+                    if (targetPackage != TIKTOK_STUDIO_PACKAGE) throw IllegalStateException("read_screen_target_not_allowed")
+                    results.put(JSONObject().put("action", action).put("data", readTikTokStudioAnalyticsScreen(root)))
+                }
                 "tap" -> {
                     val selected = findControlNode(root, step, requireEditable = false)
                         ?: throw IllegalStateException("ui_selector_not_unique_or_missing")
                     val label = controlNodeLabel(selected)
                     val idLabel = selected.viewIdResourceName.orEmpty()
                     if (isSensitiveLabel(label)) throw IllegalStateException("sensitive_authentication_control_blocked")
+                    if (targetPackage == TIKTOK_STUDIO_PACKAGE &&
+                        !isTikTokStudioNavigationLabel(label) && !isTikTokStudioNavigationLabel(idLabel)) {
+                        throw IllegalStateException("tiktok_studio_navigation_only")
+                    }
                     if ((isIrreversibleLabel(label) || isIrreversibleLabel(idLabel)) && !task.optBoolean("owner_approved", false)) {
                         throw IllegalStateException("owner_approval_required")
                     }
@@ -288,6 +317,7 @@ class FlowAutomationService : AccessibilityService() {
                     results.put(JSONObject().put("action", action).put("target", safeUiText(label)).put("clicked", true))
                 }
                 "type_text" -> {
+                    if (targetPackage == TIKTOK_STUDIO_PACKAGE) throw IllegalStateException("tiktok_studio_read_only")
                     val selected = findControlNode(root, step, requireEditable = true)
                         ?: throw IllegalStateException("ui_editor_not_unique_or_missing")
                     val label = controlNodeLabel(selected)
@@ -355,6 +385,37 @@ class FlowAutomationService : AccessibilityService() {
     private fun controlNodeLabel(node: AccessibilityNodeInfo): String =
         listOf(node.text?.toString(), node.contentDescription?.toString(), node.hintText?.toString())
             .filterNot { it.isNullOrBlank() }.joinToString(" ").replace(Regex("\\s+"), " ").trim()
+
+    private fun readTikTokStudioAnalyticsScreen(root: AccessibilityNodeInfo): JSONObject {
+        if (root.packageName?.toString() != TIKTOK_STUDIO_PACKAGE) {
+            throw IllegalStateException("tiktok_studio_target_mismatch")
+        }
+        val texts = linkedSetOf<String>()
+        walk(root) { node ->
+            if (texts.size >= 80 || !node.isVisibleToUser || node.isEditable || node.isPassword) return@walk
+            val raw = listOf(node.text?.toString(), node.contentDescription?.toString())
+                .filterNot { it.isNullOrBlank() }.joinToString(" ").replace(Regex("\\s+"), " ").trim()
+            if (raw.isBlank() || raw.length > 180 || raw.contains("@") || isSensitiveTikTokStudioText(raw)) return@walk
+            val safe = safeUiText(raw)
+            if (safe.isNotBlank()) texts.add(safe)
+        }
+        val combined = texts.joinToString(" ").lowercase()
+        val analyticsTerms = listOf(
+            "analytics", "overview", "views", "video views", "followers", "likes", "engagement",
+            "audience", "content performance", "profile views",
+            "التحليلات", "نظرة عامة", "المشاهدات", "المتابعون", "الإعجابات", "التفاعل",
+            "الجمهور", "أداء المحتوى", "مشاهدات الملف"
+        )
+        val available = analyticsTerms.any(combined::contains)
+        val result = JSONObject()
+            .put("available", available)
+            .put("screen", "tiktok_studio_analytics")
+            .put("captured_at_ms", System.currentTimeMillis())
+            .put("visible_text_count", texts.size)
+        if (available) result.put("texts", JSONArray(texts.toList()))
+        else result.put("reason", "analytics_screen_not_detected")
+        return result
+    }
 
     private fun safeUiText(value: String): String {
         val emailRedacted = value.replace(Regex("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"), "[email]")
@@ -861,16 +922,27 @@ class FlowAutomationService : AccessibilityService() {
             if (target !in ZOZ_CONTROL_PACKAGES) throw IllegalArgumentException("target_package_not_allowed")
             val steps = payload.optJSONArray("steps") ?: throw IllegalArgumentException("control_steps_missing")
             if (steps.length() !in 1..12) throw IllegalArgumentException("control_steps_limit")
-            val allowed = setOf("inspect", "tap", "type_text", "scroll", "back", "wait", "open_url")
+            val allowed = setOf("inspect", "read_screen", "tap", "type_text", "scroll", "back", "wait", "open_url")
             for (i in 0 until steps.length()) {
                 val step = steps.optJSONObject(i) ?: throw IllegalArgumentException("control_step_invalid")
                 val action = step.optString("action")
                 if (action !in allowed) throw IllegalArgumentException("unsupported_ui_action")
                 if (step.optString("text").length > 3000) throw IllegalArgumentException("ui_text_invalid")
                 if (action == "type_text" &&
-                    (step.optString("input_purpose").lowercase() !in ZOZ_TEXT_PURPOSES ||
+                    (target == TIKTOK_STUDIO_PACKAGE ||
+                     step.optString("input_purpose").lowercase() !in ZOZ_TEXT_PURPOSES ||
                      containsSensitiveWorkValue(step.optString("text")))) {
                     throw IllegalArgumentException("sensitive_or_nonbusiness_text_blocked")
+                }
+                if (action == "read_screen" && target != TIKTOK_STUDIO_PACKAGE) {
+                    throw IllegalArgumentException("read_screen_target_not_allowed")
+                }
+                if (target == TIKTOK_STUDIO_PACKAGE && action !in setOf("inspect", "read_screen", "tap", "scroll", "back", "wait")) {
+                    throw IllegalArgumentException("tiktok_studio_read_only")
+                }
+                if (target == TIKTOK_STUDIO_PACKAGE && action == "tap") {
+                    val selector = step.optString("text", step.optString("content_description", ""))
+                    if (!isTikTokStudioNavigationLabel(selector)) throw IllegalArgumentException("tiktok_studio_navigation_only")
                 }
                 if (action == "open_url" &&
                     (target != "com.android.chrome" || !isAllowedZozWebUrl(step.optString("url")))) {
