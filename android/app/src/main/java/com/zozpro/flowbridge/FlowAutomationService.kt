@@ -562,7 +562,7 @@ class FlowAutomationService : AccessibilityService() {
                 val selectedTexts = (important.take(10) + candidates.take(18) + candidates.drop(18))
                     .distinct().take(18)
                 val outTexts = JSONArray()
-                selectedTexts.forEach(outTexts::put)
+                selectedTexts.forEach { outTexts.put(it) }
                 val outData = JSONObject()
                     .put("available", data.optBoolean("available"))
                     .put("screen", data.optString("screen"))
@@ -583,7 +583,7 @@ class FlowAutomationService : AccessibilityService() {
                 }
                 boundedSteps.put(JSONObject().put("action", action).put("nodes", nodes))
             } else {
-                boundedSteps.put(JSONObject(item.toString().take(700)))
+                boundedSteps.put(JSONObject(item.toString()))
             }
         }
         compact.put("step_results", boundedSteps)
