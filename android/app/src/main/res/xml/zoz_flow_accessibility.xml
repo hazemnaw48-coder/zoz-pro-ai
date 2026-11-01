@@ -7,4 +7,4 @@
     android:canRetrieveWindowContent="true"
     android:canPerformGestures="false"
     android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
-    android:packageNames="com.google.android.apps.youtube.creator,com.ss.android.tt.creator" />
+    android:packageNames="com.ss.android.tt.creator,com.google.android.apps.youtube.creator,com.zhiliaoapp.musically,com.google.android.youtube" />
