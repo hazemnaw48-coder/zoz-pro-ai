@@ -319,12 +319,33 @@ body.upload-mode .footer{font-size:11px}
   <div id="tiktok-analysis-results" class="stack"></div>
   <div id="tiktok-accounts" class="stack"></div>
  </section>
+ <section class="card" id="tiktok-fekra-direct-attach">
+  <h3>إرفاق فيديو جديد وإرساله إلى Fekra TikTok</h3>
+  <p>اختر ملف MP4 من الهاتف مباشرة. سيرتبط الملف بقناة فِكرة على YouTube داخل مخزن الإنتاج، وليس بالقناة النشطة أو قناة مصر القديمة، ثم يُرسل إلى صندوق وارد حساب Fekra (@zoz.ai78) للمراجعة اليدوية.</p>
+  <label for="tiktok-fekra-file">ملف الفيديو من الهاتف</label>
+  <input id="tiktok-fekra-file" type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit">
+  <label for="tiktok-fekra-title">العنوان المقترح لتيك توك</label>
+  <input id="tiktok-fekra-title" type="text" maxlength="100" value="حوّل موبايلك لمساعد ذكي ينفّذ مهامك! 🤯📱" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit">
+  <label for="tiktok-fekra-caption">الوصف المقترح والوسوم لإضافتها داخل TikTok</label>
+  <textarea id="tiktok-fekra-caption" rows="4" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit">تخيل إن موبايلك يبقى عنده وكيل ذكاء اصطناعي يساعدك في تنفيذ المهام، مش مجرد شات بيرد على أسئلتك! 🤖
+
+دي بداية الرحلة، وهنبنيها خطوة بخطوة على فِكرة.
+
+تابعنا عشان تشوف التطبيق العملي 🔥
+
+#فكرة #ذكاء_اصطناعي #وكيل_ذكاء_اصطناعي #AI #AIAgent</textarea>
+  <div class="actions">
+   <button type="button" id="tiktok-fekra-attach-send">ارفع الملف وأرسله إلى صندوق Fekra</button>
+   <button type="button" id="tiktok-fekra-copy-caption" class="secondary">نسخ الوصف</button>
+  </div>
+  <div id="tiktok-fekra-attach-status" class="notice">هذه العملية تحفظ الملف أولًا في قناة فِكرة تحديدًا، ثم ترسله إلى صندوق الوارد. لا تنشره علنًا.</div>
+ </section>
  <section class="card">
   <h3>رفع فيديو من ملفات ZOZ Pro إلى صندوق TikTok</h3>
   <p>اختر ملف فيديو محفوظًا في تخزين الإنتاج وحساب TikTok المستهدف. سيصل الفيديو إلى صندوق الوارد لتكمل مراجعته ونشره يدويًا داخل TikTok.</p>
   <label for="tiktok-target">الحساب المستهدف</label>
   <select id="tiktok-target" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit">
-   <option value="tiktok_1">Hazem Now</option><option value="tiktok_2">Fekra</option>
+   <option value="tiktok_2" selected>Fekra</option><option value="tiktok_1">Hazem Now</option>
   </select>
   <label for="tiktok-source">الفيديو المحفوظ</label>
   <select id="tiktok-source" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit">
@@ -1474,6 +1495,88 @@ $('tiktok-analyze-all')?.addEventListener('click',async()=>{
  const b=$('tiktok-analyze-all');b.disabled=true;
  try{await runTikTokAnalysis(null);}finally{b.disabled=false;}
 });
+const FEKRA_YOUTUBE_CHANNEL_ID='UC9fr5B0SZZkmVAApfCqEO3w';
+async function attachAndSendFekraVideo(){
+ const file=$('tiktok-fekra-file')?.files?.[0];
+ if(!file)throw new Error('اختر ملف الفيديو من الهاتف أولًا.');
+ if(!file.size||file.size<1000)throw new Error('ملف الفيديو فارغ أو أصغر من الحد الأدنى.');
+ if(file.size>52428800)throw new Error('حجم الفيديو يتجاوز 50 MB؛ حد الرفع الحالي لصندوق TikTok هو 50 MB.');
+ const detected=file.type||'video/mp4';
+ if(!/^(video\/(mp4|quicktime|webm)|application\/octet-stream)$/i.test(detected))throw new Error('اختر فيديو MP4 أو MOV أو WebM.');
+ const title=String($('tiktok-fekra-title')?.value||'').trim();
+ const caption=String($('tiktok-fekra-caption')?.value||'').trim();
+ if(!title)throw new Error('اكتب عنوان الفيديو أولًا.');
+ const button=$('tiktok-fekra-attach-send');
+ button.disabled=true;
+ const statusId='tiktok-fekra-attach-status';
+ let asset=null;
+ const resumeKey='zoz-pro-tiktok-fekra-intake-v1';
+ try{
+  const session=await ownerSession();
+  let active=null;
+  try{active=JSON.parse(localStorage.getItem(resumeKey)||'null')}catch(e){}
+  if(active&&active.filename===file.name&&Number(active.total_bytes)===file.size&&active.asset_id){
+   try{
+    const saved=await call('intake_status',{asset_id:active.asset_id});
+    if(saved.asset&&saved.asset.channel_id===FEKRA_YOUTUBE_CHANNEL_ID&&['uploading','ready_for_review'].includes(saved.asset.status))asset=saved.asset;
+    else localStorage.removeItem(resumeKey);
+   }catch(e){localStorage.removeItem(resumeKey);}
+  }
+  if(!asset){
+   notice(statusId,'جارٍ إنشاء ملف استقبال مستقل لقناة فِكرة…');
+   const created=await call('intake_create',{
+    channel_id:FEKRA_YOUTUBE_CHANNEL_ID,
+    filename:file.name,
+    total_bytes:file.size,
+    content_type:detected,
+    title,
+    description:caption,
+    tags:['فكرة','ذكاء اصطناعي','وكيل ذكاء اصطناعي','AI','AIAgent'],
+    made_for_kids:false,
+    contains_synthetic_media:true,
+    target_privacy_status:'unlisted'
+   });
+   asset=created.asset;
+   if(!asset?.id||asset.channel_id!==FEKRA_YOUTUBE_CHANNEL_ID)throw new Error('لم يؤكد مركز الإنتاج ربط الملف بقناة فِكرة؛ أوقفنا النقل.');
+   asset.uploaded_parts=[];
+   localStorage.setItem(resumeKey,JSON.stringify({asset_id:asset.id,filename:file.name,total_bytes:file.size}));
+  }
+  if(asset.status==='uploading'){
+   const completed=new Set(Array.isArray(asset.uploaded_parts)?asset.uploaded_parts.map(Number):[]);
+   const chunk=Number(asset.chunk_size||8388608),count=Number(asset.chunk_count||Math.ceil(file.size/chunk));
+   for(let part=0;part<count;part++){
+    if(completed.has(part))continue;
+    notice(statusId,'جارٍ رفع فيديو فِكرة: الجزء '+(part+1)+' من '+count+'…');
+    const blob=file.slice(part*chunk,Math.min(file.size,(part+1)*chunk));
+    const response=await fetch(API+'?action=intake_upload_part&asset_id='+encodeURIComponent(asset.id)+'&part_index='+encodeURIComponent(part),{
+     method:'POST',
+     headers:{'apikey':SUPABASE_PUBLISHABLE_KEY,'authorization':'Bearer '+session.access_token,'content-type':'application/octet-stream'},
+     body:blob,
+     cache:'no-store'
+    });
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok||result.ok===false)throw new Error('تعذر رفع الجزء '+(part+1)+' (HTTP '+response.status+'): '+String(result.error||'تحقق من الاتصال ثم أعد اختيار الملف نفسه لاستكماله.'));
+    const progress=await call('intake_part_done',{asset_id:asset.id,part_index:part});
+    completed.add(part);
+    asset.uploaded_parts=Array.from(completed);
+    notice(statusId,'تم حفظ '+fmt(progress.uploaded_bytes)+' من '+fmt(progress.total_bytes)+' بايت في مساحة فِكرة.');
+   }
+   await call('intake_finalize',{asset_id:asset.id});
+  }
+  notice(statusId,'اكتمل حفظ الملف في مساحة فِكرة. جارٍ إرساله إلى صندوق TikTok…');
+  $('tiktok-target').value='tiktok_2';
+  await loadTikTokAccounts();
+  const sent=await tiktokCall('upload_inbox',{slot_key:'tiktok_2',intake_asset_id:asset.id});
+  localStorage.removeItem(resumeKey);
+  $('tiktok-source').value=asset.id;
+  $('tiktok-fekra-file').value='';
+  notice(statusId,'تم إرسال الفيديو إلى صندوق وارد Fekra بنجاح. '+(sent.message||'افتح TikTok لإكمال المراجعة والنشر يدويًا.')+' العنوان المقترح: '+title,'good');
+ }catch(e){
+  const message=e?.message||'تعذر إكمال إرفاق الفيديو.';
+  notice(statusId,(asset?.id?'تم إنشاء/حفظ سجل الفيديو في مساحة فِكرة، لكن لم يكتمل الإرسال إلى TikTok: ':'تعذر إرفاق الفيديو: ')+message,'bad');
+  throw e;
+ }finally{button.disabled=false;}
+}
 async function loadTikTokAccounts(){
  const host=$('tiktok-accounts');if(!host)return;
  host.innerHTML='';notice('tiktok-status','جارٍ قراءة حسابي TikTok من مشروع الإنتاج…');
@@ -1505,16 +1608,24 @@ async function loadTikTokAccounts(){
    card.appendChild(actions);host.appendChild(card);
   }
   const selector=$('tiktok-source');selector.innerHTML='';
-  const available=tiktokAssets.filter(x=>x.available_for_tiktok);
-  const fekra=tiktokAssets.find(x=>String(x.original_filename||'').includes('fekra_first_video_assembled'));
-  const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent=available.length?'اختر الفيديو المحفوظ':'لا توجد ملفات فيديو مكتملة متاحة للرفع';selector.appendChild(placeholder);
-  for(const a of available){const op=document.createElement('option');op.value=a.id;op.textContent=(a.title||a.original_filename)+' · '+(Number(a.total_bytes)/1048576).toFixed(1)+' MB';selector.appendChild(op);}
-  if(fekra&&!fekra.available_for_tiktok){const op=document.createElement('option');op.value='';op.disabled=true;op.textContent='فيديو فِكرة الأخير — ملفه الأصلي غير موجود في تخزين الإنتاج';selector.appendChild(op);}
+  const targetSlot=$('tiktok-target')?.value||'tiktok_2';
+  const available=tiktokAssets.filter(x=>x.available_for_tiktok&&(targetSlot!=='tiktok_2'||x.channel_id===FEKRA_YOUTUBE_CHANNEL_ID));
+  const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent=available.length?'اختر فيديو محفوظًا لهذه القناة':'لا توجد فيديوهات محفوظة متاحة لهذه القناة';selector.appendChild(placeholder);
+  for(const a of available){const op=document.createElement('option');op.value=a.id;const channelLabel=a.channel_id===FEKRA_YOUTUBE_CHANNEL_ID?'فِكرة':'قناة أخرى';op.textContent=channelLabel+' · '+(a.title||a.original_filename)+' · '+(Number(a.total_bytes)/1048576).toFixed(1)+' MB';selector.appendChild(op);}
   if(!accountData.app_credentials_ready)notice('tiktok-status','حسابا TikTok مسجلان، لكن بيانات تطبيق المطوّر غير متاحة في Vault أو أسرار Edge Function لهذا المشروع؛ لم يبدأ التفويض.','warn');
-  else notice('tiktok-status','تم تحميل حالة الحسابين و'+tiktokAssets.length+' ملف استقبال من الإنتاج.','good');
-  notice('tiktok-upload-note',fekra&&!fekra.available_for_tiktok?'فيديو فِكرة الأخير موجود كسجل نشر YouTube، لكن ملف MP4 الأصلي غير محفوظ في مخزن ZOZ Pro؛ لذلك لا يمكن إرساله من هذا السجل حتى يُستعاد الملف الأصلي.':'اختر ملفًا مكتملًا محفوظًا بحجم لا يتجاوز 50 MB.','warn');
+  else notice('tiktok-status','تم تحميل حالة الحسابين و'+tiktokAssets.length+' ملف استقبال. عند اختيار Fekra تظهر ملفات قناة فِكرة فقط.','good');
+  notice('tiktok-upload-note',targetSlot==='tiktok_2'?(available.length?'قائمة فِكرة تعرض الملفات المرتبطة بقناتها فقط.':'لا يوجد ملف محفوظ لقناة فِكرة بعد؛ استخدم بطاقة «إرفاق فيديو جديد» بالأعلى لاختياره من الهاتف مباشرة.'):'قائمة الملفات المحفوظة.','');
  }catch(e){notice('tiktok-status',e.message||'تعذر تحميل بيانات TikTok.','bad');}
 }
+$('tiktok-fekra-attach-send')?.addEventListener('click',async()=>{
+ try{await attachAndSendFekraVideo();}catch(e){/* status is shown beside the file picker */}
+});
+$('tiktok-fekra-copy-caption')?.addEventListener('click',async()=>{
+ const caption=String($('tiktok-fekra-caption')?.value||'');
+ try{await navigator.clipboard.writeText(caption);notice('tiktok-fekra-attach-status','تم نسخ الوصف المقترح؛ أضفه في خانة الوصف داخل TikTok بعد فتح صندوق الوارد.','good');}
+ catch(e){const field=$('tiktok-fekra-caption');field.focus();field.select();notice('tiktok-fekra-attach-status','حددنا نص الوصف؛ استخدم نسخ من قائمة الهاتف.','warn');}
+});
+$('tiktok-target')?.addEventListener('change',()=>{loadTikTokAccounts();});
 $('tiktok-refresh')?.addEventListener('click',loadTikTokAccounts);
 $('tiktok-send')?.addEventListener('click',async()=>{
  const b=$('tiktok-send');const assetId=$('tiktok-source').value;const slot=$('tiktok-target').value;
