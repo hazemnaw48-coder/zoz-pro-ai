@@ -24,23 +24,25 @@ import java.io.File
 import java.util.concurrent.Executors
 
 private const val TIKTOK_STUDIO_PACKAGE = "com.ss.android.tt.creator"
+private const val YOUTUBE_STUDIO_PACKAGE = "com.google.android.apps.youtube.creator"
+private const val TIKTOK_PACKAGE = "com.zhiliaoapp.musically"
+private const val YOUTUBE_PACKAGE = "com.google.android.youtube"
 
-private val ZOZ_CONTROL_PACKAGES = setOf(
-    "com.google.android.apps.youtube.creator",
-    TIKTOK_STUDIO_PACKAGE
+private val ZOZ_CONTROL_PACKAGES = setOf(TIKTOK_STUDIO_PACKAGE, YOUTUBE_STUDIO_PACKAGE, TIKTOK_PACKAGE, YOUTUBE_PACKAGE)
+private val ZOZ_STUDIO_PACKAGES = setOf(TIKTOK_STUDIO_PACKAGE, YOUTUBE_STUDIO_PACKAGE)
+private val ZOZ_REGULAR_SOCIAL_PACKAGES = setOf(TIKTOK_PACKAGE, YOUTUBE_PACKAGE)
+
+private val STUDIO_NAV_LABELS = listOf(
+    "analytics", "overview", "insights", "dashboard", "content", "posts", "videos", "audience", "engagement",
+    "comments", "subscribers", "earn", "monetization",
+    "التحليلات", "نظرة عامة", "الرؤى", "لوحة البيانات", "المحتوى", "المنشورات",
+    "الفيديوهات", "الجمهور", "التفاعل", "التعليقات", "المشتركون", "الأرباح"
 )
-
-private val TIKTOK_STUDIO_NAV_LABELS = listOf(
-    "analytics", "overview", "insights", "content", "posts", "videos", "audience", "engagement",
-    "التحليلات", "نظرة عامة", "الرؤى", "المحتوى", "المنشورات", "الفيديوهات", "الجمهور", "التفاعل"
-)
-
-private fun isTikTokStudioNavigationLabel(value: String): Boolean {
+private fun isStudioNavigationLabel(value: String): Boolean {
     val label = value.lowercase().trim()
-    return label.isNotBlank() && TIKTOK_STUDIO_NAV_LABELS.any(label::contains)
+    return label.isNotBlank() && STUDIO_NAV_LABELS.any(label::contains)
 }
-
-private fun isSensitiveTikTokStudioText(value: String): Boolean {
+private fun isSensitiveAppText(value: String): Boolean {
     val lower = value.lowercase()
     return Regex("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}").containsMatchIn(value) ||
         Regex("\\b\\+?\\d[\\d ()-]{7,}\\d\\b").containsMatchIn(value) ||
@@ -143,31 +145,11 @@ class FlowAutomationService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         activeService = this
-        if (!receiverRegistered) {
-            val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
-            androidx.core.content.ContextCompat.registerReceiver(
-                this, downloadReceiver, filter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
-            )
-            receiverRegistered = true
-        }
+        // This build is restricted to four named apps; discard stale Flow state
+        // and do not subscribe to device-wide download events.
+        prefs().edit().remove(KEY_ACTIVE_TASK).apply()
         val control = activeControlTask()
-        if (control != null) {
-            scheduleControlInspection(900)
-            return
-        }
-        val legacyTask = activeTask()
-        if (legacyTask != null) {
-            val isGuardedTask = legacyTask.optInt("flow_origin_guard_version", 0) >= 2
-            val ageMs = System.currentTimeMillis() - legacyTask.optLong("started_at_ms", 0L)
-            if (!isGuardedTask || ageMs <= 0L || ageMs > 30L * 60L * 1000L) {
-                finishTask(legacyTask, false, "manual_intervention_required",
-                    "أُوقفت المهمة القديمة قبل إعادة المحاولة؛ يجب أن تبدأ المهمة من جديد بنص عربي وحماية التحقق من صفحة Google Flow.")
-            } else {
-                handler.postDelayed({ inspectCurrentPage() }, 1200)
-            }
-        } else {
-            handler.postDelayed({ inspectCurrentPage() }, 1200)
-        }
+        if (control != null) scheduleControlInspection(900)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -183,17 +165,8 @@ class FlowAutomationService : AccessibilityService() {
                 )) scheduleControlInspection(350)
             return
         }
-        val active = activeTask() ?: return
-        val pkg = event?.packageName?.toString().orEmpty()
-        if (pkg.isNotBlank() && pkg !in setOf("com.android.chrome", "com.google.android.googlequicksearchbox")) return
-        if (event?.eventType in listOf(
-                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
-                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
-                AccessibilityEvent.TYPE_VIEW_SCROLLED
-            )) {
-            handler.removeCallbacksAndMessages(null)
-            handler.postDelayed({ inspectCurrentPage() }, 700)
-        }
+        // No non-target app events are processed in this build.
+        return
     }
 
     override fun onInterrupt() {
@@ -289,8 +262,8 @@ class FlowAutomationService : AccessibilityService() {
                     results.put(JSONObject().put("action", action).put("nodes", nodes))
                 }
                 "read_screen" -> {
-                    if (targetPackage != TIKTOK_STUDIO_PACKAGE) throw IllegalStateException("read_screen_target_not_allowed")
-                    results.put(JSONObject().put("action", action).put("data", readTikTokStudioAnalyticsScreen(root)))
+                    if (targetPackage !in ZOZ_CONTROL_PACKAGES) throw IllegalStateException("read_screen_target_not_allowed")
+                    results.put(JSONObject().put("action", action).put("data", readAllowedAppScreen(root)))
                 }
                 "tap" -> {
                     val selected = findControlNode(root, step, requireEditable = false)
@@ -298,9 +271,9 @@ class FlowAutomationService : AccessibilityService() {
                     val label = controlNodeLabel(selected)
                     val idLabel = selected.viewIdResourceName.orEmpty()
                     if (isSensitiveLabel(label)) throw IllegalStateException("sensitive_authentication_control_blocked")
-                    if (targetPackage == TIKTOK_STUDIO_PACKAGE &&
-                        !isTikTokStudioNavigationLabel(label) && !isTikTokStudioNavigationLabel(idLabel)) {
-                        throw IllegalStateException("tiktok_studio_navigation_only")
+                    if (targetPackage in ZOZ_STUDIO_PACKAGES &&
+                        !isStudioNavigationLabel(label) && !isStudioNavigationLabel(idLabel)) {
+                        throw IllegalStateException("studio_navigation_only")
                     }
                     if ((isIrreversibleLabel(label) || isIrreversibleLabel(idLabel)) && !task.optBoolean("owner_approved", false)) {
                         throw IllegalStateException("owner_approval_required")
@@ -314,7 +287,7 @@ class FlowAutomationService : AccessibilityService() {
                     results.put(JSONObject().put("action", action).put("target", safeUiText(label)).put("clicked", true))
                 }
                 "type_text" -> {
-                    if (targetPackage == TIKTOK_STUDIO_PACKAGE) throw IllegalStateException("tiktok_studio_read_only")
+                    if (targetPackage !in ZOZ_REGULAR_SOCIAL_PACKAGES) throw IllegalStateException("studio_read_only")
                     val selected = findControlNode(root, step, requireEditable = true)
                         ?: throw IllegalStateException("ui_editor_not_unique_or_missing")
                     val label = controlNodeLabel(selected)
@@ -383,30 +356,37 @@ class FlowAutomationService : AccessibilityService() {
         listOf(node.text?.toString(), node.contentDescription?.toString(), node.hintText?.toString())
             .filterNot { it.isNullOrBlank() }.joinToString(" ").replace(Regex("\\s+"), " ").trim()
 
-    private fun readTikTokStudioAnalyticsScreen(root: AccessibilityNodeInfo): JSONObject {
-        if (root.packageName?.toString() != TIKTOK_STUDIO_PACKAGE) {
-            throw IllegalStateException("tiktok_studio_target_mismatch")
+    private fun readAllowedAppScreen(root: AccessibilityNodeInfo): JSONObject {
+        val currentPackage = root.packageName?.toString().orEmpty()
+        if (currentPackage !in ZOZ_CONTROL_PACKAGES) {
+            throw IllegalStateException("target_app_not_allowlisted")
         }
         val texts = linkedSetOf<String>()
         walk(root) { node ->
             if (texts.size >= 80 || !node.isVisibleToUser || node.isEditable || node.isPassword) return@walk
             val raw = listOf(node.text?.toString(), node.contentDescription?.toString())
                 .filterNot { it.isNullOrBlank() }.joinToString(" ").replace(Regex("\\s+"), " ").trim()
-            if (raw.isBlank() || raw.length > 180 || raw.contains("@") || isSensitiveTikTokStudioText(raw)) return@walk
+            if (raw.isBlank() || raw.length > 180 || raw.contains("@") || isSensitiveAppText(raw)) return@walk
             val safe = safeUiText(raw)
             if (safe.isNotBlank()) texts.add(safe)
         }
         val combined = texts.joinToString(" ").lowercase()
         val analyticsTerms = listOf(
-            "analytics", "overview", "views", "video views", "followers", "likes", "engagement",
-            "audience", "content performance", "profile views",
-            "التحليلات", "نظرة عامة", "المشاهدات", "المتابعون", "الإعجابات", "التفاعل",
-            "الجمهور", "أداء المحتوى", "مشاهدات الملف"
+            "analytics", "overview", "views", "video views", "followers", "subscribers", "likes", "comments",
+            "engagement", "audience", "content performance", "profile views", "watch time", "reach",
+            "التحليلات", "نظرة عامة", "المشاهدات", "المتابعون", "المشتركون", "الإعجابات", "التعليقات",
+            "التفاعل", "الجمهور", "أداء المحتوى", "وقت المشاهدة", "الوصول"
         )
         val available = analyticsTerms.any(combined::contains)
         val result = JSONObject()
             .put("available", available)
-            .put("screen", "tiktok_studio_analytics")
+            .put("screen", when (currentPackage) {
+                TIKTOK_STUDIO_PACKAGE -> "tiktok_studio_analytics"
+                YOUTUBE_STUDIO_PACKAGE -> "youtube_studio_analytics"
+                TIKTOK_PACKAGE -> "tiktok_app"
+                YOUTUBE_PACKAGE -> "youtube_app"
+                else -> "unknown"
+            })
             .put("captured_at_ms", System.currentTimeMillis())
             .put("visible_text_count", texts.size)
         if (available) result.put("texts", JSONArray(texts.toList()))
@@ -486,8 +466,10 @@ class FlowAutomationService : AccessibilityService() {
                     DeviceTokenVault.read(this) ?: "")
             }
             handler.post {
-                DeviceNotifications.show(this, if (success) "اكتمل أمر التحكم في الهاتف" else "توقف أمر التحكم في الهاتف",
-                    if (success) "تم تنفيذ " + task.optInt("step_index", 0) + " خطوة في التطبيق المستهدف." else message)
+                DeviceNotifications.show(this, if (success) "اكتملت مهمة التطبيق" else "توقفت مهمة التطبيق",
+                    if (success) "تم تنفيذ " + task.optInt("step_index", 0) + " خطوة داخل التطبيق المسموح." else message)
+                // Disable Accessibility after each operation to minimize conflict with banking apps.
+                disableSelf()
             }
         }
     }
@@ -919,7 +901,7 @@ class FlowAutomationService : AccessibilityService() {
             if (target !in ZOZ_CONTROL_PACKAGES) throw IllegalArgumentException("target_package_not_allowed")
             val steps = payload.optJSONArray("steps") ?: throw IllegalArgumentException("control_steps_missing")
             if (steps.length() !in 1..12) throw IllegalArgumentException("control_steps_limit")
-            val allowed = setOf("inspect", "read_screen", "tap", "type_text", "scroll", "back", "wait", "open_url")
+            val allowed = setOf("inspect", "read_screen", "tap", "type_text", "scroll", "wait")
             for (i in 0 until steps.length()) {
                 val step = steps.optJSONObject(i) ?: throw IllegalArgumentException("control_step_invalid")
                 val action = step.optString("action")
@@ -931,19 +913,21 @@ class FlowAutomationService : AccessibilityService() {
                      containsSensitiveWorkValue(step.optString("text")))) {
                     throw IllegalArgumentException("sensitive_or_nonbusiness_text_blocked")
                 }
-                if (action == "read_screen" && target != TIKTOK_STUDIO_PACKAGE) {
-                    throw IllegalArgumentException("read_screen_target_not_allowed")
+                if (action == "read_screen" && target !in ZOZ_CONTROL_PACKAGES) {
+                    throw IllegalArgumentException("read_screen_target_not_allowlisted")
                 }
-                if (target == TIKTOK_STUDIO_PACKAGE && action !in setOf("inspect", "read_screen", "tap", "scroll", "back", "wait")) {
-                    throw IllegalArgumentException("tiktok_studio_read_only")
+                if (target in ZOZ_STUDIO_PACKAGES &&
+                    action !in setOf("inspect", "read_screen", "tap", "scroll", "wait")) {
+                    throw IllegalArgumentException("studio_read_only")
                 }
-                if (target == TIKTOK_STUDIO_PACKAGE && action == "tap") {
+                if (target in ZOZ_STUDIO_PACKAGES && action == "tap") {
                     val selector = step.optString("text", step.optString("content_description", ""))
-                    if (!isTikTokStudioNavigationLabel(selector)) throw IllegalArgumentException("tiktok_studio_navigation_only")
+                    if (!isStudioNavigationLabel(selector)) throw IllegalArgumentException("studio_navigation_only")
                 }
-                if (action == "open_url" &&
-                    (target != "com.android.chrome" || !isAllowedZozWebUrl(step.optString("url")))) {
-                    throw IllegalArgumentException("business_url_not_allowlisted")
+                if (target in ZOZ_REGULAR_SOCIAL_PACKAGES && action == "type_text" &&
+                    (step.optString("input_purpose").lowercase() !in ZOZ_TEXT_PURPOSES ||
+                     containsSensitiveWorkValue(step.optString("text")))) {
+                    throw IllegalArgumentException("sensitive_or_nonbusiness_text_blocked")
                 }
             }
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
