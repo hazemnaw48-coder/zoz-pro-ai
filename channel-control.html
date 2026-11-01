@@ -301,6 +301,17 @@ body.upload-mode .footer{font-size:11px}
  <section class="card">
   <div class="row"><div><h2>١١. إدارة حسابات TikTok</h2><p class="small">ربط مستقل وتحليلات ورفع إلى صندوق الوارد فقط. لا يوجد نشر عام تلقائي.</p></div><button type="button" id="tiktok-refresh" class="secondary">تحديث الحالة</button></div>
   <div id="tiktok-status" class="notice">جارٍ تحميل حالة حسابات TikTok…</div>
+
+  <section class="card" id="tiktok-app-credentials">
+   <h3>إعداد تطبيق TikTok لمرة واحدة</h3>
+   <p class="small">تُحفظ بيانات التطبيق مباشرة في Supabase Vault بحساب المالك. لا تحفظ هذه الحقول في المتصفح ولا ترسلها إلى المحادثة.</p>
+   <label for="tiktok-client-key">TikTok Client Key</label>
+   <input id="tiktok-client-key" type="text" inputmode="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="أدخل Client Key">
+   <label for="tiktok-client-secret">TikTok Client Secret</label>
+   <input id="tiktok-client-secret" type="password" autocomplete="new-password" placeholder="أدخل Client Secret">
+   <div class="actions"><button type="button" id="tiktok-save-credentials">حفظ بيانات التطبيق بأمان</button></div>
+   <div id="tiktok-credentials-status" class="notice">لن تظهر قيم المفاتيح بعد الحفظ.</div>
+  </section>
   <div id="tiktok-accounts" class="stack"></div>
  </section>
  <section class="card">
@@ -1400,6 +1411,24 @@ async function tiktokCall(action,body){
  return data;
 }
 function tiktokLabel(slot){return slot==='tiktok_1'?'Hazem Now':'ZOZ Manager';}
+
+$('tiktok-save-credentials')?.addEventListener('click',async()=>{
+ const b=$('tiktok-save-credentials'),key=$('tiktok-client-key'),secret=$('tiktok-client-secret');
+ const clientKey=String(key.value||'').trim(),clientSecret=String(secret.value||'').trim();
+ if(clientKey.length<8||clientSecret.length<12){notice('tiktok-credentials-status','أدخل Client Key وClient Secret الصحيحين.','warn');return;}
+ b.disabled=true;notice('tiktok-credentials-status','جارٍ حفظ بيانات التطبيق في Supabase Vault عبر جلسة المالك…');
+ try{
+  await ownerSession();
+  const {data,error}=await sb.rpc('zoz_pro_tiktok_save_app_credentials',{p_client_key:clientKey,p_client_secret:clientSecret});
+  if(error)throw error;
+  if(!data||data.saved!==true||data.secret_stored!==true)throw new Error('لم يؤكد Supabase حفظ بيانات التطبيق.');
+  key.value='';secret.value='';
+  notice('tiktok-credentials-status','تم حفظ بيانات تطبيق TikTok بأمان في Supabase Vault.','good');
+  await loadTikTokAccounts();
+ }catch(e){key.value='';secret.value='';notice('tiktok-credentials-status',e.message||'تعذر حفظ بيانات التطبيق.','bad');}
+ finally{b.disabled=false;}
+});
+
 async function loadTikTokAccounts(){
  const host=$('tiktok-accounts');if(!host)return;
  host.innerHTML='';notice('tiktok-status','جارٍ قراءة حسابي TikTok من مشروع الإنتاج…');
@@ -1418,10 +1447,10 @@ async function loadTikTokAccounts(){
     const p=item.metadata.profile;const metrics=document.createElement('p');metrics.textContent='المتابعون: '+fmt(p.follower_count)+' · الإعجابات: '+fmt(p.likes_count)+' · الفيديوهات: '+fmt(p.video_count);card.appendChild(metrics);
    }
    const actions=document.createElement('div');actions.className='actions';
-   const connect=document.createElement('button');connect.type='button';connect.textContent=item.connection_status==='connected'?'إعادة ربط الحساب':'ربط '+tiktokLabel(slot);
+   const connect=document.createElement('button');connect.type='button';connect.disabled=!accountData.app_credentials_ready;connect.textContent=!accountData.app_credentials_ready?'أدخل بيانات التطبيق أولًا':item.connection_status==='connected'?'إعادة ربط الحساب':'ربط '+tiktokLabel(slot);
    connect.addEventListener('click',async()=>{connect.disabled=true;try{const d=await tiktokCall('start',{slot_key:slot});if(!d.authorization_url)throw new Error('لم يُرجع النظام رابط التفويض.');window.location.assign(d.authorization_url);}catch(e){notice('tiktok-status',e.message||'تعذر بدء التفويض.','bad');connect.disabled=false;}});
    actions.appendChild(connect);
-   const sync=document.createElement('button');sync.type='button';sync.className='secondary';sync.textContent='مزامنة التحليلات';
+   const sync=document.createElement('button');sync.type='button';sync.className='secondary';sync.disabled=item.connection_status!=='connected';sync.textContent='مزامنة التحليلات';
    sync.addEventListener('click',async()=>{sync.disabled=true;notice('tiktok-analytics','جارٍ قراءة الملف الشخصي والفيديوهات لحساب '+tiktokLabel(slot)+'…');try{const d=await tiktokCall('analytics',{slot_key:slot});const p=d.profile||{};const out=$('tiktok-analytics');out.innerHTML='';const summary=document.createElement('p');summary.textContent=tiktokLabel(slot)+' · @'+(p.username||'—')+' · المتابعون '+fmt(p.follower_count)+' · الإعجابات '+fmt(p.likes_count)+' · الفيديوهات '+fmt(p.video_count);out.appendChild(summary);tableInto(out,['الفيديو','المشاهدات','الإعجابات','التعليقات','المشاركات'],(d.videos||[]).map(v=>[v.title||v.video_description||v.id,fmt(v.view_count),fmt(v.like_count),fmt(v.comment_count),fmt(v.share_count)]));notice('tiktok-status','نجحت مزامنة '+tiktokLabel(slot)+' وحُفظت لقطة التحليلات.','good');}catch(e){notice('tiktok-analytics',e.message||'تعذرت مزامنة التحليلات.','bad');}finally{sync.disabled=false;}});
    actions.appendChild(sync);card.appendChild(actions);host.appendChild(card);
   }
