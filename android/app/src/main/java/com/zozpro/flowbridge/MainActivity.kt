@@ -119,11 +119,8 @@ private fun AppScopeControlScreen() {
                 .put(JSONObject().put("action", "inspect"))
                 .put(JSONObject().put("action", "read_screen"))
             apiPostWithToken("request_app_control", JSONObject().put("target_package", packageName).put("steps", steps), token)
-            val job = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job")
-                ?: throw IllegalStateException("لم يستلم الهاتف مهمة $displayName من الوكيل.")
-            val result = executeJob(context, job)
             scheduleDeviceWorker(context)
-            result
+            "تم إرسال مهمة القراءة إلى الهاتف. سيستلمها منفذ ZOZ تلقائيًا ويعيد نتيجتها إلى مركز الوكيل."
         }
     }
 
