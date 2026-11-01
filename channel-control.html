@@ -129,9 +129,10 @@ body.upload-mode .footer{font-size:11px}
    <button type="button" class="section-tab" data-page-target="recommendations">٨ · التوصيات</button>
    <button type="button" class="section-tab" data-page-target="studio">٩ · صناعة المحتوى</button>
    <button type="button" class="section-tab" data-page-target="intake">١٠ · استقبال الفيديوهات</button>
-   <button type="button" class="section-tab" data-page-target="books">١١ · الكتب وأمازون</button>
+   <button type="button" class="section-tab" data-page-target="tiktok">١١ · TikTok</button>
+   <button type="button" class="section-tab" data-page-target="books">١٢ · الكتب وأمازون</button>
   </nav>
-  <div id="page-indicator" class="page-indicator" aria-live="polite">القسم الحالي: حالة الربط · ١ من ١٠</div>
+  <div id="page-indicator" class="page-indicator" aria-live="polite">القسم الحالي: حالة الربط · ١ من ١١</div>
  </div>
 
  <div class="page-panel active" data-page="connection" id="page-connection">
@@ -295,9 +296,36 @@ body.upload-mode .footer{font-size:11px}
  </section>
 </div>
 
+
+<div class="page-panel" data-page="tiktok" id="page-tiktok">
+ <section class="card">
+  <div class="row"><div><h2>١١. إدارة حسابات TikTok</h2><p class="small">ربط مستقل وتحليلات ورفع إلى صندوق الوارد فقط. لا يوجد نشر عام تلقائي.</p></div><button type="button" id="tiktok-refresh" class="secondary">تحديث الحالة</button></div>
+  <div id="tiktok-status" class="notice">جارٍ تحميل حالة حسابات TikTok…</div>
+  <div id="tiktok-accounts" class="stack"></div>
+ </section>
+ <section class="card">
+  <h3>رفع فيديو من ملفات ZOZ Pro إلى صندوق TikTok</h3>
+  <p>اختر ملف فيديو محفوظًا في تخزين الإنتاج وحساب TikTok المستهدف. سيصل الفيديو إلى صندوق الوارد لتكمل مراجعته ونشره يدويًا داخل TikTok.</p>
+  <label for="tiktok-target">الحساب المستهدف</label>
+  <select id="tiktok-target" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit">
+   <option value="tiktok_1">Hazem Now</option><option value="tiktok_2">ZOZ Manager</option>
+  </select>
+  <label for="tiktok-source">الفيديو المحفوظ</label>
+  <select id="tiktok-source" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit">
+   <option value="">جارٍ تحميل الملفات…</option>
+  </select>
+  <div id="tiktok-upload-note" class="notice">يتم عرض الملفات التي ما زالت محفوظة في تخزين ZOZ Pro فقط.</div>
+  <div class="actions"><button type="button" id="tiktok-send">إرسال إلى صندوق TikTok</button></div>
+  <div id="tiktok-upload-status" class="notice">لن يتم النشر العام من هذه العملية.</div>
+ </section>
+ <section class="card">
+  <h3>آخر تحليلات TikTok</h3><div id="tiktok-analytics" class="notice">اختر «مزامنة التحليلات» بجوار الحساب المطلوب.</div>
+ </section>
+</div>
+
 <div class="page-panel" data-page="books" id="page-books">
  <section class="card">
-  <div class="row"><div><h2>١١. إدارة الكتب ومبيعات Amazon KDP</h2><p class="small">لوحة مرتبطة بقاعدة الإنتاج. بيانات الرف من آخر رصد قدّمه المالك؛ المبيعات والعوائد تُحدّث من تقارير KDP.</p></div><button type="button" id="books-refresh" class="secondary">تحديث من قاعدة الإنتاج</button></div>
+  <div class="row"><div><h2>١٢. إدارة الكتب ومبيعات Amazon KDP</h2><p class="small">لوحة مرتبطة بقاعدة الإنتاج. بيانات الرف من آخر رصد قدّمه المالك؛ المبيعات والعوائد تُحدّث من تقارير KDP.</p></div><button type="button" id="books-refresh" class="secondary">تحديث من قاعدة الإنتاج</button></div>
   <div id="books-status" class="notice">اضغط تحديث لتحميل سجل الكتب والتنبيهات.</div><div id="books-metrics" class="grid"></div><div id="books-list" class="stack"></div>
  </section>
  <section class="card">
@@ -1360,6 +1388,65 @@ $('zoz-agent-video-test-btn')?.addEventListener('click',async()=>{
  }catch(e){status.className='notice bad';status.textContent='تعذر اختبار الأداء: '+(e.message||e);}
  finally{b.disabled=false;b.textContent='اختبر نجاح آخر فيديو';}
 });
+
+const TIKTOK_API=SUPABASE_URL+'/functions/v1/zoz-pro-tiktok';
+let tiktokAccounts=[];
+let tiktokAssets=[];
+async function tiktokCall(action,body){
+ const session=await ownerSession();
+ const response=await fetch(TIKTOK_API,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action},body||{})),cache:'no-store'});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok||data.ok===false)throw new Error(data.error||('TikTok API HTTP '+response.status));
+ return data;
+}
+function tiktokLabel(slot){return slot==='tiktok_1'?'Hazem Now':'ZOZ Manager';}
+async function loadTikTokAccounts(){
+ const host=$('tiktok-accounts');if(!host)return;
+ host.innerHTML='';notice('tiktok-status','جارٍ قراءة حسابي TikTok من مشروع الإنتاج…');
+ try{
+  const [accountData,assetData]=await Promise.all([tiktokCall('accounts',{}),tiktokCall('assets',{})]);
+  tiktokAccounts=Array.isArray(accountData.accounts)?accountData.accounts:[];
+  tiktokAssets=Array.isArray(assetData.assets)?assetData.assets:[];
+  for(const slot of ['tiktok_1','tiktok_2']){
+   const item=tiktokAccounts.find(x=>x.slot_key===slot)||{slot_key:slot,display_name:tiktokLabel(slot),connection_status:'awaiting_owner_authorization',scopes:[]};
+   const card=document.createElement('article');card.className='video-card';
+   const h=document.createElement('h3');h.textContent=tiktokLabel(slot);card.appendChild(h);
+   const status=document.createElement('p');status.textContent='الحالة: '+(item.connection_status==='connected'?'متصل':item.connection_status==='needs_reconnect'?'يحتاج إعادة تفويض':item.connection_status==='error'?'خطأ':'بانتظار التفويض');card.appendChild(status);
+   if(item.handle){const handle=document.createElement('p');handle.textContent='@'+String(item.handle).replace(/^@/,'');card.appendChild(handle);}
+   const scopes=document.createElement('p');scopes.className='small';scopes.textContent='الصلاحيات: '+((item.scopes||[]).join('، ')||'لم تُمنح بعد');card.appendChild(scopes);
+   if(item.metadata&&item.metadata.profile){
+    const p=item.metadata.profile;const metrics=document.createElement('p');metrics.textContent='المتابعون: '+fmt(p.follower_count)+' · الإعجابات: '+fmt(p.likes_count)+' · الفيديوهات: '+fmt(p.video_count);card.appendChild(metrics);
+   }
+   const actions=document.createElement('div');actions.className='actions';
+   const connect=document.createElement('button');connect.type='button';connect.textContent=item.connection_status==='connected'?'إعادة ربط الحساب':'ربط '+tiktokLabel(slot);
+   connect.addEventListener('click',async()=>{connect.disabled=true;try{const d=await tiktokCall('start',{slot_key:slot});if(!d.authorization_url)throw new Error('لم يُرجع النظام رابط التفويض.');window.location.assign(d.authorization_url);}catch(e){notice('tiktok-status',e.message||'تعذر بدء التفويض.','bad');connect.disabled=false;}});
+   actions.appendChild(connect);
+   const sync=document.createElement('button');sync.type='button';sync.className='secondary';sync.textContent='مزامنة التحليلات';
+   sync.addEventListener('click',async()=>{sync.disabled=true;notice('tiktok-analytics','جارٍ قراءة الملف الشخصي والفيديوهات لحساب '+tiktokLabel(slot)+'…');try{const d=await tiktokCall('analytics',{slot_key:slot});const p=d.profile||{};const out=$('tiktok-analytics');out.innerHTML='';const summary=document.createElement('p');summary.textContent=tiktokLabel(slot)+' · @'+(p.username||'—')+' · المتابعون '+fmt(p.follower_count)+' · الإعجابات '+fmt(p.likes_count)+' · الفيديوهات '+fmt(p.video_count);out.appendChild(summary);tableInto(out,['الفيديو','المشاهدات','الإعجابات','التعليقات','المشاركات'],(d.videos||[]).map(v=>[v.title||v.video_description||v.id,fmt(v.view_count),fmt(v.like_count),fmt(v.comment_count),fmt(v.share_count)]));notice('tiktok-status','نجحت مزامنة '+tiktokLabel(slot)+' وحُفظت لقطة التحليلات.','good');}catch(e){notice('tiktok-analytics',e.message||'تعذرت مزامنة التحليلات.','bad');}finally{sync.disabled=false;}});
+   actions.appendChild(sync);card.appendChild(actions);host.appendChild(card);
+  }
+  const selector=$('tiktok-source');selector.innerHTML='';
+  const available=tiktokAssets.filter(x=>x.available_for_tiktok);
+  const fekra=tiktokAssets.find(x=>String(x.original_filename||'').includes('fekra_first_video_assembled'));
+  const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent=available.length?'اختر الفيديو المحفوظ':'لا توجد ملفات فيديو مكتملة متاحة للرفع';selector.appendChild(placeholder);
+  for(const a of available){const op=document.createElement('option');op.value=a.id;op.textContent=(a.title||a.original_filename)+' · '+(Number(a.total_bytes)/1048576).toFixed(1)+' MB';selector.appendChild(op);}
+  if(fekra&&!fekra.available_for_tiktok){const op=document.createElement('option');op.value='';op.disabled=true;op.textContent='فيديو فِكرة الأخير — ملفه الأصلي غير موجود في تخزين الإنتاج';selector.appendChild(op);}
+  if(!accountData.app_credentials_ready)notice('tiktok-status','حسابا TikTok مسجلان، لكن بيانات تطبيق المطوّر غير متاحة في Vault أو أسرار Edge Function لهذا المشروع؛ لم يبدأ التفويض.','warn');
+  else notice('tiktok-status','تم تحميل حالة الحسابين و'+tiktokAssets.length+' ملف استقبال من الإنتاج.','good');
+  notice('tiktok-upload-note',fekra&&!fekra.available_for_tiktok?'فيديو فِكرة الأخير موجود كسجل نشر YouTube، لكن ملف MP4 الأصلي غير محفوظ في مخزن ZOZ Pro؛ لذلك لا يمكن إرساله من هذا السجل حتى يُستعاد الملف الأصلي.':'اختر ملفًا مكتملًا محفوظًا بحجم لا يتجاوز 50 MB.','warn');
+ }catch(e){notice('tiktok-status',e.message||'تعذر تحميل بيانات TikTok.','bad');}
+}
+$('tiktok-refresh')?.addEventListener('click',loadTikTokAccounts);
+$('tiktok-send')?.addEventListener('click',async()=>{
+ const b=$('tiktok-send');const assetId=$('tiktok-source').value;const slot=$('tiktok-target').value;
+ if(!assetId){notice('tiktok-upload-status','اختر ملف فيديو محفوظًا أولًا.','warn');return;}
+ b.disabled=true;notice('tiktok-upload-status','جارٍ التحقق من ملكية الملف والصلاحيات ثم إرساله إلى صندوق TikTok…');
+ try{const d=await tiktokCall('upload_inbox',{slot_key:slot,intake_asset_id:assetId});notice('tiktok-upload-status',d.message||'تم الإرسال إلى صندوق الوارد.','good');}
+ catch(e){notice('tiktok-upload-status',e.message||'فشل رفع الفيديو.','bad');}
+ finally{b.disabled=false;}
+});
+document.querySelector('[data-page-target="tiktok"]')?.addEventListener('click',()=>{loadTikTokAccounts();});
+
 checkZozAgentHealth();
 
 })();
