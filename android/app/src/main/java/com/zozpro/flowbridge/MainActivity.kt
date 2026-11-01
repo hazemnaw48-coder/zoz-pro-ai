@@ -114,7 +114,11 @@ private fun AppScopeControlScreen() {
             }
             val token = DeviceTokenVault.read(context) ?: throw IllegalStateException("رمز الجهاز غير موجود؛ أعد اقترانه من مركز ZOZ.")
             apiPostWithToken("enable_phone_control", JSONObject().put("app_version", BuildConfig.VERSION_NAME), token)
-            apiPostWithToken("request_app_control", JSONObject().put("target_package", packageName), token)
+            val steps = JSONArray()
+                .put(JSONObject().put("action", "wait").put("milliseconds", 1000))
+                .put(JSONObject().put("action", "inspect"))
+                .put(JSONObject().put("action", "read_screen"))
+            apiPostWithToken("request_app_control", JSONObject().put("target_package", packageName).put("steps", steps), token)
             val job = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job")
                 ?: throw IllegalStateException("لم يستلم الهاتف مهمة $displayName من الوكيل.")
             val result = executeJob(context, job)
@@ -127,13 +131,14 @@ private fun AppScopeControlScreen() {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("ZOZ App Control", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text("تحكم محدود في أربعة تطبيقات فقط", style = MaterialTheme.typography.titleMedium)
+                Text("جهاز تنفيذ وكيل ZOZ داخل تطبيقات القنوات", style = MaterialTheme.typography.titleMedium)
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                         Text(if (paired) "الجهاز مرتبط بوكيل ZOZ Pro" else "الجهاز غير مرتبط", fontWeight = FontWeight.Bold)
-                        Text("النطاق المسموح: TikTok Studio، YouTube Studio، TikTok، YouTube فقط.")
-                        Text("لا يستقبل التطبيق أحداثًا من Instagram أو InstaPay أو البنوك أو أي تطبيق آخر. لا يوجد تحكم عام أو إيماءات للنظام.")
-                        Text("خدمة الوصول تعمل أثناء تنفيذ مهمة داخل أحد التطبيقات الأربعة فقط، ثم يعطّلها ZOZ تلقائيًا. قد تحتاج إلى تفعيلها عند بدء مهمة جديدة لتجنب تعارضها مع التطبيقات البنكية.")
+                        Text("النطاق: YouTube Studio وTikTok Studio وقناتا YouTube وTikTok المسجلتان على هذا الهاتف.")
+                        Text("يستطيع الوكيل فحص الشاشة وقراءة البيانات والتنقل والتمرير وتعديل حقول المحتوى الوظيفية.")
+                        Text("النشر العام والحذف والإرسال النهائي تحتاج موافقتك الصريحة. كلمات المرور ورموز التحقق وبيانات الدفع والتطبيقات الشخصية خارج النطاق.")
+                        Text("اترك خدمة ZOZ App Access مفعّلة حتى يستقبل الهاتف أوامر الوكيل وينفذها تلقائيًا داخل تطبيقات القنوات فقط.")
                         Text(if (serviceEnabled) "خدمة الوصول مفعّلة الآن." else "خدمة الوصول متوقفة الآن.")
                         OutlinedButton(onClick = {
                             context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -270,8 +275,8 @@ private fun FlowBridgeScreen() {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(if (paired) "الجهاز مقرون بالوكيل" else "الجهاز غير مقرون", fontWeight = FontWeight.Bold)
-                        Text("قدرات الجهاز: تنفيذ مهام Flow، وقراءة تحليلات TikTok Studio لقناة فِكرة، والتحكم المرئي المحدود في تطبيقات العمل المصرح بها. لا ينفذ نشرًا عامًا أو تغييرات حسابية حساسة.")
-                        Text("التطبيقات الشخصية خارج النطاق. لا تُقرأ الحسابات أو البيانات الخاصة؛ الكتابة لمحتوى العمل غير الحساس فقط. النشر والحذف والدفع والتحويل تتطلب موافقتك المستقلة.")
+                        Text("قدرات الجهاز: فحص وقراءة الشاشات، فتح تبويبات الاستوديو، التمرير، تعديل بيانات المحتوى الوظيفية، وإرجاع نتائج المهام إلى وكيل ZOZ.")
+                        Text("القنوات وتطبيقات العمل الأربعة المصرح بها فقط. لا تُقرأ كلمات المرور أو رموز التحقق أو بيانات الدفع. النشر العام والحذف والإرسال النهائي تحتاج موافقتك.")
                     }
                 }
 
