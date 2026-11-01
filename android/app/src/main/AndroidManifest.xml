@@ -2,9 +2,15 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <queries>
+        <package android:name="com.ss.android.tt.creator" />
+        <package android:name="com.google.android.apps.youtube.creator" />
+        <package android:name="com.zhiliaoapp.musically" />
+        <package android:name="com.google.android.youtube" />
+    </queries>
     <application
         android:allowBackup="false"
-        android:label="ZOZ Studio Control"
+        android:label="ZOZ App Control"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:supportsRtl="true">
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop">
@@ -15,7 +21,7 @@
         </activity>
             <service
             android:name=".FlowAutomationService"
-            android:label="ZOZ Studio Access"
+            android:label="ZOZ App Access - Four Apps Only"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="true">
             <intent-filter>
