@@ -319,7 +319,7 @@ body.upload-mode .footer{font-size:11px}
   <p>اختر ملف فيديو محفوظًا في تخزين الإنتاج وحساب TikTok المستهدف. سيصل الفيديو إلى صندوق الوارد لتكمل مراجعته ونشره يدويًا داخل TikTok.</p>
   <label for="tiktok-target">الحساب المستهدف</label>
   <select id="tiktok-target" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit">
-   <option value="tiktok_1">Hazem Now</option><option value="tiktok_2">ZOZ Manager</option>
+   <option value="tiktok_1">Hazem Now</option><option value="tiktok_2">Fekra</option>
   </select>
   <label for="tiktok-source">الفيديو المحفوظ</label>
   <select id="tiktok-source" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit">
@@ -1412,7 +1412,7 @@ async function tiktokCall(action,body){
  if(!response.ok||data.ok===false)throw new Error(data.error||('TikTok API HTTP '+response.status));
  return data;
 }
-function tiktokLabel(slot){return slot==='tiktok_1'?'Hazem Now':'ZOZ Manager';}
+function tiktokLabel(slot){return slot==='tiktok_1'?'Hazem Now':'Fekra';}
 
 $('tiktok-save-credentials')?.addEventListener('click',async()=>{
  const b=$('tiktok-save-credentials'),key=$('tiktok-client-key'),secret=$('tiktok-client-secret');
