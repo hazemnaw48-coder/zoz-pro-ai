@@ -1237,7 +1237,7 @@ async function callZozAgent(action,extra){
  const session=await ownerSession();
  const response=await fetch(AGENT_API,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:action,channel_id:CHANNEL_ID},extra||{})),cache:'no-store'});
  const data=await response.json().catch(()=>({}));
- if(!response.ok||data.ok===false)throw new Error(data.error||('فشل طلب الوكيل HTTP '+response.status));
+ if(!response.ok||(data.ok===false&&!Array.isArray(data.accounts)))throw new Error(data.error||('فشل طلب الوكيل HTTP '+response.status));
  return data;
 }
 
