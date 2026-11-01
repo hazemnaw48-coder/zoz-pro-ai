@@ -71,14 +71,129 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         scheduleDeviceWorker(this)
-        importSharedVideos(this, intent)
-        setContent { FlowBridgeScreen() }
+        setContent { AppScopeControlScreen() }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        importSharedVideos(this, intent)
+    }
+}
+
+@Composable
+private fun AppScopeControlScreen() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var paired by remember { mutableStateOf(DeviceTokenVault.read(context) != null) }
+    var pairingCode by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf(if (paired) "الجهاز مرتبط بوكيل ZOZ Pro." else "اربط التطبيق بمركز ZOZ Pro.") }
+    var serviceEnabled by remember { mutableStateOf(FlowAutomationService.isEnabled(context)) }
+
+    fun runAsync(block: suspend () -> String) {
+        if (busy) return
+        busy = true
+        scope.launch {
+            try { status = withContext(Dispatchers.IO) { block() } }
+            catch (e: Exception) { status = e.message ?: "حدث خطأ في الاتصال." }
+            finally {
+                busy = false
+                serviceEnabled = FlowAutomationService.isEnabled(context)
+            }
+        }
+    }
+
+    fun requestApp(packageName: String, displayName: String) {
+        runAsync {
+            if (!paired) throw IllegalStateException("اربط التطبيق بمركز ZOZ Pro أولًا.")
+            if (!FlowAutomationService.isEnabled(context)) {
+                throw IllegalStateException("فعّل خدمة ZOZ App Access عند الحاجة من إعدادات Android.")
+            }
+            if (context.packageManager.getLaunchIntentForPackage(packageName) == null) {
+                throw IllegalStateException("تطبيق $displayName غير مثبت على الهاتف.")
+            }
+            val token = DeviceTokenVault.read(context) ?: throw IllegalStateException("رمز الجهاز غير موجود؛ أعد اقترانه من مركز ZOZ.")
+            apiPostWithToken("enable_phone_control", JSONObject().put("app_version", BuildConfig.VERSION_NAME), token)
+            apiPostWithToken("request_app_control", JSONObject().put("target_package", packageName), token)
+            val job = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job")
+                ?: throw IllegalStateException("لم يستلم الهاتف مهمة $displayName من الوكيل.")
+            val result = executeJob(context, job)
+            scheduleDeviceWorker(context)
+            result
+        }
+    }
+
+    MaterialTheme {
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("ZOZ App Control", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text("تحكم محدود في أربعة تطبيقات فقط", style = MaterialTheme.typography.titleMedium)
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Text(if (paired) "الجهاز مرتبط بوكيل ZOZ Pro" else "الجهاز غير مرتبط", fontWeight = FontWeight.Bold)
+                        Text("النطاق المسموح: TikTok Studio، YouTube Studio، TikTok، YouTube فقط.")
+                        Text("لا يستقبل التطبيق أحداثًا من Instagram أو InstaPay أو البنوك أو أي تطبيق آخر. لا يوجد تحكم عام أو إيماءات للنظام.")
+                        Text("خدمة الوصول تعمل أثناء تنفيذ مهمة داخل أحد التطبيقات الأربعة فقط، ثم يعطّلها ZOZ تلقائيًا. قد تحتاج إلى تفعيلها عند بدء مهمة جديدة لتجنب تعارضها مع التطبيقات البنكية.")
+                        Text(if (serviceEnabled) "خدمة الوصول مفعّلة الآن." else "خدمة الوصول متوقفة الآن.")
+                        OutlinedButton(onClick = {
+                            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Text(if (serviceEnabled) "إعدادات خدمة التطبيقات" else "تفعيل خدمة التطبيقات عند الحاجة")
+                        }
+                    }
+                }
+                if (!paired) {
+                    OutlinedTextField(
+                        value = pairingCode,
+                        onValueChange = { pairingCode = it.filter(Char::isLetterOrDigit).take(32) },
+                        label = { Text("رمز الاقتران من مركز ZOZ Pro") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(enabled = !busy && pairingCode.length == 32, onClick = {
+                        runAsync {
+                            val response = apiPost(context, "pair_exchange", JSONObject()
+                                .put("pairing_code", pairingCode)
+                                .put("device_name", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL)
+                                .put("app_version", BuildConfig.VERSION_NAME)
+                                .put("app_package", BuildConfig.APPLICATION_ID))
+                            DeviceTokenVault.write(context, response.getString("device_token"), response.optString("intake_token", ""))
+                            paired = true
+                            pairingCode = ""
+                            scheduleDeviceWorker(context)
+                            "تم ربط ZOZ App Control بالوكيل."
+                        }
+                    }, modifier = Modifier.fillMaxWidth()) { Text("ربط بالوكيل") }
+                } else {
+                    Button(enabled = !busy, onClick = {
+                        runAsync {
+                            val token = DeviceTokenVault.read(context) ?: throw IllegalStateException("الجهاز غير مرتبط.")
+                            val response = apiPostWithToken("heartbeat", JSONObject().put("app_version", BuildConfig.VERSION_NAME), token)
+                            "اتصال الوكيل ناجح. وقت الخادم: " + response.optString("server_time", "متصل")
+                        }
+                    }, modifier = Modifier.fillMaxWidth()) { Text("فحص اتصال الوكيل") }
+                    Text("التطبيقات المسموح بها", fontWeight = FontWeight.Bold)
+                    Button(enabled = !busy, onClick = { requestApp("com.ss.android.tt.creator", "TikTok Studio · فِكرة") },
+                        modifier = Modifier.fillMaxWidth()) { Text("TikTok Studio · فِكرة") }
+                    Button(enabled = !busy, onClick = { requestApp("com.google.android.apps.youtube.creator", "YouTube Studio") },
+                        modifier = Modifier.fillMaxWidth()) { Text("YouTube Studio") }
+                    Button(enabled = !busy, onClick = { requestApp("com.zhiliaoapp.musically", "TikTok") },
+                        modifier = Modifier.fillMaxWidth()) { Text("TikTok العادي") }
+                    Button(enabled = !busy, onClick = { requestApp("com.google.android.youtube", "YouTube") },
+                        modifier = Modifier.fillMaxWidth()) { Text("YouTube العادي") }
+                    OutlinedButton(onClick = {
+                        DeviceTokenVault.clear(context)
+                        paired = false
+                        status = "تم فصل الجهاز محليًا."
+                    }, modifier = Modifier.fillMaxWidth()) { Text("فصل الجهاز") }
+                }
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("آخر حالة", fontWeight = FontWeight.Bold)
+                        Text(status)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -741,11 +856,12 @@ class DevicePollWorker(context: Context, params: androidx.work.WorkerParameters)
         val token = DeviceTokenVault.read(applicationContext) ?: return Result.success()
         return try {
             apiPostWithToken("heartbeat", JSONObject().put("app_version", BuildConfig.VERSION_NAME), token)
-            for (index in 0 until 6) {
+            if (!FlowAutomationService.isEnabled(applicationContext)) return Result.success()
+            for (index in 0 until 1) {
                 val job = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job") ?: break
                 val capability = job.optString("capability_id")
                 executeJob(applicationContext, job)
-                if (capability == "flow.generate_scene" || capability == "device.ui_control") break
+                if (capability == "device.ui_control") break
             }
             Result.success()
         } catch (_: Exception) { Result.retry() }
