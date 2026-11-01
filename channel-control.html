@@ -1475,6 +1475,10 @@ $('tiktok-send')?.addEventListener('click',async()=>{
  finally{b.disabled=false;}
 });
 document.querySelector('[data-page-target="tiktok"]')?.addEventListener('click',()=>{loadTikTokAccounts();});
+if(new URLSearchParams(window.location.search).get('page')==='tiktok'){
+ showPage('tiktok',false);
+ loadTikTokAccounts();
+}
 
 checkZozAgentHealth();
 
