@@ -34,9 +34,10 @@ private val ZOZ_REGULAR_SOCIAL_PACKAGES = setOf(TIKTOK_PACKAGE, YOUTUBE_PACKAGE)
 
 private val STUDIO_NAV_LABELS = listOf(
     "analytics", "overview", "insights", "dashboard", "content", "posts", "videos", "audience", "engagement",
-    "comments", "subscribers", "earn", "monetization",
-    "التحليلات", "نظرة عامة", "الرؤى", "لوحة البيانات", "المحتوى", "المنشورات",
-    "الفيديوهات", "الجمهور", "التفاعل", "التعليقات", "المشتركون", "الأرباح"
+    "comments", "subscribers", "earn", "monetization", "community", "revenue",
+    "الإحصاءات", "احصاءات", "إحصاءات", "التحليلات", "تحليلات", "نظرة عامة", "الرؤى", "لوحة البيانات",
+    "المحتوى", "المنشورات", "الفيديوهات", "المنتدى", "تحقيق الربح", "الربح", "الجمهور",
+    "التفاعل", "التعليقات", "المشتركون", "الأرباح", "إيرادات", "المشاهدات"
 )
 private fun isStudioNavigationLabel(value: String): Boolean {
     val label = value.lowercase().trim()
@@ -312,10 +313,10 @@ class FlowAutomationService : AccessibilityService() {
                 }
                 "read_screen" -> {
                     if (targetPackage !in ZOZ_CONTROL_PACKAGES) throw IllegalStateException("read_screen_target_not_allowed")
-                    results.put(JSONObject().put("action", action).put("data", readAllowedAppScreen(root)))
+                    results.put(JSONObject().put("action", action).put("data", readAllowedAppScreen(root, step.optString("section", ""))))
                 }
                 "tap" -> {
-                    val selected = findControlNode(root, step, requireEditable = false)
+                    val selected = (if (targetPackage in ZOZ_STUDIO_PACKAGES) findStudioNavigationNode(root, step) else findControlNode(root, step, requireEditable = false))
                         ?: throw IllegalStateException("ui_selector_not_unique_or_missing")
                     val label = controlNodeLabel(selected)
                     val idLabel = selected.viewIdResourceName.orEmpty()
@@ -403,7 +404,7 @@ class FlowAutomationService : AccessibilityService() {
         listOf(node.text?.toString(), node.contentDescription?.toString(), node.hintText?.toString())
             .filterNot { it.isNullOrBlank() }.joinToString(" ").replace(Regex("\\s+"), " ").trim()
 
-    private fun readAllowedAppScreen(root: AccessibilityNodeInfo): JSONObject {
+    private fun readAllowedAppScreen(root: AccessibilityNodeInfo, requestedSection: String = ""): JSONObject {
         val currentPackage = root.packageName?.toString().orEmpty()
         if (currentPackage !in ZOZ_CONTROL_PACKAGES) {
             throw IllegalStateException("target_app_not_allowlisted")
@@ -425,11 +426,22 @@ class FlowAutomationService : AccessibilityService() {
             "التفاعل", "الجمهور", "أداء المحتوى", "وقت المشاهدة", "الوصول"
         )
         val available = analyticsTerms.any(combined::contains)
+        val normalizedSection = requestedSection.lowercase().trim()
+        val sectionKey = when {
+            normalizedSection.contains("إحصاء") || normalizedSection.contains("التحليل") || normalizedSection.contains("analytics") -> "analytics"
+            normalizedSection.contains("محتوى") || normalizedSection.contains("فيديو") || normalizedSection.contains("content") -> "content"
+            normalizedSection.contains("منتدى") || normalizedSection.contains("تعليق") || normalizedSection.contains("community") -> "community"
+            normalizedSection.contains("ربح") || normalizedSection.contains("أرباح") || normalizedSection.contains("earn") -> "earn"
+            normalizedSection.contains("جمهور") || normalizedSection.contains("audience") -> "audience"
+            normalizedSection.contains("لوحة") || normalizedSection.contains("نظرة") || normalizedSection.contains("overview") -> "dashboard"
+            else -> "screen"
+        }
         val result = JSONObject()
             .put("available", available)
+            .put("section", requestedSection.take(60))
             .put("screen", when (currentPackage) {
-                TIKTOK_STUDIO_PACKAGE -> "tiktok_studio_analytics"
-                YOUTUBE_STUDIO_PACKAGE -> "youtube_studio_analytics"
+                TIKTOK_STUDIO_PACKAGE -> "tiktok_studio_$sectionKey"
+                YOUTUBE_STUDIO_PACKAGE -> "youtube_studio_$sectionKey"
                 TIKTOK_PACKAGE -> "tiktok_app"
                 YOUTUBE_PACKAGE -> "youtube_app"
                 else -> "unknown"
@@ -486,15 +498,101 @@ class FlowAutomationService : AccessibilityService() {
         return unique.singleOrNull()
     }
 
+    private fun findStudioNavigationNode(root: AccessibilityNodeInfo, selector: JSONObject): AccessibilityNodeInfo? {
+        val wanted = listOf(
+            selector.optString("text", "").trim(),
+            selector.optString("content_description", "").trim(),
+            selector.optString("hint", "").trim()
+        ).firstOrNull { it.isNotBlank() } ?: return null
+        if (!isStudioNavigationLabel(wanted)) return null
+        val matches = linkedMapOf<String, AccessibilityNodeInfo>()
+        walk(root) { node ->
+            if (!node.isVisibleToUser || !node.isEnabled || node.isEditable || node.isPassword) return@walk
+            val labels = listOf(node.text?.toString(), node.contentDescription?.toString(), node.hintText?.toString())
+                .filterNot { it.isNullOrBlank() }.map { it!!.replace(Regex("\\s+"), " ").trim() }
+            if (labels.none { it.equals(wanted, ignoreCase = true) }) return@walk
+            var clickTarget: AccessibilityNodeInfo? = node
+            var depth = 0
+            while (clickTarget != null && !clickTarget.isClickable && depth < 4) {
+                clickTarget = clickTarget.parent
+                depth++
+            }
+            val target = clickTarget ?: return@walk
+            if (!target.isVisibleToUser || !target.isEnabled || !target.isClickable) return@walk
+            val bounds = android.graphics.Rect().also(target::getBoundsInScreen)
+            val key = (target.viewIdResourceName ?: "") + "|" + bounds.flattenToString()
+            matches.putIfAbsent(key, target)
+        }
+        return matches.values.singleOrNull()
+    }
+
     private fun findScrollableNode(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
-        var found: AccessibilityNodeInfo? = null
-        walk(root) { node -> if (found == null && node.isVisibleToUser && node.isScrollable) found = node }
-        return found
+        var best: AccessibilityNodeInfo? = null
+        var bestArea = -1L
+        walk(root) { node ->
+            if (!node.isVisibleToUser || !node.isEnabled || !node.isScrollable) return@walk
+            val bounds = android.graphics.Rect().also(node::getBoundsInScreen)
+            val area = bounds.width().toLong().coerceAtLeast(0) * bounds.height().toLong().coerceAtLeast(0)
+            if (area > bestArea) {
+                best = node
+                bestArea = area
+            }
+        }
+        return best
+    }
+
+    private fun compactControlResult(source: JSONObject): JSONObject {
+        val compact = JSONObject(source.toString())
+        val steps = compact.optJSONArray("step_results") ?: return compact
+        val boundedSteps = JSONArray()
+        for (index in 0 until steps.length()) {
+            val item = steps.optJSONObject(index) ?: continue
+            val action = item.optString("action")
+            if (action == "read_screen") {
+                val data = item.optJSONObject("data") ?: JSONObject()
+                val rawTexts = data.optJSONArray("texts") ?: JSONArray()
+                val candidates = mutableListOf<String>()
+                for (i in 0 until rawTexts.length()) {
+                    val value = rawTexts.optString(i).trim()
+                    if (value.isNotBlank()) candidates.add(value.take(100))
+                }
+                val important = candidates.filter {
+                    Regex("[0-9٠-٩]|مشاهد|مشاهدات|مشاهدة|ساعة|ساعات|مشترك|إعجاب|تعليق|نسبة|وقت المشاهدة|views|watch time|subscribers|likes|comments", RegexOption.IGNORE_CASE).containsMatchIn(it)
+                }
+                val selectedTexts = (important.take(10) + candidates.take(18) + candidates.drop(18))
+                    .distinct().take(18)
+                val outTexts = JSONArray()
+                selectedTexts.forEach(outTexts::put)
+                val outData = JSONObject()
+                    .put("available", data.optBoolean("available"))
+                    .put("screen", data.optString("screen"))
+                    .put("section", data.optString("section"))
+                    .put("captured_at_ms", data.optLong("captured_at_ms"))
+                    .put("visible_text_count", data.optInt("visible_text_count"))
+                    .put("texts", outTexts)
+                boundedSteps.put(JSONObject().put("action", action).put("data", outData))
+            } else if (action == "inspect") {
+                val rawNodes = item.optJSONArray("nodes") ?: JSONArray()
+                val nodes = JSONArray()
+                for (i in 0 until minOf(rawNodes.length(), 20)) {
+                    val node = rawNodes.optJSONObject(i) ?: continue
+                    nodes.put(JSONObject()
+                        .put("label", node.optString("label").take(80))
+                        .put("clickable", node.optBoolean("clickable"))
+                        .put("scrollable", node.optBoolean("scrollable")))
+                }
+                boundedSteps.put(JSONObject().put("action", action).put("nodes", nodes))
+            } else {
+                boundedSteps.put(JSONObject(item.toString().take(700)))
+            }
+        }
+        compact.put("step_results", boundedSteps)
+        return compact
     }
 
     private fun finishControlTask(task: JSONObject, success: Boolean, code: String, message: String, extra: JSONObject = JSONObject()) {
         val id = task.optString("job_id")
-        val result = JSONObject(extra.toString())
+        val result = compactControlResult(extra)
             .put("target_package", task.optString("target_package"))
             .put("steps_completed", task.optInt("step_index", 0))
             .put("phase", if (success) "completed" else "stopped")
@@ -948,7 +1046,7 @@ class FlowAutomationService : AccessibilityService() {
             val target = payload.optString("target_package", "").trim()
             if (target !in ZOZ_CONTROL_PACKAGES) throw IllegalArgumentException("target_package_not_allowed")
             val steps = payload.optJSONArray("steps") ?: throw IllegalArgumentException("control_steps_missing")
-            if (steps.length() !in 1..12) throw IllegalArgumentException("control_steps_limit")
+            if (steps.length() !in 1..30) throw IllegalArgumentException("control_steps_limit")
             val allowed = setOf("inspect", "read_screen", "tap", "type_text", "scroll", "wait", "back")
             for (i in 0 until steps.length()) {
                 val step = steps.optJSONObject(i) ?: throw IllegalArgumentException("control_step_invalid")
