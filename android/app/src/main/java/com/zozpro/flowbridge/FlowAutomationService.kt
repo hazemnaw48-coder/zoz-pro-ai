@@ -26,9 +26,6 @@ import java.util.concurrent.Executors
 private const val TIKTOK_STUDIO_PACKAGE = "com.ss.android.tt.creator"
 
 private val ZOZ_CONTROL_PACKAGES = setOf(
-    "com.android.chrome",
-    "com.google.android.googlequicksearchbox",
-    "com.google.android.youtube",
     "com.google.android.apps.youtube.creator",
     TIKTOK_STUDIO_PACKAGE
 )
