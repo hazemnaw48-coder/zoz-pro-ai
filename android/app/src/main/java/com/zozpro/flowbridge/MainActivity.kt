@@ -104,23 +104,38 @@ private fun AppScopeControlScreen() {
     }
 
     fun requestApp(packageName: String, displayName: String) {
+        if (!paired) {
+            status = "اربط التطبيق بمركز ZOZ Pro أولًا."
+            return
+        }
+        if (!FlowAutomationService.isEnabled(context)) {
+            serviceEnabled = false
+            status = "فعّل خدمة ZOZ App Access من إعدادات Android، ثم ارجع إلى التطبيق."
+            return
+        }
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+        if (launchIntent == null) {
+            status = "تطبيق $displayName غير مثبت على الهاتف."
+            return
+        }
+
         runAsync {
-            if (!paired) throw IllegalStateException("اربط التطبيق بمركز ZOZ Pro أولًا.")
-            if (!FlowAutomationService.isEnabled(context)) {
-                throw IllegalStateException("فعّل خدمة ZOZ App Access عند الحاجة من إعدادات Android.")
-            }
-            if (context.packageManager.getLaunchIntentForPackage(packageName) == null) {
-                throw IllegalStateException("تطبيق $displayName غير مثبت على الهاتف.")
-            }
-            val token = DeviceTokenVault.read(context) ?: throw IllegalStateException("رمز الجهاز غير موجود؛ أعد اقترانه من مركز ZOZ.")
+            val token = DeviceTokenVault.read(context)
+                ?: throw IllegalStateException("رمز الجهاز غير موجود؛ أعد اقترانه من مركز ZOZ.")
             apiPostWithToken("enable_phone_control", JSONObject().put("app_version", BuildConfig.VERSION_NAME), token)
-            val steps = JSONArray()
-                .put(JSONObject().put("action", "wait").put("milliseconds", 1000))
-                .put(JSONObject().put("action", "inspect"))
-                .put(JSONObject().put("action", "read_screen"))
-            apiPostWithToken("request_app_control", JSONObject().put("target_package", packageName).put("steps", steps), token)
+            val response = apiPostWithToken(
+                "request_app_control",
+                JSONObject().put("target_package", packageName),
+                token
+            )
+            // Launch the allow-listed Studio while this owner-initiated request is active.
+            // The accessibility executor can then inspect only the selected foreground app.
+            withContext(Dispatchers.Main) {
+                context.startActivity(launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
             scheduleDeviceWorker(context)
-            "تم إرسال مهمة القراءة إلى الهاتف. سيستلمها منفذ ZOZ تلقائيًا ويعيد نتيجتها إلى مركز الوكيل."
+            "تم فتح $displayName وإنشاء مهمة قراءة للشاشة. رقم المهمة: " +
+                response.optString("job_id", "قيد التنفيذ")
         }
     }
 
