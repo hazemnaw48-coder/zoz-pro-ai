@@ -88,6 +88,7 @@ class FlowAutomationService : AccessibilityService() {
     private var lastActionAt = 0L
     private var receiverRegistered = false
     private var controlInspectionScheduled = false
+    private var agentPollScheduled = false
     private val networkExecutor = Executors.newSingleThreadExecutor()
 
     private fun browserAddressBarText(root: AccessibilityNodeInfo): String? {
@@ -150,6 +151,7 @@ class FlowAutomationService : AccessibilityService() {
         prefs().edit().remove(KEY_ACTIVE_TASK).apply()
         val control = activeControlTask()
         if (control != null) scheduleControlInspection(900)
+        scheduleAgentPoll(2500)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -174,7 +176,9 @@ class FlowAutomationService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        agentPollScheduled = false
         handler.removeCallbacksAndMessages(null)
+        networkExecutor.shutdownNow()
         if (receiverRegistered) runCatching { unregisterReceiver(downloadReceiver) }
         if (activeService === this) activeService = null
         super.onDestroy()
@@ -196,6 +200,51 @@ class FlowAutomationService : AccessibilityService() {
             controlInspectionScheduled = false
             inspectControlTask()
         }, delayMs)
+    }
+
+    /**
+     * The Accessibility service is the phone-side executor for queued Studio jobs.
+     * It only asks for the device.ui_control capability and the server still checks
+     * device ownership, allow-listed packages, per-step limits and approval state.
+     */
+    private fun scheduleAgentPoll(delayMs: Long = 15000L) {
+        if (agentPollScheduled || !isEnabled(this)) return
+        agentPollScheduled = true
+        handler.postDelayed({
+            agentPollScheduled = false
+            pollAgentQueue()
+        }, delayMs.coerceAtLeast(1000L))
+    }
+
+    private fun pollAgentQueue() {
+        if (!isEnabled(this) || activeControlTask() != null) {
+            scheduleAgentPoll(5000L)
+            return
+        }
+        val deviceToken = DeviceTokenVault.read(this)
+        if (deviceToken.isNullOrBlank()) {
+            scheduleAgentPoll(15000L)
+            return
+        }
+        networkExecutor.execute {
+            val job = runCatching {
+                apiPostWithToken("poll_ui_jobs", JSONObject(), deviceToken).optJSONObject("job")
+            }.getOrNull()
+            handler.post {
+                if (job != null && activeControlTask() == null) {
+                    val id = job.optString("id")
+                    val payload = job.optJSONObject("payload") ?: JSONObject()
+                    runCatching { startUiControl(this@FlowAutomationService, id, payload) }
+                        .onFailure {
+                            DeviceNotifications.show(this@FlowAutomationService, "تعذر بدء أمر الوكيل",
+                                it.message ?: "تعذر تشغيل مهمة الاستوديو.")
+                        }
+                    scheduleAgentPoll(3000L)
+                } else {
+                    scheduleAgentPoll(15000L)
+                }
+            }
+        }
     }
 
     private fun inspectControlTask() {
@@ -271,10 +320,6 @@ class FlowAutomationService : AccessibilityService() {
                     val label = controlNodeLabel(selected)
                     val idLabel = selected.viewIdResourceName.orEmpty()
                     if (isSensitiveLabel(label)) throw IllegalStateException("sensitive_authentication_control_blocked")
-                    if (targetPackage in ZOZ_STUDIO_PACKAGES &&
-                        !isStudioNavigationLabel(label) && !isStudioNavigationLabel(idLabel)) {
-                        throw IllegalStateException("studio_navigation_only")
-                    }
                     if ((isIrreversibleLabel(label) || isIrreversibleLabel(idLabel)) && !task.optBoolean("owner_approved", false)) {
                         throw IllegalStateException("owner_approval_required")
                     }
@@ -287,7 +332,9 @@ class FlowAutomationService : AccessibilityService() {
                     results.put(JSONObject().put("action", action).put("target", safeUiText(label)).put("clicked", true))
                 }
                 "type_text" -> {
-                    if (targetPackage !in ZOZ_REGULAR_SOCIAL_PACKAGES) throw IllegalStateException("studio_read_only")
+                    if (targetPackage !in ZOZ_REGULAR_SOCIAL_PACKAGES && targetPackage !in ZOZ_STUDIO_PACKAGES) {
+                        throw IllegalStateException("target_app_not_allowlisted")
+                    }
                     val selected = findControlNode(root, step, requireEditable = true)
                         ?: throw IllegalStateException("ui_editor_not_unique_or_missing")
                     val label = controlNodeLabel(selected)
@@ -389,8 +436,8 @@ class FlowAutomationService : AccessibilityService() {
             })
             .put("captured_at_ms", System.currentTimeMillis())
             .put("visible_text_count", texts.size)
-        if (available) result.put("texts", JSONArray(texts.toList()))
-        else result.put("reason", "analytics_screen_not_detected")
+        result.put("texts", JSONArray(texts.toList()))
+        if (texts.isEmpty()) result.put("reason", "no_accessible_visible_text")
         return result
     }
 
@@ -468,8 +515,9 @@ class FlowAutomationService : AccessibilityService() {
             handler.post {
                 DeviceNotifications.show(this, if (success) "اكتملت مهمة التطبيق" else "توقفت مهمة التطبيق",
                     if (success) "تم تنفيذ " + task.optInt("step_index", 0) + " خطوة داخل التطبيق المسموح." else message)
-                // Disable Accessibility after each operation to minimize conflict with banking apps.
-                disableSelf()
+                // Keep the owner-enabled service active as the ZOZ executor. Event handling
+                // remains limited to the four work apps; personal and banking apps are ignored.
+                scheduleAgentPoll(2000L)
             }
         }
     }
@@ -900,16 +948,17 @@ class FlowAutomationService : AccessibilityService() {
             val target = payload.optString("target_package", "").trim()
             if (target !in ZOZ_CONTROL_PACKAGES) throw IllegalArgumentException("target_package_not_allowed")
             val steps = payload.optJSONArray("steps") ?: throw IllegalArgumentException("control_steps_missing")
-            if (steps.length() !in 1..12) throw IllegalArgumentException("control_steps_limit")
-            val allowed = setOf("inspect", "read_screen", "tap", "type_text", "scroll", "wait")
+            if (steps.length() !in 1..30) throw IllegalArgumentException("control_steps_limit")
+            val allowed = setOf("inspect", "read_screen", "tap", "type_text", "scroll", "wait", "back")
             for (i in 0 until steps.length()) {
                 val step = steps.optJSONObject(i) ?: throw IllegalArgumentException("control_step_invalid")
                 val action = step.optString("action")
                 if (action !in allowed) throw IllegalArgumentException("unsupported_ui_action")
                 if (step.optString("text").length > 3000) throw IllegalArgumentException("ui_text_invalid")
                 if (action == "type_text" &&
-                    (target == TIKTOK_STUDIO_PACKAGE ||
+                    (target !in ZOZ_REGULAR_SOCIAL_PACKAGES && target !in ZOZ_STUDIO_PACKAGES ||
                      step.optString("input_purpose").lowercase() !in ZOZ_TEXT_PURPOSES ||
+                     step.optString("text").isBlank() ||
                      containsSensitiveWorkValue(step.optString("text")))) {
                     throw IllegalArgumentException("sensitive_or_nonbusiness_text_blocked")
                 }
@@ -917,12 +966,8 @@ class FlowAutomationService : AccessibilityService() {
                     throw IllegalArgumentException("read_screen_target_not_allowlisted")
                 }
                 if (target in ZOZ_STUDIO_PACKAGES &&
-                    action !in setOf("inspect", "read_screen", "tap", "scroll", "wait")) {
-                    throw IllegalArgumentException("studio_read_only")
-                }
-                if (target in ZOZ_STUDIO_PACKAGES && action == "tap") {
-                    val selector = step.optString("text", step.optString("content_description", ""))
-                    if (!isStudioNavigationLabel(selector)) throw IllegalArgumentException("studio_navigation_only")
+                    action !in setOf("inspect", "read_screen", "tap", "scroll", "wait", "back", "type_text")) {
+                    throw IllegalArgumentException("unsupported_studio_action")
                 }
                 if (target in ZOZ_REGULAR_SOCIAL_PACKAGES && action == "type_text" &&
                     (step.optString("input_purpose").lowercase() !in ZOZ_TEXT_PURPOSES ||
