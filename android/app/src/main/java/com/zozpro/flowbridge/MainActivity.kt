@@ -150,12 +150,12 @@ private fun FlowBridgeScreen() {
     MaterialTheme {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("ZOZ Flow Bridge", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text("ZOZ Pro Service", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text("جهاز تنفيذ Android المتصل بوكيل ZOZ Pro", style = MaterialTheme.typography.titleMedium)
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(if (paired) "الجهاز مقرون بالوكيل" else "الجهاز غير مقرون", fontWeight = FontWeight.Bold)
-                        Text("قدرات الجهاز: تنفيذ مشاهد Flow والتحكم المرئي في Chrome وYouTube وYouTube Studio لأعمال ZOZ فقط.")
+                        Text("قدرات الجهاز: تنفيذ مهام Flow، وقراءة تحليلات TikTok Studio لقناة فِكرة، والتحكم المرئي المحدود في تطبيقات العمل المصرح بها. لا ينفذ نشرًا عامًا أو تغييرات حسابية حساسة.")
                         Text("التطبيقات الشخصية خارج النطاق. لا تُقرأ الحسابات أو البيانات الخاصة؛ الكتابة لمحتوى العمل غير الحساس فقط. النشر والحذف والدفع والتحويل تتطلب موافقتك المستقلة.")
                     }
                 }
