@@ -5,8 +5,16 @@ function secret(name:string){try{const v=JSON.parse(Deno.env.get(name)||"{}");re
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || secret("SUPABASE_SECRET_KEYS") || Deno.env.get("SUPABASE_SECRET_KEY") || "";
 const PUBLIC = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || secret("SUPABASE_PUBLISHABLE_KEYS") || Deno.env.get("SUPABASE_ANON_KEY") || "";
 const OWNER_EMAIL = "hazemnaw48@gmail.com";
-const CAPABILITIES = new Set(["device.health_check","flow.open","flow.copy_prompt","flow.generate_scene","device.ui_control"]);
-const CONTROL_PACKAGES = new Set(["com.android.chrome","com.google.android.googlequicksearchbox","com.google.android.youtube","com.google.android.apps.youtube.creator"]);
+const CAPABILITIES = new Set(["device.health_check","device.ui_control"]);
+const TIKTOK_STUDIO_PACKAGE = "com.ss.android.tt.creator";
+const YOUTUBE_STUDIO_PACKAGE = "com.google.android.apps.youtube.creator";
+const TIKTOK_PACKAGE = "com.zhiliaoapp.musically";
+const YOUTUBE_PACKAGE = "com.google.android.youtube";
+const CONTROL_PACKAGES = new Set([YOUTUBE_STUDIO_PACKAGE,TIKTOK_STUDIO_PACKAGE,TIKTOK_PACKAGE,YOUTUBE_PACKAGE]);
+const STUDIO_PACKAGES = new Set([YOUTUBE_STUDIO_PACKAGE,TIKTOK_STUDIO_PACKAGE]);
+const REGULAR_PACKAGES = new Set([TIKTOK_PACKAGE,YOUTUBE_PACKAGE]);
+const STUDIO_NAV_LABELS = ["analytics","overview","dashboard","insights","content","posts","videos","audience","engagement","comments","subscribers","earn","monetization","community","revenue","الإحصاءات","احصاءات","إحصاءات","التحليلات","تحليلات","نظرة عامة","لوحة البيانات","الرؤى","المحتوى","المنشورات","الفيديوهات","المنتدى","تحقيق الربح","الربح","الجمهور","التفاعل","التعليقات","المشتركون","الأرباح","إيرادات","الإيرادات","المشاهدات"];
+function isStudioNavigationLabel(value:string){const v=value.toLowerCase().trim();return Boolean(v)&&STUDIO_NAV_LABELS.some(x=>v.includes(x));}
 const CONTROL_HOSTS = new Set(["labs.google","hazemnaw48-coder.github.io","github.com","supabase.com","oxyzxbkwhafzaztraowc.supabase.co","youtube.com","studio.youtube.com","kdp.amazon.com","amazon.com","draft2digital.com","notion.so","canva.com","tiktok.com"]);
 const TEXT_PURPOSES = new Set(["title","description","prompt","tags","comment","business_copy","search_query"]);
 function sensitiveWorkText(value:string){
@@ -26,15 +34,17 @@ function allowedBusinessUrl(raw:string){
 function validateUiControl(payload:any):string|null{
  if(!payload||typeof payload!=="object"||!CONTROL_PACKAGES.has(String(payload.target_package||"")))return "target_app_not_allowlisted";
  const steps=payload.steps;
- if(!Array.isArray(steps)||steps.length<1||steps.length>12)return "control_steps_invalid";
- const allowed=new Set(["inspect","tap","type_text","scroll","back","wait","open_url"]);
+ if(!Array.isArray(steps)||steps.length<1||steps.length>30)return "control_steps_invalid";
+ const allowed=new Set(["inspect","read_screen","tap","scroll","wait","type_text"]);
  for(const step of steps){
   if(!step||typeof step!=="object"||!allowed.has(String(step.action||"")))return "control_action_not_allowlisted";
-  if(step.action==="type_text"){
+  if(step.action==="read_screen"&&!CONTROL_PACKAGES.has(String(payload.target_package||"")))return "read_screen_target_not_allowed";
+  if(STUDIO_PACKAGES.has(String(payload.target_package||""))&&step.action==="type_text")return "studio_read_only";
+  if(STUDIO_PACKAGES.has(String(payload.target_package||""))&&step.action==="tap"&&!isStudioNavigationLabel(String(step.text||step.content_description||step.view_id||"")))return "studio_navigation_only";
+  if(REGULAR_PACKAGES.has(String(payload.target_package||""))&&step.action==="type_text"){
    const value=String(step.text||"");
    if(!TEXT_PURPOSES.has(String(step.input_purpose||"").toLowerCase())||!value.trim()||value.length>3000||sensitiveWorkText(value))return "sensitive_or_nonbusiness_text_blocked";
   }
-  if(step.action==="open_url"&&(payload.target_package!=="com.android.chrome"||!allowedBusinessUrl(String(step.url||""))))return "business_url_not_allowlisted";
  }
  return null;
 }
@@ -60,18 +70,17 @@ Deno.serve(async(req:Request)=>{
    const consumed=await db("zoz_pro_device_pairing_challenges?id=eq."+encodeURIComponent(found.id)+"&used_at=is.null&expires_at=gt."+encodeURIComponent(now),{method:"PATCH",headers:{prefer:"return=representation"},body:JSON.stringify({used_at:now})});
    const ch=consumed?.[0];if(!ch)return fail("رمز الاقتران استُخدم بالفعل.",409);
    const deviceName=clean(body?.device_name||"Android device",100);const appVersion=clean(body?.app_version||"0.1.0",30);
-   const deviceRows=await db("zoz_pro_device_registry",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({owner_id:ch.owner_id,device_name:deviceName,platform:"android",app_package:"com.zozpro.flowbridge",app_version:appVersion,device_status:"active",capabilities:["device.health_check","flow.open","flow.copy_prompt"]})});
+   const requestedPackage=clean(body?.app_package||"",120);
+   const appPackage=requestedPackage==="com.zozpro.flowbridge.next"||(!requestedPackage&&(appVersion.startsWith("0.5.")||appVersion.startsWith("0.6.")))?"com.zozpro.flowbridge.next":"com.zozpro.flowbridge";
+   const deviceRows=await db("zoz_pro_device_registry",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({owner_id:ch.owner_id,device_name:deviceName,platform:"android",app_package:appPackage,app_version:appVersion,device_status:"active",capabilities:["device.health_check"]})});
    const dev=deviceRows?.[0];if(!dev)throw new Error("Could not register device.");
    const raw=token();
-   const intakeToken="zoz_intake_"+token();
-   const sourceRows=await db("zoz_pro_video_intake_sources",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({owner_id:ch.owner_id,channel_id:"UCIael48cvwPG3gKj--c7HKw",source_name:"ZOZ Android — "+deviceName,secret_hash:await digest(intakeToken),is_active:true})});
-   const source=sourceRows?.[0];if(!source)throw new Error("Could not provision the private video intake capability.");
-   await db("zoz_pro_device_registry?id=eq."+encodeURIComponent(dev.id),{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({intake_source_id:source.id})});
    await db("zoz_pro_device_credentials",{method:"POST",headers:{prefer:"return=minimal"},body:JSON.stringify({owner_id:ch.owner_id,device_id:dev.id,token_hash:await digest(raw)})});
-   await log(ch.owner_id,dev.id,null,"device_paired",{device_name:deviceName,app_version:appVersion,intake_source_id:source.id});
-   return json({ok:true,device_id:dev.id,device_token:raw,intake_token:intakeToken,device_name:deviceName,capabilities:dev.capabilities,paired_at:new Date().toISOString()});
+   await log(ch.owner_id,dev.id,null,"studio_controller_paired",{device_name:deviceName,app_version:appVersion,capability_scope:["device.health_check"]});
+   return json({ok:true,device_id:dev.id,device_token:raw,intake_token:"",device_name:deviceName,capabilities:dev.capabilities,paired_at:new Date().toISOString()});
   }
-  if(action==="device_health"||action==="heartbeat"||action==="poll_jobs"||action==="complete_job"||action==="enable_flow_automation"||action==="enable_phone_control"||action==="production_intake_complete"||action==="device_intake_token"){
+  if(action==="enable_flow_automation")return fail("هذا الجهاز مخصص لاستوديو يوتيوب واستوديو تيك توك فقط؛ تم إيقاف تحكم Flow من هذا التطبيق.",403);
+  if(action==="device_health"||action==="heartbeat"||action==="poll_jobs"||action==="complete_job"||action==="enable_phone_control"||action==="request_studio_read"||action==="request_app_control"||action==="device_intake_token"){
    const d=await device(req);if(!d)return fail("الجهاز غير مقرون أو تم إلغاء صلاحياته.",401);
    const now=new Date().toISOString();
    if(action==="production_intake_complete"){
@@ -93,9 +102,9 @@ Deno.serve(async(req:Request)=>{
     await log(d.owner_id,d.device_id,null,"flow_automation_enabled",{capability_id:"flow.generate_scene"});
     return json({ok:true,device_id:d.device_id,capabilities});
    }
-      if(action==="device_intake_token"){
+   if(action==="device_intake_token"){
     const channelId=clean(body?.channel_id,80);
-    const allowedChannels=["UC9fr5B0SZZkmVAApfCqEO3w","UCIael48cvwPG3GkJ--c7HKw"];
+    const allowedChannels=["UC9fr5B0SZZkmVAApfCqEO3w","UCIael48cvwPG3gKj--c7HKw"];
     if(!allowedChannels.includes(channelId))return fail("القناة غير مفعّلة لاستقبال ملفات الهاتف؛ فِكرة كيدز مستبعدة حتى تأكيد وجهتها.",403);
     const channels=await db("zoz_pro_managed_channels?owner_id=eq."+encodeURIComponent(d.owner_id)+"&channel_id=eq."+encodeURIComponent(channelId)+"&is_active=eq.true&select=channel_id,display_name&limit=1");
     if(!channels?.[0])return fail("القناة غير مسجلة أو غير نشطة في حساب المالك.",404);
@@ -110,10 +119,31 @@ Deno.serve(async(req:Request)=>{
     return json({ok:true,intake_token:intakeToken,source_id:source.id,channel_id:channelId,channel_name:channels[0].display_name,capabilities});
    }
    if(action==="enable_phone_control"){
-    const capabilities=[...new Set([...(Array.isArray(d.device.capabilities)?d.device.capabilities:[]),"device.ui_control"])];
+    const capabilities=["device.health_check","device.ui_control"];
     await db("zoz_pro_device_registry?id=eq."+encodeURIComponent(d.device_id)+"&owner_id=eq."+encodeURIComponent(d.owner_id),{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({capabilities,updated_at:now})});
-    await log(d.owner_id,d.device_id,null,"phone_ui_control_enabled",{capability_id:"device.ui_control",scope:"visible_user_granted_accessibility"});
-    return json({ok:true,device_id:d.device_id,capabilities,scope:"visible_user_granted_accessibility"});
+    const sourceRows=await db("zoz_pro_device_registry?id=eq."+encodeURIComponent(d.device_id)+"&owner_id=eq."+encodeURIComponent(d.owner_id)+"&select=intake_source_id&limit=1");
+    const sourceId=sourceRows?.[0]?.intake_source_id;
+    if(sourceId)await db("zoz_pro_video_intake_sources?id=eq."+encodeURIComponent(sourceId)+"&owner_id=eq."+encodeURIComponent(d.owner_id),{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({is_active:false,revoked_at:now})});
+    await db("zoz_pro_device_jobs?device_id=eq."+encodeURIComponent(d.device_id)+"&owner_id=eq."+encodeURIComponent(d.owner_id)+"&capability_id=in.(flow.open,flow.copy_prompt,flow.generate_scene)&status=in.(queued,running,awaiting_owner_approval)",{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({status:"cancelled",error_code:"studio_only_device",error_message:"تم قصر هذا الجهاز على YouTube Studio وTikTok Studio.",updated_at:now,completed_at:now})});
+    await log(d.owner_id,d.device_id,null,"studio_only_access_enabled",{capability_id:"device.ui_control",scope:["com.ss.android.tt.creator","com.google.android.apps.youtube.creator","com.zhiliaoapp.musically","com.google.android.youtube"],intake_disabled:Boolean(sourceId)});
+    return json({ok:true,device_id:d.device_id,capabilities,scope:["com.ss.android.tt.creator","com.google.android.apps.youtube.creator","com.zhiliaoapp.musically","com.google.android.youtube"],intake_disabled:Boolean(sourceId)});
+   }
+   if(action==="request_app_control"){
+    const target=clean(body?.target_package,120);
+    if(!CONTROL_PACKAGES.has(target))return fail("التطبيق خارج قائمة التطبيقات الأربعة المسموح بها.",403);
+    if(!(d.device.capabilities||[]).includes("device.ui_control"))return fail("فعّل قدرة التحكم المقيّد من تطبيق ZOZ Studio Control أولًا.",403);
+    const section=clean(body?.section||"screen",30).toLowerCase();
+    const steps=section==="analytics"&&STUDIO_PACKAGES.has(target)
+      ? [{action:"wait",milliseconds:900},{action:"tap",text:"Analytics",alternates:["الإحصاءات","التحليلات","Insights","Analytics"]},{action:"wait",milliseconds:1400},{action:"read_screen",section:"analytics"}]
+      : [{action:"wait",milliseconds:900},{action:"read_screen",section:"screen"}];
+    const payload={target_package:target,owner_approved:false,steps};
+    const rows=await db("zoz_pro_device_jobs",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({
+      owner_id:d.owner_id,device_id:d.device_id,capability_id:"device.ui_control",payload,status:"queued",
+      approval_required:false,approval_status:"not_required",idempotency_key:"studio-read-"+d.device_id+"-"+Date.now(),priority:1
+    })});
+    const job=rows?.[0];if(!job)throw new Error("تعذر إنشاء مهمة قراءة الاستوديو.");
+    await log(d.owner_id,d.device_id,job.id,"allowed_app_control_requested",{target_package:target,read_only:STUDIO_PACKAGES.has(target)});
+    return json({ok:true,job_id:job.id,target_package:target,status:"queued",read_only:STUDIO_PACKAGES.has(target)});
    }
    if(action==="device_health"||action==="heartbeat"){
     await db("zoz_pro_device_registry?id=eq."+encodeURIComponent(d.device_id),{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({last_seen_at:now,last_heartbeat_at:now,updated_at:now,app_version:clean(body?.app_version||"0.1.0",30)})});
@@ -153,7 +183,7 @@ Deno.serve(async(req:Request)=>{
    const needsOwnerApproval=outcome==="failed"&&clean(body?.error_code,80)==="owner_approval_required";
    const retry=outcome==="failed"&&!needsOwnerApproval&&Number(j.attempts)<Number(j.max_attempts);
    const status=needsOwnerApproval?"awaiting_owner_approval":retry?"queued":outcome;
-   await db("zoz_pro_device_jobs?id=eq."+encodeURIComponent(jobId)+"&status=eq.running",{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({status,result:safeResult,error_code:clean(body?.error_code,80)||null,error_message:clean(body?.error_message,500)||null,approval_required:needsOwnerApproval,approval_status:needsOwnerApproval?"pending":null,lease_expires_at:null,completed_at:retry||needsOwnerApproval?null:now,updated_at:now})});
+   await db("zoz_pro_device_jobs?id=eq."+encodeURIComponent(jobId)+"&status=eq.running",{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({status,result:safeResult,error_code:clean(body?.error_code,80)||null,error_message:clean(body?.error_message,500)||null,approval_required:needsOwnerApproval,approval_status:needsOwnerApproval?"pending":"not_required",lease_expires_at:null,completed_at:retry||needsOwnerApproval?null:now,updated_at:now})});
    await log(d.owner_id,d.device_id,jobId,needsOwnerApproval?"job_awaiting_owner_approval":"job_"+outcome,{retry,status,result:safeResult,error_code:clean(body?.error_code,80)});
    return json({ok:true,job_id:jobId,status,requeued:retry,approval_required:needsOwnerApproval});
   }
