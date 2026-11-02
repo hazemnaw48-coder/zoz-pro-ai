@@ -499,31 +499,38 @@ class FlowAutomationService : AccessibilityService() {
     }
 
     private fun findStudioNavigationNode(root: AccessibilityNodeInfo, selector: JSONObject): AccessibilityNodeInfo? {
-        val wanted = listOf(
-            selector.optString("text", "").trim(),
-            selector.optString("content_description", "").trim(),
-            selector.optString("hint", "").trim()
-        ).firstOrNull { it.isNotBlank() } ?: return null
-        if (!isStudioNavigationLabel(wanted)) return null
-        val matches = linkedMapOf<String, AccessibilityNodeInfo>()
-        walk(root) { node ->
-            if (!node.isVisibleToUser || !node.isEnabled || node.isEditable || node.isPassword) return@walk
-            val labels = listOf(node.text?.toString(), node.contentDescription?.toString(), node.hintText?.toString())
-                .filterNot { it.isNullOrBlank() }.map { it!!.replace(Regex("\\s+"), " ").trim() }
-            if (labels.none { it.equals(wanted, ignoreCase = true) }) return@walk
-            var clickTarget: AccessibilityNodeInfo? = node
-            var depth = 0
-            while (clickTarget != null && !clickTarget.isClickable && depth < 4) {
-                clickTarget = clickTarget.parent
-                depth++
-            }
-            val target = clickTarget ?: return@walk
-            if (!target.isVisibleToUser || !target.isEnabled || !target.isClickable) return@walk
-            val bounds = android.graphics.Rect().also(target::getBoundsInScreen)
-            val key = (target.viewIdResourceName ?: "") + "|" + bounds.flattenToString()
-            matches.putIfAbsent(key, target)
+        val candidates = linkedSetOf<String>()
+        listOf(
+            selector.optString("text", ""),
+            selector.optString("content_description", ""),
+            selector.optString("hint", "")
+        ).map { it.trim() }.filter { it.isNotBlank() }.forEach(candidates::add)
+        val alternates = selector.optJSONArray("alternates") ?: JSONArray()
+        for (index in 0 until minOf(alternates.length(), 8)) {
+            alternates.optString(index).trim().takeIf { it.isNotBlank() }?.let(candidates::add)
         }
-        return matches.values.singleOrNull()
+        for (wanted in candidates.filter(::isStudioNavigationLabel)) {
+            val matches = linkedMapOf<String, AccessibilityNodeInfo>()
+            walk(root) { node ->
+                if (!node.isVisibleToUser || !node.isEnabled || node.isEditable || node.isPassword) return@walk
+                val labels = listOf(node.text?.toString(), node.contentDescription?.toString(), node.hintText?.toString())
+                    .filterNot { it.isNullOrBlank() }.map { it!!.replace(Regex("\\s+"), " ").trim() }
+                if (labels.none { it.equals(wanted, ignoreCase = true) }) return@walk
+                var clickTarget: AccessibilityNodeInfo? = node
+                var depth = 0
+                while (clickTarget != null && !clickTarget.isClickable && depth < 4) {
+                    clickTarget = clickTarget.parent
+                    depth++
+                }
+                val target = clickTarget ?: return@walk
+                if (!target.isVisibleToUser || !target.isEnabled || !target.isClickable) return@walk
+                val bounds = android.graphics.Rect().also(target::getBoundsInScreen)
+                val key = (target.viewIdResourceName ?: "") + "|" + bounds.flattenToString()
+                matches.putIfAbsent(key, target)
+            }
+            if (matches.size == 1) return matches.values.first()
+        }
+        return null
     }
 
     private fun findScrollableNode(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
