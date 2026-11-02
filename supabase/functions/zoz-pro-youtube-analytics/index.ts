@@ -725,7 +725,7 @@ async function vidiqMcpStart(apiKey:string){
    const sessionId=initialized.sessionId;
    const session={sessionId,protocolVersion};
    await vidiqMcpRpc(apiKey,"notifications/initialized",{},0,session.sessionId,protocolVersion).catch(()=>null);
-   const tools=await vidiqMcpRpc(apiKey,"tools/list",{cursor:null},2,session.sessionId,protocolVersion);
+   const tools=await vidiqMcpRpc(apiKey,"tools/list",{},2,session.sessionId,protocolVersion);
    const list=tools.payload?.result?.tools||tools.payload?.tools||[];
    if(!Array.isArray(list))throw new Error("vidIQ MCP did not return a tool list.");
    return {sessionId:tools.sessionId,protocolVersion,tools:list};
@@ -791,8 +791,8 @@ async function vidiqReadAccountBalance(account:any,ownerId:string){
    error:(error instanceof Error?error.message:"vidIQ account check failed").slice(0,220)};
  }
 }
-async function vidiqAccountBalances(){
- return await Promise.all(VIDIQ_ACCOUNT_SLOTS.map(account=>vidiqReadAccountBalance(account)));
+async function vidiqAccountBalances(ownerId:string){
+ return await Promise.all(VIDIQ_ACCOUNT_SLOTS.map(account=>vidiqReadAccountBalance(account,ownerId)));
 }
 function chooseVidiqAccount(balances:any[],minimumCredits:number){
  return balances.filter(x=>x.connected&&typeof x.credits_remaining==="number"&&x.credits_remaining>=minimumCredits)
