@@ -256,8 +256,12 @@ body.upload-mode .footer{font-size:11px}
 
  <h3 class="section-gap">ملف الفيديو وبيانات النشر</h3>
  <label for="intake-file">اختر ملف الفيديو من الهاتف (MP4 أو MOV أو WebM أو MKV)</label><input id="intake-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,application/octet-stream">
- <label for="intake-title">عنوان الفيديو على YouTube</label><input id="intake-title" maxlength="100" placeholder="عنوان الفيديو النهائي">
- <label for="intake-description">وصف الفيديو</label><textarea id="intake-description" rows="4" maxlength="5000" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit"></textarea>
+ <label for="intake-title">عنوان الفيديو على YouTube</label><input id="intake-title" maxlength="100" value="ما هو الوكيل الذكي؟ وكيف يحوّل هاتفك إلى مساعد ينفّذ المهام؟" placeholder="عنوان الفيديو النهائي">
+ <label for="intake-description">وصف الفيديو</label><textarea id="intake-description" rows="4" maxlength="5000" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit">ما هو الوكيل الذكي؟ 🤖
+في هذا الفيديو نوضح الفرق بين الشات العادي والوكيل الذكي، وكيف يمكن للهاتف أن يتحول إلى مساعد ينفذ مهامًا حقيقية ضمن صلاحيات واضحة.
+تابع فِكرة لمزيد من التجارب العملية والأفكار المفيدة.
+
+#فكرة #ذكاء_اصطناعي #وكيل_ذكي #AI #AIAgent</textarea>
  <label for="intake-tags">الكلمات المفتاحية (افصل بينها بفواصل)</label><input id="intake-tags" maxlength="2000" placeholder="مصر القديمة، الآثار، التاريخ">
  <div class="grid">
   <div><label for="intake-kids">هل صُنع الفيديو خصيصًا للأطفال؟</label><select id="intake-kids" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px"><option value="false" selected>لا</option><option value="true">نعم</option></select></div>
@@ -708,6 +712,12 @@ async function loadIntakeAssets(){
   if(a.status==='ready_for_review'){
    addButton('موافقة المالك',async()=>{if(!confirm('تأكيد مراجعة بيانات الفيديو والسماح برفعه إلى YouTube بوضع خاص؟'))return;await intakeApi('intake_review',{asset_id:a.id,decision:'approve'});notice('intake-msg','تم تسجيل الموافقة؛ الفيديو لم يُنشر علنًا.','good');});
    addButton('رفض الفيديو',async()=>{if(!confirm('رفض هذا الملف؟'))return;await intakeApi('intake_review',{asset_id:a.id,decision:'reject',note:'رفض من مراجعة المالك'});notice('intake-msg','تم رفض الملف.','good');},true);
+  }
+  if(a.channel_id==='UC9fr5B0SZZkmVAApfCqEO3w' && ['ready_for_review','approved','processing','ready_to_publish','published'].includes(a.status) && Number(a.total_bytes||0)<=52428800){
+   addButton('إرسال نفس الفيديو إلى مسودة TikTok فِكرة',async()=>{
+    const d=await tiktokCall('upload_inbox',{slot_key:'tiktok_2',intake_asset_id:a.id});
+    notice('intake-msg',d.message||'تم إرسال الفيديو إلى صندوق وارد TikTok فِكرة.','good');
+   },true);
   }
   if(a.status==='approved')addButton('رفع إلى YouTube بوضع خاص',async()=>{if(!confirm('بدء رفع الفيديو إلى قناتك بوضع خاص؟ لن يكون عامًا بعد الرفع.'))return;await intakeApi('intake_start_youtube',{asset_id:a.id});for(let i=0;i<a.chunk_count;i++){const r=await intakeApi('intake_youtube_part',{asset_id:a.id,part_index:i});notice('intake-msg','جارٍ نقل الفيديو إلى YouTube: '+fmt(r.uploaded_bytes||0)+' / '+fmt(r.total_bytes||a.total_bytes)+' بايت.','');if(r.complete)break;}notice('intake-msg','انتهى رفع الملف إلى YouTube؛ انتظر اكتمال المعالجة ثم افحص الحالة.','good');});
   if(a.status==='processing')addButton('فحص معالجة YouTube',async()=>{const r=await intakeApi('intake_check_processing',{asset_id:a.id});notice('intake-msg','حالة YouTube: '+intakeStatusLabel(r.status)+' · '+r.processing_status,'good');},true);
