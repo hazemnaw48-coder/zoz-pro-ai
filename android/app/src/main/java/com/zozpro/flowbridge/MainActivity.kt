@@ -103,7 +103,7 @@ private fun AppScopeControlScreen() {
         }
     }
 
-    fun requestApp(packageName: String, displayName: String) {
+    fun requestApp(packageName: String, displayName: String, analytics: Boolean = false) {
         if (!paired) {
             status = "اربط التطبيق بمركز ZOZ Pro أولًا."
             return
@@ -125,7 +125,7 @@ private fun AppScopeControlScreen() {
             apiPostWithToken("enable_phone_control", JSONObject().put("app_version", BuildConfig.VERSION_NAME), token)
             val response = apiPostWithToken(
                 "request_app_control",
-                JSONObject().put("target_package", packageName),
+                JSONObject().put("target_package", packageName).put("section", if (analytics) "analytics" else "screen"),
                 token
             )
             // Launch the allow-listed Studio while this owner-initiated request is active.
@@ -134,7 +134,7 @@ private fun AppScopeControlScreen() {
                 context.startActivity(launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
             scheduleDeviceWorker(context)
-            "تم فتح $displayName وإنشاء مهمة قراءة للشاشة. رقم المهمة: " +
+            "تم فتح $displayName وإنشاء مهمة " + (if (analytics) "قراءة الإحصاءات" else "قراءة الشاشة") + ". رقم المهمة: " +
                 response.optString("job_id", "قيد التنفيذ")
         }
     }
@@ -191,8 +191,10 @@ private fun AppScopeControlScreen() {
                     Text("التطبيقات المسموح بها", fontWeight = FontWeight.Bold)
                     Button(enabled = !busy, onClick = { requestApp("com.ss.android.tt.creator", "TikTok Studio · فِكرة") },
                         modifier = Modifier.fillMaxWidth()) { Text("TikTok Studio · فِكرة") }
+                    OutlinedButton(enabled = !busy, onClick = { requestApp("com.ss.android.tt.creator", "TikTok Studio · فِكرة", analytics = true) }, modifier = Modifier.fillMaxWidth()) { Text("قراءة إحصاءات TikTok Studio") }
                     Button(enabled = !busy, onClick = { requestApp("com.google.android.apps.youtube.creator", "YouTube Studio") },
                         modifier = Modifier.fillMaxWidth()) { Text("YouTube Studio") }
+                    OutlinedButton(enabled = !busy, onClick = { requestApp("com.google.android.apps.youtube.creator", "YouTube Studio", analytics = true) }, modifier = Modifier.fillMaxWidth()) { Text("قراءة إحصاءات YouTube Studio") }
                     Button(enabled = !busy, onClick = { requestApp("com.zhiliaoapp.musically", "TikTok") },
                         modifier = Modifier.fillMaxWidth()) { Text("TikTok العادي") }
                     Button(enabled = !busy, onClick = { requestApp("com.google.android.youtube", "YouTube") },
