@@ -11,6 +11,7 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import android.media.MediaMetadataRetriever
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.provider.Settings
@@ -19,6 +20,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.documentfile.provider.DocumentFile
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -63,6 +65,10 @@ private const val PREF_CLIPS = "saved_clips"
 private const val PREF_PROMPT = "scene_prompt"
 private const val PREF_PENDING_PROMPT = "pending_agent_prompt"
 private const val PREF_PENDING_PROMPTS = "pending_agent_prompts"
+private const val PREF_MEDIA_TREE_URI = "media_library_tree_uri"
+private const val PREF_MEDIA_UPLOAD_HISTORY = "media_upload_history"
+private const val FEKRA_CHANNEL_ID = "UC9fr5B0SZZkmVAApfCqEO3w"
+private const val HAZEM_CHANNEL_ID = "UCIael48cvwPG3gKj--c7HKw"
 private const val API = "https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-device-agent"
 private const val INTAKE_API = "https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-youtube-analytics"
 private const val PUBLIC_KEY = "sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm"
@@ -70,6 +76,7 @@ private const val PUBLIC_KEY = "sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm"
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        importSharedVideos(this, intent)
         scheduleDeviceWorker(this)
         setContent { AppScopeControlScreen() }
     }
@@ -77,6 +84,8 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        importSharedVideos(this, intent)
+        scheduleDeviceWorker(this)
     }
 }
 
@@ -89,15 +98,10 @@ private fun AppScopeControlScreen() {
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf(if (paired) "الجهاز مرتبط بوكيل ZOZ Pro." else "اربط التطبيق بمركز ZOZ Pro.") }
     var serviceEnabled by remember { mutableStateOf(FlowAutomationService.isEnabled(context)) }
-    var uploadChannelId by remember { mutableStateOf("UC9fr5B0SZZkmVAApfCqEO3w") }
-    var uploadVideoUri by remember { mutableStateOf<Uri?>(null) }
-    val uploadPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
-            uploadVideoUri = uri
-            status = "تم اختيار الملف: ${queryName(context, uri) ?: "فيديو"} — جاهز للإرسال إلى استقبال القناة المختارة."
-        }
+    var mediaTreeUri by remember {
+        mutableStateOf(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(PREF_MEDIA_TREE_URI, null)?.let(Uri::parse))
     }
+    var mediaFolderName by remember { mutableStateOf(mediaTreeUri?.let { mediaTreeDisplayName(context, it) } ?: "لم يتم اختيار مجلد بعد") }
 
     fun runAsync(block: suspend () -> String) {
         if (busy) return
@@ -119,29 +123,70 @@ private fun AppScopeControlScreen() {
                 try {
                     withContext(Dispatchers.IO) {
                         val storedIntake = DeviceTokenVault.readIntake(context)
-                        if (storedIntake.isNullOrBlank() || storedIntake.length < 32) {
+                        val storedChannel = DeviceTokenVault.readIntakeChannel(context)
+                        if (storedIntake.isNullOrBlank() || storedIntake.length < 32 || storedChannel != FEKRA_CHANNEL_ID) {
                             val response = apiPostWithToken(
                                 "device_intake_token",
-                                JSONObject().put("channel_id", "UC9fr5B0SZZkmVAApfCqEO3w"),
+                                JSONObject().put("channel_id", FEKRA_CHANNEL_ID),
                                 deviceToken
                             )
                             val issued = response.optString("intake_token")
-                            if (issued.length < 32) throw IllegalStateException("الخادم لم يصدر رمز استقبال صالحًا.")
-                            DeviceTokenVault.writeIntake(context, issued)
+                            if (issued.length < 32) throw IllegalStateException("الخادم لم يصدر رمز استقبال صالحًا لقناة فِكرة.")
+                            DeviceTokenVault.writeIntake(context, issued, FEKRA_CHANNEL_ID)
+                        }
+                        val savedTree = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(PREF_MEDIA_TREE_URI, null)
+                        val savedTreeUri = savedTree?.let(Uri::parse)
+                        if (savedTreeUri != null && mediaTreeIsReadable(context, savedTreeUri)) {
+                            apiPostWithToken("set_media_folder_access", JSONObject().put("enabled", true), deviceToken)
+                        } else if (savedTreeUri != null) {
+                            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(PREF_MEDIA_TREE_URI).apply()
+                            mediaTreeUri = null
+                            mediaFolderName = "لم يتم اختيار مجلد بعد"
+                            apiPostWithToken("set_media_folder_access", JSONObject().put("enabled", false), deviceToken)
                         }
                         if (FlowAutomationService.isEnabled(context)) {
                             apiPostWithToken("enable_phone_control", JSONObject().put("app_version", BuildConfig.VERSION_NAME), deviceToken)
                         }
                     }
                     serviceEnabled = FlowAutomationService.isEnabled(context)
-                    status = if (serviceEnabled) {
-                        "اتصال الهاتف نشط. تم تجهيز استقبال فيديو فِكرة، وتفعيل نطاق التحكم المسموح بتطبيقات الاستوديو."
+                    val folderReady = mediaTreeUri != null && mediaTreeIsReadable(context, mediaTreeUri!!)
+                    status = if (folderReady) {
+                        "اتصال الهاتف نشط. مجلد العمل محفوظ، والوكيل يستطيع اختيار ملف الفيديو المطابق ورفعه إلى استقبال فِكرة تلقائيًا."
                     } else {
-                        "اتصال الهاتف نشط. تم تجهيز استقبال فيديو فِكرة. فعّل خدمة ZOZ App Access لإتاحة التحكم داخل تطبيقات الاستوديو."
+                        "اتصال الهاتف نشط. اختر مجلد Downloads/ZOZ Work مرة واحدة لتفعيل اختيار الفيديو ورفعه تلقائيًا."
                     }
                 } catch (e: Exception) {
                     status = "اتصال الجهاز قائم، لكن تعذر تجهيز استقبال الملفات: " + (e.message ?: "خطأ غير معروف")
                 }
+            }
+        }
+    }
+
+    val mediaFolderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                val folder = DocumentFile.fromTreeUri(context, uri)
+                if (folder == null || !folder.canRead()) {
+                    status = "لم يمنح Android صلاحية قراءة المجلد. اختر مجلد العمل مرة أخرى."
+                } else {
+                    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(PREF_MEDIA_TREE_URI, uri.toString()).apply()
+                    mediaTreeUri = uri
+                    mediaFolderName = folder.name ?: "مجلد العمل"
+                    runAsync {
+                        val deviceToken = DeviceTokenVault.read(context) ?: throw IllegalStateException("الجهاز غير مرتبط بالوكيل.")
+                        val response = apiPostWithToken("device_intake_token", JSONObject().put("channel_id", FEKRA_CHANNEL_ID), deviceToken)
+                        val intakeToken = response.optString("intake_token")
+                        if (intakeToken.length < 32) throw IllegalStateException("تعذر إنشاء رمز استقبال فِكرة.")
+                        DeviceTokenVault.writeIntake(context, intakeToken, FEKRA_CHANNEL_ID)
+                        val enabled = apiPostWithToken("set_media_folder_access", JSONObject().put("enabled", true), deviceToken)
+                        if (!enabled.optBoolean("ok", false)) throw IllegalStateException("الخادم لم يؤكد صلاحية مجلد الفيديو.")
+                        scheduleDeviceWorker(context)
+                        "تم حفظ مجلد العمل وتفعيل قدرة اختيار الفيديو. سيختار الوكيل ملف MP4 المطابق لمشروع فِكرة ويرفعه للقناة دون اختيار ملف يدوي في كل مرة."
+                    }
+                }
+            } catch (e: Exception) {
+                status = "تعذر حفظ إذن المجلد: " + (e.message ?: "خطأ غير معروف")
             }
         }
     }
@@ -244,22 +289,35 @@ private fun AppScopeControlScreen() {
                         modifier = Modifier.fillMaxWidth()) { Text("YouTube العادي") }
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("رفع الفيديو مباشرة من الهاتف إلى مركز ZOZ", fontWeight = FontWeight.Bold)
-                            Text("اختر القناة ثم حدد ملف الفيديو مرة واحدة. يرفع التطبيق الملف إلى استقبال القناة فقط؛ لا ينشره تلقائيًا.")
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(enabled = !busy, onClick = { uploadChannelId = "UC9fr5B0SZZkmVAApfCqEO3w" }) { Text(if (uploadChannelId == "UC9fr5B0SZZkmVAApfCqEO3w") "✓ فِكرة" else "فِكرة") }
-                                OutlinedButton(enabled = !busy, onClick = { uploadChannelId = "UCIael48cvwPG3gKj--c7HKw" }) { Text(if (uploadChannelId == "UCIael48cvwPG3gKj--c7HKw") "✓ Hazem Ahmed" else "Hazem Ahmed") }
-                            }
-                            OutlinedButton(enabled = !busy, onClick = { uploadPicker.launch(arrayOf("video/mp4","video/quicktime","video/webm","video/*")) }, modifier = Modifier.fillMaxWidth()) { Text(if (uploadVideoUri == null) "اختيار ملف فيديو من الهاتف" else "تغيير ملف الفيديو") }
-                            if (uploadVideoUri != null) Text(queryName(context, uploadVideoUri!!) ?: "فيديو محدد", style = MaterialTheme.typography.bodySmall)
-                            Button(enabled = !busy && paired && uploadVideoUri != null, onClick = { runAsync {
-                                val deviceToken = DeviceTokenVault.read(context) ?: throw IllegalStateException("الجهاز غير مرتبط بالوكيل.")
-                                val tokenResponse = apiPostWithToken("device_intake_token", JSONObject().put("channel_id", uploadChannelId), deviceToken)
-                                val intakeToken = tokenResponse.optString("intake_token")
-                                if (intakeToken.length < 32) throw IllegalStateException("لم يصدر الخادم رمز استقبال صالحًا؛ لم يبدأ رفع الملف.")
-                                DeviceTokenVault.writeIntake(context, intakeToken)
-                                uploadFinalVideoToIntake(context, uploadVideoUri!!, true, false, uploadChannelId)
-                            } }, modifier = Modifier.fillMaxWidth()) { Text("رفع الملف إلى استقبال القناة المختارة") }
+                            Text("اختيار الفيديو والرفع التلقائي من الهاتف", fontWeight = FontWeight.Bold)
+                            Text("امنح التطبيق إذنًا لمجلد العمل مرة واحدة فقط. بعد ذلك يختار وكيل ZOZ ملف MP4 المطابق للمهمة (القناة والمدة والعنوان) ويرفعه إلى استقبال القناة دون مطالبتك باختيار الملف في كل مرة.")
+                            Text("القناة الحالية للمهمة المعتمدة: فِكرة على YouTube. لا يرفع التطبيق أي ملف خارج المجلد الذي اخترته.")
+                            Text(
+                                if (mediaTreeUri != null && mediaTreeIsReadable(context, mediaTreeUri!!))
+                                    "المجلد المصرح به: $mediaFolderName"
+                                else "لم يتم منح إذن مجلد العمل بعد.",
+                                fontWeight = FontWeight.Medium
+                            )
+                            OutlinedButton(
+                                enabled = !busy && paired,
+                                onClick = { mediaFolderPicker.launch(mediaTreeUri) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text(if (mediaTreeUri == null) "اختيار مجلد Downloads/ZOZ Work مرة واحدة" else "تغيير مجلد العمل المصرح به") }
+                            OutlinedButton(
+                                enabled = !busy && paired && mediaTreeUri != null,
+                                onClick = {
+                                    runAsync {
+                                        val token = DeviceTokenVault.read(context) ?: throw IllegalStateException("الجهاز غير مرتبط.")
+                                        if (!mediaTreeIsReadable(context, mediaTreeUri!!)) throw IllegalStateException("إذن المجلد لم يعد متاحًا في Android.")
+                                        val response = apiPostWithToken("set_media_folder_access", JSONObject().put("enabled", true), token)
+                                        if (!response.optBoolean("ok", false)) throw IllegalStateException("لم يتم تفعيل صلاحية اختيار الفيديو.")
+                                        scheduleDeviceWorker(context)
+                                        "تم تأكيد إذن مجلد العمل. أصبح الهاتف جاهزًا لاستقبال مهمة اختيار ورفع الفيديو من الوكيل."
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text("تأكيد إذن المجلد وتشغيل استقبال المهام") }
+                            Text("يُرفع الملف إلى استقبال ZOZ الخاص أولًا. يظل النشر العام على YouTube محكومًا بموافقة النشر المحفوظة للمشروع المحدد، ولا يُنشر على TikTok تلقائيًا.", style = MaterialTheme.typography.bodySmall)
                         }
                     }
                     OutlinedButton(onClick = {
@@ -571,7 +629,7 @@ private fun intakePost(action: String, body: JSONObject, token: String): JSONObj
     return result
 }
 
-fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kids: Boolean, channelId: String = ""): String {
+fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kids: Boolean, channelId: String = "", metadata: JSONObject? = null): String {
     val intakeToken = DeviceTokenVault.readIntake(context)?.takeIf { it.length >= 32 } ?: throw IllegalStateException("رمز استقبال الفيديو غير موجود أو غير صالح. اختر القناة لإصدار رمز جديد.")
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     val name = queryName(context, uri) ?: "ZOZ-final-video.mp4"
@@ -601,9 +659,10 @@ fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kid
             .put("filename", name)
             .put("total_bytes", size)
             .put("content_type", "video/mp4")
-            .put("title", name.substringBeforeLast("."))
-            .put("description", "تم تجميع الفيديو محليًا على جهاز ZOZ Android؛ ينتظر مراجعة المالك.")
-            .put("tags", JSONArray())
+            .put("title", metadata?.optString("title")?.takeIf { it.isNotBlank() }?.take(100) ?: name.substringBeforeLast("."))
+            .put("description", metadata?.optString("description")?.takeIf { it.isNotBlank() }?.take(5000)
+                ?: "تم اختيار الفيديو آليًا من مجلد العمل المصرح به على هاتف ZOZ Android؛ ينتظر مراجعة ZOZ.")
+            .put("tags", metadata?.optJSONArray("tags") ?: JSONArray())
             .put("made_for_kids", kids)
             .put("contains_synthetic_media", synthetic)
             .put("target_privacy_status", "public"), intakeToken)
@@ -664,8 +723,13 @@ fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kid
         }
     }
     intakePost("intake_finalize", JSONObject().put("asset_id", assetId), intakeToken)
-    prefs.edit().remove("intake_upload_asset_id").remove("intake_upload_uri").remove("intake_upload_size").apply()
-    return "اكتمل استقبال الفيديو النهائي في ZOZ. رقم الملف: $assetId. ينتظر موافقة المالك، ولم يُرفع إلى YouTube أو يُنشر بعد."
+    val verified = intakePost("intake_status", JSONObject().put("asset_id", assetId), intakeToken).optJSONObject("asset")
+        ?: throw IllegalStateException("تعذر التحقق من الملف بعد اكتمال الرفع.")
+    if (verified.optString("status") != "ready_for_review" || (channelId.isNotBlank() && verified.optString("channel_id") != channelId)) {
+        throw IllegalStateException("اكتمل نقل الملف لكن حالة الاستقبال أو القناة لا تطابق المهمة المطلوبة.")
+    }
+    prefs.edit().remove("intake_upload_asset_id").remove("intake_upload_uri").remove("intake_upload_size").remove("intake_upload_channel_id").apply()
+    return "اكتمل استقبال الفيديو النهائي في ZOZ. رقم الملف: $assetId. ينتظر المراجعة الخاصة؛ لم يتم النشر العام من الهاتف."
 }
 
 fun assembleCompatibleClips(context: Context, clips: List<ImportedClip>, outputUri: Uri) {
@@ -802,6 +866,40 @@ private fun executeJob(context: Context, job: JSONObject): String {
         val result = JSONObject()
         when (cap) {
             "device.health_check" -> result.put("device_model", android.os.Build.MODEL).put("android_release", android.os.Build.VERSION.RELEASE)
+            "media.upload_intake" -> {
+                val workItemId = payload.optString("work_item_id", "")
+                val channelId = payload.optString("channel_id", "")
+                if (!Regex("^[0-9a-f-]{36}$", RegexOption.IGNORE_CASE).matches(workItemId)) throw IllegalArgumentException("media_work_item_invalid")
+                if (channelId != FEKRA_CHANNEL_ID && channelId != HAZEM_CHANNEL_ID) throw IllegalArgumentException("media_channel_not_allowed")
+                val candidate = selectAgentVideo(context, payload)
+                val historyAsset = uploadedAssetForTask(context, workItemId, candidate.fingerprint)
+                if (historyAsset != null) {
+                    result.put("asset_id", historyAsset).put("already_uploaded", true)
+                        .put("selected_filename", candidate.name).put("fingerprint", candidate.fingerprint)
+                } else {
+                    val deviceToken = DeviceTokenVault.read(context) ?: throw IllegalStateException("device_token_missing")
+                    val tokenResponse = apiPostWithToken("device_intake_token", JSONObject().put("channel_id", channelId), deviceToken)
+                    val intakeToken = tokenResponse.optString("intake_token")
+                    if (intakeToken.length < 32) throw IllegalStateException("channel_intake_token_unavailable")
+                    DeviceTokenVault.writeIntake(context, intakeToken, channelId)
+                    val metadata = payload.optJSONObject("metadata") ?: payload
+                    uploadFinalVideoToIntake(
+                        context, candidate.uri,
+                        payload.optBoolean("contains_synthetic_media", true),
+                        payload.optBoolean("made_for_kids", false),
+                        channelId,
+                        metadata
+                    )
+                    val assetId = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                        .getString("zoz_last_uploaded_asset_id", null)
+                        ?: throw IllegalStateException("intake_asset_id_missing_after_upload")
+                    rememberUploadedAsset(context, workItemId, candidate, channelId, assetId)
+                    result.put("asset_id", assetId).put("already_uploaded", false)
+                        .put("selected_filename", candidate.name).put("selected_duration_seconds", candidate.durationSeconds)
+                        .put("file_size_bytes", candidate.size).put("fingerprint", candidate.fingerprint)
+                }
+                DeviceNotifications.show(context, "اكتمل رفع فيديو فِكرة", "اختار الوكيل الملف المطابق ورفعه إلى استقبال القناة الخاصة. لا يوجد نشر مباشر من الهاتف.")
+            }
             "flow.generate_scene" -> {
                 FlowAutomationService.startScene(context, id, payload)
                 return "بدأ الهاتف تنفيذ مشهد Flow المرئي."
@@ -845,6 +943,7 @@ class DeviceTokenVault {
         private const val IV = "device_token_iv"
         private const val INTAKE_TOKEN = "encrypted_intake_token"
         private const val INTAKE_IV = "intake_token_iv"
+        private const val INTAKE_CHANNEL = "intake_channel_id"
 
         fun write(context: Context, token: String, intakeToken: String) {
             val ks = java.security.KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
@@ -870,7 +969,7 @@ class DeviceTokenVault {
                 .putString(INTAKE_IV, android.util.Base64.encodeToString(intakeCipher.iv, android.util.Base64.NO_WRAP)).apply()
         }
 
-        fun writeIntake(context: Context, intakeToken: String) {
+        fun writeIntake(context: Context, intakeToken: String, channelId: String = "") {
             val ks = java.security.KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
             val key = (ks.getEntry(KEY_ALIAS, null) as java.security.KeyStore.SecretKeyEntry).secretKey
             val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
@@ -878,7 +977,12 @@ class DeviceTokenVault {
             val encrypted = cipher.doFinal(intakeToken.toByteArray(Charsets.UTF_8))
             context.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit()
                 .putString(INTAKE_TOKEN, android.util.Base64.encodeToString(encrypted, android.util.Base64.NO_WRAP))
-                .putString(INTAKE_IV, android.util.Base64.encodeToString(cipher.iv, android.util.Base64.NO_WRAP)).apply()
+                .putString(INTAKE_IV, android.util.Base64.encodeToString(cipher.iv, android.util.Base64.NO_WRAP))
+                .putString(INTAKE_CHANNEL, channelId).apply()
+        }
+
+        fun readIntakeChannel(context: Context): String {
+            return context.getSharedPreferences(PREF, Context.MODE_PRIVATE).getString(INTAKE_CHANNEL, "") ?: ""
         }
 
         fun readIntake(context: Context): String? {
@@ -949,12 +1053,22 @@ class DevicePollWorker(context: Context, params: androidx.work.WorkerParameters)
         val token = DeviceTokenVault.read(applicationContext) ?: return Result.success()
         return try {
             apiPostWithToken("heartbeat", JSONObject().put("app_version", BuildConfig.VERSION_NAME), token)
-            if (!FlowAutomationService.isEnabled(applicationContext)) return Result.success()
-            for (index in 0 until 1) {
-                val job = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job") ?: break
+            val accessibilityEnabled = FlowAutomationService.isEnabled(applicationContext)
+            val supported = JSONArray()
+                .put("device.health_check")
+                .put("media.upload_intake")
+                .put("flow.copy_prompt")
+                .put("flow.open")
+            if (accessibilityEnabled) {
+                supported.put("device.ui_control").put("flow.generate_scene")
+            }
+            val request = JSONObject().put("supported_capabilities", supported)
+            val job = apiPostWithToken("poll_jobs", request, token).optJSONObject("job")
+            if (job != null) {
                 val capability = job.optString("capability_id")
-                executeJob(applicationContext, job)
-                if (capability == "device.ui_control") break
+                if (accessibilityEnabled || capability !in setOf("device.ui_control", "flow.generate_scene")) {
+                    executeJob(applicationContext, job)
+                }
             }
             Result.success()
         } catch (_: Exception) { Result.retry() }
@@ -996,6 +1110,136 @@ private fun importSharedVideos(context: Context, intent: Intent?) {
         } catch (_: Exception) { }
     }
     saveClips(context, clips.distinctBy { it.uri })
+}
+
+private data class AgentVideoCandidate(
+    val uri: Uri,
+    val name: String,
+    val size: Long,
+    val durationSeconds: Int,
+    val lastModified: Long,
+    val fingerprint: String
+)
+
+private fun mediaTreeDisplayName(context: Context, treeUri: Uri): String {
+    return DocumentFile.fromTreeUri(context, treeUri)?.name ?: "مجلد العمل"
+}
+
+private fun mediaTreeIsReadable(context: Context, treeUri: Uri): Boolean {
+    return try {
+        val hasPersistedGrant = context.contentResolver.persistedUriPermissions.any {
+            it.uri == treeUri && it.isReadPermission
+        }
+        hasPersistedGrant && DocumentFile.fromTreeUri(context, treeUri)?.canRead() == true
+    } catch (_: Exception) {
+        false
+    }
+}
+
+private fun collectAgentMp4Files(root: DocumentFile, depth: Int, target: MutableList<DocumentFile>) {
+    if (depth > 2) return
+    val children = try { root.listFiles() } catch (_: Exception) { emptyArray() }
+    for (child in children) {
+        if (child.isDirectory) {
+            if (child.name?.startsWith(".") != true) collectAgentMp4Files(child, depth + 1, target)
+        } else {
+            val name = child.name ?: continue
+            if (name.substringAfterLast(".", "").equals("mp4", ignoreCase = true)) target.add(child)
+        }
+    }
+}
+
+private fun videoDurationSeconds(context: Context, uri: Uri): Int? {
+    val retriever = MediaMetadataRetriever()
+    return try {
+        retriever.setDataSource(context, uri)
+        val value = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+        value?.takeIf { it > 0 }?.let { ((it + 500L) / 1000L).toInt() }
+    } catch (_: Exception) {
+        null
+    } finally {
+        runCatching { retriever.release() }
+    }
+}
+
+private fun selectAgentVideo(context: Context, payload: JSONObject): AgentVideoCandidate {
+    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    val treeUriText = prefs.getString(PREF_MEDIA_TREE_URI, null)
+        ?: throw IllegalStateException("media_folder_not_selected")
+    val treeUri = Uri.parse(treeUriText)
+    if (!mediaTreeIsReadable(context, treeUri)) throw IllegalStateException("media_folder_permission_missing")
+    val root = DocumentFile.fromTreeUri(context, treeUri)
+        ?: throw IllegalStateException("media_folder_unavailable")
+    val expectedDuration = payload.optInt("expected_duration_seconds", 48).coerceIn(1, 600)
+    val tolerance = payload.optInt("duration_tolerance_seconds", 3).coerceIn(0, 10)
+    val excluded = mutableSetOf("1000436186.mp4", "fekra_first_video_assembled.mp4")
+    payload.optJSONArray("exclude_filenames")?.let { list ->
+        for (i in 0 until list.length()) list.optString(i).takeIf { it.isNotBlank() }?.let { excluded.add(it.lowercase()) }
+    }
+    val files = mutableListOf<DocumentFile>()
+    collectAgentMp4Files(root, 0, files)
+    val matches = files.mapNotNull { file ->
+        val name = file.name ?: return@mapNotNull null
+        val normalized = name.lowercase()
+        if (normalized in excluded) return@mapNotNull null
+        val size = file.length()
+        if (size <= 0L || size > 850L * 1024L * 1024L) return@mapNotNull null
+        val duration = videoDurationSeconds(context, file.uri) ?: return@mapNotNull null
+        if (kotlin.math.abs(duration - expectedDuration) > tolerance) return@mapNotNull null
+        val modified = file.lastModified()
+        val fingerprint = listOf(file.uri.toString(), size.toString(), modified.toString()).joinToString("|")
+        AgentVideoCandidate(file.uri, name, size, duration, modified, fingerprint)
+    }
+    if (matches.isEmpty()) throw IllegalStateException("media_candidate_not_found: لم يجد الوكيل ملف MP4 وحيدًا يطابق مدة $expectedDuration ثانية داخل مجلد العمل.")
+    if (matches.size > 1) {
+        val names = matches.sortedByDescending { it.lastModified }.take(5).joinToString("، ") { "${it.name} (${it.durationSeconds} ث)" }
+        throw IllegalStateException("media_candidate_ambiguous: وُجد أكثر من ملف يطابق المهمة: $names. لم يرفع الوكيل أي ملف حتى لا يختار نسخة خاطئة.")
+    }
+    return matches.single()
+}
+
+private fun uploadedAssetForTask(context: Context, workItemId: String, fingerprint: String): String? {
+    val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(PREF_MEDIA_UPLOAD_HISTORY, "[]") ?: "[]"
+    return try {
+        val rows = JSONArray(raw)
+        for (i in 0 until rows.length()) {
+            val row = rows.optJSONObject(i) ?: continue
+            if (row.optString("work_item_id") == workItemId && row.optString("fingerprint") == fingerprint) {
+                return row.optString("asset_id").takeIf { it.isNotBlank() }
+            }
+        }
+        null
+    } catch (_: Exception) { null }
+}
+
+private fun rememberUploadedAsset(
+    context: Context,
+    workItemId: String,
+    candidate: AgentVideoCandidate,
+    channelId: String,
+    assetId: String
+) {
+    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    val raw = prefs.getString(PREF_MEDIA_UPLOAD_HISTORY, "[]") ?: "[]"
+    val rows = try { JSONArray(raw) } catch (_: Exception) { JSONArray() }
+    val alreadySaved = (0 until rows.length()).any { index ->
+        val row = rows.optJSONObject(index)
+        row?.optString("work_item_id") == workItemId && row.optString("fingerprint") == candidate.fingerprint
+    }
+    if (!alreadySaved) {
+        rows.put(JSONObject()
+            .put("work_item_id", workItemId)
+            .put("fingerprint", candidate.fingerprint)
+            .put("asset_id", assetId)
+            .put("channel_id", channelId)
+            .put("filename", candidate.name)
+            .put("duration_seconds", candidate.durationSeconds)
+            .put("uploaded_at", System.currentTimeMillis()))
+    }
+    val bounded = JSONArray()
+    val start = maxOf(0, rows.length() - 80)
+    for (i in start until rows.length()) bounded.put(rows.getJSONObject(i))
+    prefs.edit().putString(PREF_MEDIA_UPLOAD_HISTORY, bounded.toString()).apply()
 }
 
 private fun loadPendingPrompts(prefs: android.content.SharedPreferences): List<String> {
