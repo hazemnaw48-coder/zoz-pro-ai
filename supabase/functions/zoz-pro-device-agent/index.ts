@@ -71,7 +71,7 @@ Deno.serve(async(req:Request)=>{
    const ch=consumed?.[0];if(!ch)return fail("رمز الاقتران استُخدم بالفعل.",409);
    const deviceName=clean(body?.device_name||"Android device",100);const appVersion=clean(body?.app_version||"0.1.0",30);
    const requestedPackage=clean(body?.app_package||"",120);
-   const appPackage=requestedPackage==="com.zozpro.flowbridge.next"||(!requestedPackage&&(appVersion.startsWith("0.5.")||appVersion.startsWith("0.6.")))?"com.zozpro.flowbridge.next":"com.zozpro.flowbridge";
+   const appPackage=["com.zozpro.flowbridge.next","com.zozpro.flowbridge.next2"].includes(requestedPackage)?requestedPackage:(!requestedPackage&&(appVersion.startsWith("0.5.")||appVersion.startsWith("0.6."))?"com.zozpro.flowbridge.next":"com.zozpro.flowbridge");
    const deviceRows=await db("zoz_pro_device_registry",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({owner_id:ch.owner_id,device_name:deviceName,platform:"android",app_package:appPackage,app_version:appVersion,device_status:"active",capabilities:["device.health_check"]})});
    const dev=deviceRows?.[0];if(!dev)throw new Error("Could not register device.");
    const raw=token();
