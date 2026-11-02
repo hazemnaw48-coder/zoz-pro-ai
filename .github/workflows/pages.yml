@@ -1,6 +1,11 @@
 name: Deploy ZOZ Pro to GitHub Pages
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "channel-control.html"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
