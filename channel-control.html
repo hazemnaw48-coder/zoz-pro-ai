@@ -104,7 +104,7 @@ body.upload-mode .footer{font-size:11px}
  <div id="zoz-flow-proposal-view" style="display:none"></div>
  <div class="actions"><button type="button" id="zoz-flow-approve" disabled>أوافق على الخطة وابدأ التنفيذ</button></div>
 </div>
-<div class="section-gap"><h3>١ · تحليل قناة Hazem Ahmed</h3><p>يقرأ حالة القناة والتحليلات والتقويم والمسودات وملفات الفيديو، ثم يعرض التشخيص والخطوات العملية. لا يغيّر الفيديوهات ولا ينشر.</p><div class="actions"><button type="button" id="zoz-agent-analyze-btn">حلّل القناة الآن</button><button type="button" class="secondary" id="zoz-agent-video-test-btn">اختبر نجاح آخر فيديو</button><button type="button" id="zoz-agent-cycle-btn">شغّل دورة الإدارة</button></div><div id="zoz-agent-analysis-status" class="notice" style="display:none"></div><pre id="zoz-agent-analysis-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre></div>
+<div class="section-gap"><h3>١ · وكيل تحليل القناة النشطة</h3><p>يعمل الوكيل على القناة المختارة في مركز القنوات: يقرأ التحليلات والفيديوهات والتقويم والاستقبال، ويعد تقريرًا ومهمة متابعة. لا ينشر ولا يغيّر الخصوصية أو بيانات الفيديو من التحليل.</p><div class="actions"><button type="button" id="zoz-agent-analyze-btn">حلّل القناة الآن</button><button type="button" class="secondary" id="zoz-agent-video-test-btn">اختبر نجاح آخر فيديو</button><button type="button" id="zoz-agent-cycle-btn">شغّل دورة الإدارة</button></div><div id="zoz-agent-analysis-status" class="notice" style="display:none"></div><pre id="zoz-agent-analysis-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre></div>
 <div class="section-gap"><h3>٢ · إنشاء مسودة محتوى</h3><p>المسودة تُحفظ في مركز الإنتاج للمراجعة. لا يتم إنشاء فيديو أو رفعه أو نشره تلقائيًا.</p><label for="zoz-agent-topic">موضوع المسودة</label><input id="zoz-agent-topic" maxlength="240" placeholder="مثال: كيف عاش العمال في دير المدينة؟"><div class="grid"><div><label for="zoz-agent-mode">نوع المحتوى</label><select id="zoz-agent-mode" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit"><option value="short">Short</option><option value="long">فيديو طويل</option></select></div><div><label for="zoz-agent-duration">المدة المقترحة بالثواني</label><input id="zoz-agent-duration" type="number" min="20" max="180" value="45"></div></div><div class="actions"><button type="button" id="zoz-agent-draft-btn">أنشئ المسودة واحفظها</button></div><div id="zoz-agent-draft-status" class="notice" style="display:none"></div><pre id="zoz-agent-draft-result" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#0a1422;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px"></pre></div>
 </section>
 <section class="card" id="login-card">
@@ -232,9 +232,9 @@ body.upload-mode .footer{font-size:11px}
 </div>
 <div class="page-panel" data-page="intake" id="page-intake">
 <section class="card">
- <h2>مسار النشر الأساسي — قناة فِكرة</h2>
- <p>اختر ملف MP4 من الهاتف مرة واحدة. يُحفظ في استقبال قناة فِكرة، ثم يمكنك إرساله إلى صندوق Fekra TikTok ورفعه إلى YouTube بوضع خاص للمراجعة. لا يُنشر علنًا إلا بعد تأكيدك.</p>
- <div class="notice good" style="margin:10px 0">القناة المثبتة في هذا المسار: فِكرة · YouTube ID: UC9fr5B0SZZkmVAApfCqEO3w · الرفع نفسه متاح أيضًا للإرسال إلى TikTok Fekra.</div>
+ <h2>مسار النشر الأساسي — كل القنوات النشطة</h2>
+ <p>اختر القناة ثم اختر الفيديو من الهاتف مرة واحدة. يحفظ المركز الملف في مساحة القناة الصحيحة، ويتولى الوكيل متابعة اكتمال الرفع والمعالجة وسجل النشر. النشر العام يظل بعد مراجعة المالك وتأكيده.</p>
+ <div class="notice good" style="margin:10px 0">الرفع من الهاتف يتم داخل مركز ZOZ Pro باستخدام جلسة المالك المحفوظة. لا يستخدم هذا المسار vidIQ لرفع الملف. إرسال Fekra إلى TikTok متاح كخطوة منفصلة، ولا يعني النشر العام.</div>
  <div id="intake-msg" class="notice">يتم التحقق من جلسة المالك في مشروع الإنتاج…</div>
  <div class="section-gap"></div>
  <div class="notice" id="external-production-approved" style="margin:12px 0">مسار الإنتاج المعتمد: أنشئ المشاهد والتعليق الصوتي النهائي في Google Flow أو مركز فيديو خارجي مناسب، ثم صدّر ملف MP4 وارفعه أدناه إلى ZOZ Pro. يتولى المركز حفظ الملف وبيانات النشر والتحقق والمراجعة ورفع الفيديو إلى YouTube. أُخفيت تجربة التوليد الداخلي المحدودة لأن جودة المشاهد والدمج لم تكن مناسبة للنشر؛ لا توليد مدفوع ولا نشر عام تلقائي.</div>
@@ -256,14 +256,27 @@ body.upload-mode .footer{font-size:11px}
  </div>
 
  <h3 class="section-gap">ملف الفيديو وبيانات النشر</h3>
+ <label for="intake-target-channel">القناة المستهدفة</label>
+ <select id="intake-target-channel" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px">
+  <option value="UC9fr5B0SZZkmVAApfCqEO3w" selected>فِكرة — أفكار وذكاء اصطناعي</option>
+  <option value="UCIael48cvwPG3GkJ--c7HKw">Hazem Ahmed — مصر القديمة</option>
+  <option value="UC-FimUUFXRd0MOSoikzczcQ" disabled>فِكرة كيدز — متوقفة حتى تأكيد وجهة القناة</option>
+ </select>
+ <p id="intake-target-help" class="small">اختر القناة قبل تحديد الملف. لن يرسل المركز ملفًا إلى قناة كيدز ما دامت وجهتها غير مؤكدة.</p>
  <label for="intake-file">اختر ملف الفيديو من الهاتف (MP4 أو MOV أو WebM أو MKV)</label><input id="intake-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,application/octet-stream">
- <label for="intake-title">عنوان الفيديو على YouTube</label><input id="intake-title" maxlength="100" value="حوّل موبايلك لوكيل ذكاء اصطناعي ينفّذ مهامك! 🤖📱" placeholder="عنوان الفيديو النهائي">
- <label for="intake-description">وصف الفيديو</label><textarea id="intake-description" rows="4" maxlength="5000" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit">هل الذكاء الاصطناعي مجرد شات بيرد على أسئلتك؟ 🤖
-في فِكرة بنشرح إزاي تحوّل موبايلك إلى وكيل ذكي يساعدك في تنفيذ مهام حقيقية، خطوة بخطوة وبأدوات عملية.
-تابع القناة واشترك عشان تتابع التجربة وتتعلم تبني أدواتك بنفسك 📱🔥
+ <label for="intake-title">عنوان الفيديو على YouTube</label><input id="intake-title" maxlength="100" value="ازاي تبني وكيل ذكاء اصطناعي من موبايلك مجانًا؟ 🤖📱 | تجربة عملية" placeholder="عنوان الفيديو النهائي">
+ <label for="intake-description">وصف الفيديو</label><textarea id="intake-description" rows="4" maxlength="5000" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit">هل ينفع تحوّل موبايلك إلى مساعد ذكي ينفّذ مهام حقيقية؟
 
-#فكرة #ذكاء_اصطناعي #وكيل_ذكاء_اصطناعي #مساعد_ذكي #AI #AIAgent</textarea>
- <label for="intake-tags">الكلمات المفتاحية (افصل بينها بفواصل)</label><input id="intake-tags" maxlength="2000" value="فِكرة, ذكاء اصطناعي, وكيل ذكاء اصطناعي, مساعد ذكي, AI Agent, أدوات مجانية" placeholder="كلمات مفتاحية مرتبطة بالفيديو">
+في الفيديو ده من فِكرة هنبدأ رحلة بناء وكيل ذكاء اصطناعي من الهاتف، ونتعرف إزاي نستخدم الأدوات المتاحة ونربط بينها علشان نعمل نظام يساعدنا في الشغل والحياة اليومية، من غير الاعتماد على كورسات مدفوعة.
+
+الفكرة مش مجرد تجربة مع الذكاء الاصطناعي، لكن إنك تتعلم إزاي تبني نظام عملي خطوة بخطوة.
+
+تابع فِكرة لأفكار مفيدة، وأدوات ذكاء اصطناعي، وحلول عملية تقدر تطبقها بنفسك.
+
+اشترك وفعل الجرس علشان تكمل معانا الرحلة! 🔔
+
+#فكرة #الذكاء_الاصطناعي #AI_Agent #ذكاء_اصطناعي #أدوات_AI #من_الموبايل</textarea>
+ <label for="intake-tags">الكلمات المفتاحية (افصل بينها بفواصل)</label><input id="intake-tags" maxlength="2000" value="AI Agent, أدوات مجانية, ذكاء اصطناعي, فِكرة, مساعد ذكي, وكيل ذكاء اصطناعي" placeholder="كلمات مفتاحية مرتبطة بالفيديو">
  <div class="grid">
   <div><label for="intake-kids">هل صُنع الفيديو خصيصًا للأطفال؟</label><select id="intake-kids" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px"><option value="false" selected>لا</option><option value="true">نعم</option></select></div>
   <div><label for="intake-synthetic">هل يحتوي مشاهد واقعية مولدة أو معدلة اصطناعيًا؟</label><select id="intake-synthetic" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px"><option value="true" selected>نعم</option><option value="false">لا</option></select></div>
@@ -406,10 +419,20 @@ const AGENT_CONTROL_API=SUPABASE_URL+'/functions/v1/zoz-pro-agent-control';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
 const $=id=>document.getElementById(id);
 const FEKRA_UPLOAD_CHANNEL_ID='UC9fr5B0SZZkmVAApfCqEO3w';
+const HAZEM_UPLOAD_CHANNEL_ID='UCIael48cvwPG3GkJ--c7HKw';
+const KIDS_CHANNEL_ID='UC-FimUUFXRd0MOSoikzczcQ';
+const ACTIVE_UPLOAD_CHANNELS=new Set([FEKRA_UPLOAD_CHANNEL_ID,HAZEM_UPLOAD_CHANNEL_ID]);
+const requestedUploadChannel=String(pageParams.get('channel_id')||'');
+const initialUploadChannel=ACTIVE_UPLOAD_CHANNELS.has(requestedUploadChannel)?requestedUploadChannel:FEKRA_UPLOAD_CHANNEL_ID;
 if(uploadMode){
- CHANNEL_ID=FEKRA_UPLOAD_CHANNEL_ID;
+ CHANNEL_ID=initialUploadChannel;
  const uploadChannel=$('managed-channel-selector');
- if(uploadChannel)uploadChannel.value=FEKRA_UPLOAD_CHANNEL_ID;
+ if(uploadChannel)uploadChannel.value=initialUploadChannel;
+}
+const intakeTargetAtStartup=$('intake-target-channel');
+if(intakeTargetAtStartup){
+ const startupTarget=uploadMode?initialUploadChannel:selectedChannelId();
+ if(ACTIVE_UPLOAD_CHANNELS.has(startupTarget))intakeTargetAtStartup.value=startupTarget;
 }
 let loadedVideos=[];
 let lastAnalytics=null;
@@ -470,7 +493,7 @@ async function call(action,body){
 const MANAGED_CHANNELS=[
  {channel_id:'UCIael48cvwPG3gKj--c7HKw',label:'Hazem Ahmed',purpose:'تاريخ مصر القديمة والآثار'},
  {channel_id:'UC9fr5B0SZZkmVAApfCqEO3w',label:'فكره 🗣️',purpose:'أفكار مفيدة ومعلومات متنوعة وذكاء اصطناعي عملي'},
- {channel_id:'UC-FimUUFXRd0MOSoikzczcQ',label:'القناة السياسية — الاسم قيد الاختيار',purpose:'أخبار مصرية وعالمية موثوقة وتحليل سياسي موثق'}
+ {channel_id:'UC-FimUUFXRd0MOSoikzczcQ',label:'فِكرة كيدز — موقوفة لحين تأكيد الوجهة',purpose:'قراءة بيانات القناة فقط؛ لا إنتاج أو توصيات موضوعية قبل تأكيد المالك'}
 ];
 async function loadManagedChannels(){
  const host=$('managed-channels-list');host.innerHTML='';
@@ -648,8 +671,31 @@ async function generateContentCalendar(){
 
 async function intakeApi(action,body){return await call(action,body||{});}
 function managedChannelId(){return $('managed-channel-selector')?.value||CHANNEL_ID;}
-$('managed-channel-selector')?.addEventListener('change',async()=>{try{await loadStudioScripts();await loadIntakeAssets();await loadIntakeSources();}catch(e){notice('intake-msg',e.message||'تعذر تحديث بيانات القناة.','bad');}});
+$('managed-channel-selector')?.addEventListener('change',async()=>{try{if(ACTIVE_UPLOAD_CHANNELS.has(selectedChannelId()))setIntakeTargetChannel(selectedChannelId(),true);await loadStudioScripts();await loadIntakeAssets();await loadIntakeSources();}catch(e){notice('intake-msg',e.message||'تعذر تحديث بيانات القناة.','bad');}});
 function managedPayload(body){return Object.assign({channel_id:managedChannelId()},body||{});}
+const FEKRA_UPLOAD_DEFAULTS={title:'ازاي تبني وكيل ذكاء اصطناعي من موبايلك مجانًا؟ 🤖📱 | تجربة عملية',description:'هل ينفع تحوّل موبايلك إلى مساعد ذكي ينفّذ مهام حقيقية؟\n\nفي الفيديو ده من فِكرة هنبدأ رحلة بناء وكيل ذكاء اصطناعي من الهاتف، ونتعرف إزاي نستخدم الأدوات المتاحة ونربط بينها علشان نعمل نظام يساعدنا في الشغل والحياة اليومية، من غير الاعتماد على كورسات مدفوعة.\n\nالفكرة مش مجرد تجربة مع الذكاء الاصطناعي، لكن إنك تتعلم إزاي تبني نظام عملي خطوة بخطوة.\n\nتابع فِكرة لأفكار مفيدة، وأدوات ذكاء اصطناعي، وحلول عملية تقدر تطبقها بنفسك.\n\nاشترك وفعل الجرس علشان تكمل معانا الرحلة! 🔔\n\n#فكرة #الذكاء_الاصطناعي #AI_Agent #ذكاء_اصطناعي #أدوات_AI #من_الموبايل',tags:'AI Agent, أدوات مجانية, ذكاء اصطناعي, فِكرة, مساعد ذكي, وكيل ذكاء اصطناعي'};
+function setIntakeTargetChannel(channelId,resetMetadata=true){
+ const cid=String(channelId||'');
+ if(!ACTIVE_UPLOAD_CHANNELS.has(cid))throw new Error('هذه القناة غير مفعّلة لمسار رفع الفيديو. فِكرة كيدز تظل للقراءة فقط حتى تأكيد وجهتها.');
+ const channelSelect=$('managed-channel-selector');
+ if(channelSelect){const option=Array.from(channelSelect.options).find(x=>x.value===cid);if(!option)throw new Error('القناة المستهدفة غير موجودة في قائمة القنوات المسجلة.');channelSelect.value=cid;}
+ if($('intake-target-channel'))$('intake-target-channel').value=cid;
+ CHANNEL_ID=cid;
+ if(resetMetadata){
+  const fekra=cid===FEKRA_UPLOAD_CHANNEL_ID;
+  $('intake-title').value=fekra?FEKRA_UPLOAD_DEFAULTS.title:'';
+  $('intake-description').value=fekra?FEKRA_UPLOAD_DEFAULTS.description:'';
+  $('intake-tags').value=fekra?FEKRA_UPLOAD_DEFAULTS.tags:'';
+  $('intake-kids').value='false';$('intake-synthetic').value='true';$('intake-privacy').value='public';
+ }
+ const label=cid===FEKRA_UPLOAD_CHANNEL_ID?'فِكرة':'Hazem Ahmed';
+ notice('intake-target-help','القناة المستهدفة الآن: '+label+'. راجع العنوان والوصف ليتطابقا مع ملف الفيديو قبل الرفع.','good');
+}
+try{if($('intake-target-channel'))setIntakeTargetChannel($('intake-target-channel').value,true);}catch(e){notice('intake-target-help',e.message||'اختر قناة صالحة.','warn');}
+$('intake-target-channel')?.addEventListener('change',async()=>{
+ try{setIntakeTargetChannel($('intake-target-channel').value,true);await loadIntakeAssets();await loadIntakeSources();}
+ catch(e){notice('intake-msg',e.message||'تعذر تغيير القناة المستهدفة.','bad');}
+});
 async function managedCall(action,body){return await call(action,managedPayload(body));}
 
 async function uploadIntakeFile(){
@@ -660,7 +706,9 @@ async function uploadIntakeFile(){
  const kids=$('intake-kids').value,synthetic=$('intake-synthetic').value;
  if(kids===''||synthetic==='')throw new Error('اختر إجابة واضحة لسؤال الجمهور وإفصاح المشاهد الاصطناعية.');
  const button=$('intake-upload');button.disabled=true;
- const resumeKey='zoz-pro-intake-resume-v1';
+ const targetChannelId=managedChannelId();
+ if(!ACTIVE_UPLOAD_CHANNELS.has(targetChannelId))throw new Error('اختر قناة نشطة صالحة قبل الرفع.');
+ const resumeKey='zoz-pro-intake-resume-v1:'+targetChannelId;
  try{
   let active=null;
   try{active=JSON.parse(localStorage.getItem(resumeKey)||'null')}catch(e){}
@@ -678,7 +726,7 @@ async function uploadIntakeFile(){
    notice('intake-progress','جارٍ إنشاء جلسة استقبال آمنة…');
    const created=await managedCall('intake_create',{filename:file.name,total_bytes:file.size,content_type:file.type||'application/octet-stream',title:$('intake-title').value.trim()||file.name.replace(/\.[^.]+$/,''),description:$('intake-description').value,tags:$('intake-tags').value.split(',').map(x=>x.trim()).filter(Boolean),made_for_kids:kids==='true',contains_synthetic_media:synthetic==='true',target_privacy_status:$('intake-privacy').value});
    asset=created.asset;
-   localStorage.setItem(resumeKey,JSON.stringify({asset_id:asset.id,filename:file.name,total_bytes:file.size}));
+   localStorage.setItem(resumeKey,JSON.stringify({asset_id:asset.id,filename:file.name,total_bytes:file.size,channel_id:targetChannelId}));
    asset.uploaded_parts=[];
   }
   const completed=new Set(Array.isArray(asset.uploaded_parts)?asset.uploaded_parts.map(Number):[]);
@@ -1273,7 +1321,7 @@ $('zoz-flow-approve')?.addEventListener('click',async()=>{
 });
 async function callZozAgent(action,extra){
  const session=await ownerSession();
- const response=await fetch(AGENT_API,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:action,channel_id:CHANNEL_ID},extra||{})),cache:'no-store'});
+ const response=await fetch(AGENT_API,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:action,channel_id:selectedChannelId()},extra||{})),cache:'no-store'});
  const data=await response.json().catch(()=>({}));
  if(!response.ok||(data.ok===false&&!Array.isArray(data.accounts)))throw new Error(data.error||('فشل طلب الوكيل HTTP '+response.status));
  return data;
@@ -1349,7 +1397,7 @@ $('zoz-agent-tools-btn')?.addEventListener('click',()=>runZozAgentControl('tool_
 
 $('zoz-agent-analyze-btn')?.addEventListener('click',async()=>{
  const b=$('zoz-agent-analyze-btn'),status=$('zoz-agent-analysis-status'),out=$('zoz-agent-analysis-result');
- b.disabled=true;b.textContent='جارٍ التحليل…';status.style.display='block';out.style.display='none';status.className='notice';status.textContent='يتحقق الوكيل من جلسة المالك ويقرأ بيانات قناة Hazem Ahmed…';
+ b.disabled=true;b.textContent='جارٍ التحليل…';status.style.display='block';out.style.display='none';status.className='notice';status.textContent='يتحقق الوكيل من جلسة المالك ويقرأ بيانات القناة المختارة…';
  try{
   const d=await callZozAgent('analyze');
   const a=d.analysis||{};
