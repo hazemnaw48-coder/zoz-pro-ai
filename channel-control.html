@@ -232,8 +232,9 @@ body.upload-mode .footer{font-size:11px}
 </div>
 <div class="page-panel" data-page="intake" id="page-intake">
 <section class="card">
- <h2>رفع فيديو جاهز إلى YouTube</h2>
- <p>اختر ملف الفيديو النهائي من هاتفك، أدخل بيانات النشر، ثم ارفعه للمراجعة. يُرفع إلى YouTube بوضع خاص أولًا، ولا يصبح عامًا إلا بتأكيدك الصريح.</p>
+ <h2>مسار النشر الأساسي — قناة فِكرة</h2>
+ <p>اختر ملف MP4 من الهاتف مرة واحدة. يُحفظ في استقبال قناة فِكرة، ثم يمكنك إرساله إلى صندوق Fekra TikTok ورفعه إلى YouTube بوضع خاص للمراجعة. لا يُنشر علنًا إلا بعد تأكيدك.</p>
+ <div class="notice good" style="margin:10px 0">القناة المثبتة في هذا المسار: فِكرة · YouTube ID: UC9fr5B0SZZkmVAApfCqEO3w · الرفع نفسه متاح أيضًا للإرسال إلى TikTok Fekra.</div>
  <div id="intake-msg" class="notice">يتم التحقق من جلسة المالك في مشروع الإنتاج…</div>
  <div class="section-gap"></div>
  <div class="notice" id="external-production-approved" style="margin:12px 0">مسار الإنتاج المعتمد: أنشئ المشاهد والتعليق الصوتي النهائي في Google Flow أو مركز فيديو خارجي مناسب، ثم صدّر ملف MP4 وارفعه أدناه إلى ZOZ Pro. يتولى المركز حفظ الملف وبيانات النشر والتحقق والمراجعة ورفع الفيديو إلى YouTube. أُخفيت تجربة التوليد الداخلي المحدودة لأن جودة المشاهد والدمج لم تكن مناسبة للنشر؛ لا توليد مدفوع ولا نشر عام تلقائي.</div>
@@ -256,13 +257,13 @@ body.upload-mode .footer{font-size:11px}
 
  <h3 class="section-gap">ملف الفيديو وبيانات النشر</h3>
  <label for="intake-file">اختر ملف الفيديو من الهاتف (MP4 أو MOV أو WebM أو MKV)</label><input id="intake-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,application/octet-stream">
- <label for="intake-title">عنوان الفيديو على YouTube</label><input id="intake-title" maxlength="100" value="ما هو الوكيل الذكي؟ وكيف يحوّل هاتفك إلى مساعد ينفّذ المهام؟" placeholder="عنوان الفيديو النهائي">
- <label for="intake-description">وصف الفيديو</label><textarea id="intake-description" rows="4" maxlength="5000" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit">ما هو الوكيل الذكي؟ 🤖
-في هذا الفيديو نوضح الفرق بين الشات العادي والوكيل الذكي، وكيف يمكن للهاتف أن يتحول إلى مساعد ينفذ مهامًا حقيقية ضمن صلاحيات واضحة.
-تابع فِكرة لمزيد من التجارب العملية والأفكار المفيدة.
+ <label for="intake-title">عنوان الفيديو على YouTube</label><input id="intake-title" maxlength="100" value="حوّل موبايلك لوكيل ذكاء اصطناعي ينفّذ مهامك! 🤖📱" placeholder="عنوان الفيديو النهائي">
+ <label for="intake-description">وصف الفيديو</label><textarea id="intake-description" rows="4" maxlength="5000" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit">هل الذكاء الاصطناعي مجرد شات بيرد على أسئلتك؟ 🤖
+في فِكرة بنشرح إزاي تحوّل موبايلك إلى وكيل ذكي يساعدك في تنفيذ مهام حقيقية، خطوة بخطوة وبأدوات عملية.
+تابع القناة واشترك عشان تتابع التجربة وتتعلم تبني أدواتك بنفسك 📱🔥
 
-#فكرة #ذكاء_اصطناعي #وكيل_ذكي #AI #AIAgent</textarea>
- <label for="intake-tags">الكلمات المفتاحية (افصل بينها بفواصل)</label><input id="intake-tags" maxlength="2000" placeholder="مصر القديمة، الآثار، التاريخ">
+#فكرة #ذكاء_اصطناعي #وكيل_ذكاء_اصطناعي #مساعد_ذكي #AI #AIAgent</textarea>
+ <label for="intake-tags">الكلمات المفتاحية (افصل بينها بفواصل)</label><input id="intake-tags" maxlength="2000" value="فِكرة, ذكاء اصطناعي, وكيل ذكاء اصطناعي, مساعد ذكي, AI Agent, أدوات مجانية" placeholder="كلمات مفتاحية مرتبطة بالفيديو">
  <div class="grid">
   <div><label for="intake-kids">هل صُنع الفيديو خصيصًا للأطفال؟</label><select id="intake-kids" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px"><option value="false" selected>لا</option><option value="true">نعم</option></select></div>
   <div><label for="intake-synthetic">هل يحتوي مشاهد واقعية مولدة أو معدلة اصطناعيًا؟</label><select id="intake-synthetic" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px"><option value="true" selected>نعم</option><option value="false">لا</option></select></div>
@@ -404,6 +405,12 @@ const AGENT_API=SUPABASE_URL+'/functions/v1/zoz-pro-agent';
 const AGENT_CONTROL_API=SUPABASE_URL+'/functions/v1/zoz-pro-agent-control';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
 const $=id=>document.getElementById(id);
+const FEKRA_UPLOAD_CHANNEL_ID='UC9fr5B0SZZkmVAApfCqEO3w';
+if(uploadMode){
+ CHANNEL_ID=FEKRA_UPLOAD_CHANNEL_ID;
+ const uploadChannel=$('managed-channel-selector');
+ if(uploadChannel)uploadChannel.value=FEKRA_UPLOAD_CHANNEL_ID;
+}
 let loadedVideos=[];
 let lastAnalytics=null;
 let lastVideoAnalytics=null;
