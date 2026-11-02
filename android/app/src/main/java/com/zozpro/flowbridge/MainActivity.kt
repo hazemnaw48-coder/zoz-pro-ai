@@ -89,6 +89,15 @@ private fun AppScopeControlScreen() {
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf(if (paired) "الجهاز مرتبط بوكيل ZOZ Pro." else "اربط التطبيق بمركز ZOZ Pro.") }
     var serviceEnabled by remember { mutableStateOf(FlowAutomationService.isEnabled(context)) }
+    var uploadChannelId by remember { mutableStateOf("UC9fr5B0SZZkmVAApfCqEO3w") }
+    var uploadVideoUri by remember { mutableStateOf<Uri?>(null) }
+    val uploadPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
+            uploadVideoUri = uri
+            status = "تم اختيار الملف: ${queryName(context, uri) ?: "فيديو"} — جاهز للإرسال إلى استقبال القناة المختارة."
+        }
+    }
 
     fun runAsync(block: suspend () -> String) {
         if (busy) return
@@ -199,10 +208,26 @@ private fun AppScopeControlScreen() {
                         modifier = Modifier.fillMaxWidth()) { Text("TikTok العادي") }
                     Button(enabled = !busy, onClick = { requestApp("com.google.android.youtube", "YouTube") },
                         modifier = Modifier.fillMaxWidth()) { Text("YouTube العادي") }
-                    Button(enabled = !busy, onClick = {
-                        val uploadUrl = "https://hazemnaw48-coder.github.io/zoz-pro-ai/channel-control.html?mode=upload"
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uploadUrl)))
-                    }, modifier = Modifier.fillMaxWidth()) { Text("رفع فيديو فِكرة من الهاتف") }
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("رفع الفيديو مباشرة من الهاتف إلى مركز ZOZ", fontWeight = FontWeight.Bold)
+                            Text("اختر القناة ثم حدد ملف الفيديو مرة واحدة. يرفع التطبيق الملف إلى استقبال القناة فقط؛ لا ينشره تلقائيًا.")
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(enabled = !busy, onClick = { uploadChannelId = "UC9fr5B0SZZkmVAApfCqEO3w" }) { Text(if (uploadChannelId == "UC9fr5B0SZZkmVAApfCqEO3w") "✓ فِكرة" else "فِكرة") }
+                                OutlinedButton(enabled = !busy, onClick = { uploadChannelId = "UCIael48cvwPG3gKj--c7HKw" }) { Text(if (uploadChannelId == "UCIael48cvwPG3gKj--c7HKw") "✓ Hazem Ahmed" else "Hazem Ahmed") }
+                            }
+                            OutlinedButton(enabled = !busy, onClick = { uploadPicker.launch(arrayOf("video/mp4","video/quicktime","video/webm","video/*")) }, modifier = Modifier.fillMaxWidth()) { Text(if (uploadVideoUri == null) "اختيار ملف فيديو من الهاتف" else "تغيير ملف الفيديو") }
+                            if (uploadVideoUri != null) Text(queryName(context, uploadVideoUri!!) ?: "فيديو محدد", style = MaterialTheme.typography.bodySmall)
+                            Button(enabled = !busy && paired && uploadVideoUri != null, onClick = { runAsync {
+                                val deviceToken = DeviceTokenVault.read(context) ?: throw IllegalStateException("الجهاز غير مرتبط بالوكيل.")
+                                val tokenResponse = apiPostWithToken("device_intake_token", JSONObject().put("channel_id", uploadChannelId), deviceToken)
+                                val intakeToken = tokenResponse.optString("intake_token")
+                                if (intakeToken.length < 32) throw IllegalStateException("لم يصدر الخادم رمز استقبال صالحًا؛ لم يبدأ رفع الملف.")
+                                DeviceTokenVault.writeIntake(context, intakeToken)
+                                uploadFinalVideoToIntake(context, uploadVideoUri!!, true, false, uploadChannelId)
+                            } }, modifier = Modifier.fillMaxWidth()) { Text("رفع الملف إلى استقبال القناة المختارة") }
+                        }
+                    }
                     OutlinedButton(onClick = {
                         DeviceTokenVault.clear(context)
                         paired = false
@@ -513,7 +538,7 @@ private fun intakePost(action: String, body: JSONObject, token: String): JSONObj
 }
 
 fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kids: Boolean, channelId: String = ""): String {
-    val intakeToken = DeviceTokenVault.readIntake(context) ?: throw IllegalStateException("رمز استقبال الفيديو غير موجود. أعد اقتران الجهاز.")
+    val intakeToken = DeviceTokenVault.readIntake(context)?.takeIf { it.length >= 32 } ?: throw IllegalStateException("رمز استقبال الفيديو غير موجود أو غير صالح. اختر القناة لإصدار رمز جديد.")
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     val name = queryName(context, uri) ?: "ZOZ-final-video.mp4"
     val size = querySize(context, uri)
@@ -809,6 +834,17 @@ class DeviceTokenVault {
                 .putString(IV, android.util.Base64.encodeToString(cipher.iv, android.util.Base64.NO_WRAP))
                 .putString(INTAKE_TOKEN, android.util.Base64.encodeToString(encryptedIntake, android.util.Base64.NO_WRAP))
                 .putString(INTAKE_IV, android.util.Base64.encodeToString(intakeCipher.iv, android.util.Base64.NO_WRAP)).apply()
+        }
+
+        fun writeIntake(context: Context, intakeToken: String) {
+            val ks = java.security.KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            val key = (ks.getEntry(KEY_ALIAS, null) as java.security.KeyStore.SecretKeyEntry).secretKey
+            val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key)
+            val encrypted = cipher.doFinal(intakeToken.toByteArray(Charsets.UTF_8))
+            context.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit()
+                .putString(INTAKE_TOKEN, android.util.Base64.encodeToString(encrypted, android.util.Base64.NO_WRAP))
+                .putString(INTAKE_IV, android.util.Base64.encodeToString(cipher.iv, android.util.Base64.NO_WRAP)).apply()
         }
 
         fun readIntake(context: Context): String? {
