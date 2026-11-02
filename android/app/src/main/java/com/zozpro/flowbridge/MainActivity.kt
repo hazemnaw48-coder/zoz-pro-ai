@@ -199,6 +199,10 @@ private fun AppScopeControlScreen() {
                         modifier = Modifier.fillMaxWidth()) { Text("TikTok العادي") }
                     Button(enabled = !busy, onClick = { requestApp("com.google.android.youtube", "YouTube") },
                         modifier = Modifier.fillMaxWidth()) { Text("YouTube العادي") }
+                    Button(enabled = !busy, onClick = {
+                        val uploadUrl = "https://hazemnaw48-coder.github.io/zoz-pro-ai/channel-control.html?mode=upload"
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uploadUrl)))
+                    }, modifier = Modifier.fillMaxWidth()) { Text("رفع فيديو فِكرة من الهاتف") }
                     OutlinedButton(onClick = {
                         DeviceTokenVault.clear(context)
                         paired = false
