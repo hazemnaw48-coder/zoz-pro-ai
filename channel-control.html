@@ -406,6 +406,7 @@ body.upload-mode .footer{font-size:11px}
 'use strict';
 const pageParams=new URLSearchParams(window.location.search);
 const requestedPage=pageParams.get('page')||'';
+const requestedAuthorizationChannel=String(pageParams.get('authorize_channel')||'');
 const uploadMode=pageParams.get('mode')!=='full';
 if(uploadMode)document.body.classList.add('upload-mode');
 const SUPABASE_URL='https://oxyzxbkwhafzaztraowc.supabase.co';
@@ -488,6 +489,17 @@ async function call(action,body){
  const data=await response.json().catch(()=>({}));
  if(!response.ok||data.ok===false)throw new Error(data.error||('فشل الطلب HTTP '+response.status));
  return data;
+}
+
+async function startRequestedGoogleAuthorization(){
+ const target=requestedAuthorizationChannel;
+ if(!target)return false;
+ if(target!==HAZEM_UPLOAD_CHANNEL_ID)throw new Error('رابط التفويض مخصص حاليًا لقناة Hazem Ahmed فقط.');
+ notice('managed-channels-msg','جارٍ إنشاء تفويض Google مستقل لقناة Hazem Ahmed…');
+ const result=await call('managed_channel_connect',{channel_id:target});
+ if(!result.authorization_url)throw new Error('لم يُرجع النظام رابط تفويض Google.');
+ window.location.replace(result.authorization_url);
+ return true;
 }
 
 const MANAGED_CHANNELS=[
@@ -969,7 +981,7 @@ $('login').addEventListener('click',async()=>{
   $('password').value='';
   if(error)throw error;
   if(!data||!data.session)throw new Error('لم تُنشأ جلسة تسجيل دخول.');
-  await ownerSession();setSigned(true);notice('login-msg','تم تسجيل الدخول إلى مشروع الإنتاج الصحيح.','good');if(uploadMode)await loadIntakeAssets();else await refreshStatus();
+  await ownerSession();setSigned(true);notice('login-msg','تم تسجيل الدخول إلى مشروع الإنتاج الصحيح.','good');if(requestedAuthorizationChannel){await startRequestedGoogleAuthorization();return;}if(uploadMode)await loadIntakeAssets();else await refreshStatus();
  }catch(e){setSigned(false);notice('login-msg',e.message||'تعذر تسجيل الدخول.','bad');}
  finally{$('login').disabled=false;}
 });
@@ -1180,7 +1192,7 @@ const end=new Date(Date.now()-86400000);const start=new Date(end);start.setDate(
 $('load-calendar')?.addEventListener('click',async()=>{try{await loadContentCalendar()}catch(e){notice('calendar-msg',e.message||'تعذر تحميل التقويم.','bad')}});
 $('generate-calendar')?.addEventListener('click',async()=>{const b=$('generate-calendar');b.disabled=true;try{await generateContentCalendar()}catch(e){notice('calendar-msg',e.message||'تعذر إنشاء التقويم.','bad')}finally{b.disabled=false}});
 (async()=>{
- try{const {data}=await sb.auth.getSession();if(data&&data.session){await ownerSession();setSigned(true);notice('login-msg','تم العثور على جلسة مالك محفوظة في مشروع الإنتاج.','good');if(uploadMode)await loadIntakeAssets();else await refreshStatus();}else{setSigned(false);notice('login-msg','لم توجد جلسة إنتاج محفوظة. سجّل الدخول فقط؛ لن نعيد تفويض Google.');}}
+ try{const {data}=await sb.auth.getSession();if(data&&data.session){await ownerSession();setSigned(true);notice('login-msg','تم العثور على جلسة مالك محفوظة في مشروع الإنتاج.','good');if(requestedAuthorizationChannel){await startRequestedGoogleAuthorization();return;}if(uploadMode)await loadIntakeAssets();else await refreshStatus();}else{setSigned(false);notice('login-msg',requestedAuthorizationChannel?'سجّل الدخول بحساب مالك ZOZ Pro وسيبدأ تفويض Hazem Ahmed تلقائيًا.':'لم توجد جلسة إنتاج محفوظة. سجّل الدخول فقط؛ لن نعيد تفويض Google.');}}
  catch(e){setSigned(false);notice('login-msg',e.message||'تعذر استعادة الجلسة.','bad');}
 })();
 
