@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/zoz-android-flow-bridge
+      - feature/zoz-media-library-agent
     paths:
       - "android/**"
       - ".github/workflows/android-flow-bridge.yml"

@@ -11,6 +11,7 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import androidx.documentfile.provider.DocumentFile
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.provider.Settings
@@ -58,6 +59,8 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 
 data class ImportedClip(val uri: Uri, val name: String, val size: Long)
+private data class LocalVideoCandidate(val uri: Uri, val name: String, val size: Long, val modified: Long, val durationMs: Long?)
+private const val PREF_MEDIA_TREE = "media_library_tree_uri"
 private const val PREFS = "zoz_flow_bridge"
 private const val PREF_CLIPS = "saved_clips"
 private const val PREF_PROMPT = "scene_prompt"
@@ -89,6 +92,17 @@ private fun AppScopeControlScreen() {
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf(if (paired) "الجهاز مرتبط بوكيل ZOZ Pro." else "اربط التطبيق بمركز ZOZ Pro.") }
     var serviceEnabled by remember { mutableStateOf(FlowAutomationService.isEnabled(context)) }
+    var mediaTreeUri by remember { mutableStateOf(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(PREF_MEDIA_TREE, null)?.let(Uri::parse)) }
+    var mediaCandidates by remember { mutableStateOf<List<LocalVideoCandidate>>(emptyList()) }
+    val mediaPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
+            mediaTreeUri = uri
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(PREF_MEDIA_TREE, uri.toString()).apply()
+            mediaCandidates = emptyList()
+            status = "تم حفظ إذن القراءة للمجلد المختار. اضغط فحص الفيديوهات."
+        }
+    }
 
     fun runAsync(block: suspend () -> String) {
         if (busy) return
@@ -100,6 +114,44 @@ private fun AppScopeControlScreen() {
                 busy = false
                 serviceEnabled = FlowAutomationService.isEnabled(context)
             }
+        }
+    }
+
+    fun scanSelectedMediaFolder() {
+        val tree = mediaTreeUri
+        if (tree == null) { status = "اختر مجلد التنزيلات أو مجلد الفيديوهات أولًا."; return }
+        runAsync {
+            val root = DocumentFile.fromTreeUri(context, tree) ?: throw IllegalStateException("تعذر فتح المجلد المختار.")
+            val found = mutableListOf<LocalVideoCandidate>()
+            val queue = ArrayDeque<Pair<DocumentFile, Int>>()
+            queue.add(root to 0)
+            var visited = 0
+            while (queue.isNotEmpty() && visited < 4000) {
+                val pair = queue.removeFirst()
+                val folder = pair.first
+                val depth = pair.second
+                visited++
+                for (item in folder.listFiles()) {
+                    if (item.isDirectory && depth < 5) queue.add(item to depth + 1)
+                    else if (item.isFile) {
+                        val name = item.name ?: continue
+                        val mime = item.type.orEmpty()
+                        val ext = name.substringAfterLast('.', "").lowercase()
+                        if (mime.startsWith("video/") || ext in setOf("mp4","mov","m4v","webm","mkv")) {
+                            val duration = runCatching {
+                                val retriever = MediaMetadataRetriever()
+                                retriever.setDataSource(context, item.uri)
+                                val value = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+                                retriever.release()
+                                value
+                            }.getOrNull()
+                            found.add(LocalVideoCandidate(item.uri, name, item.length(), item.lastModified(), duration))
+                        }
+                    }
+                }
+            }
+            withContext(Dispatchers.Main) { mediaCandidates = found.sortedByDescending { it.modified } }
+            "اكتمل فحص المجلد المختار: " + found.size + " ملف فيديو. تمت قراءة البيانات فقط؛ لم يتم تعديل أي ملف."
         }
     }
 
@@ -188,7 +240,23 @@ private fun AppScopeControlScreen() {
                             "اتصال الوكيل ناجح. وقت الخادم: " + response.optString("server_time", "متصل")
                         }
                     }, modifier = Modifier.fillMaxWidth()) { Text("فحص اتصال الوكيل") }
-                    Text("التطبيقات المسموح بها", fontWeight = FontWeight.Bold)
+                    Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("مكتبة الفيديوهات على الهاتف", fontWeight = FontWeight.Bold)
+                        Text(if (mediaTreeUri == null) "اختر مجلد التنزيلات أو مجلد الألبومات/الفيديوهات مرة واحدة." else "يوجد مجلد مختار بصلاحية قراءة محفوظة.")
+                        OutlinedButton(enabled = !busy, onClick = { mediaPicker.launch(mediaTreeUri) }, modifier = Modifier.fillMaxWidth()) { Text("اختيار مجلد الملفات أو الألبومات") }
+                        Button(enabled = !busy && mediaTreeUri != null, onClick = { scanSelectedMediaFolder() }, modifier = Modifier.fillMaxWidth()) { Text("فحص الفيديوهات الموجودة") }
+                        Text("تم العثور على: " + mediaCandidates.size + " فيديو")
+                        mediaCandidates.take(20).forEach { item ->
+                            Column {
+                                Text(item.name, fontWeight = FontWeight.Medium)
+                                Text((item.size / (1024 * 1024)).toString() + " MB · " + (item.durationMs?.let { (it / 1000).toString() + " ثانية" } ?: "المدة غير متاحة"))
+                            }
+                        }
+                        if (mediaCandidates.size > 20) Text("يعرض أول 20 نتيجة من الأحدث.")
+                    }
+                }
+                Text("التطبيقات المسموح بها", fontWeight = FontWeight.Bold)
                     Button(enabled = !busy, onClick = { requestApp("com.ss.android.tt.creator", "TikTok Studio · فِكرة") },
                         modifier = Modifier.fillMaxWidth()) { Text("TikTok Studio · فِكرة") }
                     OutlinedButton(enabled = !busy, onClick = { requestApp("com.ss.android.tt.creator", "TikTok Studio · فِكرة", analytics = true) }, modifier = Modifier.fillMaxWidth()) { Text("قراءة إحصاءات TikTok Studio") }
