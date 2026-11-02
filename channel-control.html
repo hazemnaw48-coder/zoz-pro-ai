@@ -1534,7 +1534,7 @@ async function attachAndSendFekraVideo(){
     tags:['فكرة','ذكاء اصطناعي','وكيل ذكاء اصطناعي','AI','AIAgent'],
     made_for_kids:false,
     contains_synthetic_media:true,
-    target_privacy_status:'unlisted'
+    target_privacy_status:'public'
    });
    asset=created.asset;
    if(!asset?.id||asset.channel_id!==FEKRA_YOUTUBE_CHANNEL_ID)throw new Error('لم يؤكد مركز الإنتاج ربط الملف بقناة فِكرة؛ أوقفنا النقل.');
