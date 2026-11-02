@@ -11,8 +11,8 @@ android {
         applicationId = "com.zozpro.flowbridge.next2"
         minSdk = 26
         targetSdk = 35
-        versionCode = 22
-        versionName = "0.7.7"
+        versionCode = 23
+        versionName = "0.7.8"
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
@@ -33,5 +33,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.documentfile:documentfile:1.0.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
