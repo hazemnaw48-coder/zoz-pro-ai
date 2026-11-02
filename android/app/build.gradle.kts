@@ -11,8 +11,8 @@ android {
         applicationId = "com.zozpro.flowbridge.next"
         minSdk = 26
         targetSdk = 35
-        versionCode = 18
-        versionName = "0.7.3"
+        versionCode = 19
+        versionName = "0.7.4"
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
