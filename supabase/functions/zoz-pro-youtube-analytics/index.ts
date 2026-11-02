@@ -648,7 +648,7 @@ async function intakeAuth(req:Request){
  if(token.length<32)return null;
  const rows=await db("zoz_pro_video_intake_sources?secret_hash=eq."+encodeURIComponent(await sha(token))+"&is_active=eq.true&select=id,owner_id,channel_id,source_name,expires_at&limit=1");
  const row=rows?.[0];
- if(!row||row.channel_id!==CHANNEL_ID||(row.expires_at&&Date.parse(row.expires_at)<Date.now()))return null;
+ if(!row||(row.expires_at&&Date.parse(row.expires_at)<Date.now()))return null;
  await db("zoz_pro_video_intake_sources?id=eq."+encodeURIComponent(row.id),{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({last_used_at:new Date().toISOString()})});
  return {id:row.owner_id,email:OWNER_EMAIL,channel_id:row.channel_id,source_id:row.id,source_name:row.source_name,is_intake_source:true};
 }
