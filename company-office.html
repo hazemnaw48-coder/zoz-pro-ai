@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1422"><title>ZOZ Pro — مكتب الشركة الذكي</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{color-scheme:dark;--bg:#0b1422;--panel:#142238;--line:#2b405c;--txt:#edf4ff;--muted:#a9bad0;--blue:#5f91f5;--green:#42d39a;--yellow:#ffca70;--red:#ff8181}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#091321,#102039);color:var(--txt);font:15px/1.65 system-ui,sans-serif}main{max-width:1180px;margin:auto;padding:14px}.hero,.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}.hero{background:linear-gradient(120deg,#17365a,#142238)}h1{font-size:clamp(24px,5vw,34px);margin:3px 0}h2{font-size:20px;margin:0 0 10px}h3{font-size:16px;margin:0 0 6px}p,.muted{color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px}.metric{padding:12px;border:1px solid var(--line);border-radius:12px;background:#0e1b2d}.num{font-size:26px;font-weight:800}.row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:3px 9px;font-size:12px}.good{color:var(--green)}.warn{color:var(--yellow)}.bad{color:var(--red)}button,a.btn{border:0;border-radius:10px;padding:10px 14px;background:var(--blue);color:#fff;font:inherit;font-weight:700;text-decoration:none;cursor:pointer}button.secondary,a.secondary{background:#263b57}button:disabled{opacity:.5;cursor:wait}input,select,textarea{width:100%;background:#091625;border:1px solid #405875;color:var(--txt);border-radius:9px;padding:10px;font:inherit}label{display:block;margin:9px 0 4px;font-weight:700}.stack{display:grid;gap:9px}.item{background:#0e1b2d;border:1px solid var(--line);border-radius:12px;padding:12px;min-width:0}.small{font-size:12px;color:var(--muted)}.tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:9px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.notice{padding:10px;border:1px solid var(--line);border-radius:10px;margin-top:10px;white-space:pre-wrap}.hidden{display:none!important}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#091625;padding:10px;border-radius:9px;max-height:340px;overflow:auto}a{color:#9dc0ff}@media(max-width:480px){main{padding:9px}.hero,.card{padding:12px}}
+</style>
+</head>
+<body><main>
+<section class="hero">
+ <div class="row"><div><div class="small">ZOZ PRO · COMPANY OPERATIONS</div><h1>مكتب الشركة الذكي</h1><p>إدارة الأدوات والوكلاء والمهام من محرك Supabase المباشر — دون Make ودون اعتماد على حاسوبك.</p></div><span class="pill good">المسار الأساسي: مباشر ومجاني ضمن الحصة</span></div>
+ <div class="actions"><a class="btn secondary" href="./channel-control.html?mode=full">العودة إلى مركز القنوات</a><button id="refresh">تحديث بيانات الشركة</button><button id="logout" class="secondary">تسجيل الخروج</button></div>
+ <div id="notice" class="notice">جارٍ فحص جلسة المالك…</div>
+</section>
+<section id="login-card" class="card hidden"><h2>دخول مالك الشركة</h2><p>تُستخدم جلسة Supabase نفسها الخاصة بمركز ZOZ Pro. لن نرسل كلمة المرور إلى أي جهة خارجية.</p><label>البريد</label><input id="email" type="email" value="hazemnaw48@gmail.com" autocomplete="username"><label>كلمة المرور</label><input id="password" type="password" autocomplete="current-password"><div class="actions"><button id="login">تسجيل الدخول</button></div></section>
+<section id="dashboard" class="hidden">
+ <div class="grid" id="metrics"></div>
+ <section class="card"><div class="row"><h2>محركات الذكاء الاصطناعي</h2><span class="pill">لا خدمات مدفوعة</span></div><div id="models" class="tools"></div></section>
+ <section class="card"><h2>أقسام الشركة</h2><div id="departments" class="tools"></div></section>
+ <section class="card"><h2>الوكلاء المتخصصون</h2><div id="agents" class="tools"></div></section>
+ <section class="card"><div class="row"><h2>مكتبة الأدوات</h2><span class="small">متصل / يحتاج ربط / تنزيل / غير مفعل</span></div><div id="tools" class="tools"></div></section>
+ <section class="card"><h2>إنشاء مهمة للقسم</h2><p class="small">المهمة تُنفذ كمسودة/بحث فقط. لا نشر ولا شراء ولا تغيير خارجي تلقائي.</p><label>القسم</label><select id="department"></select><label>عنوان المهمة</label><input id="task-title" placeholder="مثال: إعداد منتج رقمي قابل للبيع"><label>تفاصيل المطلوب</label><textarea id="task-desc" rows="4" placeholder="اكتب النتيجة المطلوبة ومعايير الجودة..."></textarea><div class="actions"><button id="create-task">إضافة المهمة إلى طابور الشركة</button><button id="run-next">تشغيل المهمة التالية الآن</button></div><div class="small">يعمل حالياً الوكيل النشط المصرح له فقط. الأقسام التي لم يُفعّل وكيلها ستظهر كغير جاهزة بدلاً من ادعاء التنفيذ.</div></section>
+ <section class="card"><h2>مهام الشركة ونتائجها</h2><div id="tasks" class="stack"></div></section>
+ <section class="card"><h2>سجل تشغيل الوكلاء</h2><div id="runs" class="stack"></div></section>
+</section>
+</main>
+<script>
+(()=>{'use strict';
+const URL='https://oxyzxbkwhafzaztraowc.supabase.co';
+const KEY='sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm';
+const OWNER='hazemnaw48@gmail.com';
+const sb=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+const $=id=>document.getElementById(id);let state=null,busy=false;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const msg=(s,kind='')=>{$('notice').textContent=s;$('notice').className='notice '+kind};
+async function session(){const {data,error}=await sb.auth.getSession();if(error)throw error;const t=data.session;if(!t?.access_token)throw new Error('سجّل الدخول بحساب مالك ZOZ Pro.');const {data:u,error:e}=await sb.auth.getUser(t.access_token);if(e)throw e;if(String(u.user?.email||'').toLowerCase()!==OWNER)throw new Error('هذه الجلسة ليست جلسة مالك ZOZ Pro.');return t}
+async function api(action,body={}){const s=await session();const r=await fetch(URL+'/functions/v1/zoz-company-agent',{method:'POST',headers:{'content-type':'application/json','apikey':KEY,'authorization':'Bearer '+s.access_token},body:JSON.stringify({action,...body})});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||('HTTP '+r.status));return d}
+function pill(status){const v=String(status||'غير معروف');let c=/connected|ready|active|succeeded|completed/i.test(v)?'good':/missing|needs|queued|planned|awaiting|blocked|failed|not_tested/i.test(v)?'warn':'';return '<span class="pill '+c+'">'+esc(v)+'</span>'}
+function render(d){state=d;$('dashboard').classList.remove('hidden');$('login-card').classList.add('hidden');
+const active=d.agents.filter(x=>x.status==='active').length,connected=d.tools.filter(x=>x.connection?.connection_status==='connected'||x.integration_status==='available_now').length;
+$('metrics').innerHTML=[['الأقسام',d.departments.length],['الوكلاء',d.agents.length],['وكلاء نشطون',active],['الأدوات',d.tools.length],['أدوات متاحة/متصلة',connected],['مهام مسجلة',d.tasks.length]].map(x=>'<div class="metric"><div class="num">'+esc(x[1])+'</div><div class="small">'+esc(x[0])+'</div></div>').join('');
+$('models').innerHTML=d.models.map(m=>'<article class="item"><h3>'+esc(m.provider)+' · '+esc(m.model_name)+'</h3>'+pill(m.last_test_status)+' '+(m.free_tier_only?'<span class="pill good">مجاني فقط</span>':'')+'<p class="small">'+esc(m.notes||'')+'</p></article>').join('');
+$('departments').innerHTML=d.departments.map(x=>'<article class="item"><h3>'+esc(x.name_ar)+'</h3>'+pill(x.status)+'<p class="small">'+esc(x.mission||x.department_key)+'</p></article>').join('');
+$('agents').innerHTML=d.agents.map(x=>'<article class="item"><h3>'+esc(x.name_ar)+' · '+esc(x.role_title)+'</h3>'+pill(x.status)+'<p class="small">'+esc(x.mission||'')+'</p><div class="small">الاستقلالية: '+esc(x.autonomy_level||'غير محدد')+'</div></article>').join('');
+$('tools').innerHTML=d.tools.map(x=>{const c=x.connection;const status=c?.connection_status||x.integration_status;const action=x.install_required?'تنزيل/تثبيت':x.api_key_required?'يحتاج اعتماد API':c?.connection_status==='connected'?'متصل':'يحتاج تهيئة';return '<article class="item"><div class="row"><h3>'+esc(x.name)+'</h3>'+pill(status)+'</div><p class="small">'+esc(x.description||x.category||'')+'</p><div class="small">النموذج: '+esc(x.pricing_model||'غير محدد')+' · '+esc(action)+'</div>'+(x.setup_url?'<p><a target="_blank" rel="noopener" href="'+esc(x.setup_url)+'">صفحة الإعداد الرسمية</a></p>':'')+'<p class="small">'+esc(c?.setup_notes||x.notes||'')+'</p></article>'}).join('');
+const sel=$('department');const keep=sel.value;sel.innerHTML=d.departments.map(x=>'<option value="'+esc(x.department_key)+'">'+esc(x.name_ar)+'</option>').join('');if(keep)sel.value=keep;
+$('tasks').innerHTML=d.tasks.length?d.tasks.map(t=>'<article class="item"><div class="row"><h3>'+esc(t.title)+'</h3>'+pill(t.status)+'</div><p class="small">'+esc(t.objective||'')+'</p>'+(t.result?'<details><summary>عرض المخرجات</summary><pre>'+esc(JSON.stringify(t.result,null,2))+'</pre></details>':'')+(t.status==='awaiting_owner'?'<div class="actions"><button data-review="accept" data-id="'+esc(t.id)+'">اعتماد النتيجة</button><button class="secondary" data-review="return" data-id="'+esc(t.id)+'">إرجاع للمراجعة</button></div>':'')+'</article>').join(''):'<p class="muted">لا توجد مهام بعد.</p>';
+$('runs').innerHTML=d.runs.length?d.runs.slice(0,15).map(x=>'<article class="item"><div class="row"><strong>'+esc(x.model_provider)+' · '+esc(x.model_name)+'</strong>'+pill(x.status)+'</div><div class="small">'+esc(x.result_summary||x.error_summary||x.started_at||'')+'</div></article>').join(''):'<p class="muted">لا توجد سجلات تشغيل بعد.</p>';
+}
+async function refresh(){if(busy)return;busy=true;$('refresh').disabled=true;try{msg('جارٍ قراءة بيانات الشركة من الإنتاج...');const d=await api('status');render(d);msg('تم تحديث لوحة الشركة من قاعدة الإنتاج. Gemini مباشر؛ Make غير مطلوب؛ Claude غير مفعل لعدم وجود API مجاني موثق.','good')}catch(e){msg(e.message,'warn');if(/سجّل الدخول|جلسة/.test(e.message)){$('dashboard').classList.add('hidden');$('login-card').classList.remove('hidden')}}finally{busy=false;$('refresh').disabled=false}}
+$('refresh').onclick=refresh;
+$('login').onclick=async()=>{try{const {error}=await sb.auth.signInWithPassword({email:$('email').value,password:$('password').value});if(error)throw error;await refresh()}catch(e){msg(e.message,'bad')}};
+$('logout').onclick=async()=>{await sb.auth.signOut();$('dashboard').classList.add('hidden');$('login-card').classList.remove('hidden');msg('تم تسجيل الخروج من هذه الجلسة.')}
+$('create-task').onclick=async()=>{const title=$('task-title').value.trim(),description=$('task-desc').value.trim(),department_key=$('department').value;if(!title||!description){msg('أدخل عنوان المهمة وتفاصيلها.','warn');return}try{await api('enqueue_task',{title,description,department_key,task_type:'company_work'});$('task-title').value='';$('task-desc').value='';await refresh();msg('أضيفت المهمة إلى طابور الشركة.','good')}catch(e){msg(e.message,'bad')}};
+$('run-next').onclick=async()=>{try{$('run-next').disabled=true;msg('جارٍ تشغيل المهمة التالية عبر الوكيل النشط وGemini المباشر...');const d=await api('run_next');await refresh();msg(d.ran?'انتهى تشغيل المهمة. النتيجة بانتظار مراجعتك.':(d.message||'لا توجد مهمة في الطابور.'),d.ran?'good':'warn')}catch(e){msg(e.message,'bad')}finally{$('run-next').disabled=false}};
+$('tasks').addEventListener('click',async e=>{const b=e.target.closest('[data-review]');if(!b)return;try{await api('review_task',{task_id:b.dataset.id,decision:b.dataset.review,feedback:b.dataset.review==='return'?'تحتاج إلى مراجعة إضافية.':''});await refresh();msg('تم تحديث قرار مراجعة المهمة.','good')}catch(err){msg(err.message,'bad')}});
+(async()=>{try{await session();await refresh()}catch(e){$('login-card').classList.remove('hidden');msg('يلزم تسجيل الدخول: '+e.message,'warn')}})();
+})();
+</script></body></html>
