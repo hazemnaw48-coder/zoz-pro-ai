@@ -112,6 +112,40 @@ private fun AppScopeControlScreen() {
         }
     }
 
+    LaunchedEffect(paired) {
+        if (paired) {
+            val deviceToken = DeviceTokenVault.read(context)
+            if (deviceToken != null) {
+                try {
+                    withContext(Dispatchers.IO) {
+                        val storedIntake = DeviceTokenVault.readIntake(context)
+                        if (storedIntake.isNullOrBlank() || storedIntake.length < 32) {
+                            val response = apiPostWithToken(
+                                "device_intake_token",
+                                JSONObject().put("channel_id", "UC9fr5B0SZZkmVAApfCqEO3w"),
+                                deviceToken
+                            )
+                            val issued = response.optString("intake_token")
+                            if (issued.length < 32) throw IllegalStateException("الخادم لم يصدر رمز استقبال صالحًا.")
+                            DeviceTokenVault.writeIntake(context, issued)
+                        }
+                        if (FlowAutomationService.isEnabled(context)) {
+                            apiPostWithToken("enable_phone_control", JSONObject().put("app_version", BuildConfig.VERSION_NAME), deviceToken)
+                        }
+                    }
+                    serviceEnabled = FlowAutomationService.isEnabled(context)
+                    status = if (serviceEnabled) {
+                        "اتصال الهاتف نشط. تم تجهيز استقبال فيديو فِكرة، وتفعيل نطاق التحكم المسموح بتطبيقات الاستوديو."
+                    } else {
+                        "اتصال الهاتف نشط. تم تجهيز استقبال فيديو فِكرة. فعّل خدمة ZOZ App Access لإتاحة التحكم داخل تطبيقات الاستوديو."
+                    }
+                } catch (e: Exception) {
+                    status = "اتصال الجهاز قائم، لكن تعذر تجهيز استقبال الملفات: " + (e.message ?: "خطأ غير معروف")
+                }
+            }
+        }
+    }
+
     fun requestApp(packageName: String, displayName: String, analytics: Boolean = false) {
         if (!paired) {
             status = "اربط التطبيق بمركز ZOZ Pro أولًا."
