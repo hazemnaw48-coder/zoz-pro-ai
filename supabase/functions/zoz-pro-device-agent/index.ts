@@ -71,7 +71,7 @@ Deno.serve(async(req:Request)=>{
    await log(ch.owner_id,dev.id,null,"device_paired",{device_name:deviceName,app_version:appVersion,intake_source_id:source.id});
    return json({ok:true,device_id:dev.id,device_token:raw,intake_token:intakeToken,device_name:deviceName,capabilities:dev.capabilities,paired_at:new Date().toISOString()});
   }
-  if(action==="device_health"||action==="heartbeat"||action==="poll_jobs"||action==="complete_job"||action==="enable_flow_automation"||action==="enable_phone_control"||action==="production_intake_complete"){
+  if(action==="device_health"||action==="heartbeat"||action==="poll_jobs"||action==="complete_job"||action==="enable_flow_automation"||action==="enable_phone_control"||action==="production_intake_complete"||action==="device_intake_token"){
    const d=await device(req);if(!d)return fail("الجهاز غير مقرون أو تم إلغاء صلاحياته.",401);
    const now=new Date().toISOString();
    if(action==="production_intake_complete"){
@@ -92,6 +92,22 @@ Deno.serve(async(req:Request)=>{
     await db("zoz_pro_device_registry?id=eq."+encodeURIComponent(d.device_id)+"&owner_id=eq."+encodeURIComponent(d.owner_id),{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({capabilities,updated_at:now})});
     await log(d.owner_id,d.device_id,null,"flow_automation_enabled",{capability_id:"flow.generate_scene"});
     return json({ok:true,device_id:d.device_id,capabilities});
+   }
+      if(action==="device_intake_token"){
+    const channelId=clean(body?.channel_id,80);
+    const allowedChannels=["UC9fr5B0SZZkmVAApfCqEO3w","UCIael48cvwPG3GkJ--c7HKw"];
+    if(!allowedChannels.includes(channelId))return fail("القناة غير مفعّلة لاستقبال ملفات الهاتف؛ فِكرة كيدز مستبعدة حتى تأكيد وجهتها.",403);
+    const channels=await db("zoz_pro_managed_channels?owner_id=eq."+encodeURIComponent(d.owner_id)+"&channel_id=eq."+encodeURIComponent(channelId)+"&is_active=eq.true&select=channel_id,display_name&limit=1");
+    if(!channels?.[0])return fail("القناة غير مسجلة أو غير نشطة في حساب المالك.",404);
+    const previous=await db("zoz_pro_device_registry?id=eq."+encodeURIComponent(d.device_id)+"&owner_id=eq."+encodeURIComponent(d.owner_id)+"&select=intake_source_id&limit=1");
+    const previousId=previous?.[0]?.intake_source_id;
+    if(previousId)await db("zoz_pro_video_intake_sources?id=eq."+encodeURIComponent(previousId)+"&owner_id=eq."+encodeURIComponent(d.owner_id)+"&is_active=eq.true",{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({is_active:false,revoked_at:now})});
+    const intakeToken=token(),sourceRows=await db("zoz_pro_video_intake_sources",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({owner_id:d.owner_id,channel_id:channelId,source_name:"ZOZ Android — "+clean(d.device.device_name,80),secret_hash:await digest(intakeToken),is_active:true,expires_at:null})});
+    const source=sourceRows?.[0];if(!source)throw new Error("تعذر إنشاء صلاحية استقبال الهاتف.");
+    const capabilities=[...new Set([...(Array.isArray(d.device.capabilities)?d.device.capabilities:[]),"device.health_check","video.intake.upload"])];
+    await db("zoz_pro_device_registry?id=eq."+encodeURIComponent(d.device_id)+"&owner_id=eq."+encodeURIComponent(d.owner_id),{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({intake_source_id:source.id,capabilities,updated_at:now})});
+    await log(d.owner_id,d.device_id,null,"device_intake_token_issued",{channel_id:channelId,source_id:source.id});
+    return json({ok:true,intake_token:intakeToken,source_id:source.id,channel_id:channelId,channel_name:channels[0].display_name,capabilities});
    }
    if(action==="enable_phone_control"){
     const capabilities=[...new Set([...(Array.isArray(d.device.capabilities)?d.device.capabilities:[]),"device.ui_control"])];
