@@ -33,21 +33,14 @@ Official Termux sources:
 
 ## Install
 
-Open Termux (not a browser terminal) and run:
+Open Termux (not a browser terminal) and run this one installer command:
 
 ```bash
-pkg update -y
-pkg install -y git proot-distro curl
-proot-distro install debian
+curl -fsSL "https://raw.githubusercontent.com/hazemnaw48-coder/zoz-pro-ai/docs/paperclip-zoz-orchestration/paperclip-android/termux-install.sh" -o ~/zoz-paperclip-install.sh
+bash ~/zoz-paperclip-install.sh
 ```
 
-Then download this repository branch inside Debian and run the installer as root (only the OS package/user setup runs as root):
-
-```bash
-proot-distro login debian -- bash -lc 'apt-get update && apt-get install -y git curl ca-certificates sudo passwd procps psmisc'
-proot-distro login debian -- bash -lc 'id zoz >/dev/null 2>&1 || useradd -m -s /bin/bash zoz; git clone --branch docs/paperclip-zoz-orchestration --single-branch https://github.com/hazemnaw48-coder/zoz-pro-ai.git /home/zoz/zoz-pro-ai; chown -R zoz:zoz /home/zoz/zoz-pro-ai'
-proot-distro login debian --user zoz -- bash -lc 'bash ~/zoz-pro-ai/paperclip-android/install-debian.sh'
-```
+The script installs Debian, creates a non-root user, clones the company package, and installs the required runtimes. It does not initialize a database or import the company.
 
 The install script does not run onboarding, import a company, add keys, or start a service. It only installs software and checks versions.
 
