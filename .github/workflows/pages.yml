@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "channel-control.html"
+      - "company-office.html"
+      - "qwen-provider-connect.html"
+      - "video-provider-connect.html"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
