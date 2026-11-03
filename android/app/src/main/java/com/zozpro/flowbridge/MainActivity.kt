@@ -118,17 +118,17 @@ private fun AppScopeControlScreen() {
             if (deviceToken != null) {
                 try {
                     withContext(Dispatchers.IO) {
-                        val storedIntake = DeviceTokenVault.readIntake(context)
-                        if (storedIntake.isNullOrBlank() || storedIntake.length < 32) {
-                            val response = apiPostWithToken(
-                                "device_intake_token",
-                                JSONObject().put("channel_id", "UC9fr5B0SZZkmVAApfCqEO3w"),
-                                deviceToken
-                            )
-                            val issued = response.optString("intake_token")
-                            if (issued.length < 32) throw IllegalStateException("الخادم لم يصدر رمز استقبال صالحًا.")
-                            DeviceTokenVault.writeIntake(context, issued)
-                        }
+                        // Re-provision the server-side intake source on each app launch.
+                        // The owner may have revoked a server source while the encrypted phone token
+                        // still exists locally; checking only local storage would leave uploads broken.
+                        val response = apiPostWithToken(
+                            "device_intake_token",
+                            JSONObject().put("channel_id", "UC9fr5B0SZZkmVAApfCqEO3w"),
+                            deviceToken
+                        )
+                        val issued = response.optString("intake_token")
+                        if (issued.length < 32) throw IllegalStateException("الخادم لم يصدر رمز استقبال صالحًا.")
+                        DeviceTokenVault.writeIntake(context, issued)
                         if (FlowAutomationService.isEnabled(context)) {
                             apiPostWithToken("enable_phone_control", JSONObject().put("app_version", BuildConfig.VERSION_NAME), deviceToken)
                         }
