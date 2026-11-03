@@ -37,6 +37,11 @@ jobs:
           test -s _site/index.html
           test -s _site/studio.html
           echo "Verified Pages entrypoints:" && ls -l _site/index.html _site/studio.html
+          mkdir -p _site/product-guide
+          cp product-guide/index.html product-guide/guide.html product-guide/privacy.html _site/product-guide/
+          test -s _site/product-guide/index.html
+          test -s _site/product-guide/guide.html
+          test -s _site/product-guide/privacy.html
           mkdir -p _site/production
           cp studio/index.html studio/style.css _site/production/
           git fetch origin supabase-studio-pages
