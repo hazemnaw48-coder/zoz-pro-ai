@@ -8,7 +8,7 @@ fi
 
 pkg update -y
 pkg install -y git curl proot-distro
-if ! proot-distro list | grep -q '^debian'; then
+if ! proot-distro login debian -- true >/dev/null 2>&1; then
   proot-distro install debian
 fi
 
