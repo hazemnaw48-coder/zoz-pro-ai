@@ -118,7 +118,7 @@ private fun AppScopeControlScreen() {
             if (deviceToken != null) {
                 try {
                     withContext(Dispatchers.IO) {
-                        ensureIntakeToken(context, deviceToken, "UC9fr5B0SZZkmVAApfCqEO3w")
+                        ensureIntakeToken(context, deviceToken, "UC9fr5B0SZZkmVAApfCqEO3w", forceRefresh = true)
                         if (FlowAutomationService.isEnabled(context)) {
                             apiPostWithToken("enable_phone_control", JSONObject().put("app_version", BuildConfig.VERSION_NAME), deviceToken)
                         }
@@ -934,9 +934,14 @@ class DeviceNotifications {
     }
 }
 
-private fun ensureIntakeToken(context: Context, deviceToken: String, channelId: String) {
+private fun ensureIntakeToken(
+    context: Context,
+    deviceToken: String,
+    channelId: String,
+    forceRefresh: Boolean = false
+) {
     val existing = DeviceTokenVault.readIntake(context)
-    if (!existing.isNullOrBlank() && existing.length >= 32) return
+    if (!forceRefresh && !existing.isNullOrBlank() && existing.length >= 32) return
     val response = apiPostWithToken(
         "device_intake_token",
         JSONObject().put("channel_id", channelId),
