@@ -1,1 +1,40 @@
-<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ZOZ Pro - Qwen</title><body><h1>ربط Qwen عبر Hugging Face</h1><p>صفحة ربط منفصلة عن LTX Video.</p><p>سيتم التحقق من الجلسة والرمز داخل خادم ZOZ Pro.</p></body></html>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#09111d"><title>ZOZ Pro | ربط Qwen</title>
+<style>
+:root{color-scheme:dark;--bg:#09111d;--line:#2d4968;--text:#edf5ff;--muted:#afc0d3;--blue:#3978ef}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 10% 0,#172c48 0,transparent 40%),var(--bg);color:var(--text);font:16px/1.8 system-ui,sans-serif}.wrap{max-width:720px;margin:auto;padding:18px}.card{background:linear-gradient(145deg,#172b43,#0d1928);border:1px solid var(--line);border-radius:18px;padding:20px;margin:16px 0}.muted{color:var(--muted)}a{color:#a9caff}button{padding:12px 18px;border:0;border-radius:12px;background:var(--blue);color:white;font:inherit;font-weight:700}button:disabled{opacity:.5}.notice{padding:12px;border-radius:12px;background:#20344c;margin:14px 0}.good{background:#123e34}.bad{background:#542b32}.warn{background:#49391e}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.small{font-size:13px}
+</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head><body><main class="wrap">
+<div class="muted">ZOZ PRO · AI MODELS</div>
+<section class="card">
+<h1>ربط Qwen عبر Hugging Face</h1>
+<p>صفحة مستقلة عن LTX Video. رمز Inference Providers محفوظ في مخزن مشفر منفصل، ولا يظهر في المتصفح أو السجلات.</p>
+<div class="notice warn">الفحص التالي يتحقق من حساب Hugging Face وإمكانية الوصول إلى Inference Providers وقائمة النماذج فقط. لا يرسل طلب استدلال ولا يستهلك رصيدًا. لن يتم تفعيل الوكيل قبل اختبار نموذج آمن ومراجعة حدود الإنفاق.</div>
+<div class="row"><button id="verify">فحص اتصال Qwen المحفوظ</button><a href="./company-office.html">العودة إلى مكتب الشركة</a></div>
+<div id="status" class="notice" role="status">اضغط فحص الاتصال للتحقق من الرمز المحفوظ.</div><div id="details" class="small muted"></div>
+</section>
+<section class="card">
+<h2>حالة المحركات</h2>
+<p>Qwen: رمز Inference Providers منفصل، والفحص لا يشغّل النموذج.</p>
+<p>LTX Video: يحتاج رمز Read منفصلًا لإعادة الاتصال إذا كان الرمز السابق قد استُبدل.</p>
+<a href="./video-provider-connect.html">فتح صفحة ربط LTX Video</a>
+</section>
+<p class="small muted">النشر الخارجي يظل بموافقة المالك. لا يوجد تجاوز تلقائي إلى استخدام مدفوع.</p>
+</main>
+<script>
+(()=>{'use strict';
+const URL='https://oxyzxbkwhafzaztraowc.supabase.co',KEY='sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm',OWNER='hazemnaw48@gmail.com';
+const sb=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+const $=id=>document.getElementById(id),status=(s,c='')=>{$('status').textContent=s;$('status').className='notice '+c};
+$('verify').onclick=async()=>{const b=$('verify');b.disabled=true;$('details').textContent='';status('جارٍ فحص جلسة المالك والرمز المحفوظ...');
+try{const {data,error}=await sb.auth.getSession();if(error)throw error;const session=data?.session;if(!session?.access_token)throw new Error('جلسة ZOZ Pro غير موجودة. افتح مكتب الشركة وسجّل الدخول ثم أعد المحاولة.');
+const {data:u,error:ue}=await sb.auth.getUser(session.access_token);if(ue)throw ue;if(String(u?.user?.email||'').toLowerCase()!==OWNER)throw new Error('يجب فتح الصفحة من جلسة مالك ZOZ Pro.');
+const r=await fetch(URL+'/functions/v1/zoz-qwen-provider-connect',{method:'POST',headers:{'content-type':'application/json','apikey':KEY,'authorization':'Bearer '+session.access_token},body:JSON.stringify({action:'verify'})});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||('HTTP '+r.status));
+status('تم التحقق من Hugging Face Inference Providers. لم يتم استدعاء نموذج ولم يُستهلك رصيد.','good');
+$('details').textContent='الحساب: '+d.account+' · نماذج Qwen الظاهرة: '+d.qwen_models_available+' · النموذج المقترح: '+(d.preferred_model||'لم يظهر في القائمة')+' · تفعيل الوكيل: متوقف حتى اختبار الاستجابة ومراجعة الإنفاق.';
+}catch(e){status(e.message||'تعذر التحقق من الاتصال.','bad')}finally{b.disabled=false}};
+})();
+</script></body></html>
