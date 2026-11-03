@@ -12,8 +12,6 @@ case "$ARCH" in
   *) echo "Unsupported Debian architecture: $ARCH"; exit 1 ;;
 esac
 
-sudo apt-get update
-sudo apt-get install -y ca-certificates curl git build-essential python3 procps psmisc
 
 export NVM_DIR="$HOME/.nvm"
 if [ ! -s "$NVM_DIR/nvm.sh" ]; then
