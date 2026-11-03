@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#09111d"><title>ZOZ Pro | ربط مولد الفيديو المجاني</title>
+<style>
+:root{color-scheme:dark;--bg:#09111d;--panel:#14243a;--line:#2d4968;--text:#edf5ff;--muted:#afc0d3;--blue:#3978ef;--green:#32c48d;--amber:#e9b44c;--red:#f27676}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 10% 0,#172c48 0,transparent 40%),var(--bg);color:var(--text);font:16px/1.8 system-ui,sans-serif}.wrap{max-width:720px;margin:auto;padding:18px}.card{background:linear-gradient(145deg,#172b43,#0d1928);border:1px solid var(--line);border-radius:18px;padding:20px;margin:16px 0}.muted{color:var(--muted)}a{color:#a9caff}label{display:block;margin:12px 0 6px}input{width:100%;padding:14px;border-radius:12px;border:1px solid #405c7a;background:#071421;color:white;font:inherit;direction:ltr;text-align:left}button{padding:12px 18px;border:0;border-radius:12px;background:var(--blue);color:white;font:inherit;font-weight:700}button:disabled{opacity:.5}.notice{padding:12px;border-radius:12px;background:#20344c;margin:14px 0}.good{background:#123e34}.bad{background:#542b32}.warn{background:#49391e}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.small{font-size:13px}.steps li{margin:8px 0}
+</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head><body><main class="wrap">
+<div class="muted">ZOZ PRO · VIDEO PRODUCTION</div>
+<section class="card"><h1>ربط مولد الفيديو المجاني</h1>
+<p>هذا الربط يضيف بديلاً احتياطياً لـ Google Flow، ولا يحذف Flow. المحرك هو LTX Video على Hugging Face، ويعمل من خلال طابور GPU مجاني محدود.</p>
+<div class="notice warn">المجاني ليس غير محدود: حساب Hugging Face المجاني يحصل عادةً على حصة ZeroGPU يومية محدودة (حوالي 5 دقائق GPU)، مع انتظار مشترك وقد تتوقف الخدمة أو تنفد الحصة. لذلك سيبدأ الوكيل بمشاهد تجريبية ومسودات فقط.</div>
+<h2>خطوة واحدة مطلوبة من المالك</h2>
+<ol class="steps">
+<li>افتح <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">صفحة Hugging Face Access Tokens</a>.</li>
+<li>أنشئ رمزاً جديداً بصلاحية <b>Read فقط</b>، ولا تمنحه صلاحية Write أو Admin.</li>
+<li>ارجع إلى هذه الصفحة والصق الرمز هنا ثم اضغط «تحقق وربط بشكل مشفر».</li>
+</ol>
+<label for="hf-token">Hugging Face Read Token</label>
+<input id="hf-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="hf_••••••••••••••••">
+<div class="row" style="margin-top:14px"><button id="connect">تحقق وربط بشكل مشفر</button><a href="./company-office.html">العودة إلى مكتب الشركة</a></div>
+<div id="status" class="notice" role="status">لن يُحفظ الرمز في المتصفح أو يُرسل إلى المحادثة. سيتم التحقق منه ثم تخزينه داخل Supabase Vault المشفر.</div>
+</section>
+<p class="small muted">الأمان: لا يُمنح الوكيل صلاحية نشر. الرمز لا يظهر في النتائج أو السجلات. يمكن إلغاءه لاحقاً من Hugging Face.</p>
+</main>
+<script>
+(()=>{'use strict';
+const URL='https://oxyzxbkwhafzaztraowc.supabase.co';
+const KEY='sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm';
+const OWNER='hazemnaw48@gmail.com';
+const sb=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+const $=id=>document.getElementById(id);
+const status=(s,c='')=>{$('status').textContent=s;$('status').className='notice '+c;};
+$('connect').onclick=async()=>{
+ const b=$('connect');const token=$('hf-token').value.trim();
+ if(!token){status('أدخل الرمز أولاً.','warn');return;}
+ b.disabled=true;status('جارٍ التحقق من جلسة المالك والرمز مع Hugging Face...');
+ try{
+  const {data,error}=await sb.auth.getSession();if(error)throw error;
+  const session=data?.session;if(!session?.access_token)throw new Error('جلسة ZOZ Pro غير موجودة. افتح مركز القنوات وسجّل الدخول ثم عُد.');
+  const {data:u,error:ue}=await sb.auth.getUser(session.access_token);if(ue)throw ue;
+  if(String(u?.user?.email||'').toLowerCase()!==OWNER)throw new Error('يجب فتح الصفحة من جلسة مالك ZOZ Pro.');
+  const r=await fetch(URL+'/functions/v1/zoz-video-provider-connect',{method:'POST',headers:{'content-type':'application/json','apikey':KEY,'authorization':'Bearer '+session.access_token},body:JSON.stringify({token})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||!d.ok)throw new Error(d.error||('HTTP '+r.status));
+  $('hf-token').value='';
+  status('تم التحقق من حساب '+d.account+' وتخزين الرمز بشكل مشفر. الاتصال جاهز لمرحلة اختبار توليد المشهد؛ الحصة المجانية والطابور يظلان محدودين.','good');
+ }catch(e){$('hf-token').value='';status(e.message||'تعذر إكمال الربط.','bad');}
+ finally{b.disabled=false;}
+};
+})();
+</script></body></html>
