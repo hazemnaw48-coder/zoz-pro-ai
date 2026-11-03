@@ -118,17 +118,7 @@ private fun AppScopeControlScreen() {
             if (deviceToken != null) {
                 try {
                     withContext(Dispatchers.IO) {
-                        // Re-provision the server-side intake source on each app launch.
-                        // The owner may have revoked a server source while the encrypted phone token
-                        // still exists locally; checking only local storage would leave uploads broken.
-                        val response = apiPostWithToken(
-                            "device_intake_token",
-                            JSONObject().put("channel_id", "UC9fr5B0SZZkmVAApfCqEO3w"),
-                            deviceToken
-                        )
-                        val issued = response.optString("intake_token")
-                        if (issued.length < 32) throw IllegalStateException("الخادم لم يصدر رمز استقبال صالحًا.")
-                        DeviceTokenVault.writeIntake(context, issued)
+                        ensureIntakeToken(context, deviceToken, "UC9fr5B0SZZkmVAApfCqEO3w")
                         if (FlowAutomationService.isEnabled(context)) {
                             apiPostWithToken("enable_phone_control", JSONObject().put("app_version", BuildConfig.VERSION_NAME), deviceToken)
                         }
@@ -944,11 +934,25 @@ class DeviceNotifications {
     }
 }
 
+private fun ensureIntakeToken(context: Context, deviceToken: String, channelId: String) {
+    val existing = DeviceTokenVault.readIntake(context)
+    if (!existing.isNullOrBlank() && existing.length >= 32) return
+    val response = apiPostWithToken(
+        "device_intake_token",
+        JSONObject().put("channel_id", channelId),
+        deviceToken
+    )
+    val issued = response.optString("intake_token")
+    if (issued.length < 32) throw IllegalStateException("الخادم لم يصدر رمز استقبال صالحًا.")
+    DeviceTokenVault.writeIntake(context, issued)
+}
+
 class DevicePollWorker(context: Context, params: androidx.work.WorkerParameters) : androidx.work.Worker(context, params) {
     override fun doWork(): Result {
         val token = DeviceTokenVault.read(applicationContext) ?: return Result.success()
         return try {
             apiPostWithToken("heartbeat", JSONObject().put("app_version", BuildConfig.VERSION_NAME), token)
+            ensureIntakeToken(applicationContext, token, "UC9fr5B0SZZkmVAApfCqEO3w")
             if (!FlowAutomationService.isEnabled(applicationContext)) return Result.success()
             for (index in 0 until 1) {
                 val job = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job") ?: break
