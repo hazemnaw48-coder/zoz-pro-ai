@@ -70,8 +70,9 @@ The script previews the import first. It imports as a **new company**, never mer
 
 ```bash
 bash ~/zoz-pro-ai/paperclip-android/start-termux.sh
+# In a second Termux session:
 bash ~/zoz-pro-ai/paperclip-android/status-termux.sh
-bash ~/zoz-pro-ai/paperclip-android/stop-termux.sh
+# To stop: return to the first session and press Ctrl+C
 ```
 
 Open this on the same phone only: http://127.0.0.1:3100
