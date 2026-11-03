@@ -10,7 +10,7 @@
 <section class="card"><h2>5 · أمن قاعدة البيانات</h2><p>RLS والمنح SQL يعملان معاً. فعّل RLS على كل جدول مكشوف، امنح كل دور أقل صلاحية، واكتب سياسة منفصلة لكل عملية. لا تجعل زائر الموقع يقرأ جدول العملاء مباشرة إذا كان الإدخال يتم من وظيفة خادمية.</p><pre>alter table public.agent_tasks enable row level security;
 
 revoke all on public.agent_tasks from anon, authenticated;
-grant select, insert, update, delete
+grant select, insert, update
 on public.agent_tasks to authenticated;
 
 create policy "owners read own tasks"
