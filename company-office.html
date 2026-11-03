@@ -73,7 +73,17 @@ function saveSession(d){token=d.access_token||'';refreshToken=d.refresh_token||'
 function clearSession(){token='';refreshToken='';localStorage.removeItem('zoz_company_auth');}
 async function authRequest(path,body){const r=await fetch(URL+'/auth/v1/'+path,{method:'POST',headers:{'content-type':'application/json','apikey':KEY},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.msg||d.message||d.error_description||d.error||('Auth HTTP '+r.status));return d;}
 async function ensureSession(){
- if(!token){const raw=localStorage.getItem('zoz_company_auth');if(raw){try{const s=JSON.parse(raw);token=s.access_token||'';refreshToken=s.refresh_token||'';}catch{clearSession()}}}
+ if(!token){
+  const raw=localStorage.getItem('zoz_company_auth');
+  if(raw){try{const s=JSON.parse(raw);token=s.access_token||'';refreshToken=s.refresh_token||'';}catch{clearSession()}}
+ }
+ // Reuse the existing authenticated ZOZ Pro Supabase session on this phone when available.
+ if(!token){
+  const sharedRaw=localStorage.getItem('sb-oxyzxbkwhafzaztraowc-auth-token');
+  if(sharedRaw){
+   try{const shared=JSON.parse(sharedRaw);token=shared.access_token||shared.currentSession?.access_token||'';refreshToken=shared.refresh_token||shared.currentSession?.refresh_token||'';if(token&&refreshToken)saveSession({access_token:token,refresh_token:refreshToken,expires_in:Math.max(60,Math.floor(((shared.expires_at||0)*1000-Date.now())/1000)||3600)});}catch{}
+  }
+ }
  if(!token)throw new Error('سجّل الدخول بحساب مالك ZOZ Pro.');
  let r=await fetch(URL+'/auth/v1/user',{headers:{apikey:KEY,authorization:'Bearer '+token}});
  if(r.status===401&&refreshToken){const fresh=await authRequest('token?grant_type=refresh_token',{refresh_token:refreshToken});saveSession(fresh);r=await fetch(URL+'/auth/v1/user',{headers:{apikey:KEY,authorization:'Bearer '+token}});}
