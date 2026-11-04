@@ -153,6 +153,9 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0) {
                         if (FlowAutomationService.isEnabled(context)) {
                             apiPostWithToken("enable_phone_control", JSONObject().put("app_version", BuildConfig.VERSION_NAME), deviceToken)
                             apiPostWithToken("enable_flow_automation", JSONObject().put("app_version", BuildConfig.VERSION_NAME), deviceToken)
+                            apiPostWithToken("enable_voiceover_merge", JSONObject()
+                                .put("app_version", BuildConfig.VERSION_NAME)
+                                .put("app_package", BuildConfig.APPLICATION_ID), deviceToken)
                         }
                     }
                     serviceEnabled = FlowAutomationService.isEnabled(context)
@@ -830,11 +833,11 @@ fun assembleCompatibleClips(context: Context, clips: List<ImportedClip>, outputU
 }
 
 
-private data class VoiceoverOutput(val file: File, val voiceLabel: String)
+internal data class VoiceoverOutput(val file: File, val voiceLabel: String)
 private data class PcmWavInfo(val dataOffset: Long, val dataSize: Long, val sampleRate: Int, val channels: Int, val bitsPerSample: Int)
 private val voiceLabels = java.util.concurrent.ConcurrentHashMap<String, String>()
 
-private suspend fun createArabicVoiceoverVideo(context: Context, sourceUri: Uri, narration: String): VoiceoverOutput {
+internal suspend fun createArabicVoiceoverVideo(context: Context, sourceUri: Uri, narration: String): VoiceoverOutput {
     if (narration.isBlank()) throw IllegalArgumentException("اكتب نص التعليق الصوتي أولًا.")
     if (narration.length > 3000) throw IllegalArgumentException("نص التعليق طويل جدًا؛ اختصره إلى 3000 حرف.")
     val wav = synthesizeArabicVoice(context, narration)
