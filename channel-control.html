@@ -270,8 +270,8 @@ body.upload-mode .footer{font-size:11px}
  <h3 class="section-gap">ملف الفيديو وبيانات النشر</h3>
  <label for="intake-target-channel">القناة المستهدفة</label>
  <select id="intake-target-channel" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px">
-  <option value="UC9fr5B0SZZkmVAApfCqEO3w" selected>فِكرة — أفكار وذكاء اصطناعي</option>
-  <option value="UCIael48cvwPG3GkJ--c7HKw">Hazem Ahmed — مصر القديمة</option>
+  <option value="UC9fr5B0SZZkmVAApfCqEO3w">فِكرة — أفكار وذكاء اصطناعي</option>
+  <option value="UCIael48cvwPG3GkJ--c7HKw" selected>Hazem Ahmed — مصر القديمة</option>
   <option value="UC-FimUUFXRd0MOSoikzczcQ" disabled>فِكرة كيدز — متوقفة حتى تأكيد وجهة القناة</option>
  </select>
  <p id="intake-target-help" class="small">اختر القناة قبل تحديد الملف. لن يرسل المركز ملفًا إلى قناة كيدز ما دامت وجهتها غير مؤكدة.</p>
@@ -445,7 +445,7 @@ const HAZEM_UPLOAD_CHANNEL_ID='UCIael48cvwPG3GkJ--c7HKw';
 const KIDS_CHANNEL_ID='UC-FimUUFXRd0MOSoikzczcQ';
 const ACTIVE_UPLOAD_CHANNELS=new Set([FEKRA_UPLOAD_CHANNEL_ID,HAZEM_UPLOAD_CHANNEL_ID]);
 const requestedUploadChannel=String(pageParams.get('channel_id')||'');
-const initialUploadChannel=ACTIVE_UPLOAD_CHANNELS.has(requestedUploadChannel)?requestedUploadChannel:FEKRA_UPLOAD_CHANNEL_ID;
+const initialUploadChannel=ACTIVE_UPLOAD_CHANNELS.has(requestedUploadChannel)?requestedUploadChannel:HAZEM_UPLOAD_CHANNEL_ID;
 if(uploadMode){
  CHANNEL_ID=initialUploadChannel;
  const uploadChannel=$('managed-channel-selector');
@@ -766,8 +766,17 @@ async function generateContentCalendar(){
  notice('calendar-msg',d.message||'تم تحديث التقويم.','good');await loadContentCalendar();
 }
 
-async function intakeApi(action,body){return await call(action,body||{});}
-function managedChannelId(){return $('managed-channel-selector')?.value||CHANNEL_ID;}
+async function intakeApi(action,body){
+ const channelId=managedChannelId();
+ return await call(action,Object.assign({},body||{},{channel_id:channelId}));
+}
+function managedChannelId(){
+ if(uploadMode){
+  const intakeTarget=String($('intake-target-channel')?.value||'');
+  if(ACTIVE_UPLOAD_CHANNELS.has(intakeTarget))return intakeTarget;
+ }
+ return $('managed-channel-selector')?.value||CHANNEL_ID;
+}
 $('managed-channel-selector')?.addEventListener('change',async()=>{try{if(ACTIVE_UPLOAD_CHANNELS.has(selectedChannelId()))setIntakeTargetChannel(selectedChannelId(),true);await loadStudioScripts();await loadIntakeAssets();await loadIntakeSources();}catch(e){notice('intake-msg',e.message||'تعذر تحديث بيانات القناة.','bad');}});
 function managedPayload(body){return Object.assign({channel_id:managedChannelId()},body||{});}
 const FEKRA_UPLOAD_DEFAULTS={title:'ازاي تبني وكيل ذكاء اصطناعي من موبايلك مجانًا؟ 🤖📱 | تجربة عملية',description:'هل ينفع تحوّل موبايلك إلى مساعد ذكي ينفّذ مهام حقيقية؟\n\nفي الفيديو ده من فِكرة هنبدأ رحلة بناء وكيل ذكاء اصطناعي من الهاتف، ونتعرف إزاي نستخدم الأدوات المتاحة ونربط بينها علشان نعمل نظام يساعدنا في الشغل والحياة اليومية، من غير الاعتماد على كورسات مدفوعة.\n\nالفكرة مش مجرد تجربة مع الذكاء الاصطناعي، لكن إنك تتعلم إزاي تبني نظام عملي خطوة بخطوة.\n\nتابع فِكرة لأفكار مفيدة، وأدوات ذكاء اصطناعي، وحلول عملية تقدر تطبقها بنفسك.\n\nاشترك وفعل الجرس علشان تكمل معانا الرحلة! 🔔\n\n#فكرة #الذكاء_الاصطناعي #AI_Agent #ذكاء_اصطناعي #أدوات_AI #من_الموبايل',tags:'AI Agent, أدوات مجانية, ذكاء اصطناعي, فِكرة, مساعد ذكي, وكيل ذكاء اصطناعي'};
@@ -775,7 +784,7 @@ function setIntakeTargetChannel(channelId,resetMetadata=true){
  const cid=String(channelId||'');
  if(!ACTIVE_UPLOAD_CHANNELS.has(cid))throw new Error('هذه القناة غير مفعّلة لمسار رفع الفيديو. فِكرة كيدز تظل للقراءة فقط حتى تأكيد وجهتها.');
  const channelSelect=$('managed-channel-selector');
- if(channelSelect){const option=Array.from(channelSelect.options).find(x=>x.value===cid);if(!option)throw new Error('القناة المستهدفة غير موجودة في قائمة القنوات المسجلة.');channelSelect.value=cid;}
+ if(channelSelect){const option=Array.from(channelSelect.options).find(x=>x.value===cid);if(option)channelSelect.value=cid;}
  if($('intake-target-channel'))$('intake-target-channel').value=cid;
  CHANNEL_ID=cid;
  if(resetMetadata){
