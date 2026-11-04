@@ -153,9 +153,6 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0) {
                         if (FlowAutomationService.isEnabled(context)) {
                             apiPostWithToken("enable_phone_control", JSONObject().put("app_version", BuildConfig.VERSION_NAME), deviceToken)
                             apiPostWithToken("enable_flow_automation", JSONObject().put("app_version", BuildConfig.VERSION_NAME), deviceToken)
-                            apiPostWithToken("enable_voiceover_merge", JSONObject()
-                                .put("app_version", BuildConfig.VERSION_NAME)
-                                .put("app_package", BuildConfig.APPLICATION_ID), deviceToken)
                         }
                     }
                     serviceEnabled = FlowAutomationService.isEnabled(context)
