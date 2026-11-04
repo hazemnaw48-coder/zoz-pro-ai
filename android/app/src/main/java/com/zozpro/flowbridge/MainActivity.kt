@@ -79,6 +79,7 @@ private const val PREF_PENDING_PROMPT = "pending_agent_prompt"
 private const val PREF_PENDING_PROMPTS = "pending_agent_prompts"
 private const val API = "https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-device-agent"
 private const val INTAKE_API = "https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-youtube-analytics"
+private const val VOICEOVER_API = "https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-voiceover"
 private const val PUBLIC_KEY = "sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm"
 
 class MainActivity : ComponentActivity() {
@@ -1085,6 +1086,75 @@ private fun encodePcmWavToAac(wavFile: File, aacFile: File) {
         if (muxerStarted) runCatching { muxer.stop() }
         runCatching { muxer.release() }
     }
+}
+
+
+fun createScriptVoiceoverVideo(
+    context: Context, sourceUri: Uri, channelId: String, scriptId: String,
+    deviceToken: String, outputFile: File
+): String {
+    if (channelId != "UCIael48cvwPG3gKj--c7HKw") throw IllegalArgumentException("قناة التعليق الصوتي الآلي غير مسموح بها.")
+    if (!scriptId.matches(Regex("^[0-9a-fA-F-]{36}$"))) throw IllegalArgumentException("السكريبت المحفوظ غير مرتبط بمهمة الإنتاج.")
+    if (deviceToken.length < 40) throw IllegalStateException("رمز جهاز الوكيل غير صالح.")
+    val retriever = android.media.MediaMetadataRetriever()
+    val targetSeconds = try {
+        retriever.setDataSource(context, sourceUri)
+        val ms = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+        (ms / 1000L).toInt().coerceIn(8, 180)
+    } finally { runCatching { retriever.release() } }
+    if (targetSeconds < 8) throw IllegalStateException("مدة الفيديو الأصلي غير صالحة للتعليق الصوتي.")
+    val request = JSONObject().put("action", "generate_from_script").put("channel_id", channelId)
+        .put("script_id", scriptId).put("target_duration_seconds", targetSeconds)
+    val conn = java.net.URL(VOICEOVER_API).openConnection() as java.net.HttpURLConnection
+    conn.requestMethod = "POST"; conn.connectTimeout = 15000; conn.readTimeout = 65000; conn.doOutput = true
+    conn.setRequestProperty("apikey", PUBLIC_KEY)
+    conn.setRequestProperty("content-type", "application/json")
+    conn.setRequestProperty("x-zoz-device-token", deviceToken)
+    val code: Int
+    val response: JSONObject
+    try {
+        conn.outputStream.use { it.write(request.toString().toByteArray(Charsets.UTF_8)) }
+        code = conn.responseCode
+        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+        response = JSONObject(stream?.bufferedReader()?.use { it.readText() } ?: "{}")
+    } finally { conn.disconnect() }
+    if (code !in 200..299 || !response.optBoolean("ok", false))
+        throw IllegalStateException("تعذر على وكيل الإنتاج توليد التعليق: " + response.optString("error", "HTTP $code"))
+    val audioUrl = response.optString("audio_url")
+    if (!audioUrl.startsWith("https://oxyzxbkwhafzaztraowc.supabase.co/storage/"))
+        throw IllegalStateException("رابط ملف التعليق الصوتي غير موثوق.")
+    val wav = File(context.cacheDir, "zoz-agent-voice-\${UUID.randomUUID()}.wav")
+    val aac = File(context.cacheDir, "zoz-agent-voice-\${UUID.randomUUID()}.m4a")
+    try {
+        val download = java.net.URL(audioUrl).openConnection() as java.net.HttpURLConnection
+        download.connectTimeout = 15000; download.readTimeout = 60000
+        try {
+            if (download.responseCode !in 200..299) throw IllegalStateException("تعذر تنزيل ملف التعليق الصوتي.")
+            if (download.contentLengthLong > 24L * 1024L * 1024L) throw IllegalStateException("ملف التعليق الصوتي أكبر من الحد الآمن.")
+            download.inputStream.use { input ->
+                FileOutputStream(wav).use { output ->
+                    val buffer = ByteArray(64 * 1024); var total = 0L
+                    while (true) {
+                        val read = input.read(buffer); if (read < 0) break
+                        total += read
+                        if (total > 24L * 1024L * 1024L) throw IllegalStateException("ملف التعليق الصوتي تجاوز الحد الآمن.")
+                        output.write(buffer, 0, read)
+                    }
+                }
+            }
+        } finally { download.disconnect() }
+        val info = readPcmWavInfo(wav)
+        val duration = info.dataSize.toDouble() / (info.sampleRate.toDouble() * info.channels * 2.0)
+        if (duration > targetSeconds + 0.4) throw IllegalStateException("مدة التعليق أطول من الفيديو؛ لم نقص الكلام أو نرفع نسخة صامتة.")
+        encodePcmWavToAac(wav, aac)
+        outputFile.parentFile?.mkdirs()
+        muxVideoWithVoiceover(context, sourceUri, aac, outputFile)
+        if (!outputFile.exists() || outputFile.length() < 1024L) throw IllegalStateException("لم ينتج ملف فيديو نهائي صالح.")
+        return response.optString("speech_provider", "Gemini Egyptian Arabic TTS") +
+            " | " + response.optString("narration_provider", "Gemini script writer")
+    } catch (e: Exception) {
+        outputFile.delete(); throw e
+    } finally { wav.delete(); aac.delete() }
 }
 
 private fun muxVideoWithVoiceover(context: Context, sourceUri: Uri, aacFile: File, outputFile: File) {
