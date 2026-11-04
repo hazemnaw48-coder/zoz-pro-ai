@@ -36,6 +36,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import kotlin.math.roundToInt
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -77,26 +82,41 @@ private const val INTAKE_API = "https://oxyzxbkwhafzaztraowc.supabase.co/functio
 private const val PUBLIC_KEY = "sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm"
 
 class MainActivity : ComponentActivity() {
+    private val voiceoverDeepLinkRequest = mutableIntStateOf(0)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (isVoiceoverLink(intent)) voiceoverDeepLinkRequest.intValue++
         scheduleDeviceWorker(this)
-        setContent { AppScopeControlScreen() }
+        setContent { AppScopeControlScreen(voiceoverDeepLinkRequest.intValue) }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (isVoiceoverLink(intent)) voiceoverDeepLinkRequest.intValue++
     }
+
+    private fun isVoiceoverLink(intent: Intent?): Boolean =
+        intent?.data?.let { it.scheme == "zozpro" && it.host == "voiceover" } == true
 }
 
 @Composable
-private fun AppScopeControlScreen() {
+private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0) {
     val context = LocalContext.current
+    val scrollState = rememberScrollState()
+    var voiceoverCardTop by remember { mutableIntStateOf(-1) }
     val scope = rememberCoroutineScope()
     var paired by remember { mutableStateOf(DeviceTokenVault.read(context) != null) }
     var pairingCode by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf(if (paired) "الجهاز مرتبط بوكيل ZOZ Pro." else "اربط التطبيق بمركز ZOZ Pro.") }
+    LaunchedEffect(voiceoverDeepLinkRequest, paired, voiceoverCardTop) {
+        if (voiceoverDeepLinkRequest > 0 && paired && voiceoverCardTop >= 0) {
+            withFrameNanos { }
+            scrollState.animateScrollTo(voiceoverCardTop)
+        }
+    }
     var serviceEnabled by remember { mutableStateOf(FlowAutomationService.isEnabled(context)) }
     var uploadChannelId by remember { mutableStateOf("UC9fr5B0SZZkmVAApfCqEO3w") }
     var uploadVideoUri by remember { mutableStateOf<Uri?>(null) }
@@ -185,7 +205,7 @@ private fun AppScopeControlScreen() {
 
     MaterialTheme {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.fillMaxSize().verticalScroll(scrollState).padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("ZOZ App Control", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text("جهاز تنفيذ وكيل ZOZ داخل تطبيقات القنوات", style = MaterialTheme.typography.titleMedium)
                 Card(Modifier.fillMaxWidth()) {
@@ -265,7 +285,11 @@ private fun AppScopeControlScreen() {
                             } }, modifier = Modifier.fillMaxWidth()) { Text("رفع الملف إلى استقبال القناة المختارة") }
                         }
                     }
-                    Card(Modifier.fillMaxWidth()) {
+                    Card(
+                        Modifier.fillMaxWidth().onGloballyPositioned { coordinates ->
+                            if (voiceoverCardTop < 0) voiceoverCardTop = coordinates.positionInParent().y.roundToInt()
+                        }
+                    ) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("إنتاج التعليق الصوتي ودمجه مع الفيديو", fontWeight = FontWeight.Bold)
                             Text("اختر ملف الفيديو من بطاقة الرفع أعلاه، واكتب التعليق بالعربية. سيستخدم الهاتف محرك النطق العربي المثبت دون رصيد API، ثم يضيف مسار AAC إلى ملف MP4 مع إبقاء الصورة الأصلية دون إعادة ترميز. صوت الفيديو الأصلي يُستبدل بالتعليق.")
