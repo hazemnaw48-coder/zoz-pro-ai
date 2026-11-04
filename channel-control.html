@@ -149,8 +149,9 @@ body.upload-mode .footer{font-size:11px}
  <select id="managed-channel-selector" style="width:100%;padding:12px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;font:inherit">
  <option value="UCIael48cvwPG3gKj--c7HKw">Hazem Ahmed — مصر القديمة</option>
  <option value="UC9fr5B0SZZkmVAApfCqEO3w">فكره 🗣️ — أفكار وذكاء اصطناعي</option>
+ <option value="UC-FimUUFXRd0MOSoikzczcQ">حكايات وراء الباب — قصص سينمائية</option>
  </select>
- <p class="small">فكره كيدز متوقفة حتى تأكيد وجهتها. كل قناة تستخدم تفويضها المستقل.</p>
+ <p class="small">حكايات وراء الباب قناة قصصية للجمهور العام. كل قناة تستخدم تفويضها المستقل.</p>
  </section>
 <section class="card" id="huggingface-connection-card">
  <div class="row"><h2>ربط محرك الفيديو LTX · Hugging Face</h2><span class="small">Read فقط · مسودات فقط</span></div>
@@ -276,7 +277,7 @@ body.upload-mode .footer{font-size:11px}
  <select id="intake-target-channel" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px">
   <option value="UC9fr5B0SZZkmVAApfCqEO3w">فِكرة — أفكار وذكاء اصطناعي</option>
   <option value="UCIael48cvwPG3gKj--c7HKw" selected>Hazem Ahmed — مصر القديمة</option>
-  <option value="UC-FimUUFXRd0MOSoikzczcQ" disabled>فِكرة كيدز — متوقفة حتى تأكيد وجهة القناة</option>
+  <option value="UC-FimUUFXRd0MOSoikzczcQ">حكايات وراء الباب — قصص سينمائية</option>
  </select>
  <p id="intake-target-help" class="small">اختر القناة قبل تحديد الملف. لن يرسل المركز ملفًا إلى قناة كيدز ما دامت وجهتها غير مؤكدة.</p>
  <label for="intake-file">اختر ملف الفيديو من الهاتف (MP4 أو MOV أو WebM أو MKV)</label><input id="intake-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,application/octet-stream"><p class="small" id="intake-final-file-note">ارفع ملف الفيديو النهائي بالصورة والصوت كما تريد نشره. مسار الاستقبال لا يولد تعليقًا صوتيًا ولا يغيّر صوت الفيديو.</p>
@@ -439,9 +440,13 @@ const $=id=>document.getElementById(id);
 const FEKRA_UPLOAD_CHANNEL_ID='UC9fr5B0SZZkmVAApfCqEO3w';
 const HAZEM_UPLOAD_CHANNEL_ID='UCIael48cvwPG3gKj--c7HKw';
 const KIDS_CHANNEL_ID='UC-FimUUFXRd0MOSoikzczcQ';
-const ACTIVE_UPLOAD_CHANNELS=new Set([FEKRA_UPLOAD_CHANNEL_ID,HAZEM_UPLOAD_CHANNEL_ID]);
+const ACTIVE_UPLOAD_CHANNELS=new Set([FEKRA_UPLOAD_CHANNEL_ID,HAZEM_UPLOAD_CHANNEL_ID,KIDS_CHANNEL_ID]);
 const requestedUploadChannel=String(pageParams.get('channel_id')||'');
 const initialUploadChannel=ACTIVE_UPLOAD_CHANNELS.has(requestedUploadChannel)?requestedUploadChannel:HAZEM_UPLOAD_CHANNEL_ID;
+if(ACTIVE_UPLOAD_CHANNELS.has(requestedUploadChannel)){
+ const channel=$('managed-channel-selector');if(channel)channel.value=requestedUploadChannel;
+ const intake=$('intake-target-channel');if(intake)intake.value=requestedUploadChannel;
+}
 if(uploadMode){
  CHANNEL_ID=initialUploadChannel;
  const uploadChannel=$('managed-channel-selector');
@@ -605,7 +610,7 @@ async function startRequestedGoogleAuthorization(){
 const MANAGED_CHANNELS=[
  {channel_id:'UCIael48cvwPG3gKj--c7HKw',label:'Hazem Ahmed',purpose:'تاريخ مصر القديمة والآثار'},
  {channel_id:'UC9fr5B0SZZkmVAApfCqEO3w',label:'فكره 🗣️',purpose:'أفكار مفيدة ومعلومات متنوعة وذكاء اصطناعي عملي'},
- {channel_id:'UC-FimUUFXRd0MOSoikzczcQ',label:'فِكرة كيدز — موقوفة لحين تأكيد الوجهة',purpose:'قراءة بيانات القناة فقط؛ لا إنتاج أو توصيات موضوعية قبل تأكيد المالك'}
+ {channel_id:'UC-FimUUFXRd0MOSoikzczcQ',label:'حكايات وراء الباب',purpose:'قصص كرتونية سينمائية مشوقة للجمهور العام: غموض وتشويق ومغامرة ودراما إنسانية'}
 ];
 async function loadManagedChannels(){
  const host=$('managed-channels-list');host.innerHTML='';
@@ -799,7 +804,7 @@ function managedPayload(body){return Object.assign({channel_id:managedChannelId(
 const FEKRA_UPLOAD_DEFAULTS={title:'ازاي تبني وكيل ذكاء اصطناعي من موبايلك مجانًا؟ 🤖📱 | تجربة عملية',description:'هل ينفع تحوّل موبايلك إلى مساعد ذكي ينفّذ مهام حقيقية؟\n\nفي الفيديو ده من فِكرة هنبدأ رحلة بناء وكيل ذكاء اصطناعي من الهاتف، ونتعرف إزاي نستخدم الأدوات المتاحة ونربط بينها علشان نعمل نظام يساعدنا في الشغل والحياة اليومية، من غير الاعتماد على كورسات مدفوعة.\n\nالفكرة مش مجرد تجربة مع الذكاء الاصطناعي، لكن إنك تتعلم إزاي تبني نظام عملي خطوة بخطوة.\n\nتابع فِكرة لأفكار مفيدة، وأدوات ذكاء اصطناعي، وحلول عملية تقدر تطبقها بنفسك.\n\nاشترك وفعل الجرس علشان تكمل معانا الرحلة! 🔔\n\n#فكرة #الذكاء_الاصطناعي #AI_Agent #ذكاء_اصطناعي #أدوات_AI #من_الموبايل',tags:'AI Agent, أدوات مجانية, ذكاء اصطناعي, فِكرة, مساعد ذكي, وكيل ذكاء اصطناعي'};
 function setIntakeTargetChannel(channelId,resetMetadata=true){
  const cid=String(channelId||'');
- if(!ACTIVE_UPLOAD_CHANNELS.has(cid))throw new Error('هذه القناة غير مفعّلة لمسار رفع الفيديو. فِكرة كيدز تظل للقراءة فقط حتى تأكيد وجهتها.');
+ if(!ACTIVE_UPLOAD_CHANNELS.has(cid))throw new Error('اختر قناة نشطة صالحة قبل رفع الفيديو.');
  const channelSelect=$('managed-channel-selector');
  if(channelSelect){const option=Array.from(channelSelect.options).find(x=>x.value===cid);if(option)channelSelect.value=cid;}
  if($('intake-target-channel'))$('intake-target-channel').value=cid;
@@ -811,7 +816,7 @@ function setIntakeTargetChannel(channelId,resetMetadata=true){
   $('intake-tags').value=fekra?FEKRA_UPLOAD_DEFAULTS.tags:'';
   $('intake-kids').value='false';$('intake-synthetic').value='true';$('intake-privacy').value='public';
  }
- const label=cid===FEKRA_UPLOAD_CHANNEL_ID?'فِكرة':'Hazem Ahmed';
+ const label=cid===FEKRA_UPLOAD_CHANNEL_ID?'فِكرة':cid===KIDS_CHANNEL_ID?'حكايات وراء الباب':'Hazem Ahmed';
  notice('intake-target-help','القناة المستهدفة الآن: '+label+'. راجع العنوان والوصف ليتطابقا مع ملف الفيديو قبل الرفع.','good');
 }
 try{if($('intake-target-channel'))setIntakeTargetChannel($('intake-target-channel').value,true);}catch(e){notice('intake-target-help',e.message||'اختر قناة صالحة.','warn');}
@@ -949,6 +954,12 @@ async function loadIntakeAssets(){
   if(a.status==='ready_for_review'){
    addButton('موافقة المالك',async()=>{if(!confirm('تأكيد مراجعة بيانات الفيديو والسماح برفعه إلى YouTube بوضع خاص؟'))return;await intakeApi('intake_review',{asset_id:a.id,decision:'approve'});notice('intake-msg','تم تسجيل الموافقة؛ الفيديو لم يُنشر علنًا.','good');});
    addButton('رفض الفيديو',async()=>{if(!confirm('رفض هذا الملف؟'))return;await intakeApi('intake_review',{asset_id:a.id,decision:'reject',note:'رفض من مراجعة المالك'});notice('intake-msg','تم رفض الملف.','good');},true);
+  }
+  if(a.channel_id==='UC-FimUUFXRd0MOSoikzczcQ' && ['ready_for_review','approved','processing','ready_to_publish','published'].includes(a.status) && Number(a.total_bytes||0)<=52428800){
+   addButton('إرسال نفس الفيديو إلى صندوق وارد TikTok Hazem Now',async()=>{
+    const d=await tiktokCall('upload_inbox',{slot_key:'tiktok_1',intake_asset_id:a.id});
+    notice('intake-msg',d.message||'تم إرسال الفيديو إلى صندوق وارد TikTok Hazem Now.','good');
+   },true);
   }
   if(a.channel_id==='UC9fr5B0SZZkmVAApfCqEO3w' && ['ready_for_review','approved','processing','ready_to_publish','published'].includes(a.status) && Number(a.total_bytes||0)<=52428800){
    addButton('إرسال نفس الفيديو إلى مسودة TikTok فِكرة',async()=>{
@@ -1163,7 +1174,7 @@ document.querySelectorAll('[data-page-target]').forEach(button=>button.addEventL
   if(key==='books'){await loadBooksDashboard();}
   if(key==='studio'){
    await loadStudioScripts();
-   if(managedChannelId()==='UC-FimUUFXRd0MOSoikzczcQ')await loadManagedNews();
+   if(managedChannelId()==='UC-FimUUFXRd0MOSoikzczcQ'){$('managed-news-status').textContent='قناة قصصية: لا توجد أخبار سياسية مرتبطة بهذا المسار.';$('managed-news-list').innerHTML='';}
    await checkManagedAi();
    await loadManagedCalendar(false);
   }
@@ -1203,7 +1214,7 @@ $('studio-refresh')?.addEventListener('click',loadStudioScripts);
 function managedEsc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 async function loadManagedNews(){
  const cid=managedChannelId(),status=$('managed-news-status'),host=$('managed-news-list');host.innerHTML='';
- if(cid!=='UC-FimUUFXRd0MOSoikzczcQ'){status.textContent='البحث الإخباري السياسي متاح للقناة السياسية فقط. اختر القناة السياسية من القائمة.';return;}
+ if(cid!=='UC_POLITICAL_CHANNEL_NOT_CONFIGURED'){status.textContent='لا توجد قناة سياسية مفعّلة في هذا المشروع. قناة حكايات وراء الباب مخصصة للقصص السينمائية.';return;}
  status.textContent='جارٍ البحث في موجزات الأخبار الحديثة…';
  try{
   const r=await managedCall('managed_political_news',{});
