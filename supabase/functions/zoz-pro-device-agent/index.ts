@@ -5,7 +5,7 @@ function secret(name:string){try{const v=JSON.parse(Deno.env.get(name)||"{}");re
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || secret("SUPABASE_SECRET_KEYS") || Deno.env.get("SUPABASE_SECRET_KEY") || "";
 const PUBLIC = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || secret("SUPABASE_PUBLISHABLE_KEYS") || Deno.env.get("SUPABASE_ANON_KEY") || "";
 const OWNER_EMAIL = "hazemnaw48@gmail.com";
-const CAPABILITIES = new Set(["device.health_check","device.ui_control"]);
+const CAPABILITIES = new Set(["device.health_check","device.ui_control","flow.generate_scene"]);
 const TIKTOK_STUDIO_PACKAGE = "com.ss.android.tt.creator";
 const YOUTUBE_STUDIO_PACKAGE = "com.google.android.apps.youtube.creator";
 const TIKTOK_PACKAGE = "com.zhiliaoapp.musically";
@@ -79,8 +79,7 @@ Deno.serve(async(req:Request)=>{
    await log(ch.owner_id,dev.id,null,"studio_controller_paired",{device_name:deviceName,app_version:appVersion,capability_scope:["device.health_check"]});
    return json({ok:true,device_id:dev.id,device_token:raw,intake_token:"",device_name:deviceName,capabilities:dev.capabilities,paired_at:new Date().toISOString()});
   }
-  if(action==="enable_flow_automation")return fail("هذا الجهاز مخصص لاستوديو يوتيوب واستوديو تيك توك فقط؛ تم إيقاف تحكم Flow من هذا التطبيق.",403);
-  if(action==="device_health"||action==="heartbeat"||action==="poll_jobs"||action==="complete_job"||action==="enable_phone_control"||action==="request_studio_read"||action==="request_app_control"||action==="device_intake_token"){
+  if(action==="device_health"||action==="heartbeat"||action==="poll_jobs"||action==="complete_job"||action==="enable_phone_control"||action==="request_studio_read"||action==="request_app_control"||action==="device_intake_token"||action==="production_intake_complete"){
    const d=await device(req);if(!d)return fail("الجهاز غير مقرون أو تم إلغاء صلاحياته.",401);
    const now=new Date().toISOString();
    if(action==="production_intake_complete"){
@@ -119,14 +118,14 @@ Deno.serve(async(req:Request)=>{
     return json({ok:true,intake_token:intakeToken,source_id:source.id,channel_id:channelId,channel_name:channels[0].display_name,capabilities});
    }
    if(action==="enable_phone_control"){
-    const sourceRows=await db("zoz_pro_device_registry?id=eq."+encodeURIComponent(d.device_id)+"&owner_id=eq."+encodeURIComponent(d.owner_id)+"&select=intake_source_id&limit=1");
+    const sourceRows=await db("zoz_pro_device_registry?id=eq."+encodeURIComponent(d.device_id)+"&owner_id=eq."+encodeURIComponent(d.owner_id)+"&select=intake_source_id,capabilities&limit=1");
     const sourceId=sourceRows?.[0]?.intake_source_id;
     const activeSource=sourceId?(await db("zoz_pro_video_intake_sources?id=eq."+encodeURIComponent(sourceId)+"&owner_id=eq."+encodeURIComponent(d.owner_id)+"&is_active=eq.true&select=id&limit=1"))?.[0]:null;
-    const capabilities=[...new Set(["device.health_check","device.ui_control",...(activeSource?["video.intake.upload"]:[])])];
+    const preserveFlow=Array.isArray(d.device.capabilities)&&d.device.capabilities.includes("flow.generate_scene");
+    const capabilities=[...new Set(["device.health_check","device.ui_control",...(activeSource?["video.intake.upload"]:[]),...(preserveFlow?["flow.generate_scene"]:[])])];
     await db("zoz_pro_device_registry?id=eq."+encodeURIComponent(d.device_id)+"&owner_id=eq."+encodeURIComponent(d.owner_id),{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({capabilities,updated_at:now})});
-    await db("zoz_pro_device_jobs?device_id=eq."+encodeURIComponent(d.device_id)+"&owner_id=eq."+encodeURIComponent(d.owner_id)+"&capability_id=in.(flow.open,flow.copy_prompt,flow.generate_scene)&status=in.(queued,running,awaiting_owner_approval)",{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({status:"cancelled",error_code:"studio_only_device",error_message:"تم قصر هذا الجهاز على YouTube Studio وTikTok Studio.",updated_at:now,completed_at:now})});
-    await log(d.owner_id,d.device_id,null,"studio_only_access_enabled",{capability_id:"device.ui_control",scope:["com.ss.android.tt.creator","com.google.android.apps.youtube.creator","com.zhiliaoapp.musically","com.google.android.youtube"],intake_preserved:Boolean(activeSource)});
-    return json({ok:true,device_id:d.device_id,capabilities,scope:["com.ss.android.tt.creator","com.google.android.apps.youtube.creator","com.zhiliaoapp.musically","com.google.android.youtube"],intake_preserved:Boolean(activeSource)});
+    await log(d.owner_id,d.device_id,null,"studio_access_enabled",{capabilities,scope:["com.ss.android.tt.creator","com.google.android.apps.youtube.creator","com.zhiliaoapp.musically","com.google.android.youtube"],intake_preserved:Boolean(activeSource),flow_preserved:preserveFlow});
+    return json({ok:true,device_id:d.device_id,capabilities,scope:["com.ss.android.tt.creator","com.google.android.apps.youtube.creator","com.zhiliaoapp.musically","com.google.android.youtube"],intake_preserved:Boolean(activeSource),flow_preserved:preserveFlow});
    }
    if(action==="request_app_control"){
     const target=clean(body?.target_package,120);
