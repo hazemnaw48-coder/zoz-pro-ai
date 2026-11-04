@@ -232,7 +232,7 @@ class FlowAutomationService : AccessibilityService() {
     }
 
     private fun pollAgentQueue() {
-        if (!isEnabled(this) || activeControlTask() != null) {
+        if (!isEnabled(this) || activeControlTask() != null || activeTask() != null) {
             scheduleAgentPoll(5000L)
             return
         }
@@ -1047,7 +1047,17 @@ class FlowAutomationService : AccessibilityService() {
                 assembleCompatibleClips(this, ordered, Uri.fromFile(output))
                 val deviceToken = DeviceTokenVault.read(this) ?: throw IllegalStateException("الجهاز غير مرتبط بالوكيل.")
                 // Intake tokens are channel-bound; refresh only when this campaign changes destination.
-                ensureIntakeToken(this, deviceToken, channelId, forceRefresh = false)
+                val intakePrefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                val savedIntakeChannel = intakePrefs.getString("zoz_intake_channel_id", "") ?: ""
+                val savedIntakeToken = DeviceTokenVault.readIntake(this)
+                if (savedIntakeChannel != channelId || savedIntakeToken.isNullOrBlank() || savedIntakeToken.length < 32) {
+                    val tokenResponse = apiPostWithToken("device_intake_token",
+                        JSONObject().put("channel_id", channelId), deviceToken)
+                    val freshIntakeToken = tokenResponse.optString("intake_token")
+                    if (freshIntakeToken.length < 32) throw IllegalStateException("الخادم لم يصدر رمز استقبال صالحًا للقناة المطلوبة.")
+                    DeviceTokenVault.writeIntake(this, freshIntakeToken)
+                    intakePrefs.edit().putString("zoz_intake_channel_id", channelId).apply()
+                }
                 val uploadMessage = uploadFinalVideoToIntake(this, Uri.fromFile(output), true, false, channelId)
                 val assetId = prefs().getString("zoz_last_uploaded_asset_id", "") ?: ""
                 if (assetId.isBlank()) throw IllegalStateException("اكتمل الرفع لكن لم يُسجل معرّف ملف الاستقبال.")
