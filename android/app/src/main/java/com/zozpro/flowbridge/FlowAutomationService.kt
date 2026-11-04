@@ -434,8 +434,13 @@ class FlowAutomationService : AccessibilityService() {
                     val capability = job.optString("capability_id")
                     runCatching {
                         when (capability) {
-                            "flow.generate_scene" -> startScene(this@FlowAutomationService, id, payload)
-                            "device.ui_control" -> startUiControl(this@FlowAutomationService, id, payload)
+                            "flow.generate_scene" -> {
+                                if (payload.optString("task_type") == "voiceover_merge") {
+                                    startVoiceoverMerge(id, payload)
+                                } else {
+                                    startScene(this@FlowAutomationService, id, payload)
+                                }
+                            }                            "device.ui_control" -> startUiControl(this@FlowAutomationService, id, payload)
                             "device.voiceover_merge" -> startVoiceoverMerge(id, payload)
                             else -> throw IllegalArgumentException("capability_not_supported_by_flow_bridge")
                         }
