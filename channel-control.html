@@ -154,7 +154,7 @@ body.upload-mode .footer{font-size:11px}
  <label for="zoz-hf-read-token">رمز Hugging Face Read</label>
  <input id="zoz-hf-read-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="hf_..." maxlength="4096">
  <div class="actions"><button type="button" id="zoz-hf-connect-btn">تحقق واحفظ الاتصال المشفر</button></div>
- <div id="zoz-hf-connect-status" class="notice" role="status">لم يتم إرسال أي رمز بعد.</div>
+ <div id="zoz-hf-connect-status" class="notice" role="status">جارٍ قراءة حالة اتصال Hugging Face المحفوظة…</div>
  <p class="small">نجاح الاتصال يفعّل LTX على مستوى المسودات فقط. التوليد يظل خاضعًا لتوفر مساحة Hugging Face المجانية والانتظار وحدود ZeroGPU، ولا يفعّل النشر العام.</p>
 </section>
 <section class="card" id="managed-channels-card">
@@ -470,7 +470,7 @@ function showPage(pageKey, scrollTop=true){
  if(indicator)indicator.textContent='القسم الحالي: '+label+' · '+step+' من '+tabs.length;
  if(scrollTop)window.scrollTo(0,0);
 }
-function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage(uploadMode?'intake':(requestedPage==='tiktok'?'tiktok':'connection'),false);notice('intake-msg',uploadMode?'الجلسة متصلة. اختر ملف الفيديو ثم اضغط «رفع الفيديو للمراجعة والنشر».':'جلسة المالك متصلة بمشروع الإنتاج.','good');if(!uploadMode){if(requestedPage==='tiktok')loadTikTokAccounts();else loadManagedChannels();}}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
+function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage(uploadMode?'intake':(requestedPage==='tiktok'?'tiktok':'connection'),false);notice('intake-msg',uploadMode?'الجلسة متصلة. اختر ملف الفيديو ثم اضغط «رفع الفيديو للمراجعة والنشر».':'جلسة المالك متصلة بمشروع الإنتاج.','good');if(!uploadMode){if(requestedPage==='tiktok')loadTikTokAccounts();else{loadManagedChannels();loadHFProviderStatus();}}}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
 async function ownerSession(){
  const {data,error}=await sb.auth.getSession();if(error)throw error;const session=data&&data.session;
  if(!session||!session.access_token)throw new Error('لا توجد جلسة مالك محفوظة. سجّل الدخول بحساب مالك ZOZ Pro.');
@@ -478,6 +478,29 @@ async function ownerSession(){
  const user=userData&&userData.user;
  if(!user||String(user.email||'').toLowerCase()!==OWNER||!user.email_confirmed_at){await sb.auth.signOut();throw new Error('الجلسة ليست لحساب مالك ZOZ Pro المؤكد.');}
  return session;
+}
+
+async function loadHFProviderStatus(){
+ const status=$('zoz-hf-connect-status');if(!status)return;
+ try{
+  const session=await ownerSession();
+  const headers={apikey:SUPABASE_PUBLISHABLE_KEY,authorization:'Bearer '+session.access_token};
+  const catalogResponse=await fetch(SUPABASE_URL+'/rest/v1/zoz_pro_tool_catalog?select=id&tool_key=eq.huggingface_ltx',{headers,cache:'no-store'});
+  if(!catalogResponse.ok)throw new Error('تعذر قراءة سجل محرك الفيديو.');
+  const catalog=await catalogResponse.json(),toolId=catalog?.[0]?.id;
+  if(!toolId)throw new Error('سجل محرك LTX غير موجود.');
+  const response=await fetch(SUPABASE_URL+'/rest/v1/zoz_pro_tool_connections?select=connection_status,account_label,last_checked_at,last_error&tool_id=eq.'+encodeURIComponent(toolId)+'&owner_id=eq.'+encodeURIComponent(session.user.id),{headers,cache:'no-store'});
+  if(!response.ok)throw new Error('تعذر قراءة حالة اتصال Hugging Face.');
+  const rows=await response.json(),row=rows?.[0];
+  if(row?.connection_status==='connected'){
+   const checked=row.last_checked_at?new Date(row.last_checked_at).toLocaleString('ar-EG'):'';
+   notice('zoz-hf-connect-status','متصل بالفعل · الحساب: '+String(row.account_label||'Hugging Face')+' · صلاحية الوكيل: مسودات فقط'+(checked?' · آخر تحقق: '+checked:''),'good');
+  }else{
+   notice('zoz-hf-connect-status',row?.last_error||'الاتصال غير مكتمل. يلزم ربط Hugging Face Read.','warn');
+  }
+ }catch(error){
+  notice('zoz-hf-connect-status',error?.message||'تعذر قراءة حالة اتصال Hugging Face.','warn');
+ }
 }
 const HF_PROVIDER_CONNECT_API=SUPABASE_URL+'/functions/v1/zoz-video-provider-connect';
 $('zoz-hf-connect-btn')?.addEventListener('click',async()=>{
@@ -503,6 +526,7 @@ $('zoz-hf-connect-btn')?.addEventListener('click',async()=>{
   const result=await response.json().catch(()=>({}));
   if(!response.ok||result.ok!==true)throw new Error(String(result.error||'تعذر إتمام ربط Hugging Face.'));
   notice('zoz-hf-connect-status','تم التحقق من Hugging Face وحفظ الرمز في المخزن المشفر. الحساب: '+String(result.account||'متصل')+' · الصلاحية: مسودات فقط.','good');
+  await loadHFProviderStatus();
  }catch(error){
   notice('zoz-hf-connect-status',error?.message||'تعذر ربط Hugging Face.','bad');
  }finally{
