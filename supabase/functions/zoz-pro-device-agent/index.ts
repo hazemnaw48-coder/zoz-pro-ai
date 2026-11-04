@@ -79,7 +79,7 @@ Deno.serve(async(req:Request)=>{
    await log(ch.owner_id,dev.id,null,"studio_controller_paired",{device_name:deviceName,app_version:appVersion,capability_scope:["device.health_check"]});
    return json({ok:true,device_id:dev.id,device_token:raw,intake_token:"",device_name:deviceName,capabilities:dev.capabilities,paired_at:new Date().toISOString()});
   }
-  if(action==="device_health"||action==="heartbeat"||action==="poll_jobs"||action==="complete_job"||action==="enable_phone_control"||action==="request_studio_read"||action==="request_app_control"||action==="device_intake_token"||action==="production_intake_complete"){
+  if(action==="device_health"||action==="heartbeat"||action==="poll_jobs"||action==="complete_job"||action==="enable_phone_control"||action==="request_studio_read"||action==="request_app_control"||action==="device_intake_token"||action==="production_intake_complete"||action==="enable_flow_automation"){
    const d=await device(req);if(!d)return fail("الجهاز غير مقرون أو تم إلغاء صلاحياته.",401);
    const now=new Date().toISOString();
    if(action==="production_intake_complete"){
