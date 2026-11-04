@@ -246,14 +246,28 @@ class FlowAutomationService : AccessibilityService() {
                 apiPostWithToken("poll_jobs", JSONObject(), deviceToken).optJSONObject("job")
             }.getOrNull()
             handler.post {
-                if (job != null && activeControlTask() == null) {
+                if (job != null && activeControlTask() == null && activeTask() == null) {
                     val id = job.optString("id")
                     val payload = job.optJSONObject("payload") ?: JSONObject()
-                    runCatching { startUiControl(this@FlowAutomationService, id, payload) }
-                        .onFailure {
-                            DeviceNotifications.show(this@FlowAutomationService, "تعذر بدء أمر الوكيل",
-                                it.message ?: "تعذر تشغيل مهمة الاستوديو.")
+                    val capability = job.optString("capability_id")
+                    runCatching {
+                        when (capability) {
+                            "flow.generate_scene" -> startScene(this@FlowAutomationService, id, payload)
+                            "device.ui_control" -> startUiControl(this@FlowAutomationService, id, payload)
+                            else -> throw IllegalArgumentException("capability_not_supported_by_flow_bridge")
                         }
+                    }.onFailure { error ->
+                        networkExecutor.execute {
+                            runCatching {
+                                apiPostWithToken("complete_job", JSONObject().put("job_id", id)
+                                    .put("outcome", "failed").put("error_code", "device_executor_error")
+                                    .put("error_message", error.message ?: "تعذر تشغيل مهمة الهاتف."),
+                                    DeviceTokenVault.read(this@FlowAutomationService) ?: "")
+                            }
+                        }
+                        DeviceNotifications.show(this@FlowAutomationService, "تعذر بدء أمر الوكيل",
+                            error.message ?: "تعذر تشغيل المهمة على الهاتف.")
+                    }
                     scheduleAgentPoll(3000L)
                 } else {
                     scheduleAgentPoll(15000L)
@@ -1003,11 +1017,8 @@ class FlowAutomationService : AccessibilityService() {
                 val index = task.optInt("scene_index", 0)
                 if (success && total > 0 && index >= total) {
                     handler.postDelayed({ assembleAndUpload(task.optString("campaign_id"), total, task.optString("channel_id")) }, 800)
-                } else if (success) {
-                    handler.postDelayed({
-                        WorkManager.getInstance(this).enqueueUniqueWork("zoz-device-next-scene",
-                            ExistingWorkPolicy.REPLACE, OneTimeWorkRequestBuilder<DevicePollWorker>().build())
-                    }, 1200)
+                } else {
+                    scheduleAgentPoll(1200L)
                 }
             }
         }
@@ -1034,6 +1045,9 @@ class FlowAutomationService : AccessibilityService() {
                 if (ordered.size < 2) throw IllegalStateException("At least two downloaded scenes are required.")
                 val output = File(getExternalFilesDir(null), "ZOZ-final-${System.currentTimeMillis()}.mp4")
                 assembleCompatibleClips(this, ordered, Uri.fromFile(output))
+                val deviceToken = DeviceTokenVault.read(this) ?: throw IllegalStateException("الجهاز غير مرتبط بالوكيل.")
+                // Intake tokens are channel-bound; refresh only when this campaign changes destination.
+                ensureIntakeToken(this, deviceToken, channelId, forceRefresh = false)
                 val uploadMessage = uploadFinalVideoToIntake(this, Uri.fromFile(output), true, false, channelId)
                 val assetId = prefs().getString("zoz_last_uploaded_asset_id", "") ?: ""
                 if (assetId.isBlank()) throw IllegalStateException("اكتمل الرفع لكن لم يُسجل معرّف ملف الاستقبال.")
@@ -1157,11 +1171,10 @@ class FlowAutomationService : AccessibilityService() {
                 try {
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 } catch (_: Exception) {
-                    // Android may block background activity launches. Keep the leased job and let the owner
-                    // open Flow from this notification; the accessibility service resumes the saved task.
                     DeviceNotifications.showFlow(context, url)
                 }
             }
+            runningService?.scheduleAgentPoll(1200L)
         }
     }
 }
