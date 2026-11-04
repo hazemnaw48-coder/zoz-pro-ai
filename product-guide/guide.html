@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#09111f"><title>الدليل العملي لوكيل الذكاء الاصطناعي من الهاتف | ZOZ Pro</title><style>
+:root{color-scheme:dark;--bg:#09111f;--card:#14243a;--line:#304761;--text:#f1f6fc;--muted:#bbcadd;--gold:#ffd06b;--green:#62d8b1}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.9 system-ui,Tahoma,sans-serif}.wrap{max-width:900px;margin:auto;padding:20px}.hero,.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin:18px 0}.hero h1{font-size:clamp(30px,6vw,45px);line-height:1.35;margin:8px 0}.tag{color:var(--green);font-weight:800}.card h2{color:var(--gold);margin:0 0 8px}a{color:#a9c8ff}.muted{color:var(--muted)}li{margin:7px 0}.note{border-right:4px solid var(--green);padding:10px 14px;background:#10332d;border-radius:8px}.warn{border-right:4px solid var(--gold);padding:10px 14px;background:#342b1b;border-radius:8px}pre{direction:ltr;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere;background:#07101c;border:1px solid var(--line);border-radius:10px;padding:14px;color:#e5efff;font:13px/1.6 ui-monospace,monospace}.btn{display:inline-block;padding:8px 13px;border:1px solid var(--line);border-radius:10px;text-decoration:none;margin:5px 0}footer{border-top:1px solid var(--line);padding:18px 0;color:var(--muted);font-size:13px}@media print{body{background:white;color:#111}.card,.hero{background:white;color:#111;border-color:#ccc}.muted{color:#444}pre{background:#f4f4f4;color:#111}.btn{display:none}}
+</style></head><body><main class="wrap">
+<header class="hero"><div class="tag">ZOZ PRO · فِكرة</div><h1>الدليل العملي لبناء وكيل ذكاء اصطناعي من الهاتف</h1><p class="muted">نسخة أولى عملية · 3 نوفمبر 2026. حوّل المساعد من محادثة إلى نظام مهام وذاكرة وأدوات ومراجعة. الهاتف لوحة تحكم؛ التشغيل الدوري يكون على خادم سحابي، وليس بافتراض بقاء الهاتف مفتوحاً.</p><a class="btn" href="javascript:window.print()">طباعة / حفظ PDF</a> <a class="btn" href="./index.html">صفحة الدليل</a></header>
+<section class="card"><h2>1 · ما الذي تبنيه؟</h2><p>الوكيل نظام يتكون من هدف واضح، مهام، قاعدة بيانات، نموذج ذكاء اصطناعي، أدوات محددة الصلاحيات، مجدول، وسجل يثبت ما حدث. لا تكفي عبارة «أدر عملي» دون صلاحيات ومخرجات قابلة للفحص.</p><div class="note"><b>البنية المقترحة:</b> الهاتف للواجهة والموافقة؛ Supabase للبيانات والوظائف والجدولة؛ Gemini للاستدلال؛ ومراجعة مستقلة قبل التسليم أو الإجراء الخارجي.</div></section>
+<section class="card"><h2>2 · ضع مصفوفة الصلاحيات</h2><ul><li>التحليل والبحث والصياغة: تلقائي، مع فصل الحقائق عن الافتراضات.</li><li>إنشاء مسودات وملفات داخلية: تلقائي، مع حفظ سجل التنفيذ.</li><li>تعديل إنتاج حي أو تكوين تكامل: يتطلب تفويضاً واختبارات قبل الإطلاق.</li><li>النشر العام أو مراسلة العملاء: موافقة صريحة على المحتوى والحساب والجمهور.</li><li>الدفع والشراء وتغيير الحسابات: لا تنفذ تلقائياً.</li></ul></section>
+<section class="card"><h2>3 · مكونات التشغيل</h2><ol><li><b>واجهة الهاتف:</b> تعرض المهام والنتائج وتسمح بالموافقة؛ لا تخزن مفاتيح إدارية.</li><li><b>قاعدة البيانات:</b> تحفظ المالك والقسم والوكيل والحالة والمدخلات والمخرجات والمراجعة.</li><li><b>Edge Function:</b> تتحقق من التفويض وتحجز مهمة واحدة وتنفذها وتحفظ النتيجة.</li><li><b>المجدول:</b> يشغل العامل دورياً من الخادم حتى لو أغلق الهاتف.</li><li><b>مراجع الجودة:</b> يتحقق من الاكتمال والدقة والأمان ولا يعتمد على ملخص الوكيل نفسه.</li></ol></section>
+<section class="card"><h2>4 · حالات المهمة</h2><ul><li><b>queued:</b> تنتظر التنفيذ.</li><li><b>running:</b> تم حجزها بواسطة عامل واحد.</li><li><b>awaiting_owner:</b> المخرج محفوظ واجتاز المراجعة وينتظر قرار المالك عند الحاجة.</li><li><b>completed:</b> اكتمل العمل الداخلي أو سُجل قرار الاعتماد وفق السياسة.</li><li><b>blocked / failed:</b> اعتماد أو اتصال مفقود أو خطأ؛ تحفظ رسالة السبب قبل إعادة المحاولة.</li></ul><p>سجّل وقت البدء والانتهاء ومعرّف المهمة والنموذج والحالة وملخص النتيجة ورسالة الخطأ. لا تعتبر استلام طلب API نجاحاً نهائياً.</p></section>
+<section class="card"><h2>5 · أمن قاعدة البيانات</h2><p>RLS والمنح SQL يعملان معاً. فعّل RLS على كل جدول مكشوف، امنح كل دور أقل صلاحية، واكتب سياسة منفصلة لكل عملية. لا تجعل زائر الموقع يقرأ جدول العملاء مباشرة إذا كان الإدخال يتم من وظيفة خادمية.</p><pre>alter table public.agent_tasks enable row level security;
+
+revoke all on public.agent_tasks from anon, authenticated;
+grant select, insert, update
+on public.agent_tasks to authenticated;
+
+create policy "owners read own tasks"
+on public.agent_tasks for select
+to authenticated
+using ((select auth.uid()) = owner_id);
+
+create policy "owners create own tasks"
+on public.agent_tasks for insert
+to authenticated
+with check ((select auth.uid()) = owner_id);
+
+create policy "owners update own tasks"
+on public.agent_tasks for update
+to authenticated
+using ((select auth.uid()) = owner_id)
+with check ((select auth.uid()) = owner_id);</pre><div class="warn"><b>تحذير:</b> لا تضع Secret أو service_role في HTML أو تطبيق الهاتف. هذه المفاتيح تتجاوز RLS ويجب أن تبقى في بيئة الخادم فقط. لا تستخدم user_metadata لتحديد صلاحيات المستخدم.</div></section>
+<section class="card"><h2>6 · رسالة مهمة جيدة للوكيل</h2><pre>الدور: وكيل الإنتاج الإعلامي
+المهمة: إعداد مسودة فيديو لقناة فِكرة
+المدخلات: موضوع الفيديو، هوية القناة، القيود
+المطلوب:
+- سيناريو ومشاهد قصيرة قابلة للإنتاج
+- عنوان ووصف ووسوم
+- قائمة تحقق للدقة والحقوق
+- ما تم فعله فعلياً وما تعذر
+
+الحدود:
+- لا تنشر ولا ترسل رسائل
+- لا تنفق أموالاً
+- لا تدّعِ استدعاء أداة لم تستخدم
+- أعد JSON صالحاً: summary, deliverable,
+  risks, next_steps, requires_owner_approval</pre><p>مرر للوكيل ملخصات قصيرة ومرتبطة بالمهمة فقط. ضع حداً لحجم المخرج واختبر اكتمال JSON قبل حفظه. الرد المبتور لا يتحول إلى نتيجة ناجحة.</p></section>
+<section class="card"><h2>7 · التشغيل المجدول</h2><p>يمكن استخدام pg_cron مع pg_net لاستدعاء Edge Function. خزّن رابط الوظيفة ومفتاح التفويض في Supabase Vault، ولا تضعهما في مستودع عام أو واجهة الموقع. اضبط التحقق من الرمز بما يتفق مع سياسة الوظيفة، وراقب استجابة HTTP ثم سجل التشغيل النهائي.</p><p class="muted">لا تنسخ أمثلة الجدولة دون تعديلها لتناسب الدالة الفعلية. رقم request_id وحده لا يثبت نجاح تنفيذ المهمة.</p></section>
+<section class="card"><h2>8 · اربط الأدوات بناءً على دليل</h2><ul><li>YouTube: رمز صالح وصلاحيات القراءة أو الرفع المطلوبة.</li><li>TikTok: تفويض الحساب ونطاقات API المعتمدة وحدود النشر.</li><li>KDP: تقرير رسمي أو اتصال مباشر مختبر؛ حالة «published» ليست مبيعات.</li><li>Google Flow: مسار إرسال واستقبال حقيقي أو جسر هاتف مختبر؛ الرابط وحده لا يكفي.</li><li>Canva وRunway: اتصال مؤكد ومراجعة الرصيد والحدود قبل الاستخدام.</li><li>Notion: صلاحية قراءة وكتابة ثم التحقق من الصفحة الناتجة.</li></ul><p>استخدم حالات منفصلة: غير مهيأ، متصل، مختبر، مقيد، معطل. وجود أداة في القائمة لا يعني أن الوكيل استدعاها.</p></section>
+<section class="card"><h2>9 · اختبارات القبول</h2><ul><li>مستخدمان منفصلان: لا يرى أي منهما مهام الآخر.</li><li>زائر غير مسجل: لا يستطيع قراءة البيانات الخاصة.</li><li>اختبار إدخال صحيح وخاطئ وتكرار الطلب.</li><li>طلبان متزامنان للمهمة نفسها: عامل واحد فقط يحجزها.</li><li>اختبار انقطاع النموذج و429 والمهلة وJSON غير المكتمل.</li><li>تأكيد توقف النشر والإنفاق وتغيير الحساب حتى موافقة مستقلة.</li><li>التحقق من أثر محفوظ: صف قاعدة بيانات أو ملف أو سجل عملية أو اختبار ناجح.</li></ul></section>
+<section class="card"><h2>10 · حافظ على التكلفة والخصوصية</h2><p>راجع حدود كل خطة من لوحة المزود الحالية؛ لا تعتمد على أرقام قديمة في دليل. حدد سقف تكلفة صفرياً، وأوقف المهمة عند الحاجة لخدمة مدفوعة. قلل بيانات العميل، اجمع الموافقة الصريحة، وحدد غرض الاستخدام ومدة الاحتفاظ وطريقة طلب الحذف.</p></section>
+<section class="card"><h2>11 · تطبيق الدورة على ZOZ Pro</h2><ol><li>افتح مكتب الشركة وتأكد من اتصال جلسة المالك.</li><li>أنشئ مهمة واحدة بهدف ومخرج قابل للقياس.</li><li>يختار العامل الوكيل ويرسل له السياق الضروري فقط.</li><li>يحفظ الوكيل المخرج وسجل التشغيل.</li><li>يراجع وكيل الجودة المخرج بشكل مستقل.</li><li>تظهر النتيجة للمالك؛ لا يتم النشر العام دون الموافقة.</li><li>إذا كانت أداة خارجية متصلة ومصرحاً بها، ينفذ الإجراء ثم يسجل نتيجته ومعرّفه.</li></ol><p><a href="https://hazemnaw48-coder.github.io/zoz-pro-ai/company-office.html">مكتب الشركة</a> · <a href="https://hazemnaw48-coder.github.io/zoz-pro-ai/channel-control.html">مركز القنوات</a></p></section>
+<section class="card"><h2>المصادر الفنية الرسمية</h2><ul><li><a href="https://supabase.com/docs/guides/database/postgres/row-level-security">Supabase RLS</a></li><li><a href="https://supabase.com/docs/guides/functions/secrets">Supabase Secrets</a></li><li><a href="https://supabase.com/docs/guides/functions/auth">Securing Edge Functions</a></li><li><a href="https://supabase.com/docs/guides/functions/schedule-functions">Scheduling Edge Functions</a></li><li><a href="https://supabase.com/docs/guides/database/extensions/pgnet">pg_net</a></li></ul><p class="muted">تمت مراجعة الوثائق الرسمية بتاريخ 3 نوفمبر 2026. راجع أحدث توثيق قبل تعديل الإنتاج.</p></section>
+<footer>ZOZ Pro · فِكرة — دليل تعليمي أولي. لا يضمن إيرادات أو موافقات منصات أو اتصال أدوات غير مهيأة. <br><a href="./index.html">صفحة المنتج</a> · <a href="mailto:hazemnaw48@gmail.com?subject=طلب%20خصوصية%20دليل%20ZOZ">طلب متعلق بالخصوصية أو حذف البيانات</a></footer>
+</main></body></html>
