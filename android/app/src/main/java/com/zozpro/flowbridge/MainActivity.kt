@@ -11,6 +11,15 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import java.util.Locale
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
+import java.io.RandomAccessFile
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.provider.Settings
@@ -91,6 +100,7 @@ private fun AppScopeControlScreen() {
     var serviceEnabled by remember { mutableStateOf(FlowAutomationService.isEnabled(context)) }
     var uploadChannelId by remember { mutableStateOf("UC9fr5B0SZZkmVAApfCqEO3w") }
     var uploadVideoUri by remember { mutableStateOf<Uri?>(null) }
+    var narrationText by remember { mutableStateOf("") }
     val uploadPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
@@ -253,6 +263,37 @@ private fun AppScopeControlScreen() {
                                     .putString("zoz_intake_channel_id", uploadChannelId).apply()
                                 uploadFinalVideoToIntake(context, uploadVideoUri!!, true, false, uploadChannelId)
                             } }, modifier = Modifier.fillMaxWidth()) { Text("رفع الملف إلى استقبال القناة المختارة") }
+                        }
+                    }
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("إنتاج التعليق الصوتي ودمجه مع الفيديو", fontWeight = FontWeight.Bold)
+                            Text("اختر ملف الفيديو من بطاقة الرفع أعلاه، واكتب التعليق بالعربية. سيستخدم الهاتف محرك النطق العربي المثبت دون رصيد API، ثم يضيف مسار AAC إلى ملف MP4 مع إبقاء الصورة الأصلية دون إعادة ترميز. صوت الفيديو الأصلي يُستبدل بالتعليق.")
+                            OutlinedTextField(
+                                value = narrationText,
+                                onValueChange = { narrationText = it.take(3000) },
+                                label = { Text("نص التعليق الصوتي المصري") },
+                                placeholder = { Text("اكتب النص كما تريد أن يُنطق، من دون تشكيل.") },
+                                minLines = 4,
+                                maxLines = 8,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text("إذا طال التعليق عن مدة الفيديو، سيوقف النظام الدمج بدل قطع الكلام.", style = MaterialTheme.typography.bodySmall)
+                            Button(enabled = !busy && uploadVideoUri != null && narrationText.trim().isNotEmpty(), onClick = {
+                                val sourceUri = uploadVideoUri
+                                val narration = narrationText.trim()
+                                if (sourceUri == null) {
+                                    status = "اختر فيديو أولًا من بطاقة رفع الفيديو."
+                                } else {
+                                    runAsync {
+                                        val output = createArabicVoiceoverVideo(context, sourceUri, narration)
+                                        withContext(Dispatchers.Main) { uploadVideoUri = Uri.fromFile(output.file) }
+                                        "اكتمل توليد التعليق ودمجه. الصوت: ${output.voiceLabel}. الملف النهائي: ${output.file.name}. الصورة لم تُعد ترميزها؛ أصبح الملف جاهزًا للرفع إلى القناة المختارة."
+                                    }
+                                }
+                            }, modifier = Modifier.fillMaxWidth()) {
+                                Text(if (busy) "جارٍ توليد الصوت والدمج…" else "توليد التعليق الصوتي ودمجه")
+                            }
                         }
                     }
                     OutlinedButton(onClick = {
@@ -760,6 +801,362 @@ fun assembleCompatibleClips(context: Context, clips: List<ImportedClip>, outputU
         runCatching { muxer?.release() }
         extractors.forEach { runCatching { it.release() } }
         runCatching { temp.delete() }
+    }
+}
+
+
+private data class VoiceoverOutput(val file: File, val voiceLabel: String)
+private data class PcmWavInfo(val dataOffset: Long, val dataSize: Long, val sampleRate: Int, val channels: Int, val bitsPerSample: Int)
+private val voiceLabels = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+private suspend fun createArabicVoiceoverVideo(context: Context, sourceUri: Uri, narration: String): VoiceoverOutput {
+    if (narration.isBlank()) throw IllegalArgumentException("اكتب نص التعليق الصوتي أولًا.")
+    if (narration.length > 3000) throw IllegalArgumentException("نص التعليق طويل جدًا؛ اختصره إلى 3000 حرف.")
+    val wav = synthesizeArabicVoice(context, narration)
+    val aac = File(context.cacheDir, "zoz-voice-\${System.currentTimeMillis()}.m4a")
+    val outputDir = (context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES) ?: context.filesDir).apply { mkdirs() }
+    val output = File(outputDir, "ZOZ-voiceover-\${System.currentTimeMillis()}.mp4")
+    val label = voiceLabels.remove(wav.absolutePath) ?: "صوت العربية المتاح على الهاتف"
+    try {
+        encodePcmWavToAac(wav, aac)
+        muxVideoWithVoiceover(context, sourceUri, aac, output)
+        if (!output.exists() || output.length() < 1024L) throw IllegalStateException("ملف MP4 النهائي لم يُنشأ بحجم صالح.")
+        return VoiceoverOutput(output, label)
+    } catch (e: Exception) {
+        output.delete()
+        throw e
+    } finally {
+        wav.delete()
+        aac.delete()
+    }
+}
+
+private suspend fun synthesizeArabicVoice(context: Context, text: String): File = withContext(Dispatchers.Main) {
+    suspendCancellableCoroutine { continuation ->
+        val output = File(context.cacheDir, "zoz-voice-\${System.currentTimeMillis()}.wav")
+        val finished = AtomicBoolean(false)
+        lateinit var engine: TextToSpeech
+        fun fail(error: Throwable) {
+            if (finished.compareAndSet(false, true)) {
+                runCatching { engine.stop() }
+                runCatching { engine.shutdown() }
+                output.delete()
+                if (continuation.isActive) continuation.resumeWithException(error)
+            }
+        }
+        try {
+            engine = TextToSpeech(context.applicationContext) { initStatus ->
+                if (!continuation.isActive || finished.get()) {
+                    runCatching { engine.shutdown() }
+                    return@TextToSpeech
+                }
+                if (initStatus != TextToSpeech.SUCCESS) {
+                    fail(IllegalStateException("تعذر تشغيل محرك النطق. تأكد من تفعيل خدمة تحويل النص إلى كلام وتنزيل صوت عربي."))
+                    return@TextToSpeech
+                }
+                try {
+                    val available = engine.voices ?: emptySet()
+                    val egyptian = available
+                        .filter { it.locale.language.equals("ar", true) && it.locale.country.equals("EG", true) }
+                        .sortedBy { it.isNetworkConnectionRequired }
+                        .firstOrNull()
+                    val voiceLabel: String
+                    if (egyptian != null) {
+                        engine.voice = egyptian
+                        voiceLabel = "العربية المصرية (\${egyptian.name})"
+                    } else {
+                        val language = engine.setLanguage(Locale("ar", "EG"))
+                        if (language == TextToSpeech.LANG_MISSING_DATA || language == TextToSpeech.LANG_NOT_SUPPORTED) {
+                            val fallback = engine.setLanguage(Locale("ar"))
+                            if (fallback == TextToSpeech.LANG_MISSING_DATA || fallback == TextToSpeech.LANG_NOT_SUPPORTED) {
+                                throw IllegalStateException("لا يوجد صوت عربي مثبت. افتح إعدادات تحويل النص إلى كلام ونزّل صوت العربية ثم أعد المحاولة.")
+                            }
+                        }
+                        voiceLabel = "العربية المتاحة على الهاتف (لا يوجد صوت مصري محدد)"
+                    }
+                    engine.setSpeechRate(0.96f)
+                    engine.setPitch(1.0f)
+                    val utteranceId = "zoz-\${UUID.randomUUID()}"
+                    engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(id: String?) {}
+                        override fun onDone(id: String?) {
+                            if (id != utteranceId || !finished.compareAndSet(false, true)) return
+                            runCatching { engine.shutdown() }
+                            if (output.exists() && output.length() > 44L) {
+                                voiceLabels[output.absolutePath] = voiceLabel
+                                if (continuation.isActive) continuation.resume(output)
+                            } else {
+                                output.delete()
+                                if (continuation.isActive) continuation.resumeWithException(
+                                    IllegalStateException("محرك النطق لم ينتج ملف صوت صالحًا.")
+                                )
+                            }
+                        }
+                        override fun onError(id: String?) {
+                            fail(IllegalStateException("فشل محرك النطق في إنشاء التعليق الصوتي."))
+                        }
+                        override fun onError(id: String?, errorCode: Int) {
+                            fail(IllegalStateException("فشل محرك النطق (رمز $errorCode). تأكد من تنزيل صوت العربية."))
+                        }
+                        override fun onStop(id: String?, interrupted: Boolean) {
+                            if (interrupted) fail(IllegalStateException("تم إيقاف توليد التعليق قبل اكتماله."))
+                        }
+                    })
+                    val result = engine.synthesizeToFile(text, Bundle(), output, utteranceId)
+                    if (result != TextToSpeech.SUCCESS) {
+                        throw IllegalStateException("محرك النطق رفض النص. اختصره أو افحص صوت العربية المثبت.")
+                    }
+                } catch (e: Exception) {
+                    fail(e)
+                }
+            }
+        } catch (e: Exception) {
+            if (finished.compareAndSet(false, true) && continuation.isActive) continuation.resumeWithException(e)
+        }
+        continuation.invokeOnCancellation {
+            if (finished.compareAndSet(false, true)) {
+                runCatching { engine.stop() }
+                runCatching { engine.shutdown() }
+                output.delete()
+            }
+        }
+    }
+}
+
+private fun readPcmWavInfo(file: File): PcmWavInfo {
+    RandomAccessFile(file, "r").use { input ->
+        if (input.length() < 44L) throw IllegalStateException("ملف التعليق الصوتي قصير أو غير مكتمل.")
+        fun readAscii(count: Int): String {
+            val bytes = ByteArray(count)
+            input.readFully(bytes)
+            return String(bytes, Charsets.US_ASCII)
+        }
+        fun readU16(): Int {
+            val a = input.readUnsignedByte()
+            val b = input.readUnsignedByte()
+            return a or (b shl 8)
+        }
+        fun readU32(): Long {
+            val a = input.readUnsignedByte().toLong()
+            val b = input.readUnsignedByte().toLong()
+            val c = input.readUnsignedByte().toLong()
+            val d = input.readUnsignedByte().toLong()
+            return a or (b shl 8) or (c shl 16) or (d shl 24)
+        }
+        if (readAscii(4) != "RIFF") throw IllegalStateException("صيغة الصوت الناتج ليست WAV PCM مدعومة.")
+        readU32()
+        if (readAscii(4) != "WAVE") throw IllegalStateException("ملف الصوت لا يحتوي ترويسة WAVE صحيحة.")
+        var audioFormat = -1
+        var channels = 0
+        var sampleRate = 0
+        var bits = 0
+        var dataOffset = -1L
+        var dataSize = 0L
+        while (input.filePointer + 8L <= input.length()) {
+            val id = readAscii(4)
+            val chunkSize = readU32()
+            val chunkStart = input.filePointer
+            when (id) {
+                "fmt " -> {
+                    if (chunkSize < 16L) throw IllegalStateException("ترويسة WAV غير مكتملة.")
+                    audioFormat = readU16()
+                    channels = readU16()
+                    sampleRate = readU32().toInt()
+                    readU32()
+                    readU16()
+                    bits = readU16()
+                }
+                "data" -> {
+                    dataOffset = input.filePointer
+                    dataSize = minOf(chunkSize, input.length() - dataOffset)
+                }
+            }
+            val next = chunkStart + chunkSize + (chunkSize and 1L)
+            if (next > input.length()) break
+            input.seek(next)
+            if (dataOffset >= 0L && audioFormat >= 0) break
+        }
+        if (audioFormat != 1 || channels !in 1..2 || sampleRate !in 8000..96000 || bits != 16 || dataOffset < 0L || dataSize <= 0L) {
+            throw IllegalStateException("محرك الهاتف أنتج WAV غير مدعوم. المطلوب PCM 16-bit أحادي أو ثنائي القناة.")
+        }
+        return PcmWavInfo(dataOffset, dataSize, sampleRate, channels, bits)
+    }
+}
+
+private fun encodePcmWavToAac(wavFile: File, aacFile: File) {
+    val wav = readPcmWavInfo(wavFile)
+    aacFile.delete()
+    val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, wav.sampleRate, wav.channels).apply {
+        setInteger(MediaFormat.KEY_AAC_PROFILE, android.media.MediaCodecInfo.CodecProfileLevel.AACObjectLC)
+        setInteger(MediaFormat.KEY_BIT_RATE, if (wav.channels == 1) 96000 else 128000)
+        setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 16384)
+    }
+    val encoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
+    val muxer = MediaMuxer(aacFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+    var muxerStarted = false
+    var encoderStarted = false
+    var trackIndex = -1
+    val info = MediaCodec.BufferInfo()
+    val frameBytes = wav.channels * 2
+    var bytesSubmitted = 0L
+    var inputEnded = false
+    var outputEnded = false
+    try {
+        encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+        encoder.start()
+        encoderStarted = true
+        RandomAccessFile(wavFile, "r").use { input ->
+            input.seek(wav.dataOffset)
+            val chunk = ByteArray(16 * 1024)
+            while (!outputEnded) {
+                if (!inputEnded) {
+                    val inputIndex = encoder.dequeueInputBuffer(10000)
+                    if (inputIndex >= 0) {
+                        val inputBuffer = encoder.getInputBuffer(inputIndex) ?: throw IllegalStateException("مدخل ترميز الصوت غير متاح.")
+                        inputBuffer.clear()
+                        val capacity = minOf(chunk.size, inputBuffer.remaining())
+                        val alignedCapacity = capacity - (capacity % frameBytes)
+                        val available = minOf(alignedCapacity.toLong(), wav.dataSize - bytesSubmitted).toInt()
+                        val read = if (available > 0) input.read(chunk, 0, available) else -1
+                        if (read > 0) {
+                            val alignedRead = read - (read % frameBytes)
+                            if (alignedRead <= 0) throw IllegalStateException("بيانات PCM غير مصطفة على حدود الإطار.")
+                            inputBuffer.put(chunk, 0, alignedRead)
+                            val pts = bytesSubmitted * 1_000_000L / (wav.sampleRate.toLong() * frameBytes)
+                            encoder.queueInputBuffer(inputIndex, 0, alignedRead, pts, 0)
+                            bytesSubmitted += alignedRead
+                        } else {
+                            val pts = bytesSubmitted * 1_000_000L / (wav.sampleRate.toLong() * frameBytes)
+                            encoder.queueInputBuffer(inputIndex, 0, 0, pts, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                            inputEnded = true
+                        }
+                    }
+                }
+                val outputIndex = encoder.dequeueOutputBuffer(info, 10000)
+                when {
+                    outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                        if (muxerStarted) throw IllegalStateException("تغير تنسيق AAC بعد بدء الدمج.")
+                        trackIndex = muxer.addTrack(encoder.outputFormat)
+                        muxer.start()
+                        muxerStarted = true
+                    }
+                    outputIndex >= 0 -> {
+                        val outputBuffer = encoder.getOutputBuffer(outputIndex)
+                        if (outputBuffer != null && info.size > 0 && muxerStarted &&
+                            (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0) {
+                            outputBuffer.position(info.offset)
+                            outputBuffer.limit(info.offset + info.size)
+                            muxer.writeSampleData(trackIndex, outputBuffer, info)
+                        }
+                        if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) outputEnded = true
+                        encoder.releaseOutputBuffer(outputIndex, false)
+                    }
+                }
+            }
+        }
+        if (!muxerStarted || trackIndex < 0) throw IllegalStateException("لم يبدأ ترميز AAC؛ راجع محرك الصوت في الهاتف.")
+    } finally {
+        if (encoderStarted) runCatching { encoder.stop() }
+        runCatching { encoder.release() }
+        if (muxerStarted) runCatching { muxer.stop() }
+        runCatching { muxer.release() }
+    }
+}
+
+private fun muxVideoWithVoiceover(context: Context, sourceUri: Uri, aacFile: File, outputFile: File) {
+    val videoExtractor = MediaExtractor()
+    val audioExtractor = MediaExtractor()
+    var muxer: MediaMuxer? = null
+    var muxerStarted = false
+    try {
+        videoExtractor.setDataSource(context, sourceUri, null)
+        audioExtractor.setDataSource(aacFile.absolutePath)
+        var videoTrack = -1
+        var videoFormat: MediaFormat? = null
+        for (i in 0 until videoExtractor.trackCount) {
+            val candidate = videoExtractor.getTrackFormat(i)
+            val mime = candidate.getString(MediaFormat.KEY_MIME) ?: continue
+            if (mime.startsWith("video/")) {
+                if (videoTrack >= 0) throw IllegalStateException("الفيديو يحتوي أكثر من مسار صورة؛ أوقفنا الدمج لتفادي فقد مسار.")
+                videoTrack = i
+                videoFormat = candidate
+            }
+        }
+        if (videoTrack < 0 || videoFormat == null) throw IllegalStateException("الملف المختار لا يحتوي فيديو.")
+        var audioTrack = -1
+        var audioFormat: MediaFormat? = null
+        for (i in 0 until audioExtractor.trackCount) {
+            val candidate = audioExtractor.getTrackFormat(i)
+            if (candidate.getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true) {
+                audioTrack = i
+                audioFormat = candidate
+                break
+            }
+        }
+        if (audioTrack < 0 || audioFormat == null) throw IllegalStateException("ملف التعليق لم ينتج مسار AAC.")
+        val videoDuration = if (videoFormat.containsKey(MediaFormat.KEY_DURATION)) videoFormat.getLong(MediaFormat.KEY_DURATION) else 0L
+        val audioDuration = if (audioFormat.containsKey(MediaFormat.KEY_DURATION)) audioFormat.getLong(MediaFormat.KEY_DURATION) else 0L
+        if (videoDuration > 0L && audioDuration > videoDuration + 250_000L) {
+            throw IllegalStateException("مدة التعليق الصوتي أطول من الفيديو. اختصر النص أو اختر فيديو أطول؛ لم نقص أي كلمة.")
+        }
+        outputFile.parentFile?.mkdirs()
+        outputFile.delete()
+        val outputMuxer = MediaMuxer(outputFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        muxer = outputMuxer
+        val outVideoTrack = outputMuxer.addTrack(videoFormat)
+        val outAudioTrack = outputMuxer.addTrack(audioFormat)
+        val rotation = runCatching {
+            val retriever = android.media.MediaMetadataRetriever()
+            retriever.setDataSource(context, sourceUri)
+            val value = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+            retriever.release()
+            value
+        }.getOrDefault(0)
+        if (rotation in listOf(0, 90, 180, 270)) outputMuxer.setOrientationHint(rotation)
+        outputMuxer.start()
+        muxerStarted = true
+        videoExtractor.selectTrack(videoTrack)
+        audioExtractor.selectTrack(audioTrack)
+        val maxBuffer = maxOf(16 * 1024 * 1024, runCatching { videoFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) }.getOrDefault(0)).coerceAtMost(64 * 1024 * 1024)
+        val buffer = java.nio.ByteBuffer.allocate(maxBuffer)
+        val info = MediaCodec.BufferInfo()
+        var videoDone = false
+        var audioDone = false
+        while (!videoDone || !audioDone) {
+            val videoTime = if (videoDone) -1L else videoExtractor.sampleTime
+            val audioTime = if (audioDone) -1L else audioExtractor.sampleTime
+            if (videoTime < 0L && audioTime < 0L) break
+            val takeVideo = audioTime < 0L || (videoTime >= 0L && videoTime <= audioTime)
+            val extractor = if (takeVideo) videoExtractor else audioExtractor
+            val outputTrack = if (takeVideo) outVideoTrack else outAudioTrack
+            buffer.clear()
+            val size = extractor.readSampleData(buffer, 0)
+            if (size < 0) {
+                if (takeVideo) videoDone = true else audioDone = true
+                continue
+            }
+            val sampleFlags = extractor.sampleFlags
+            if ((sampleFlags and MediaExtractor.SAMPLE_FLAG_ENCRYPTED) != 0) {
+                throw IllegalStateException("الفيديو الأصلي يحتوي عينات مشفرة؛ لم نغيّر الملف.")
+            }
+            var flags = 0
+            if ((sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC) != 0) flags = flags or MediaCodec.BUFFER_FLAG_KEY_FRAME
+            if ((sampleFlags and MediaExtractor.SAMPLE_FLAG_PARTIAL_FRAME) != 0) flags = flags or MediaCodec.BUFFER_FLAG_PARTIAL_FRAME
+            info.set(0, size, extractor.sampleTime, flags)
+            outputMuxer.writeSampleData(outputTrack, buffer, info)
+            if (!extractor.advance()) {
+                if (takeVideo) videoDone = true else audioDone = true
+            }
+        }
+        outputMuxer.stop()
+        muxerStarted = false
+        outputMuxer.release()
+        muxer = null
+    } finally {
+        if (muxerStarted) runCatching { muxer?.stop() }
+        runCatching { muxer?.release() }
+        videoExtractor.release()
+        audioExtractor.release()
     }
 }
 
