@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#101827">
 <title>ZOZ Pro — مركز التحليل ورفع الفيديو</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <style>
 :root{color-scheme:dark;--bg:#0c1422;--panel:#121f31;--line:#2b3c53;--text:#eef4ff;--muted:#a9bad0;--accent:#80a9ff;--good:#50d5a0;--warn:#ffca70;--bad:#ff8989}
 *{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#0b1422,#101c2d);color:var(--text);font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -275,6 +276,15 @@ body.upload-mode .footer{font-size:11px}
  </select>
  <p id="intake-target-help" class="small">اختر القناة قبل تحديد الملف. لن يرسل المركز ملفًا إلى قناة كيدز ما دامت وجهتها غير مؤكدة.</p>
  <label for="intake-file">اختر ملف الفيديو من الهاتف (MP4 أو MOV أو WebM أو MKV)</label><input id="intake-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,application/octet-stream">
+ <section class="card" id="zoz-postproduction-card">
+  <h3>إكمال الإنتاج النهائي — التعليق الصوتي والدمج والمعاينة</h3>
+  <p>اختر ملف الفيديو المرئي أعلاه، ثم أنشئ تعليقًا صوتيًا عربيًا مصريًا عبر Gemini. سيُدمج الصوت مع الصورة دون إعادة ترميز الفيديو، ثم يُعرض الملف النهائي ويُرفع إلى قائمة المراجعة الخاصة فقط.</p>
+  <label for="zoz-postproduction-script">نص التعليق الصوتي</label>
+  <textarea id="zoz-postproduction-script" rows="6" maxlength="1800" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit">تفتكر اللون الأزرق اللي بنشوفه على آثار مصر القديمة كان لازورد مطحون؟ مش دايمًا! المصري القديم ابتكر صبغة اسمها الأزرق المصري، ودي من أقدم الأصباغ الصناعية المعروفة. كانوا بيخلطوا رمل غني بالسيليكا مع مصدر للنحاس ومواد قلوية، وبعد التسخين في أفران خاصة بيتكوّن اللون الأزرق المميز. استخدموه في الخرز والتماثيل والزخارف. يعني اللون ده مش مجرد زينة؛ ده اختراع تكنولوجي من آلاف السنين!</textarea>
+  <div class="actions"><button type="button" id="zoz-postproduction-run">توليد الصوت ودمجه وتجهيز المعاينة</button></div>
+  <div id="zoz-postproduction-status" class="notice">لم يبدأ تجهيز النسخة النهائية. يلزم تسجيل دخول المالك واختيار ملف الفيديو أعلاه.</div>
+  <div id="zoz-postproduction-preview" class="stack"></div>
+ </section>
  <label for="intake-title">عنوان الفيديو على YouTube</label><input id="intake-title" maxlength="100" value="ازاي تبني وكيل ذكاء اصطناعي من موبايلك مجانًا؟ 🤖📱 | تجربة عملية" placeholder="عنوان الفيديو النهائي">
  <label for="intake-description">وصف الفيديو</label><textarea id="intake-description" rows="4" maxlength="5000" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit">هل ينفع تحوّل موبايلك إلى مساعد ذكي ينفّذ مهام حقيقية؟
 
@@ -785,6 +795,64 @@ $('intake-target-channel')?.addEventListener('change',async()=>{
 });
 async function managedCall(action,body){return await call(action,managedPayload(body));}
 
+async function runZozPostproduction(){
+ const button=$('zoz-postproduction-run'),status=$('zoz-postproduction-status'),preview=$('zoz-postproduction-preview');
+ const source=$('intake-file').files&&$('intake-file').files[0];
+ const narration=String($('zoz-postproduction-script').value||'').trim();
+ if(!source)throw new Error('اختر ملف الفيديو المرئي من الهاتف أولًا.');
+ if(!source.type.startsWith('video/')&&!/\\.(mp4|mov|webm|mkv)$/i.test(source.name))throw new Error('الملف المحدد ليس ملف فيديو معروفًا.');
+ if(source.size>850*1024*1024)throw new Error('حجم الفيديو يتجاوز الحد المسموح للمعالجة في المتصفح.');
+ if(narration.length<40||narration.length>1800)throw new Error('نص التعليق يجب أن يكون بين 40 و1800 حرف.');
+ const {data:sessionData,error:sessionError}=await sb.auth.getSession();
+ if(sessionError||!sessionData?.session?.access_token)throw new Error('سجّل دخول المالك إلى ZOZ Pro أولًا ثم أعد المحاولة.');
+ const token=sessionData.session.access_token;
+ const userEmail=String(sessionData.session.user?.email||'').toLowerCase();
+ if(userEmail!==OWNER)throw new Error('جلسة الحساب الحالية ليست جلسة مالك ZOZ Pro المعتمدة.');
+ button.disabled=true;preview.innerHTML='';
+ try{
+  status.textContent='1/4 — جارٍ توليد التعليق الصوتي المصري عبر Gemini…';
+  const voiceResponse=await fetch(SUPABASE_URL+'/functions/v1/zoz-pro-voiceover',{
+   method:'POST',headers:{'content-type':'application/json','apikey':SUPABASE_PUBLISHABLE_KEY,'authorization':'Bearer '+token},
+   body:JSON.stringify({channel_id:HAZEM_UPLOAD_CHANNEL_ID,narration})
+  });
+  const voiceData=await voiceResponse.json().catch(()=>({}));
+  if(!voiceResponse.ok||!voiceData.ok||!voiceData.audio_url)throw new Error(voiceData.error||'تعذر توليد التعليق الصوتي.');
+  status.textContent='2/4 — تم إنشاء الصوت. جارٍ تحميل محرك دمج الفيديو…';
+  if(!window.FFmpeg||!window.FFmpeg.createFFmpeg)throw new Error('مكتبة دمج الفيديو لم تُحمّل. أعد فتح الصفحة مع اتصال إنترنت ثم حاول مجددًا.');
+  const {createFFmpeg,fetchFile}=window.FFmpeg;
+  const ffmpeg=createFFmpeg({log:false,corePath:'https://unpkg.com/@ffmpeg/core@0.11.5/dist/ffmpeg-core.js'});
+  await ffmpeg.load();
+  status.textContent='3/4 — جارٍ دمج الصوت مع الفيديو مع الحفاظ على مسار الصورة الأصلي…';
+  const sourceExt=(source.name.split('.').pop()||'mp4').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const inputName='zoz_input.'+(['mp4','mov','webm','mkv'].includes(sourceExt)?sourceExt:'mp4');
+  ffmpeg.FS('writeFile',inputName,await fetchFile(source));
+  const audioResponse=await fetch(voiceData.audio_url);
+  if(!audioResponse.ok)throw new Error('تعذر تنزيل ملف التعليق الصوتي من التخزين الخاص.');
+  const audioBlob=await audioResponse.blob();
+  ffmpeg.FS('writeFile','zoz_narration.wav',await fetchFile(audioBlob));
+  await ffmpeg.run('-i',inputName,'-i','zoz_narration.wav','-map','0:v:0','-map','1:a:0','-c:v','copy','-c:a','aac','-b:a','160k','-af','apad','-shortest','-movflags','+faststart','zoz_final.mp4');
+  const output=ffmpeg.FS('readFile','zoz_final.mp4');
+  if(!output||output.length<50000)throw new Error('ملف MP4 الناتج غير مكتمل أو أصغر من الحد المتوقع.');
+  const finalFile=new File([output.buffer], 'egyptian_blue_final_with_egyptian_voice.mp4',{type:'video/mp4'});
+  const probeUrl=URL.createObjectURL(finalFile);
+  const video=document.createElement('video');video.controls=true;video.playsInline=true;video.preload='metadata';video.src=probeUrl;video.style.width='100%';video.style.maxHeight='520px';video.style.borderRadius='12px';
+  const download=document.createElement('a');download.href=probeUrl;download.download=finalFile.name;download.className='link secondary';download.textContent='تنزيل النسخة النهائية';
+  preview.append(video,download);
+  status.textContent='4/4 — اكتمل الدمج. جارٍ إرسال النسخة النهائية إلى قائمة المراجعة الخاصة…';
+  const transfer=new DataTransfer();transfer.items.add(finalFile);$('intake-file').files=transfer.files;
+  $('intake-target-channel').value=HAZEM_UPLOAD_CHANNEL_ID;
+  $('intake-title').value='سر اختراع الأزرق المصري — تكنولوجيا سبقت عصرها';
+  $('intake-description').value='الأزرق المصري مش مجرد لون جميل؛ ده واحد من أقدم الأصباغ الصناعية اللي عرفها العالم. في الفيديو ده نكتشف إزاي المصري القديم صنع الصبغة الزرقاء واستخدمها في الخرز والتماثيل والزخارف.\n\n#مصر_القديمة #الأزرق_المصري #الحضارة_المصرية #تاريخ_مصر';
+  $('intake-tags').value='الأزرق المصري, مصر القديمة, الحضارة المصرية, الأصباغ القديمة, الكيمياء المصرية, آثار مصر';
+  $('intake-kids').value='false';$('intake-synthetic').value='true';
+  await uploadIntakeFile();
+  status.textContent='اكتمل إنتاج النسخة ذات التعليق الصوتي ورفعها إلى قائمة المراجعة الخاصة لقناة حازم أحمد. لم يتم النشر العام.';
+ }finally{button.disabled=false;}
+}
+$('zoz-postproduction-run')?.addEventListener('click',async()=>{
+ try{await runZozPostproduction();}
+ catch(e){notice('zoz-postproduction-status',e.message||'تعذر إكمال مرحلة ما بعد الإنتاج.','bad');$('zoz-postproduction-run').disabled=false;}
+});
 async function uploadIntakeFile(){
  const file=$('intake-file').files&&$('intake-file').files[0];
  if(!file)throw new Error('اختر ملف فيديو أولًا.');
