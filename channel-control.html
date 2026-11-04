@@ -51,6 +51,8 @@ body.upload-mode #page-intake #intake-file{border:2px dashed #648fce;padding:16p
 body.upload-mode #page-intake #intake-upload{min-height:50px;font-size:17px;width:100%}
 body.upload-mode #page-intake .card{padding:14px}
 body.upload-mode .footer{font-size:11px}
+/* Use the finished video as supplied; disable AI voiceover/post-production UI. */
+#zoz-postproduction-card{display:none!important}
 </style>
 </head>
 <body>
@@ -95,7 +97,7 @@ body.upload-mode .footer{font-size:11px}
  <h3>وكيل إنتاج الفيديو · خطة ثم موافقة ثم تنفيذ</h3>
  <p>يختار الوكيل القناة المناسبة، ويعد السيناريو والهوية البصرية، ويقسم العمل إلى مقاطع منفصلة لا تتجاوز 8 ثوانٍ. لن يبدأ الإنتاج قبل موافقتك.</p>
  <div class="grid">
-  <div><label for="zoz-flow-channel">القناة</label><select id="zoz-flow-channel" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit"><option value="">اختيار الوكيل حسب الموضوع</option><option value="UC9fr5B0SZZkmVAApfCqEO3w">فِكرة — أفكار وذكاء اصطناعي</option><option value="UCIael48cvwPG3gKj--c7HKw">Hazem Ahmed — مصر القديمة</option></select></div>
+  <div><label for="zoz-flow-channel">القناة</label><select id="zoz-flow-channel" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit"><option value="">اختيار الوكيل حسب الموضوع</option><option value="UC9fr5B0SZZkmVAApfCqEO3w">فِكرة — أفكار وذكاء اصطناعي</option><option value="UCIael48cvwPG3GkJ--c7HKw">Hazem Ahmed — مصر القديمة</option></select></div>
   <div><label for="zoz-flow-topic">موضوع الفيديو (اختياري)</label><input id="zoz-flow-topic" maxlength="240" placeholder="يختار الوكيل موضوعًا من التقويم إذا تركته فارغًا"></div>
  </div>
  <label for="zoz-flow-style">الهوية البصرية المطلوبة (اختياري)</label>
@@ -143,7 +145,7 @@ body.upload-mode .footer{font-size:11px}
   <div id="channel-status" class="notice">سيتم اختبار الاتصال من خلال طلب تحليلات للقراءة فقط.</div>
   <label for="managed-channel-selector">القناة النشطة لكل أقسام التحليل والفيديو والتقويم والتوصيات</label>
  <select id="managed-channel-selector" style="width:100%;padding:12px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;font:inherit">
- <option value="UCIael48cvwPG3gKj--c7HKw">Hazem Ahmed — مصر القديمة</option>
+ <option value="UCIael48cvwPG3GkJ--c7HKw">Hazem Ahmed — مصر القديمة</option>
  <option value="UC9fr5B0SZZkmVAApfCqEO3w">فكره 🗣️ — أفكار وذكاء اصطناعي</option>
  </select>
  <p class="small">فكره كيدز متوقفة حتى تأكيد وجهتها. كل قناة تستخدم تفويضها المستقل.</p>
@@ -275,7 +277,7 @@ body.upload-mode .footer{font-size:11px}
   <option value="UC-FimUUFXRd0MOSoikzczcQ" disabled>فِكرة كيدز — متوقفة حتى تأكيد وجهة القناة</option>
  </select>
  <p id="intake-target-help" class="small">اختر القناة قبل تحديد الملف. لن يرسل المركز ملفًا إلى قناة كيدز ما دامت وجهتها غير مؤكدة.</p>
- <label for="intake-file">اختر ملف الفيديو من الهاتف (MP4 أو MOV أو WebM أو MKV)</label><input id="intake-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,application/octet-stream">
+ <label for="intake-file">اختر ملف الفيديو من الهاتف (MP4 أو MOV أو WebM أو MKV)</label><input id="intake-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,application/octet-stream"><p class="small" id="intake-final-file-note">ارفع ملف الفيديو النهائي بالصورة والصوت كما تريد نشره. مسار الاستقبال لا يولد تعليقًا صوتيًا ولا يغيّر صوت الفيديو.</p>
  <section class="card" id="zoz-postproduction-card">
   <h3>إكمال الإنتاج النهائي — التعليق الصوتي والدمج والمعاينة</h3>
   <p>اختر ملف الفيديو المرئي أعلاه، ثم أنشئ تعليقًا صوتيًا عربيًا مصريًا عبر Gemini. سيُدمج الصوت مع الصورة دون إعادة ترميز الفيديو، ثم يُعرض الملف النهائي ويُرفع إلى قائمة المراجعة الخاصة فقط.</p>
@@ -433,7 +435,7 @@ if(uploadMode)document.body.classList.add('upload-mode');
 const SUPABASE_URL='https://oxyzxbkwhafzaztraowc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm';
 const OWNER='hazemnaw48@gmail.com';
-let CHANNEL_ID='UCIael48cvwPG3gKj--c7HKw';
+let CHANNEL_ID='UCIael48cvwPG3GkJ--c7HKw';
 function selectedChannelId(){return String($('managed-channel-selector')?.value||CHANNEL_ID);}
 const API=SUPABASE_URL+'/functions/v1/zoz-pro-youtube-analytics';
 const AGENT_API=SUPABASE_URL+'/functions/v1/zoz-pro-agent';
@@ -607,7 +609,7 @@ async function startRequestedGoogleAuthorization(){
 }
 
 const MANAGED_CHANNELS=[
- {channel_id:'UCIael48cvwPG3gKj--c7HKw',label:'Hazem Ahmed',purpose:'تاريخ مصر القديمة والآثار'},
+ {channel_id:'UCIael48cvwPG3GkJ--c7HKw',label:'Hazem Ahmed',purpose:'تاريخ مصر القديمة والآثار'},
  {channel_id:'UC9fr5B0SZZkmVAApfCqEO3w',label:'فكره 🗣️',purpose:'أفكار مفيدة ومعلومات متنوعة وذكاء اصطناعي عملي'},
  {channel_id:'UC-FimUUFXRd0MOSoikzczcQ',label:'فِكرة كيدز — موقوفة لحين تأكيد الوجهة',purpose:'قراءة بيانات القناة فقط؛ لا إنتاج أو توصيات موضوعية قبل تأكيد المالك'}
 ];
