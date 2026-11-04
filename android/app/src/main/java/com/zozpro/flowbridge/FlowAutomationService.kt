@@ -21,6 +21,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.util.concurrent.Executors
 
@@ -28,6 +29,9 @@ private const val TIKTOK_STUDIO_PACKAGE = "com.ss.android.tt.creator"
 private const val YOUTUBE_STUDIO_PACKAGE = "com.google.android.apps.youtube.creator"
 private const val TIKTOK_PACKAGE = "com.zhiliaoapp.musically"
 private const val YOUTUBE_PACKAGE = "com.google.android.youtube"
+private const val VOICEOVER_CHANNEL_ID = "UCIael48cvwPG3gKj--c7HKw"
+private const val VOICEOVER_SOURCE_PREFIX = "/storage/v1/object/sign/zoz-pro-intake/voiceover-source/"
+private const val VOICEOVER_MAX_SOURCE_BYTES = 100L * 1024L * 1024L
 
 private val ZOZ_CONTROL_PACKAGES = setOf(TIKTOK_STUDIO_PACKAGE, YOUTUBE_STUDIO_PACKAGE, TIKTOK_PACKAGE, YOUTUBE_PACKAGE)
 private val ZOZ_STUDIO_PACKAGES = setOf(TIKTOK_STUDIO_PACKAGE, YOUTUBE_STUDIO_PACKAGE)
@@ -228,8 +232,188 @@ class FlowAutomationService : AccessibilityService() {
         }, delayMs.coerceAtLeast(1000L))
     }
 
+
+    private fun startVoiceoverMerge(jobId: String, payload: JSONObject) {
+        val current = prefs().getString(KEY_ACTIVE_VOICEOVER_JOB, null)
+        if (!current.isNullOrBlank()) return
+        val startedAt = System.currentTimeMillis()
+        prefs().edit().putString(
+            KEY_ACTIVE_VOICEOVER_JOB,
+            JSONObject().put("job_id", jobId).put("started_at_ms", startedAt).toString()
+        ).apply()
+        DeviceNotifications.show(this, "بدأ دمج التعليق الصوتي", "الهاتف يستخدم محرك النطق العربي المحلي ثم يرسل النسخة للمراجعة في ZOZ.")
+
+        networkExecutor.execute {
+            var sourceFile: File? = null
+            var outputFile: File? = null
+            try {
+                val channelId = payload.optString("channel_id", "")
+                if (channelId != VOICEOVER_CHANNEL_ID) {
+                    throw IllegalArgumentException("voiceover_channel_not_allowed")
+                }
+                val narration = payload.optString("narration", "").trim()
+                if (narration.isBlank() || narration.length > 3000) {
+                    throw IllegalArgumentException("voiceover_narration_invalid")
+                }
+                val sourceUrl = payload.optString("video_url", "")
+                sourceFile = downloadVoiceoverSource(sourceUrl)
+                val rendered = runBlocking {
+                    createArabicVoiceoverVideo(
+                        applicationContext,
+                        Uri.fromFile(sourceFile),
+                        narration
+                    )
+                }
+                outputFile = rendered.file
+
+                val deviceToken = DeviceTokenVault.read(this)
+                    ?: throw IllegalStateException("device_token_missing")
+                val intakePrefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                val savedChannel = intakePrefs.getString("zoz_intake_channel_id", "") ?: ""
+                val savedIntakeToken = DeviceTokenVault.readIntake(this)
+                if (savedChannel != channelId || savedIntakeToken.isNullOrBlank() || savedIntakeToken.length < 32) {
+                    val issued = apiPostWithToken(
+                        "device_intake_token",
+                        JSONObject().put("channel_id", channelId),
+                        deviceToken
+                    ).optString("intake_token")
+                    if (issued.length < 32) throw IllegalStateException("intake_token_invalid")
+                    DeviceTokenVault.writeIntake(this, issued)
+                    intakePrefs.edit().putString("zoz_intake_channel_id", channelId).apply()
+                }
+
+                val uploadMessage = uploadFinalVideoToIntake(
+                    this,
+                    Uri.fromFile(rendered.file),
+                    true,
+                    false,
+                    channelId
+                )
+                val assetId = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .getString("zoz_last_uploaded_asset_id", "") ?: ""
+                if (assetId.isBlank()) throw IllegalStateException("voiceover_intake_asset_missing")
+
+                val result = JSONObject()
+                    .put("channel_id", channelId)
+                    .put("asset_id", assetId)
+                    .put("intake_status", "ready_for_review")
+                    .put("voice_engine", "Android TextToSpeech")
+                    .put("voice_label", rendered.voiceLabel)
+                    .put("output_filename", rendered.file.name)
+                    .put("output_bytes", rendered.file.length())
+                    .put("upload_message", uploadMessage)
+                    .put("publication_performed", false)
+
+                apiPostWithToken(
+                    "complete_job",
+                    JSONObject().put("job_id", jobId)
+                        .put("outcome", "succeeded")
+                        .put("result", result),
+                    DeviceTokenVault.read(this) ?: deviceToken
+                )
+                handler.post {
+                    DeviceNotifications.show(
+                        this,
+                        "اكتمل التعليق والدمج",
+                        "تم رفع نسخة «سر اختراع الأزرق المصري» إلى استقبال Hazem Ahmed للمراجعة فقط."
+                    )
+                }
+            } catch (error: Exception) {
+                val message = error.message ?: "voiceover_merge_failed"
+                runCatching {
+                    apiPostWithToken(
+                        "complete_job",
+                        JSONObject().put("job_id", jobId)
+                            .put("outcome", "failed")
+                            .put("error_code", "voiceover_merge_failed")
+                            .put("error_message", message),
+                        DeviceTokenVault.read(this) ?: ""
+                    )
+                }
+                handler.post {
+                    DeviceNotifications.show(
+                        this,
+                        "تعذر إكمال التعليق والدمج",
+                        message.take(180)
+                    )
+                }
+            } finally {
+                sourceFile?.delete()
+                prefs().edit().remove(KEY_ACTIVE_VOICEOVER_JOB).apply()
+                handler.post { scheduleAgentPoll(5000L) }
+            }
+        }
+    }
+
+    private fun downloadVoiceoverSource(rawUrl: String): File {
+        val uri = runCatching { Uri.parse(rawUrl) }.getOrNull()
+            ?: throw IllegalArgumentException("voiceover_source_url_invalid")
+        if (uri.scheme != "https" ||
+            uri.host != "oxyzxbkwhafzaztraowc.supabase.co" ||
+            uri.userInfo != null ||
+            uri.port !in setOf(-1, 443) ||
+            !uri.path.orEmpty().startsWith(VOICEOVER_SOURCE_PREFIX) ||
+            uri.fragment != null
+        ) {
+            throw IllegalArgumentException("voiceover_source_url_not_allowlisted")
+        }
+
+        val connection = (java.net.URL(rawUrl).openConnection() as java.net.HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 30000
+            readTimeout = 60000
+            instanceFollowRedirects = false
+            setRequestProperty("Accept", "video/mp4")
+        }
+        val file = File(cacheDir, "zoz-voiceover-source-${System.currentTimeMillis()}.mp4")
+        try {
+            val code = connection.responseCode
+            if (code != 200) throw IllegalStateException("voiceover_source_download_http_$code")
+            val declaredSize = connection.getHeaderFieldLong("Content-Length", -1L)
+            if (declaredSize > VOICEOVER_MAX_SOURCE_BYTES) throw IllegalStateException("voiceover_source_too_large")
+            connection.inputStream.use { input ->
+                FileOutputStream(file).use { output ->
+                    val buffer = ByteArray(64 * 1024)
+                    var total = 0L
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        if (total > VOICEOVER_MAX_SOURCE_BYTES) {
+                            throw IllegalStateException("voiceover_source_too_large")
+                        }
+                        output.write(buffer, 0, count)
+                    }
+                }
+            }
+            if (!file.exists() || file.length() < 1024L) throw IllegalStateException("voiceover_source_empty")
+            java.io.RandomAccessFile(file, "r").use { input ->
+                input.seek(4L)
+                val brand = ByteArray(4)
+                input.readFully(brand)
+                if (String(brand, Charsets.US_ASCII) != "ftyp") {
+                    throw IllegalStateException("voiceover_source_not_mp4")
+                }
+            }
+            return file
+        } catch (error: Exception) {
+            file.delete()
+            throw error
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun hasActiveVoiceoverJob(): Boolean {
+        val raw = prefs().getString(KEY_ACTIVE_VOICEOVER_JOB, null) ?: return false
+        val startedAt = runCatching { JSONObject(raw).optLong("started_at_ms", 0L) }.getOrDefault(0L)
+        if (startedAt > 0L && System.currentTimeMillis() - startedAt <= 35L * 60L * 1000L) return true
+        prefs().edit().remove(KEY_ACTIVE_VOICEOVER_JOB).apply()
+        return false
+    }
+
     private fun pollAgentQueue() {
-        if (!isEnabled(this) || activeControlTask() != null || activeTask() != null) {
+        if (!isEnabled(this) || activeControlTask() != null || activeTask() != null || hasActiveVoiceoverJob()) {
             scheduleAgentPoll(5000L)
             return
         }
@@ -251,6 +435,7 @@ class FlowAutomationService : AccessibilityService() {
                         when (capability) {
                             "flow.generate_scene" -> startScene(this@FlowAutomationService, id, payload)
                             "device.ui_control" -> startUiControl(this@FlowAutomationService, id, payload)
+                            "device.voiceover_merge" -> startVoiceoverMerge(id, payload)
                             else -> throw IllegalArgumentException("capability_not_supported_by_flow_bridge")
                         }
                     }.onFailure { error ->
@@ -1074,6 +1259,7 @@ class FlowAutomationService : AccessibilityService() {
         const val PREF_CLIPS = "saved_clips"
         const val KEY_ACTIVE_TASK = "flow_active_scene_task"
         const val KEY_ACTIVE_CONTROL_TASK = "phone_control_task"
+        const val KEY_ACTIVE_VOICEOVER_JOB = "voiceover_merge_task"
 
         fun isEnabled(context: Context): Boolean {
             val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
