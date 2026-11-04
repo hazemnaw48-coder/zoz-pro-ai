@@ -23,6 +23,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.Executors
 
 private const val TIKTOK_STUDIO_PACKAGE = "com.ss.android.tt.creator"
