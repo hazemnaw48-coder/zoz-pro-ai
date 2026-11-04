@@ -153,7 +153,7 @@ body.upload-mode .footer{font-size:11px}
  <p><a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener noreferrer">فتح إعدادات رموز Hugging Face</a> · اختر New token ثم Read.</p>
  <label for="zoz-hf-read-token">رمز Hugging Face Read</label>
  <input id="zoz-hf-read-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="hf_..." maxlength="4096">
- <div class="actions"><button type="button" id="zoz-hf-connect-btn">تحقق واحفظ الاتصال المشفر</button></div>
+ <div class="actions"><button type="button" id="zoz-hf-connect-btn">تحقق واحفظ الاتصال المشفر</button><button type="button" id="zoz-hf-refresh-btn" class="secondary">إعادة فحص الاتصال</button></div>
  <div id="zoz-hf-connect-status" class="notice" role="status">جارٍ قراءة حالة اتصال Hugging Face المحفوظة…</div>
  <p class="small">نجاح الاتصال يفعّل LTX على مستوى المسودات فقط. التوليد يظل خاضعًا لتوفر مساحة Hugging Face المجانية والانتظار وحدود ZeroGPU، ولا يفعّل النشر العام.</p>
 </section>
@@ -481,28 +481,36 @@ async function ownerSession(){
 }
 
 async function loadHFProviderStatus(){
- const status=$('zoz-hf-connect-status');if(!status)return;
+ const button=$('zoz-hf-connect-btn');
+ if(button)button.disabled=true;
  try{
   const session=await ownerSession();
-  const headers={apikey:SUPABASE_PUBLISHABLE_KEY,authorization:'Bearer '+session.access_token};
-  const catalogResponse=await fetch(SUPABASE_URL+'/rest/v1/zoz_pro_tool_catalog?select=id&tool_key=eq.huggingface_ltx',{headers,cache:'no-store'});
-  if(!catalogResponse.ok)throw new Error('تعذر قراءة سجل محرك الفيديو.');
-  const catalog=await catalogResponse.json(),toolId=catalog?.[0]?.id;
-  if(!toolId)throw new Error('سجل محرك LTX غير موجود.');
-  const response=await fetch(SUPABASE_URL+'/rest/v1/zoz_pro_tool_connections?select=connection_status,account_label,last_checked_at,last_error&tool_id=eq.'+encodeURIComponent(toolId)+'&owner_id=eq.'+encodeURIComponent(session.user.id),{headers,cache:'no-store'});
-  if(!response.ok)throw new Error('تعذر قراءة حالة اتصال Hugging Face.');
-  const rows=await response.json(),row=rows?.[0];
-  if(row?.connection_status==='connected'){
-   const checked=row.last_checked_at?new Date(row.last_checked_at).toLocaleString('ar-EG'):'';
-   notice('zoz-hf-connect-status','متصل بالفعل · الحساب: '+String(row.account_label||'Hugging Face')+' · صلاحية الوكيل: مسودات فقط'+(checked?' · آخر تحقق: '+checked:''),'good');
+  const response=await fetch(HF_PROVIDER_CONNECT_API,{
+   method:'GET',
+   headers:{apikey:SUPABASE_PUBLISHABLE_KEY,authorization:'Bearer '+session.access_token},
+   cache:'no-store',
+   credentials:'omit',
+   signal:AbortSignal.timeout(15000)
+  });
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||result.ok!==true)throw new Error(result.error||('تعذر قراءة حالة الاتصال (HTTP '+response.status+').'));
+  const connection=result.connection||{};
+  const access=result.agent_access||{};
+  if(result.connected&&access.enabled===true&&access.access_level==='draft'){
+   const checked=connection.last_checked_at?new Date(connection.last_checked_at).toLocaleString('ar-EG'):'';
+   notice('zoz-hf-connect-status','متصل بالفعل · الحساب: '+String(connection.account_label||'Hugging Face')+' · الوكيل: مسودات فقط'+(checked?' · آخر تحقق: '+checked:''),'good');
   }else{
-   notice('zoz-hf-connect-status',row?.last_error||'الاتصال غير مكتمل. يلزم ربط Hugging Face Read.','warn');
+   notice('zoz-hf-connect-status',connection.last_error||'الاتصال غير مكتمل. راجع ربط Hugging Face Read.','warn');
   }
  }catch(error){
-  notice('zoz-hf-connect-status',error?.message||'تعذر قراءة حالة اتصال Hugging Face.','warn');
+  notice('zoz-hf-connect-status',error?.name==='TimeoutError'?'انتهت مهلة قراءة حالة Hugging Face. اضغط «إعادة فحص الاتصال» للمحاولة مرة أخرى.':(error?.message||'تعذر قراءة حالة اتصال Hugging Face.'),'bad');
+ }finally{
+  if(button)button.disabled=false;
  }
 }
+
 const HF_PROVIDER_CONNECT_API=SUPABASE_URL+'/functions/v1/zoz-video-provider-connect';
+$('zoz-hf-refresh-btn')?.addEventListener('click',loadHFProviderStatus);
 $('zoz-hf-connect-btn')?.addEventListener('click',async()=>{
  const button=$('zoz-hf-connect-btn'),field=$('zoz-hf-read-token');
  let token=String(field?.value||'').trim();
