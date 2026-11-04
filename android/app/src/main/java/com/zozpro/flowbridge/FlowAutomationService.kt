@@ -15,6 +15,7 @@ import android.os.Looper
 import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.core.content.ContextCompat
 import androidx.work.WorkManager
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -149,11 +150,7 @@ class FlowAutomationService : AccessibilityService() {
         activeService = this
         if (!receiverRegistered) {
             val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
-            if (Build.VERSION.SDK_INT >= 33) registerReceiver(downloadReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            else {
-                @Suppress("DEPRECATION")
-                registerReceiver(downloadReceiver, filter)
-            }
+            ContextCompat.registerReceiver(this, downloadReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
             receiverRegistered = true
         }
         // Preserve in-flight Flow state across accessibility-service restarts.
