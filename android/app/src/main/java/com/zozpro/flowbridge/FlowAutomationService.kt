@@ -147,29 +147,43 @@ class FlowAutomationService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         activeService = this
-        // This build is restricted to four named apps; discard stale Flow state
-        // and do not subscribe to device-wide download events.
-        prefs().edit().remove(KEY_ACTIVE_TASK).apply()
-        val control = activeControlTask()
-        if (control != null) scheduleControlInspection(900)
-        scheduleAgentPoll(2500)
+        if (!receiverRegistered) {
+            val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(downloadReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            else {
+                @Suppress("DEPRECATION")
+                registerReceiver(downloadReceiver, filter)
+            }
+            receiverRegistered = true
+        }
+        // Preserve in-flight Flow state across accessibility-service restarts.
+        if (activeTask() != null) handler.postDelayed({ inspectCurrentPage() }, 900)
+        if (activeControlTask() != null) scheduleControlInspection(900)
+        scheduleAgentPoll(1800)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        val control = activeControlTask()
-        if (control != null) {
-            val pkg = event?.packageName?.toString().orEmpty()
-            if (pkg.isNotBlank() && pkg != control.optString("target_package")) return
-            if (event?.eventType in listOf(
-                    AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
-                    AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
-                    AccessibilityEvent.TYPE_VIEW_SCROLLED,
-                    AccessibilityEvent.TYPE_VIEW_FOCUSED
-                )) scheduleControlInspection(350)
+        val pkg = event?.packageName?.toString().orEmpty()
+        if (event?.eventType !in listOf(
+                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
+                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+                AccessibilityEvent.TYPE_VIEW_SCROLLED,
+                AccessibilityEvent.TYPE_VIEW_FOCUSED
+            )) return
+        if (activeTask() != null) {
+            // Browser events are considered only during an active Flow scene; inspectCurrentPage
+            // independently verifies the labs.google origin before entering text or clicking.
+            if (pkg !in setOf("com.android.chrome", "com.google.android.googlequicksearchbox")) return
+            handler.postDelayed({ inspectCurrentPage() }, 300)
             return
         }
-        // No non-target app events are processed in this build.
-        return
+        val control = activeControlTask()
+        if (control != null) {
+            if (pkg.isNotBlank() && pkg != control.optString("target_package")) return
+            scheduleControlInspection(350)
+            return
+        }
+        scheduleAgentPoll(1200L)
     }
 
     override fun onInterrupt() {
