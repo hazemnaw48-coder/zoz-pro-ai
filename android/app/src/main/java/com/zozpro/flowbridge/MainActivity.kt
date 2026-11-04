@@ -121,6 +121,7 @@ private fun AppScopeControlScreen() {
                         ensureIntakeToken(context, deviceToken, "UC9fr5B0SZZkmVAApfCqEO3w", forceRefresh = true)
                         if (FlowAutomationService.isEnabled(context)) {
                             apiPostWithToken("enable_phone_control", JSONObject().put("app_version", BuildConfig.VERSION_NAME), deviceToken)
+                            apiPostWithToken("enable_flow_automation", JSONObject().put("app_version", BuildConfig.VERSION_NAME), deviceToken)
                         }
                     }
                     serviceEnabled = FlowAutomationService.isEnabled(context)
@@ -248,6 +249,8 @@ private fun AppScopeControlScreen() {
                                 val intakeToken = tokenResponse.optString("intake_token")
                                 if (intakeToken.length < 32) throw IllegalStateException("لم يصدر الخادم رمز استقبال صالحًا؛ لم يبدأ رفع الملف.")
                                 DeviceTokenVault.writeIntake(context, intakeToken)
+                                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                                    .putString("zoz_intake_channel_id", uploadChannelId).apply()
                                 uploadFinalVideoToIntake(context, uploadVideoUri!!, true, false, uploadChannelId)
                             } }, modifier = Modifier.fillMaxWidth()) { Text("رفع الملف إلى استقبال القناة المختارة") }
                         }
@@ -940,8 +943,10 @@ private fun ensureIntakeToken(
     channelId: String,
     forceRefresh: Boolean = false
 ) {
+    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     val existing = DeviceTokenVault.readIntake(context)
-    if (!forceRefresh && !existing.isNullOrBlank() && existing.length >= 32) return
+    val existingChannel = prefs.getString("zoz_intake_channel_id", "") ?: ""
+    if (!forceRefresh && existingChannel == channelId && !existing.isNullOrBlank() && existing.length >= 32) return
     val response = apiPostWithToken(
         "device_intake_token",
         JSONObject().put("channel_id", channelId),
@@ -950,6 +955,7 @@ private fun ensureIntakeToken(
     val issued = response.optString("intake_token")
     if (issued.length < 32) throw IllegalStateException("الخادم لم يصدر رمز استقبال صالحًا.")
     DeviceTokenVault.writeIntake(context, issued)
+    prefs.edit().putString("zoz_intake_channel_id", channelId).apply()
 }
 
 class DevicePollWorker(context: Context, params: androidx.work.WorkerParameters) : androidx.work.Worker(context, params) {
@@ -957,14 +963,8 @@ class DevicePollWorker(context: Context, params: androidx.work.WorkerParameters)
         val token = DeviceTokenVault.read(applicationContext) ?: return Result.success()
         return try {
             apiPostWithToken("heartbeat", JSONObject().put("app_version", BuildConfig.VERSION_NAME), token)
-            ensureIntakeToken(applicationContext, token, "UC9fr5B0SZZkmVAApfCqEO3w")
-            if (!FlowAutomationService.isEnabled(applicationContext)) return Result.success()
-            for (index in 0 until 1) {
-                val job = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job") ?: break
-                val capability = job.optString("capability_id")
-                executeJob(applicationContext, job)
-                if (capability == "device.ui_control") break
-            }
+            // Queue consumption is owned by FlowAutomationService to avoid two pollers
+            // racing for the same device job. This worker only refreshes device presence.
             Result.success()
         } catch (_: Exception) { Result.retry() }
     }
