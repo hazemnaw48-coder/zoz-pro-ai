@@ -672,7 +672,7 @@ async function intakeCreate(req:Request,u:any){
  const filename=intakeText(b.filename,240),bytes=Number(b.total_bytes),type=intakeText(b.content_type||"video/mp4",100);
  if(!/^UC[A-Za-z0-9_-]{22}$/.test(channelId))return fail("معرّف القناة المستهدفة غير صالح.",400);
  if(u.is_intake_source&&channelId!==String(u.channel_id||""))return fail("رمز مركز الإنتاج مخصص لقناة واحدة فقط.",403);
- const registered=await db("zoz_pro_managed_channels?owner_id=eq."+encodeURIComponent(u.id)+"&channel_id=eq."+encodeURIComponent(channelId)+"&select=channel_id,is_active,display_name&limit=1");
+ const registered=(await ownerManagedChannels(u.id)).filter((x:any)=>String(x.channel_id)===channelId);
  if(!registered?.[0]||registered[0].is_active===false)return fail("القناة غير مسجلة أو غير نشطة في إدارة ZOZ Pro.",404);
  if(!filename||!Number.isSafeInteger(bytes)||bytes<1||bytes>850*1024*1024)return fail("اختر ملفًا بحجم من 1 بايت إلى 850 ميجابايت.",400);
  if(!/^(video\/(mp4|quicktime|webm|x-matroska)|application\/octet-stream)$/i.test(type))return fail("الصيغ المدعومة: MP4 وMOV وWebM وMKV.",415);
@@ -800,8 +800,19 @@ function chooseVidiqAccount(balances:any[],minimumCredits:number){
 }
 
 
+async function ownerManagedChannels(ownerId:string){
+  // Read channel ownership directly through the server-side service-role Data API.
+  // This avoids depending on a public-schema RPC result shape for authorization checks.
+  const rows=await db(
+    "zoz_pro_managed_channels?owner_id=eq."+encodeURIComponent(ownerId)+
+    "&select=owner_id,channel_id,channel_title,display_name,niche,target_audience,default_language,content_tone,channel_goal,content_pillars,content_constraints,monetization_strategy,is_active,connection_status,last_synced_at,created_at,updated_at,vidiq_account_key"+
+    "&order=display_name.asc"
+  );
+  if(!Array.isArray(rows))throw new Error("Managed-channel registry returned an invalid response.");
+  return rows;
+}
 async function listManagedChannels(u:any){
- const rows=await db("zoz_pro_managed_channels?owner_id=eq."+encodeURIComponent(u.id)+"&select=id,channel_id,channel_title,display_name,niche,target_audience,default_language,content_tone,channel_goal,content_pillars,content_constraints,monetization_strategy,is_active,connection_status,last_synced_at,updated_at&order=channel_title.asc");
+ const rows=await ownerManagedChannels(u.id);
  const credentials=await db("zoz_pro_managed_channel_credentials?owner_id=eq."+encodeURIComponent(u.id)+"&select=channel_id,status,token_expires_at,updated_at");
  const legacy=await db("zoz_pro_youtube_analytics_tokens?owner_id=eq."+encodeURIComponent(u.id)+"&select=channel_id,status,token_expires_at,updated_at");
  const creds=new Map((Array.isArray(credentials)?credentials:[]).map((x:any)=>[String(x.channel_id),x]));
@@ -811,7 +822,7 @@ async function listManagedChannels(u:any){
 async function managedChannelConnect(req:Request,u:any){
  const b=await req.json().catch(()=>({})),channelId=String(b.channel_id||"");
  if(!/^UC[A-Za-z0-9_-]{22}$/.test(channelId))return fail("معرّف القناة غير صالح.",400);
- const channels=await db("zoz_pro_managed_channels?owner_id=eq."+encodeURIComponent(u.id)+"&channel_id=eq."+encodeURIComponent(channelId)+"&select=channel_id,channel_title,display_name&limit=1");
+ const channels=(await ownerManagedChannels(u.id)).filter((x:any)=>String(x.channel_id)===channelId);
  if(!channels?.[0])return fail("هذه القناة غير مسجلة ضمن قنوات المالك في ZOZ Pro.",404);
  if(!GOOGLE_CLIENT_ID||!GOOGLE_CLIENT_SECRET)return fail("إعداد OAuth في Supabase غير مكتمل؛ لم نبدأ التفويض.",503);
  const rawState=crypto.randomUUID()+"-"+crypto.randomUUID()+".mc."+channelId;
@@ -848,7 +859,7 @@ async function getManagedChannelToken(u:any,channelId:string){
 async function managedChannelSync(req:Request,u:any){
  const b=await req.json().catch(()=>({})),channelId=String(b.channel_id||"");
  if(!/^UC[A-Za-z0-9_-]{22}$/.test(channelId))return fail("معرّف القناة غير صالح.",400);
- const known=await db("zoz_pro_managed_channels?owner_id=eq."+encodeURIComponent(u.id)+"&channel_id=eq."+encodeURIComponent(channelId)+"&select=channel_id,channel_title,display_name,connection_status&limit=1");
+ const known=(await ownerManagedChannels(u.id)).filter((x:any)=>String(x.channel_id)===channelId);
  if(!known?.[0])return fail("القناة غير مسجلة لهذا المالك في ZOZ Pro.",404);
  try{
   const token=await getManagedChannelToken(u,channelId),access=token.access_token;
@@ -888,7 +899,7 @@ function newsXml(v:string){return String(v||"").replace(/<!\[CDATA\[([\s\S]*?)\]
 function newsField(xml:string,tag:string){const m=xml.match(new RegExp("<"+tag+"\\b[^>]*>([\\s\\S]*?)</"+tag+">","i"));return m?newsXml(m[1]):"";}
 async function managedPoliticalNews(req:Request,u:any){
  const b=await req.json().catch(()=>({})),cid=String(b.channel_id||POLITICAL_CHANNEL_ID);if(cid!==POLITICAL_CHANNEL_ID)return fail("بحث الأخبار السياسية متاح للقناة السياسية فقط.",403);
- const known=await db("zoz_pro_managed_channels?owner_id=eq."+encodeURIComponent(u.id)+"&channel_id=eq."+encodeURIComponent(cid)+"&select=channel_id,display_name,niche&limit=1");if(!known?.[0])return fail("القناة السياسية غير مسجلة.",404);if(String(known[0].niche||"").includes("وجهة القناة قيد التحقق"))return fail("تم تعليق اكتشاف الأخبار السياسية لهذه القناة لأن اسم YouTube الفعلي هو «فكره كيدز»؛ أكّد وجهة القناة أولًا.",409);
+ const known=(await ownerManagedChannels(u.id)).filter((x:any)=>String(x.channel_id)===cid);if(!known?.[0])return fail("القناة السياسية غير مسجلة.",404);if(String(known[0].niche||"").includes("وجهة القناة قيد التحقق"))return fail("تم تعليق اكتشاف الأخبار السياسية لهذه القناة لأن اسم YouTube الفعلي هو «فكره كيدز»؛ أكّد وجهة القناة أولًا.",409);
  const feeds=[{name:"BBC Arabic Middle East",url:"https://feeds.bbci.co.uk/arabic/middleeast/rss.xml"},{name:"BBC Arabic World",url:"https://feeds.bbci.co.uk/arabic/world/rss.xml"},{name:"Google News Egypt Politics",url:"https://news.google.com/rss/search?q=Egypt%20politics%20when%3A7d&hl=en-US&gl=US&ceid=US:en"},{name:"Google News Arabic Politics",url:"https://news.google.com/rss/search?q=%D8%A7%D9%84%D8%B3%D9%8A%D8%A7%D8%B3%D8%A9%20%D9%85%D8%B5%D8%B1%20when%3A7d&hl=ar&gl=EG&ceid=EG:ar"},{name:"Google News World Politics",url:"https://news.google.com/rss/search?q=world%20politics%20when%3A7d&hl=en-US&gl=US&ceid=US:en"}];
  const results=await Promise.all(feeds.map(async f=>{try{const r=await fetch(f.url,{headers:{"user-agent":"ZOZPro-NewsResearch/1.0"},signal:AbortSignal.timeout(6500)});if(!r.ok)throw new Error("HTTP "+r.status);const xml=await r.text(),blocks=[...xml.matchAll(/<item\b[\s\S]*?<\/item>/gi)].map(m=>m[0]),items:any[]=[];for(const block of blocks){const title=newsField(block,"title"),url=newsField(block,"link"),pub=newsField(block,"pubDate"),summary=newsField(block,"description");if(!title||!/^https:\/\//i.test(url))continue;const dt=pub?new Date(pub):null;if(dt&&Number.isFinite(dt.getTime())&&dt.getTime()<Date.now()-10*86400000)continue;items.push({title,url,published_at:dt&&Number.isFinite(dt.getTime())?dt.toISOString():null,summary:summary.slice(0,1400),feed_url:f.url,source_name:f.name});if(items.length>=10)break;}return {source:f.name,ok:true,count:items.length,items};}catch(e){return {source:f.name,ok:false,count:0,items:[],error:e instanceof Error?e.message:"feed failed"};}}));
  const all:any[]=[],seen=new Set<string>();for(const r of results)for(const x of r.items){const k=x.url.split("#")[0];if(!seen.has(k)){seen.add(k);all.push({...x,url:k});}}all.sort((a,b)=>String(b.published_at||"").localeCompare(String(a.published_at||"")));
@@ -1001,8 +1012,8 @@ async function localContentStudio(req:Request,u:any){
 }
 async function listLocalContentStudio(req:Request,u:any){
  const body=await req.json().catch(()=>({})),channelId=String(body.channel_id||CHANNEL_ID);
- const known=await db("zoz_pro_managed_channels?owner_id=eq."+encodeURIComponent(u.id)+"&channel_id=eq."+encodeURIComponent(channelId)+"&select=channel_id&limit=1");
- if(!known?.[0])return fail("القناة غير مسجلة لهذا المالك.",404);
+ const known=(await ownerManagedChannels(u.id)).filter((x:any)=>String(x.channel_id)===channelId);
+ if(!known[0])return fail("القناة غير مسجلة لهذا المالك.",404);
  const rows=await db("zoz_pro_content_scripts?owner_id=eq."+encodeURIComponent(u.id)+"&channel_id=eq."+encodeURIComponent(channelId)+"&select=id,channel_id,topic,title,status,created_at,generation_method,production_package&order=created_at.desc&limit=30");
  return json({ok:true,channel_id:channelId,scripts:rows||[]});
 }
@@ -1128,10 +1139,16 @@ async function intakeStatus(req:Request,u:any){
 }
 async function intakeList(req:Request,u:any){
  const body=await req.json().catch(()=>({})),channelId=String(body.channel_id||CHANNEL_ID);
- const known=await db("zoz_pro_managed_channels?owner_id=eq."+encodeURIComponent(u.id)+"&channel_id=eq."+encodeURIComponent(channelId)+"&select=channel_id&limit=1");
- if(!known?.[0])return fail("القناة غير مسجلة لهذا المالك.",404);
+ if(!/^UC[A-Za-z0-9_-]{22}$/.test(channelId))return fail("معرّف القناة المستهدفة غير صالح.",400);
+ const knownRows=await db(
+  "zoz_pro_managed_channels?owner_id=eq."+encodeURIComponent(u.id)+
+  "&channel_id=eq."+encodeURIComponent(channelId)+
+  "&select=channel_id,display_name,channel_title,is_active&limit=1"
+ );
+ const known=Array.isArray(knownRows)?knownRows[0]:null;
+ if(!known)return fail("القناة غير مسجلة لهذا المالك في ZOZ Pro. لم يتم السماح بالوصول إلى ملفات قناة أخرى.",404);
  const rows=await db("zoz_pro_video_intake_assets?owner_id=eq."+encodeURIComponent(u.id)+"&channel_id=eq."+encodeURIComponent(channelId)+"&select=id,channel_id,source_name,original_filename,total_bytes,uploaded_bytes,chunk_count,uploaded_parts,status,title,description,target_privacy_status,youtube_video_id,youtube_processing_status,youtube_failure_reason,last_error,metadata,created_at,updated_at,published_at,archived_at&order=created_at.desc&limit=100");
- return json({ok:true,channel_id:channelId,assets:rows||[]});
+ return json({ok:true,channel_id:channelId,channel_display_name:known.display_name||known.channel_title||"Hazem Ahmed",assets:rows||[]});
 }
 
 async function intakeReview(req:Request,u:any){
@@ -1151,7 +1168,7 @@ async function intakeSourceCreate(req:Request,u:any){
  const b=await req.json().catch(()=>({})),name=intakeText(b.source_name,120),channelId=String(u.is_intake_source?u.channel_id:(b.channel_id||CHANNEL_ID));
  if(u.is_intake_source)return fail("مراكز الإنتاج لا يمكنها إنشاء رموز مراكز أخرى.",403);
  if(!name)return fail("Provide the production center name.",400);
- const known=await db("zoz_pro_managed_channels?owner_id=eq."+encodeURIComponent(u.id)+"&channel_id=eq."+encodeURIComponent(channelId)+"&select=channel_id&limit=1");
+ const known=(await ownerManagedChannels(u.id)).filter((x:any)=>String(x.channel_id)===channelId);
  if(!known?.[0])return fail("القناة غير مسجلة لهذا المالك.",404);
  const token="zoz_intake_"+crypto.randomUUID().replace(/-/g,"")+crypto.randomUUID().replace(/-/g,"");
  const rows=await db("zoz_pro_video_intake_sources",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({owner_id:u.id,channel_id:channelId,source_name:name,secret_hash:await sha(token),is_active:true})});
