@@ -10,7 +10,7 @@
     </queries>
     <application
         android:allowBackup="false"
-        android:label="ZOZ Pro Bridge 0.7.9"
+        android:label="ZOZ Pro Bridge 0.8.1"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
@@ -19,6 +19,12 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="zozpro" android:host="voiceover" />
             </intent-filter>
         </activity>
             <service
