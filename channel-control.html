@@ -1247,14 +1247,33 @@ async function mergeAIVideoAndQueue(){
   $('intake-tags').value='مصر القديمة، الحضارة المصرية، التاريخ المصري، Ancient Egypt';
   $('intake-kids').value=$('ai-video-kids').value;$('intake-synthetic').value=$('ai-video-synthetic').value;$('intake-privacy').value='unlisted';
   showPage('intake');
-  notice('ai-video-msg','اكتمل دمج المشاهد الثلاثة والتعليق في MP4 واحد، وتم نقله إلى بوابة الاستقبال. اضغط «رفع الفيديو إلى مركز ZOZ Pro» لإرساله للمراجعة؛ لن ينشر تلقائيًا.','good');
-  notice('intake-msg','وصل ملف الفيديو من محرك الإنتاج. راجع العنوان والوصف والإفصاح، ثم اضغط زر الاستقبال.','good');
+  notice('ai-video-msg','اكتمل الدمج. جارٍ رفع ملف MP4 تلقائيًا إلى مساحة الاستقبال الخاصة…','');
+  try{
+   await uploadIntakeFile();
+   notice('ai-video-msg','اكتمل إنشاء MP4 ورفعه تلقائيًا إلى مركز ZOZ Pro. الملف الآن في انتظار مراجعة المالك؛ لم يبدأ رفعه إلى YouTube ولم يُنشر.','good');
+  }catch(uploadError){
+   notice('ai-video-msg','اكتمل إنشاء ودمج MP4، لكن تعثر رفعه إلى الاستقبال: '+(uploadError?.message||'خطأ غير معروف')+'. الملف ما زال في الهاتف؛ اضغط زر الرفع لإعادة المحاولة.','warn');
+  }
  }finally{b.disabled=false;}
 }
 $('ai-video-generate')?.addEventListener('click',async()=>{try{await generateAIVideoPreview();}catch(e){notice('ai-video-msg',e.message||'فشل توليد المشاهد أو الصوت.','bad');}});
 $('ai-video-merge')?.addEventListener('click',async()=>{try{await mergeAIVideoAndQueue();}catch(e){notice('ai-video-msg',e.message||'تعذر دمج الفيديو والصوت.','bad');}});
 
- $('intake-file')?.addEventListener('change',()=>{const f=$('intake-file').files?.[0];if(!f)return;const title=$('intake-title');if(title&&!title.value.trim()){title.value=f.name.replace(/\\.[^.]+$/,'').replace(/[_-]+/g,' ').slice(0,100);}notice('intake-msg','تم اختيار الملف: '+f.name+' ('+(f.size/1024/1024).toFixed(1)+' MB). راجع بيانات النشر ثم ارفع الفيديو.','good');});
+ $('intake-file')?.addEventListener('change',async()=>{
+ const f=$('intake-file').files?.[0];if(!f)return;
+ const title=$('intake-title');if(title&&!title.value.trim())title.value=f.name.replace(/\\.[^.]+$/,'').replace(/[_-]+/g,' ').slice(0,100);
+ notice('intake-msg','تم اختيار الملف: '+f.name+' ('+(f.size/1024/1024).toFixed(1)+' MB).','good');
+ if($('intake-kids')?.value!==''&&$('intake-synthetic')?.value!==''){
+  try{
+   await uploadIntakeFile();
+   notice('intake-msg','تم رفع الملف تلقائيًا إلى مساحة ZOZ Pro الخاصة. الملف في انتظار مراجعة المالك ولم يُنشر.','good');
+  }catch(error){
+   notice('intake-msg','تعثر الرفع التلقائي: '+(error?.message||'خطأ غير معروف')+'. يمكنك تصحيح البيانات ثم استخدام زر الرفع لإعادة المحاولة.','warn');
+  }
+ }else{
+  notice('intake-msg','قبل بدء الرفع التلقائي، حدد هل الفيديو موجّه للأطفال وهل يحتوي على مشاهد اصطناعية/مولدة بالذكاء الاصطناعي.','warn');
+ }
+});
 $('intake-upload')?.addEventListener('click',async()=>{try{await uploadIntakeFile();}catch(e){notice('intake-progress',e.message||'تعذر رفع الملف.','bad');notice('intake-msg','لم يكتمل الاستقبال؛ راجع رسالة الخطأ قبل إعادة المحاولة.','warn');}});
 $('intake-refresh')?.addEventListener('click',async()=>{try{await loadIntakeAssets();notice('intake-msg','تم تحديث قائمة الاستقبال.','good');}catch(e){notice('intake-msg',e.message||'تعذر تحميل القائمة.','bad');}});
 $('intake-refresh-list')?.addEventListener('click',async()=>{try{await loadIntakeAssets();}catch(e){notice('intake-msg',e.message||'تعذر تحميل القائمة.','bad');}});
