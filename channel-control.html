@@ -490,6 +490,25 @@ async function ownerSession(){
  return session;
 }
 
+// Keep the phone UI in sync with the same Supabase Auth session used by API requests.
+sb.auth.onAuthStateChange((event,session)=>{
+ if(event==='SIGNED_OUT'){
+  setSigned(false);
+  notice('login-msg','انتهت جلسة المالك. سجّل الدخول للمتابعة.','warn');
+  return;
+ }
+ if(event==='SIGNED_IN'){
+  const user=session&&session.user;
+  const isOwner=!!user&&String(user.email||'').toLowerCase()===OWNER&&!!user.email_confirmed_at;
+  if(isOwner){
+   setSigned(true);
+   notice('login-msg','تمت مزامنة جلسة المالك مع مركز التحكم.','good');
+  }else{
+   setSigned(false);
+  }
+ }
+});
+
 async function loadHFProviderStatus(){
  const button=$('zoz-hf-connect-btn');
  if(button)button.disabled=true;
