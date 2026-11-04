@@ -790,11 +790,13 @@ async function intakeApi(action,body){
  return await call(action,Object.assign({},body||{},{channel_id:channelId}));
 }
 function managedChannelId(){
- if(uploadMode){
-  const intakeTarget=String($('intake-target-channel')?.value||'');
-  if(ACTIVE_UPLOAD_CHANNELS.has(intakeTarget))return intakeTarget;
- }
- return $('managed-channel-selector')?.value||CHANNEL_ID;
+ // The upload target is the source of truth for intake operations.
+ // Keep the analytics selector as a fallback only when it is an active upload channel.
+ const intakeTarget=String($('intake-target-channel')?.value||'');
+ if(ACTIVE_UPLOAD_CHANNELS.has(intakeTarget))return intakeTarget;
+ const selected=String($('managed-channel-selector')?.value||'');
+ if(ACTIVE_UPLOAD_CHANNELS.has(selected))return selected;
+ return ACTIVE_UPLOAD_CHANNELS.has(CHANNEL_ID)?CHANNEL_ID:'';
 }
 $('managed-channel-selector')?.addEventListener('change',async()=>{try{if(ACTIVE_UPLOAD_CHANNELS.has(selectedChannelId()))setIntakeTargetChannel(selectedChannelId(),true);await loadStudioScripts();await loadIntakeAssets();await loadIntakeSources();}catch(e){notice('intake-msg',e.message||'تعذر تحديث بيانات القناة.','bad');}});
 function managedPayload(body){return Object.assign({channel_id:managedChannelId()},body||{});}
