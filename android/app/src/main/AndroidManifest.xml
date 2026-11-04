@@ -10,7 +10,7 @@
     </queries>
     <application
         android:allowBackup="false"
-        android:label="ZOZ App Control"
+        android:label="ZOZ Pro Bridge 0.7.9"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
