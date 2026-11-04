@@ -147,6 +147,16 @@ body.upload-mode .footer{font-size:11px}
  </select>
  <p class="small">فكره كيدز متوقفة حتى تأكيد وجهتها. كل قناة تستخدم تفويضها المستقل.</p>
  </section>
+<section class="card" id="huggingface-connection-card">
+ <div class="row"><h2>ربط محرك الفيديو LTX · Hugging Face</h2><span class="small">Read فقط · مسودات فقط</span></div>
+ <p>أنشئ رمزًا جديدًا من صفحة Hugging Face الرسمية بصلاحية Read فقط، ثم أدخله هنا داخل جلسة مالك ZOZ Pro. يتحقق النظام من الرمز مباشرة ويحفظه مشفرًا في Supabase Vault؛ لا يُحفظ في المتصفح ولا يظهر في سجل الأدوات. لا تستخدم رمز Inference الخاص بـ Qwen.</p>
+ <p><a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener noreferrer">فتح إعدادات رموز Hugging Face</a> · اختر New token ثم Read.</p>
+ <label for="zoz-hf-read-token">رمز Hugging Face Read</label>
+ <input id="zoz-hf-read-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="hf_..." maxlength="4096">
+ <div class="actions"><button type="button" id="zoz-hf-connect-btn">تحقق واحفظ الاتصال المشفر</button></div>
+ <div id="zoz-hf-connect-status" class="notice" role="status">لم يتم إرسال أي رمز بعد.</div>
+ <p class="small">نجاح الاتصال يفعّل LTX على مستوى المسودات فقط. التوليد يظل خاضعًا لتوفر مساحة Hugging Face المجانية والانتظار وحدود ZeroGPU، ولا يفعّل النشر العام.</p>
+</section>
 <section class="card" id="managed-channels-card">
  <div class="row"><h2>إدارة القنوات والتفويض المستقل</h2><div class="actions"><button type="button" id="managed-channels-refresh" class="secondary">تحديث حالة القنوات</button><button type="button" id="managed-channels-sync-all">مزامنة كل القنوات المفوضة</button></div></div>
  <p>كل قناة لها تفويض Google وتحليلات وسجل خاص بها. لا يقرأ المركز قناة أخرى إذا لم يطابق معرّف القناة الذي تحقق منه Google.</p>
@@ -469,6 +479,38 @@ async function ownerSession(){
  if(!user||String(user.email||'').toLowerCase()!==OWNER||!user.email_confirmed_at){await sb.auth.signOut();throw new Error('الجلسة ليست لحساب مالك ZOZ Pro المؤكد.');}
  return session;
 }
+const HF_PROVIDER_CONNECT_API=SUPABASE_URL+'/functions/v1/zoz-video-provider-connect';
+$('zoz-hf-connect-btn')?.addEventListener('click',async()=>{
+ const button=$('zoz-hf-connect-btn'),field=$('zoz-hf-read-token');
+ let token=String(field?.value||'').trim();
+ if(!/^hf_[A-Za-z0-9]{10,}$/.test(token)||token.length>4096){
+  if(field)field.value='';
+  notice('zoz-hf-connect-status','رمز غير صالح. أنشئ رمز Hugging Face جديدًا بصلاحية Read فقط.','warn');
+  return;
+ }
+ if(field)field.value='';
+ button.disabled=true;
+ notice('zoz-hf-connect-status','جارٍ التحقق من هوية الرمز وحفظه مشفرًا في Supabase Vault…');
+ try{
+  const session=await ownerSession();
+  const response=await fetch(HF_PROVIDER_CONNECT_API,{
+   method:'POST',
+   headers:{apikey:SUPABASE_PUBLISHABLE_KEY,authorization:'Bearer '+session.access_token,'content-type':'application/json'},
+   body:JSON.stringify({token}),
+   cache:'no-store',
+   credentials:'omit'
+  });
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||result.ok!==true)throw new Error(String(result.error||'تعذر إتمام ربط Hugging Face.'));
+  notice('zoz-hf-connect-status','تم التحقق من Hugging Face وحفظ الرمز في المخزن المشفر. الحساب: '+String(result.account||'متصل')+' · الصلاحية: مسودات فقط.','good');
+ }catch(error){
+  notice('zoz-hf-connect-status',error?.message||'تعذر ربط Hugging Face.','bad');
+ }finally{
+  token='';
+  if(field)field.value='';
+  button.disabled=false;
+ }
+});
 async function call(action,body){
  const session=await ownerSession(),channelId=selectedChannelId(),payload=Object.assign({channel_id:channelId},body||{});
  let route=action;
