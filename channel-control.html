@@ -51,6 +51,8 @@ body.upload-mode #page-intake #intake-file{border:2px dashed #648fce;padding:16p
 body.upload-mode #page-intake #intake-upload{min-height:50px;font-size:17px;width:100%}
 body.upload-mode #page-intake .card{padding:14px}
 body.upload-mode .footer{font-size:11px}
+/* Keep disabled experimental video engines and synthetic voiceover out of the production workflow. */
+#huggingface-connection-card,#ai-video-studio{display:none!important}
 /* Use the finished video as supplied; disable AI voiceover/post-production UI. */
 #zoz-postproduction-card{display:none!important}
 </style>
