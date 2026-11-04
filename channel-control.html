@@ -1904,6 +1904,7 @@ if(requestedPage==='tiktok'){
  showPage('tiktok',false);
 }
 
+ownerSession().then(()=>refreshDeviceAgent()).catch(()=>{});
 checkZozAgentHealth();
 
 })();
