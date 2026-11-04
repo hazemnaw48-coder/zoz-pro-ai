@@ -800,7 +800,7 @@ async function runZozPostproduction(){
  const source=$('intake-file').files&&$('intake-file').files[0];
  const narration=String($('zoz-postproduction-script').value||'').trim();
  if(!source)throw new Error('اختر ملف الفيديو المرئي من الهاتف أولًا.');
- if(!source.type.startsWith('video/')&&!/\\.(mp4|mov|webm|mkv)$/i.test(source.name))throw new Error('الملف المحدد ليس ملف فيديو معروفًا.');
+ if(!source.type.startsWith('video/')&&!/\.(mp4|mov|webm|mkv)$/i.test(source.name))throw new Error('الملف المحدد ليس ملف فيديو معروفًا.');
  if(source.size>850*1024*1024)throw new Error('حجم الفيديو يتجاوز الحد المسموح للمعالجة في المتصفح.');
  if(narration.length<40||narration.length>1800)throw new Error('نص التعليق يجب أن يكون بين 40 و1800 حرف.');
  const {data:sessionData,error:sessionError}=await sb.auth.getSession();
@@ -840,6 +840,7 @@ async function runZozPostproduction(){
   preview.append(video,download);
   status.textContent='4/4 — اكتمل الدمج. جارٍ إرسال النسخة النهائية إلى قائمة المراجعة الخاصة…';
   const transfer=new DataTransfer();transfer.items.add(finalFile);$('intake-file').files=transfer.files;
+  setIntakeTargetChannel(HAZEM_UPLOAD_CHANNEL_ID,false);
   $('intake-target-channel').value=HAZEM_UPLOAD_CHANNEL_ID;
   $('intake-title').value='سر اختراع الأزرق المصري — تكنولوجيا سبقت عصرها';
   $('intake-description').value='الأزرق المصري مش مجرد لون جميل؛ ده واحد من أقدم الأصباغ الصناعية اللي عرفها العالم. في الفيديو ده نكتشف إزاي المصري القديم صنع الصبغة الزرقاء واستخدمها في الخرز والتماثيل والزخارف.\n\n#مصر_القديمة #الأزرق_المصري #الحضارة_المصرية #تاريخ_مصر';
