@@ -97,7 +97,7 @@ body.upload-mode .footer{font-size:11px}
  <h3>وكيل إنتاج الفيديو · خطة ثم موافقة ثم تنفيذ</h3>
  <p>يختار الوكيل القناة المناسبة، ويعد السيناريو والهوية البصرية، ويقسم العمل إلى مقاطع منفصلة لا تتجاوز 8 ثوانٍ. لن يبدأ الإنتاج قبل موافقتك.</p>
  <div class="grid">
-  <div><label for="zoz-flow-channel">القناة</label><select id="zoz-flow-channel" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit"><option value="">اختيار الوكيل حسب الموضوع</option><option value="UC9fr5B0SZZkmVAApfCqEO3w">فِكرة — أفكار وذكاء اصطناعي</option><option value="UCIael48cvwPG3GkJ--c7HKw">Hazem Ahmed — مصر القديمة</option></select></div>
+  <div><label for="zoz-flow-channel">القناة</label><select id="zoz-flow-channel" style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit"><option value="">اختيار الوكيل حسب الموضوع</option><option value="UC9fr5B0SZZkmVAApfCqEO3w">فِكرة — أفكار وذكاء اصطناعي</option><option value="UCIael48cvwPG3gKj--c7HKw">Hazem Ahmed — مصر القديمة</option></select></div>
   <div><label for="zoz-flow-topic">موضوع الفيديو (اختياري)</label><input id="zoz-flow-topic" maxlength="240" placeholder="يختار الوكيل موضوعًا من التقويم إذا تركته فارغًا"></div>
  </div>
  <label for="zoz-flow-style">الهوية البصرية المطلوبة (اختياري)</label>
@@ -145,7 +145,7 @@ body.upload-mode .footer{font-size:11px}
   <div id="channel-status" class="notice">سيتم اختبار الاتصال من خلال طلب تحليلات للقراءة فقط.</div>
   <label for="managed-channel-selector">القناة النشطة لكل أقسام التحليل والفيديو والتقويم والتوصيات</label>
  <select id="managed-channel-selector" style="width:100%;padding:12px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;font:inherit">
- <option value="UCIael48cvwPG3GkJ--c7HKw">Hazem Ahmed — مصر القديمة</option>
+ <option value="UCIael48cvwPG3gKj--c7HKw">Hazem Ahmed — مصر القديمة</option>
  <option value="UC9fr5B0SZZkmVAApfCqEO3w">فكره 🗣️ — أفكار وذكاء اصطناعي</option>
  </select>
  <p class="small">فكره كيدز متوقفة حتى تأكيد وجهتها. كل قناة تستخدم تفويضها المستقل.</p>
@@ -273,7 +273,7 @@ body.upload-mode .footer{font-size:11px}
  <label for="intake-target-channel">القناة المستهدفة</label>
  <select id="intake-target-channel" style="width:100%;padding:11px;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px">
   <option value="UC9fr5B0SZZkmVAApfCqEO3w">فِكرة — أفكار وذكاء اصطناعي</option>
-  <option value="UCIael48cvwPG3GkJ--c7HKw" selected>Hazem Ahmed — مصر القديمة</option>
+  <option value="UCIael48cvwPG3gKj--c7HKw" selected>Hazem Ahmed — مصر القديمة</option>
   <option value="UC-FimUUFXRd0MOSoikzczcQ" disabled>فِكرة كيدز — متوقفة حتى تأكيد وجهة القناة</option>
  </select>
  <p id="intake-target-help" class="small">اختر القناة قبل تحديد الملف. لن يرسل المركز ملفًا إلى قناة كيدز ما دامت وجهتها غير مؤكدة.</p>
@@ -427,7 +427,7 @@ if(uploadMode)document.body.classList.add('upload-mode');
 const SUPABASE_URL='https://oxyzxbkwhafzaztraowc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm';
 const OWNER='hazemnaw48@gmail.com';
-let CHANNEL_ID='UCIael48cvwPG3GkJ--c7HKw';
+let CHANNEL_ID='UCIael48cvwPG3gKj--c7HKw';
 function selectedChannelId(){return String($('managed-channel-selector')?.value||CHANNEL_ID);}
 const API=SUPABASE_URL+'/functions/v1/zoz-pro-youtube-analytics';
 const AGENT_API=SUPABASE_URL+'/functions/v1/zoz-pro-agent';
@@ -435,7 +435,7 @@ const AGENT_CONTROL_API=SUPABASE_URL+'/functions/v1/zoz-pro-agent-control';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
 const $=id=>document.getElementById(id);
 const FEKRA_UPLOAD_CHANNEL_ID='UC9fr5B0SZZkmVAApfCqEO3w';
-const HAZEM_UPLOAD_CHANNEL_ID='UCIael48cvwPG3GkJ--c7HKw';
+const HAZEM_UPLOAD_CHANNEL_ID='UCIael48cvwPG3gKj--c7HKw';
 const KIDS_CHANNEL_ID='UC-FimUUFXRd0MOSoikzczcQ';
 const ACTIVE_UPLOAD_CHANNELS=new Set([FEKRA_UPLOAD_CHANNEL_ID,HAZEM_UPLOAD_CHANNEL_ID]);
 const requestedUploadChannel=String(pageParams.get('channel_id')||'');
@@ -601,7 +601,7 @@ async function startRequestedGoogleAuthorization(){
 }
 
 const MANAGED_CHANNELS=[
- {channel_id:'UCIael48cvwPG3GkJ--c7HKw',label:'Hazem Ahmed',purpose:'تاريخ مصر القديمة والآثار'},
+ {channel_id:'UCIael48cvwPG3gKj--c7HKw',label:'Hazem Ahmed',purpose:'تاريخ مصر القديمة والآثار'},
  {channel_id:'UC9fr5B0SZZkmVAApfCqEO3w',label:'فكره 🗣️',purpose:'أفكار مفيدة ومعلومات متنوعة وذكاء اصطناعي عملي'},
  {channel_id:'UC-FimUUFXRd0MOSoikzczcQ',label:'فِكرة كيدز — موقوفة لحين تأكيد الوجهة',purpose:'قراءة بيانات القناة فقط؛ لا إنتاج أو توصيات موضوعية قبل تأكيد المالك'}
 ];
