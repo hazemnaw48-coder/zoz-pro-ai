@@ -251,7 +251,7 @@ body.upload-mode .footer{font-size:11px}
  <div class="notice good" style="margin:10px 0">الرفع من الهاتف يتم داخل مركز ZOZ Pro باستخدام جلسة المالك المحفوظة. لا يستخدم هذا المسار vidIQ لرفع الملف. إرسال Fekra إلى TikTok متاح كخطوة منفصلة، ولا يعني النشر العام.</div>
  <div id="intake-msg" class="notice">يتم التحقق من جلسة المالك في مشروع الإنتاج…</div>
  <div class="section-gap"></div>
- <div class="notice" id="external-production-approved" style="margin:12px 0">مسار الإنتاج المعتمد: أنشئ المشاهد والتعليق الصوتي النهائي في Google Flow أو مركز فيديو خارجي مناسب، ثم صدّر ملف MP4 وارفعه أدناه إلى ZOZ Pro. يتولى المركز حفظ الملف وبيانات النشر والتحقق والمراجعة ورفع الفيديو إلى YouTube. أُخفيت تجربة التوليد الداخلي المحدودة لأن جودة المشاهد والدمج لم تكن مناسبة للنشر؛ لا توليد مدفوع ولا نشر عام تلقائي.</div>
+ <div class="notice" id="external-production-approved" style="margin:12px 0">مسار الإنتاج المعتمد: جهّز الفيديو النهائي بالصورة والصوت داخل Google Flow أو محرر خارجي، ثم صدّر ملف MP4 وارفعه كما هو أدناه إلى ZOZ Pro. لا ينشئ المركز تعليقًا صوتيًا ولا يغيّر صوت الملف. يتولى المركز حفظ الملف وبيانات النشر والتحقق والمراجعة ورفع الفيديو إلى YouTube. أُخفيت تجربة التوليد الداخلي المحدودة لأن جودة المشاهد والدمج لم تكن مناسبة للنشر؛ لا توليد مدفوع ولا نشر عام تلقائي.</div>
  <div class="card" id="ai-video-studio" style="display:none;border-color:#416fe0">
  <h3>محرك إنتاج فيديو بالذكاء الاصطناعي — تجربة مجانية محدودة</h3>
  <p>ينشئ مشهدًا بصريًا قصيرًا عبر LTX العام وتعليقًا صوتيًا عربيًا عبر مفاتيح Gemini الثلاثة بالتناوب، ثم يدمجهما محليًا في المتصفح ويجهزه في قائمة مراجعة ZOZ Pro. قد تتوقف خدمة الفيديو المجانية بسبب الطابور أو الحصة؛ لا يستخدم هذا المسار API فيديو مدفوعًا.</p>
@@ -278,15 +278,7 @@ body.upload-mode .footer{font-size:11px}
  </select>
  <p id="intake-target-help" class="small">اختر القناة قبل تحديد الملف. لن يرسل المركز ملفًا إلى قناة كيدز ما دامت وجهتها غير مؤكدة.</p>
  <label for="intake-file">اختر ملف الفيديو من الهاتف (MP4 أو MOV أو WebM أو MKV)</label><input id="intake-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,application/octet-stream"><p class="small" id="intake-final-file-note">ارفع ملف الفيديو النهائي بالصورة والصوت كما تريد نشره. مسار الاستقبال لا يولد تعليقًا صوتيًا ولا يغيّر صوت الفيديو.</p>
- <section class="card" id="zoz-postproduction-card">
-  <h3>إكمال الإنتاج النهائي — التعليق الصوتي والدمج والمعاينة</h3>
-  <p>اختر ملف الفيديو المرئي أعلاه، ثم أنشئ تعليقًا صوتيًا عربيًا مصريًا عبر Gemini. سيُدمج الصوت مع الصورة دون إعادة ترميز الفيديو، ثم يُعرض الملف النهائي ويُرفع إلى قائمة المراجعة الخاصة فقط.</p>
-  <label for="zoz-postproduction-script">نص التعليق الصوتي</label>
-  <textarea id="zoz-postproduction-script" rows="6" maxlength="1800" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit">تفتكر اللون الأزرق اللي بنشوفه على آثار مصر القديمة كان لازورد مطحون؟ مش دايمًا! المصري القديم ابتكر صبغة اسمها الأزرق المصري، ودي من أقدم الأصباغ الصناعية المعروفة. كانوا بيخلطوا رمل غني بالسيليكا مع مصدر للنحاس ومواد قلوية، وبعد التسخين في أفران خاصة بيتكوّن اللون الأزرق المميز. استخدموه في الخرز والتماثيل والزخارف. يعني اللون ده مش مجرد زينة؛ ده اختراع تكنولوجي من آلاف السنين!</textarea>
-  <div class="actions"><button type="button" id="zoz-postproduction-run">توليد الصوت ودمجه وتجهيز المعاينة</button></div>
-  <div id="zoz-postproduction-status" class="notice">لم يبدأ تجهيز النسخة النهائية. يلزم تسجيل دخول المالك واختيار ملف الفيديو أعلاه.</div>
-  <div id="zoz-postproduction-preview" class="stack"></div>
- </section>
+ 
  <label for="intake-title">عنوان الفيديو على YouTube</label><input id="intake-title" maxlength="100" value="ازاي تبني وكيل ذكاء اصطناعي من موبايلك مجانًا؟ 🤖📱 | تجربة عملية" placeholder="عنوان الفيديو النهائي">
  <label for="intake-description">وصف الفيديو</label><textarea id="intake-description" rows="4" maxlength="5000" style="width:100%;background:#0c1727;color:var(--text);border:1px solid #40536d;border-radius:10px;padding:11px;font:inherit">هل ينفع تحوّل موبايلك إلى مساعد ذكي ينفّذ مهام حقيقية؟
 
