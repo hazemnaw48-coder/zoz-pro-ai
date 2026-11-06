@@ -55,6 +55,22 @@ body.upload-mode .footer{font-size:11px}
 #huggingface-connection-card,#ai-video-studio{display:none!important}
 /* Use the finished video as supplied; disable AI voiceover/post-production UI. */
 #zoz-postproduction-card{display:none!important}
+
+/* ZOZ Pro Ad Studio */
+.ads-layout{display:grid;grid-template-columns:minmax(300px,.85fr) minmax(0,1.15fr);gap:18px;align-items:start}
+.ads-controls,.ads-preview{min-width:0;background:#0d1929;border:1px solid var(--line);border-radius:14px;padding:15px}
+.ads-controls h3,.ads-preview h3{margin:0 0 10px}
+.ads-controls textarea,.ads-controls input,.ads-controls select{width:100%;background:#091525;color:var(--text);border:1px solid #40536d;border-radius:9px;padding:10px;font:inherit}
+.ads-controls label{display:block;margin:10px 0 5px;font-size:13px;color:#c9d9eb}
+#ads-canvas{display:block;width:100%;height:auto;max-height:75vh;object-fit:contain;background:#080f1a;border:1px solid #40536d;border-radius:12px}
+#ad-canvas{display:block;width:100%;height:auto;max-height:75vh;object-fit:contain;background:#080f1a;border:1px solid #40536d;border-radius:12px}
+.ads-preview .actions button{flex:1 1 180px}
+.ad-saved-item{padding:11px;border:1px solid var(--line);border-radius:10px;background:#101e30}
+.ad-saved-item strong{display:block}
+.ad-saved-item small{color:var(--muted)}
+.ad-variant{padding:10px;border:1px solid var(--line);border-radius:10px;background:#101e30}
+.ad-variant p{white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:800px){.ads-layout{grid-template-columns:1fr}.ads-preview{order:-1}#ad-canvas{max-height:none}}
 </style>
 </head>
 <body>
@@ -136,6 +152,7 @@ body.upload-mode .footer{font-size:11px}
    <button type="button" class="section-tab" data-page-target="intake">١٠ · استقبال الفيديوهات</button>
    <button type="button" class="section-tab" data-page-target="tiktok">١١ · TikTok</button>
    <button type="button" class="section-tab" data-page-target="books">١٢ · الكتب وأمازون</button>
+   <button type="button" class="section-tab" data-page-target="ads">١٣ · استوديو الإعلانات</button>
    <a class="section-tab" href="./company-office.html" style="display:block;text-align:center;text-decoration:none">🏢 مكتب الشركة والوكلاء</a>
   </nav>
   <div id="page-indicator" class="page-indicator" aria-live="polite">القسم الحالي: حالة الربط · ١ من ١١</div>
@@ -415,6 +432,43 @@ body.upload-mode .footer{font-size:11px}
   </form><div id="books-report-msg" class="notice" style="margin-top:10px">لا تدخل قيمة العائدات إلا إذا ظهرت في التقرير.</div>
  </section>
  <section class="card"><h3>تنبيهات متابعة الكتب</h3><div id="books-alerts" class="stack"></div></section>
+</div>
+
+<div class="page-panel" data-page="ads" id="page-ads">
+ <section class="card">
+  <div class="row"><div><h2>١٣. استوديو الإعلانات والتصميم</h2><p class="small">إنشاء إعلانات عربية احترافية بمقاسات المنصات، كتابة إعلانية بالذكاء الاصطناعي، معاينة، حفظ وتصدير بجودة عالية.</p></div><span class="small">ZOZ PRO CREATIVE</span></div>
+  <div class="ads-layout">
+   <div class="ads-controls">
+    <h3>موجز الحملة</h3>
+    <label for="ad-title">اسم التصميم / الحملة</label><input id="ad-title" maxlength="160" value="حملة تعريف بخدمات ZOZ Pro">
+    <label for="ad-service">الخدمة أو المنتج</label><input id="ad-service" maxlength="180" value="تصميم وإنتاج محتوى وإعلانات رقمية احترافية">
+    <label for="ad-audience">الجمهور المستهدف</label><input id="ad-audience" maxlength="240" value="أصحاب المشروعات الصغيرة والمتاجر وصناع المحتوى">
+    <label for="ad-goal">هدف الإعلان</label><select id="ad-goal"><option value="awareness">زيادة الوعي بالعلامة</option><option value="leads">جذب عملاء محتملين</option><option value="sales">زيادة المبيعات والطلبات</option><option value="traffic">زيارات للموقع أو الصفحة</option><option value="engagement">التفاعل وبناء المجتمع</option></select>
+    <label for="ad-platform">المنصة</label><select id="ad-platform"><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="tiktok">TikTok</option><option value="linkedin">LinkedIn</option><option value="youtube">YouTube</option><option value="multi">متعدد المنصات</option></select>
+    <label for="ad-format">مقاس التصميم</label><select id="ad-format"><option value="portrait">منشور عمودي 4:5 · 1080×1350</option><option value="square">مربع 1:1 · 1080×1080</option><option value="story">ستوري / ريلز 9:16 · 1080×1920</option><option value="landscape">أفقي 16:9 · 1920×1080</option></select>
+    <label for="ad-template">الهوية البصرية</label><select id="ad-template"><option value="midnight">Midnight Luxury · كحلي وذهبي</option><option value="ocean">Digital Ocean · أزرق وفيروزي</option><option value="minimal">Clean Minimal · أبيض وأسود</option><option value="vibrant">Bold Energy · ألوان جريئة</option></select>
+    <label for="ad-tone">نبرة الإعلان</label><select id="ad-tone"><option value="احترافية وواثقة">احترافية وواثقة</option><option value="ودودة وقريبة">ودودة وقريبة</option><option value="فاخرة وراقية">فاخرة وراقية</option><option value="مباشرة وتحفيزية">مباشرة وتحفيزية</option></select>
+    <label for="ad-offer">العرض / السعر (اختياري)</label><input id="ad-offer" maxlength="300" placeholder="لا تضف عرضاً إذا لم يكن موجوداً">
+    <label for="ad-proof">ميزة أو دليل حقيقي (اختياري)</label><input id="ad-proof" maxlength="300" placeholder="مثال: نماذج أعمال منشورة أو خبرة مثبتة">
+    <label for="ad-headline">العنوان الرئيسي</label><textarea id="ad-headline" rows="2">حوّل فكرتك إلى حضور رقمي يلفت الانتباه</textarea>
+    <label for="ad-subheadline">العنوان المساند</label><textarea id="ad-subheadline" rows="2">استراتيجية ومحتوى وتصميمات إعلانية متكاملة لمشروعك</textarea>
+    <label for="ad-body">النص على التصميم</label><textarea id="ad-body" rows="3">نساعدك على تقديم مشروعك بصورة احترافية وبمحتوى يخاطب جمهورك.</textarea>
+    <label for="ad-cta">دعوة الإجراء</label><input id="ad-cta" maxlength="80" value="تواصل معنا وابدأ الآن">
+    <label for="ad-image">صورة المنتج أو العمل أو الخلفية</label><input id="ad-image" type="file" accept="image/png,image/jpeg,image/webp">
+    <p class="small">تُرفع الصور التي تختارها أنت فقط إلى مساحة خاصة بحسابك. لا نستخدم ملفات هاتفك دون اختيار.</p>
+    <div class="actions"><button id="ad-generate-copy">✦ كتابة الإعلان بالذكاء الاصطناعي</button><button id="ad-render" class="secondary">تحديث المعاينة</button></div>
+    <div id="ad-status" class="notice">عدّل النصوص ثم حدّث المعاينة أو اطلب من الوكيل كتابة نسخة إعلانية.</div>
+   </div>
+   <div class="ads-preview">
+    <div class="row"><h3>معاينة التصميم</h3><span class="small" id="ad-dimensions">1080 × 1350</span></div>
+    <canvas id="ad-canvas" width="1080" height="1350" aria-label="معاينة الإعلان"></canvas>
+    <div class="actions"><button id="ad-export" class="secondary">تنزيل PNG عالي الجودة</button><button id="ad-save">حفظ التصميم في ZOZ Pro</button></div>
+    <div id="ad-copy-variants" class="stack"></div>
+    <h3 class="section-gap">التصاميم المحفوظة</h3><div id="ad-saved-list" class="stack"><div class="empty">اضغط «تحديث التصاميم» لقراءة محفوظاتك.</div></div>
+    <button id="ad-refresh" class="secondary">تحديث التصاميم المحفوظة</button>
+   </div>
+  </div>
+ </section>
 </div>
 </div>
 <div class="footer small">إدارة محكومة: تبقى الفيديوهات خاصة حتى اكتمال مراجعة المالك وتأكيد النشر صراحةً. <span>·</span> <a href="https://github.com/hazemnaw48-coder/zoz-pro-ai/blob/main/ZOZ-PRO-EXECUTION-NOTES.md" target="_blank" rel="noopener">سجل تنفيذ المركز والملاحظات</a></div>
@@ -1920,6 +1974,124 @@ if(requestedPage==='tiktok'){
 ownerSession().then(()=>refreshDeviceAgent()).catch(()=>{});
 checkZozAgentHealth();
 
+
+/* ZOZ Pro Ad Studio: owner-authenticated copy, private assets, durable creative records. */
+const AD_API=SUPABASE_URL+'/functions/v1/zoz-ad-studio';
+const AD_BUCKET='zoz-pro-ad-studio';
+let adImage=null, adCopyPackage={}, adCurrentId=null;
+const adEl=id=>document.getElementById(id);
+const adVal=id=>String(adEl(id)?.value||'').trim();
+const adThemes={
+ midnight:{bg:'#081426',panel:'#102640',accent:'#d6b56f',accent2:'#f1dfb3',text:'#f7f3e9',muted:'#b6c5d7'},
+ ocean:{bg:'#061c2a',panel:'#0c3547',accent:'#38d6c5',accent2:'#8be9e0',text:'#f3ffff',muted:'#b8d7df'},
+ minimal:{bg:'#f4f3ef',panel:'#e4e2dc',accent:'#111827',accent2:'#334155',text:'#101827',muted:'#465363'},
+ vibrant:{bg:'#180d2b',panel:'#35144d',accent:'#ffbd4a',accent2:'#ff6d86',text:'#fff7ed',muted:'#e3cbe4'}
+};
+function adWrap(ctx,text,x,y,maxWidth,lineHeight,maxLines,font,color,align='right'){
+ ctx.font=font;ctx.fillStyle=color;ctx.textAlign=align;ctx.direction='rtl';
+ const words=String(text||'').split(/\s+/);let line='',lines=[];
+ for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word}else line=test}
+ if(line)lines.push(line);lines=lines.slice(0,maxLines);
+ lines.forEach((item,i)=>ctx.fillText(item,x,y+i*lineHeight,maxWidth));
+ return lines.length*lineHeight;
+}
+function adLoadImage(file){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src=URL.createObjectURL(file)})}
+async function adRender(){
+ const canvas=adEl('ad-canvas'),ctx=canvas.getContext('2d');if(!ctx)return;
+ const dims={portrait:[1080,1350],square:[1080,1080],story:[1080,1920],landscape:[1920,1080]}[adVal('ad-format')]||[1080,1350];
+ canvas.width=dims[0];canvas.height=dims[1];adEl('ad-dimensions').textContent=dims[0]+' × '+dims[1];
+ const t=adThemes[adVal('ad-template')]||adThemes.midnight,w=canvas.width,h=canvas.height;
+ const g=ctx.createLinearGradient(0,0,w,h);g.addColorStop(0,t.bg);g.addColorStop(1,t.panel);ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+ ctx.save();ctx.globalAlpha=.18;ctx.strokeStyle=t.accent;ctx.lineWidth=3;
+ for(let i=-h;i<w;i+=95){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i+h,h);ctx.stroke()}ctx.restore();
+ ctx.fillStyle=t.accent;ctx.beginPath();ctx.arc(w*.12,h*.16,Math.min(w,h)*.12,0,Math.PI*2);ctx.fill();ctx.globalAlpha=.13;ctx.fillRect(0,0,w,h);ctx.globalAlpha=1;
+ const margin=w*.085;let top=h*.09;
+ ctx.fillStyle=t.accent;ctx.font='700 '+Math.round(w*.024)+'px system-ui';ctx.textAlign='right';ctx.direction='rtl';ctx.fillText('ZOZ PRO  •  CREATIVE STUDIO',w-margin,top);
+ ctx.fillStyle=t.accent;ctx.fillRect(w-margin-w*.15,top+22,w*.15,5);
+ top+=h*.07;
+ if(adImage){
+  const areaY=h*.24,areaH=h*(adVal('ad-format')==='story'?.31:.35);
+  const iw=adImage.width,ih=adImage.height,scale=Math.max(w*.82/iw,areaH/ih),dw=iw*scale,dh=ih*scale;
+  ctx.save();ctx.beginPath();ctx.roundRect(margin,areaY,w-2*margin,areaH,24);ctx.clip();ctx.drawImage(adImage,margin+(w-2*margin-dw)/2,areaY+(areaH-dh)/2,dw,dh);
+  const overlay=ctx.createLinearGradient(0,areaY,0,areaY+areaH);overlay.addColorStop(0,'#00000000');overlay.addColorStop(1,t.bg+'cc');ctx.fillStyle=overlay;ctx.fillRect(margin,areaY,w-2*margin,areaH);ctx.restore();
+  top=areaY+areaH+h*.07;
+ }else{
+  ctx.save();ctx.strokeStyle=t.accent;ctx.globalAlpha=.65;ctx.lineWidth=Math.max(5,w*.008);
+  const cx=w*.5,cy=h*.32,r=Math.min(w,h)*.14;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(cx,cy,r*.72,0,Math.PI*2);ctx.stroke();ctx.fillStyle=t.accent;ctx.font='800 '+Math.round(r*.7)+'px system-ui';ctx.textAlign='center';ctx.fillText('ZOZ',cx,cy+r*.24);ctx.restore();
+  top=h*.53;
+ }
+ const title=adVal('ad-headline'),sub=adVal('ad-subheadline'),body=adVal('ad-body');
+ const titleSize=Math.round(w*(adVal('ad-format')==='story'?.075:.068));
+ const titleHeight=adWrap(ctx,title,w-margin,top,w-2*margin,titleSize*1.2,3,'800 '+titleSize+'px system-ui',t.text);
+ top+=titleHeight+h*.022;
+ top+=adWrap(ctx,sub,w-margin,top,w-2*margin,Math.round(w*.038),3,'600 '+Math.round(w*.036)+'px system-ui',t.accent2);
+ top+=h*.025;
+ adWrap(ctx,body,w-margin,top,w-2*margin,Math.round(w*.032),3,'400 '+Math.round(w*.029)+'px system-ui',t.muted);
+ const cta=adVal('ad-cta')||'تواصل معنا';
+ const ctaW=w*.66,ctaH=h*.075,ctaX=(w-ctaW)/2,ctaY=h*.84;
+ ctx.fillStyle=t.accent;ctx.beginPath();ctx.roundRect(ctaX,ctaY,ctaW,ctaH,ctaH/2);ctx.fill();
+ ctx.fillStyle=adVal('ad-template')==='minimal'?'#ffffff':'#081426';ctx.font='800 '+Math.round(w*.034)+'px system-ui';ctx.textAlign='center';ctx.direction='rtl';ctx.fillText(cta,w/2,ctaY+ctaH*.64,ctaW*.9);
+ ctx.fillStyle=t.muted;ctx.font='500 '+Math.round(w*.018)+'px system-ui';ctx.fillText(adVal('ad-service')||'ZOZ Pro',w/2,h*.94,w*.82);
+}
+function adBrief(){return {service:adVal('ad-service'),audience:adVal('ad-audience'),goal:adVal('ad-goal'),platform:adVal('ad-platform'),tone:adVal('ad-tone'),offer:adVal('ad-offer'),proof:adVal('ad-proof'),language:'ar-EG'}}
+async function adGenerateCopy(){
+ const b=adEl('ad-generate-copy');b.disabled=true;notice('ad-status','الوكيل يكتب الحزمة الإعلانية ويراجع الادعاءات…','warn');
+ try{
+  const session=await ownerSession();
+  const response=await fetch(AD_API,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,authorization:'Bearer '+session.access_token,'content-type':'application/json'},body:JSON.stringify({action:'generate_copy',brief:adBrief()}),signal:AbortSignal.timeout(40000)});
+  const data=await response.json().catch(()=>({}));if(!response.ok||!data.ok)throw new Error(data.error||'تعذر توليد النص الإعلاني.');
+  adCopyPackage=data.copy_package||data.copy||{};
+  const c=data.copy||{};
+  for(const [id,key] of [['ad-headline','headline'],['ad-subheadline','subheadline'],['ad-body','body_copy'],['ad-cta','call_to_action']])if(c[key])adEl(id).value=c[key];
+  adRender();adRenderVariants(c.variants||[],c);
+  notice('ad-status','تم إعداد النص الإعلاني عبر '+data.model+'؛ راجع النص والحقائق قبل اعتماد التصميم.','good');
+ }catch(e){notice('ad-status','تعذر توليد النص: '+(e.message||String(e)),'bad')}
+ finally{b.disabled=false}
+}
+function adRenderVariants(variants,copy){
+ const host=adEl('ad-copy-variants');if(!host)return;host.innerHTML='';
+ const summary=copy?.visual_direction?'<div class="notice"><strong>التوجيه الفني:</strong> '+esc(copy.visual_direction)+'</div>':'';
+ host.insertAdjacentHTML('beforeend',summary);
+ (Array.isArray(variants)?variants:[]).slice(0,3).forEach((v,i)=>{
+  const el=document.createElement('div');el.className='ad-variant';el.innerHTML='<strong>نسخة بديلة '+(i+1)+'</strong><p>'+esc(v.headline||'')+'\n'+esc(v.primary_text||'')+'\n'+esc(v.call_to_action||'')+'</p><button type="button" class="secondary" data-ad-variant="'+i+'">استخدام هذه النسخة</button>';host.appendChild(el);
+ });
+}
+async function adSave(){
+ const b=adEl('ad-save');b.disabled=true;
+ try{
+  await adRender();const session=await ownerSession();const {data:{user},error:userErr}=await sb.auth.getUser(session.access_token);if(userErr||!user?.id)throw userErr||new Error('تعذر تحديد مالك التصميم.');
+  const id=crypto.randomUUID(),base=user.id+'/'+id;let assetPath=null;
+  const imageFile=adEl('ad-image').files?.[0];
+  if(imageFile){if(!/^image\/(png|jpeg|webp)$/.test(imageFile.type))throw new Error('الصيغ المدعومة PNG وJPG وWebP.');if(imageFile.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');assetPath=base+'/source-'+Date.now()+'.'+(imageFile.type==='image/jpeg'?'jpg':imageFile.type.split('/')[1]);const {error}=await sb.storage.from(AD_BUCKET).upload(assetPath,imageFile,{contentType:imageFile.type,upsert:false});if(error)throw error;}
+  const png=await new Promise((resolve,reject)=>adEl('ad-canvas').toBlob(blob=>blob?resolve(blob):reject(new Error('تعذر تصدير التصميم إلى PNG.')),'image/png'));
+  const exportPath=base+'/creative.png';const {error:pngError}=await sb.storage.from(AD_BUCKET).upload(exportPath,png,{contentType:'image/png',upsert:false});if(pngError)throw pngError;
+  const record={id,owner_id:user.id,title:adVal('ad-title')||'تصميم إعلاني',service_name:adVal('ad-service'),target_audience:adVal('ad-audience'),campaign_goal:adVal('ad-goal'),platform:adVal('ad-platform'),format_key:adVal('ad-format'),template_key:adVal('ad-template'),headline:adVal('ad-headline'),subheadline:adVal('ad-subheadline'),body_copy:adVal('ad-body'),call_to_action:adVal('ad-cta'),copy_package:adCopyPackage||{},design_json:{width:adEl('ad-canvas').width,height:adEl('ad-canvas').height,tone:adVal('ad-tone'),offer:adVal('ad-offer'),proof:adVal('ad-proof'),render_version:1},asset_path:assetPath,export_path:exportPath,status:'draft'};
+  const {data,error}=await sb.from('zoz_pro_ad_creatives').insert(record).select('id,title,created_at').single();if(error)throw error;
+  adCurrentId=data.id;notice('ad-status','تم حفظ التصميم والنسخة الأصلية وملف PNG في مساحة خاصة. رقم التصميم: '+data.id,'good');await adLoadSaved();
+ }catch(e){notice('ad-status','لم يكتمل الحفظ: '+(e.message||String(e)),'bad')}
+ finally{b.disabled=false}
+}
+async function adLoadSaved(){
+ const host=adEl('ad-saved-list');host.innerHTML='جارٍ تحميل التصاميم…';
+ try{
+  const {data,error}=await sb.from('zoz_pro_ad_creatives').select('id,title,service_name,platform,format_key,status,created_at,export_path').order('updated_at',{ascending:false}).limit(30);if(error)throw error;
+  if(!data?.length){host.innerHTML='<div class="empty">لا توجد تصاميم محفوظة بعد.</div>';return}
+  host.innerHTML='';data.forEach(item=>{const el=document.createElement('div');el.className='ad-saved-item';el.innerHTML='<strong>'+esc(item.title)+'</strong><small>'+esc(item.service_name)+' · '+esc(item.platform)+' · '+esc(item.format_key)+' · '+new Date(item.created_at).toLocaleDateString('ar-EG')+'</small><div class="actions"><button type="button" class="secondary" data-ad-download="'+esc(item.id)+'">تنزيل PNG</button></div>';host.appendChild(el)});
+ }catch(e){host.innerHTML='<div class="empty">تعذر تحميل المحفوظات: '+esc(e.message||String(e))+'</div>'}
+}
+async function adDownloadSaved(id){
+ try{const {data,error}=await sb.from('zoz_pro_ad_creatives').select('export_path,title').eq('id',id).single();if(error)throw error;const {data:file,error:dlError}=await sb.storage.from(AD_BUCKET).download(data.export_path);if(dlError)throw dlError;const url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download=(data.title||'ZOZ-Ad').replace(/[^\p{L}\p{N}-]+/gu,'-')+'.png';a.click();URL.revokeObjectURL(url)}catch(e){notice('ad-status','تعذر تنزيل التصميم المحفوظ: '+e.message,'bad')}
+}
+adEl('ad-render')?.addEventListener('click',()=>adRender().then(()=>notice('ad-status','تم تحديث المعاينة.','good')));
+adEl('ad-generate-copy')?.addEventListener('click',adGenerateCopy);
+adEl('ad-save')?.addEventListener('click',adSave);
+adEl('ad-refresh')?.addEventListener('click',adLoadSaved);
+adEl('ad-export')?.addEventListener('click',async()=>{await adRender();const a=document.createElement('a');a.href=adEl('ad-canvas').toDataURL('image/png');a.download='ZOZ-Pro-Ad-'+adVal('ad-format')+'.png';a.click()});
+['ad-headline','ad-subheadline','ad-body','ad-cta','ad-format','ad-template','ad-service'].forEach(id=>adEl(id)?.addEventListener('input',()=>adRender()));
+adEl('ad-image')?.addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{if(!/^image\/(png|jpeg|webp)$/.test(f.type))throw new Error('اختر PNG أو JPG أو WebP.');adImage=await adLoadImage(f);await adRender();notice('ad-status','تم تحميل الصورة في المعاينة. لم تُرفع بعد إلى التخزين.','good')}catch(err){notice('ad-status',err.message||'تعذر تحميل الصورة.','bad')}});
+adEl('ad-copy-variants')?.addEventListener('click',e=>{const b=e.target.closest('[data-ad-variant]');if(!b)return;const v=adCopyPackage?.variants?.[Number(b.dataset.adVariant)];if(!v)return;adEl('ad-headline').value=v.headline||'';adEl('ad-body').value=v.primary_text||'';adEl('ad-cta').value=v.call_to_action||'';adRender()});
+adEl('ad-saved-list')?.addEventListener('click',e=>{const b=e.target.closest('[data-ad-download]');if(b)adDownloadSaved(b.dataset.adDownload)});
+adEl('section-nav')?.addEventListener('click',e=>{if(e.target.closest('[data-page-target="ads"]')){adRender();adLoadSaved()}});
 })();
 </script>
 </body>
