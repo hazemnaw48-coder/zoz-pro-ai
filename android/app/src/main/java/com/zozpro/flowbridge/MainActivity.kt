@@ -1382,7 +1382,7 @@ fun findLocalDownloadForAgent(payload: JSONObject): File {
         if (ext !in extensions) return@filter false
         if (exactName.isNotBlank() && !name.equals(exactName, ignoreCase = true)) return@filter false
         if (contains.isNotBlank() && !name.lowercase(Locale.ROOT).contains(contains)) return@filter false
-        if (file.lastModified() <= after || file.lastModified() > now - 60_000L) return@filter false
+        if (file.lastModified() <= after || file.lastModified() > now) return@filter false
         if (file.length() < minSize || file.length() > maxSize) return@filter false
         val canonical = runCatching { file.canonicalPath }.getOrNull() ?: return@filter false
         canonical.startsWith(rootPath + File.separator)
