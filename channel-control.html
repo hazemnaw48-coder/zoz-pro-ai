@@ -2379,72 +2379,97 @@ function kdpDate(value){
  return Number.isFinite(parsed.getTime())?parsed.toISOString().slice(0,10):null;
 }
 async function kdpDocAnalyze(id){
- const host=kdpDocEl('kdp-document-status');notice('kdp-document-status','جارٍ قراءة تقرير KDP ومطابقة الكتب…','warn');
+ notice('kdp-document-status','جارٍ فحص أوراق تقرير KDP واستخراج المؤشرات…','warn');
  try{
   const session=await ownerSession();
-  const {data:fileRow,error}=await sb.from('zoz_pro_document_intake_assets').select('id,filename,storage_path,checksum_sha256,mime_type').eq('id',id).single();if(error)throw error;
-  const {data:blob,error:downloadError}=await sb.storage.from(KDP_DOC_BUCKET).download(fileRow.storage_path);if(downloadError)throw downloadError;
-  let rows=[];
+  const {data:fileRow,error}=await sb.from('zoz_pro_document_intake_assets')
+   .select('id,filename,storage_path,checksum_sha256,mime_type').eq('id',id).single();
+  if(error)throw error;
+  const {data:blob,error:downloadError}=await sb.storage.from(KDP_DOC_BUCKET).download(fileRow.storage_path);
+  if(downloadError)throw downloadError;
   const filename=String(fileRow.filename||'').toLowerCase();
+  let sheetRows=[],diagnostics=[];
   if(filename.endsWith('.csv')){
-   rows=kdpParseCsv(await blob.text());
+   const rows=kdpParseCsv(await blob.text());
+   sheetRows=[{name:'CSV',headers:Object.keys(rows[0]||{}),rows,header_row:1}];
+   diagnostics=[{name:'CSV',header_row:1,headers:Object.keys(rows[0]||{}),rows:rows.length}];
   }else if(filename.endsWith('.xlsx')||filename.endsWith('.xls')){
    const XLSX=await ensureKdpXlsx();
    const workbook=XLSX.read(await blob.arrayBuffer(),{type:'array',cellDates:false});
-   const scored=workbook.SheetNames.map(name=>{
-    const data=XLSX.utils.sheet_to_json(workbook.Sheets[name],{defval:'',raw:false});
-    const normalized=data.map(row=>Object.fromEntries(Object.entries(row).map(([key,value])=>[String(key).replace(/[\s_()-]+/g,' ').trim().toLowerCase(),String(value??'').trim()])));
-    const headers=Object.keys(normalized[0]||{});
-    const score=(headers.some(h=>h.includes('asin'))?2:0)+(headers.some(h=>h.includes('title'))?2:0)+(headers.some(h=>h.includes('unit')||h.includes('royalt')||h.includes('earning')||h.includes('kenp')||h.includes('page'))?2:0);
-    return {name,rows:normalized,score};
-   }).sort((a,b)=>b.score-a.score);
-   if(!scored.length||scored[0].score<4)throw new Error('لم أجد أعمدة التقرير المتوقعة في أول صف من الورقة. يلزم فحص كل الأوراق وصفوف العناوين قبل استنتاج أن الملف غير مدعوم.');
-   rows=scored[0].rows;
-  }else{
-   throw new Error('امتداد التقرير غير مدعوم للتحليل. الملف محفوظ دون تعديل سجل الكتب.');
+   sheetRows=kdpReadWorkbook(XLSX,workbook);
+   diagnostics=sheetRows.map(x=>({name:x.name,header_row:x.header_row,headers:x.headers,rows:x.rows.length}));
+  }else throw new Error('امتداد التقرير غير مدعوم.');
+  const entries=[];
+  for(const sheet of sheetRows)for(const row of sheet.rows||[])entries.push({sheet:sheet.name,row});
+  if(!entries.length){
+   const result={status:'needs_review',parser_version:'kdp-flex-v3',file_fingerprint:fileRow.checksum_sha256,analyzed_at:new Date().toISOString(),message:'لم يتم اكتشاف جدول يحتوي عنوان/ASIN ومؤشرات مبيعات. لا توجد أرقام محفوظة.',detected_sheets:diagnostics};
+   await sb.from('zoz_pro_document_intake_assets').update({processing_result:result}).eq('id',id).eq('owner_id',session.user.id);
+   notice('kdp-document-status','لم يتم اكتشاف جدول مبيعات واضح في أوراق الملف. لم تُسجل أرقام بالتخمين.','warn');
+   await kdpDocRefresh();return {ok:false,needs_review:true,error:result.message};
   }
-  if(!rows.length)throw new Error('ورقة التقرير لا تحتوي صفوف بيانات قابلة للقراءة.');
-  const {data:books,error:booksError}=await sb.from('zoz_pro_books').select('id,title,asin,marketplace').order('created_at');if(booksError)throw booksError;
-  let saved=0,review=0,duplicates=0;
-  for(const row of rows){
-   const asin=kdpField(row,['asin','asin isbn']);const title=kdpField(row,['title','book title','ebook title']);
-   let candidates=books.filter(b=>asin&&String(b.asin||'').toUpperCase()===asin.toUpperCase());
-   if(!candidates.length&&title)candidates=books.filter(b=>String(b.title||'').trim().toLowerCase()===title.trim().toLowerCase());
-   if(candidates.length!==1){review++;continue}
-   const units=kdpNumber(kdpField(row,['units sold','units ordered','paid units','units']));
-   const royalties=kdpNumber(kdpField(row,['net earnings','estimated royalties','royalties','royalty','net royalties','royalty amount']));
-   const pages=kdpNumber(kdpField(row,['kenp pages read','pages read','kenp read']));
-   if(units===null&&royalties===null&&pages===null){review++;continue}
-   const rowDate=kdpField(row,['order date','report date','transaction date','date']);
-   const start=kdpField(row,['start date','period start','report start date'])||rowDate;
-   const end=kdpField(row,['end date','period end','report end date'])||rowDate;
-   const date=s=>{if(!s)return null;const d=new Date(String(s).trim());return Number.isFinite(d.getTime())?d.toISOString().slice(0,10):null};
-   const response=await fetch(AGENT_API,{
-    method:'POST',
+  const {data:books,error:booksError}=await sb.from('zoz_pro_books').select('id,title,asin,marketplace').eq('owner_id',session.user.id);
+  if(booksError)throw booksError;
+  const asinMap=new Map((books||[]).filter(x=>x.asin).map(x=>[String(x.asin).trim().toUpperCase(),x]));
+  const titleMap=new Map((books||[]).map(x=>[kdpTitleKey(x.title),x]));
+  const grouped=new Map();let unmatched=0,metricRows=0;
+  const unmatchedSamples=[];
+  for(const entry of entries){
+   const row=entry.row||{};
+   let asin=String(kdpField(row,['asin','asin isbn','isbn'])||'').trim().toUpperCase();
+   if(!asin){const m=Object.values(row).join(' ').toUpperCase().match(/\bB0[A-Z0-9]{8}\b/);if(m)asin=m[0];}
+   const title=String(kdpField(row,['title','book title','ebook title','product title','book name'])||'').trim();
+   const book=(asin&&asinMap.get(asin))||(!asin&&title?titleMap.get(kdpTitleKey(title)):null)||(title?titleMap.get(kdpTitleKey(title)):null);
+   const units=kdpMetric(row,'units'),royalties=kdpMetric(row,'royalties'),pages=kdpMetric(row,'pages');
+   if(units===null&&royalties===null&&pages===null)continue;
+   metricRows++;
+   if(!book){unmatched++;if(unmatchedSamples.length<15)unmatchedSamples.push({sheet:entry.sheet,asin:asin||null,title:title||null});continue;}
+   let g=grouped.get(book.id);
+   if(!g){g={book,metrics:{units:{},royalties:{},pages:{}},start:null,end:null,marketplaces:new Set(),rows:0};grouped.set(book.id,g);}
+   g.rows++;
+   const dateValue=kdpField(row,['royalty date','order date','report date','transaction date','date']);
+   const start=kdpDate(kdpField(row,['start date','period start','report start date'])||dateValue);
+   const end=kdpDate(kdpField(row,['end date','period end','report end date'])||dateValue);
+   if(start&&(!g.start||start<g.start))g.start=start;
+   if(end&&(!g.end||end>g.end))g.end=end;
+   const market=String(kdpField(row,['marketplace','store'])||book.marketplace||'Amazon.com').trim();if(market)g.marketplaces.add(market);
+   for(const [key,value] of [['units',units],['royalties',royalties],['pages',pages]]){
+    if(value===null)continue;
+    if((key==='units'||key==='pages')&&(!Number.isInteger(value)||value<0))continue;
+    g.metrics[key][entry.sheet]=(g.metrics[key][entry.sheet]||0)+value;
+   }
+  }
+  const chooseMetric=(g,key)=>{
+   const values=Object.entries(g.metrics[key]);if(!values.length)return null;
+   const priority=name=>{
+    const n=String(name).toLowerCase();
+    if(key==='units')return /order|sales|combined|dashboard/.test(n)?3:1;
+    if(key==='royalties')return /royalt|earning|payment|combined|dashboard/.test(n)?3:1;
+    return /kenp|read|pages|combined|dashboard/.test(n)?3:1;
+   };
+   values.sort((a,b)=>priority(b[0])-priority(a[0]));
+   return values[0][1];
+  };
+  let saved=0,duplicates=0;const imported=[];
+  for(const g of grouped.values()){
+   const units=chooseMetric(g,'units'),royalties=chooseMetric(g,'royalties'),pages=chooseMetric(g,'pages');
+   if(units===null&&royalties===null&&pages===null)continue;
+   const response=await fetch(AGENT_API,{method:'POST',
     headers:{apikey:SUPABASE_PUBLISHABLE_KEY,authorization:'Bearer '+session.access_token,'content-type':'application/json'},
-    body:JSON.stringify({
-     action:'record_book_snapshot',
-     book_id:candidates[0].id,
-     units_sold:units,
-     royalties_amount:royalties,
-     pages_read:pages,
-     period_start:date(start),
-     period_end:date(end),
-     marketplace:kdpField(row,['marketplace','store'])||candidates[0].marketplace||'Amazon.com',
-     source:'kdp_report_import',
-     file_fingerprint:fileRow.checksum_sha256,
-     notes:'Imported from Android Downloads: '+fileRow.filename+'; matched by ASIN or exact title.'
-    }),
+    body:JSON.stringify({action:'record_book_snapshot',book_id:g.book.id,units_sold:units,royalties_amount:royalties,pages_read:pages,period_start:g.start,period_end:g.end,marketplace:g.marketplaces.size===1?[...g.marketplaces][0]:'Multiple marketplaces',source:'kdp_report_import',file_fingerprint:fileRow.checksum_sha256,notes:'Imported from owner-uploaded KDP workbook; matched against registered ASIN/title. Worksheet totals are selected by metric-specific sheet priority.'}),
     signal:AbortSignal.timeout(25000)
    });
    const result=await response.json().catch(()=>({}));
-   if(!response.ok||!result.ok)throw new Error(result.error||'تعذر حفظ صف التقرير.');
+   if(!response.ok||!result.ok)throw new Error(result.error||'تعذر حفظ بيانات '+g.book.title);
    if(result.duplicate)duplicates++;else saved++;
+   imported.push({book_id:g.book.id,title:g.book.title,units_sold:units,royalties_amount:royalties,pages_read:pages,period_start:g.start,period_end:g.end,duplicate:!!result.duplicate});
   }
-  notice('kdp-document-status','اكتمل تحليل '+rows.length+' صفًا: حُفظ '+saved+'، مكرر '+duplicates+'، يحتاج مراجعة '+review+'. لم تُدخل الصفوف غير المطابقة.','good');
-  try{const {error:markError}=await sb.from('zoz_pro_document_intake_assets').update({processing_result:{status:'processed',file_fingerprint:fileRow.checksum_sha256,analyzed_at:new Date().toISOString(),total_rows:rows.length,saved,duplicates,review}}).eq('id',id).eq('owner_id',session.user.id);if(markError)console.warn('KDP import processed marker could not be saved:',markError.message);}catch(markError){console.warn('KDP import processed marker could not be saved:',markError);}
+  const status=(saved+duplicates)>0?'processed':'needs_review';
+  const processing={status,parser_version:'kdp-flex-v3',file_fingerprint:fileRow.checksum_sha256,analyzed_at:new Date().toISOString(),total_rows:entries.length,rows_with_metrics:metricRows,saved,duplicates,review:unmatched,book_count:grouped.size,book_results:imported,unmatched_rows:unmatchedSamples,detected_sheets:diagnostics,note:unmatched?'حُفظت الصفوف المطابقة فقط؛ توجد صفوف تحتاج مراجعة.':'تمت مطابقة الصفوف المتاحة.'};
+  const {error:markError}=await sb.from('zoz_pro_document_intake_assets').update({status:status==='processed'?'processed':'ready',processing_result:processing}).eq('id',id).eq('owner_id',session.user.id);
+  if(markError)throw markError;
+  notice('kdp-document-status','انتهى التحليل: '+saved+' محفوظ، '+duplicates+' مكرر، '+unmatched+' للمراجعة.','good');
   await kdpDocRefresh();if(typeof loadBooksDashboard==='function')await loadBooksDashboard();
-  return {ok:true,saved,duplicates,review,total:rows.length};
+  return {ok:status==='processed',saved,duplicates,review:unmatched,total:entries.length};
  }catch(e){
   notice('kdp-document-status','تعذر تحليل التقرير: '+(e.message||String(e)),'bad');
   return {ok:false,error:e.message||String(e)};
@@ -2460,7 +2485,7 @@ async function processPendingKdpReportsOnLogin(){
   if(!ownerId)throw new Error('تعذر تحديد مالك جلسة الاستيراد.');
   const {data:assets,error}=await sb.from('zoz_pro_document_intake_assets')
    .select('id,filename,checksum_sha256,processing_result,created_at')
-   .eq('owner_id',ownerId).eq('source','android_downloads_picker').eq('status','ready')
+   .eq('owner_id',ownerId).eq('source','android_downloads_picker').in('status',['ready','processed'])
    .order('created_at',{ascending:false}).limit(20);
   if(error)throw error;
   const seen=new Set();
@@ -2470,7 +2495,7 @@ async function processPendingKdpReportsOnLogin(){
    const fingerprint=String(asset.checksum_sha256||'').toLowerCase();
    if(!/^[a-f0-9]{64}$/.test(fingerprint)||seen.has(fingerprint))continue;
    seen.add(fingerprint);
-   if(asset.processing_result&&asset.processing_result.status==='processed')continue;
+   if(asset.processing_result&&['processed','needs_review'].includes(asset.processing_result.status)&&asset.processing_result.parser_version==='kdp-flex-v3')continue;
    const result=await kdpDocAnalyze(asset.id);
    if(!result||!result.ok)console.warn('Pending KDP report analysis failed:',asset.filename,result&&result.error);
   }
