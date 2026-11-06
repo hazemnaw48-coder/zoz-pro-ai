@@ -2219,7 +2219,6 @@ async function ensureKdpXlsx(){
  return await kdpXlsxLoader;
 }
 function kdpEscape(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
-const kdpEscape=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const kdpDocEl=id=>document.getElementById(id);
 const kdpDocMime=(file)=>{
  const ext=(file.name.split('.').pop()||'').toLowerCase();
