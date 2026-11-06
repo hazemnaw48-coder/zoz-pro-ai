@@ -2282,18 +2282,18 @@ async function kdpDocUpload(){
  finally{button.disabled=false}
 }
 function kdpParseCsv(text){
- const first=(text.split(/\r?\n/,1)[0]||'');const candidates=[',',';','\\t'];const delimiter=candidates.sort((a,b)=>first.split(b).length-first.split(a).length)[0];
+ const first=(text.split(/\r?\n/,1)[0]||'');const candidates=[',',';','\t'];const delimiter=candidates.sort((a,b)=>first.split(b).length-first.split(a).length)[0];
  const rows=[];let row=[],field='',quoted=false;
- for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++}else quoted=!quoted}else if(ch===delimiter&&!quoted){row.push(field);field=''}else if((ch==='\\n'||ch==='\\r')&&!quoted){if(ch==='\\r'&&text[i+1]==='\\n')i++;row.push(field);if(row.some(x=>String(x).trim()))rows.push(row);row=[];field=''}else field+=ch}
+ for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++}else quoted=!quoted}else if(ch===delimiter&&!quoted){row.push(field);field=''}else if((ch==='\n'||ch==='\r')&&!quoted){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(field);if(row.some(x=>String(x).trim()))rows.push(row);row=[];field=''}else field+=ch}
  row.push(field);if(row.some(x=>String(x).trim()))rows.push(row);
  if(rows.length<2)throw new Error('الملف لا يحتوي صفوف بيانات قابلة للقراءة.');
- const norm=s=>String(s||'').replace(/^\\uFEFF/,'').trim().toLowerCase().replace(/[\\s_()-]+/g,' ');
+ const norm=s=>String(s||'').replace(/^\uFEFF/,'').trim().toLowerCase().replace(/[\s_()-]+/g,' ');
  const headers=rows[0].map(norm);
  return rows.slice(1).map(cells=>Object.fromEntries(headers.map((h,i)=>[h,String(cells[i]||'').trim()])));
 }
 function kdpNormHeader(value){
- return String(value??'').replace(/^\\uFEFF/,'').normalize('NFKC').trim().toLowerCase()
-  .replace(/[’'"`]/g,'').replace(/[\\s_()[\\]{}:;,.\\/\\\\-]+/g,' ').replace(/\\s+/g,' ').trim();
+ return String(value??'').replace(/^\uFEFF/,'').normalize('NFKC').trim().toLowerCase()
+  .replace(/[’'"`]/g,'').replace(/[\s_()[\]{}:;,.\/\\-]+/g,' ').replace(/\s+/g,' ').trim();
 }
 function kdpField(row,keys){
  const entries=Object.keys(row||{});
@@ -2312,12 +2312,12 @@ function kdpField(row,keys){
 function kdpNumber(value){
  if(value===null||value===undefined)return null;
  let raw=String(value).trim();
- if(!raw||/^(?:-|—|n\\/a|na)$/i.test(raw))return null;
- const negative=/^\\s*\\(.*\\)\\s*$/.test(raw);
- raw=raw.replace(/[()$£€¥\\s\\u00a0]/g,'').replace(/[^\\d,.\\-]/g,'');
+ if(!raw||/^(?:-|—|n\/a|na)$/i.test(raw))return null;
+ const negative=/^\s*\(.*\)\s*$/.test(raw);
+ raw=raw.replace(/[()$£€¥\s\u00a0]/g,'').replace(/[^\d,.\-]/g,'');
  if(!raw||raw==='-')return null;
  const comma=raw.lastIndexOf(','),dot=raw.lastIndexOf('.');
- if(comma>=0&&dot>=0){raw=comma>dot?raw.replace(/\\./g,'').replace(',','.'):raw.replace(/,/g,'')}
+ if(comma>=0&&dot>=0){raw=comma>dot?raw.replace(/\./g,'').replace(',','.'):raw.replace(/,/g,'')}
  else if(comma>=0){raw=raw.length-comma-1===2?raw.replace(',','.'):raw.replace(/,/g,'')}
  const n=Number(raw);
  return Number.isFinite(n)?(negative?-Math.abs(n):n):null;
@@ -2370,8 +2370,8 @@ function kdpMetric(row,kind){
  return key?kdpNumber(row[key]):null;
 }
 function kdpTitleKey(value){
- return String(value||'').normalize('NFKD').toLowerCase().replace(/[\\u0300-\\u036f]/g,'')
-  .replace(/[^a-z0-9]+/g,' ').trim().replace(/\\s+/g,' ');
+ return String(value||'').normalize('NFKD').toLowerCase().replace(/[\u0300-\u036f]/g,'')
+  .replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
 }
 function kdpDate(value){
  if(!value)return null;
