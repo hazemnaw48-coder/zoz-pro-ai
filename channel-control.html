@@ -536,7 +536,7 @@ function showPage(pageKey, scrollTop=true){
  if(indicator)indicator.textContent='القسم الحالي: '+label+' · '+step+' من '+tabs.length;
  if(scrollTop)window.scrollTo(0,0);
 }
-function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage(uploadMode?'intake':(requestedPage==='tiktok'?'tiktok':'connection'),false);notice('intake-msg',uploadMode?'الجلسة متصلة. اختر ملف الفيديو ثم اضغط «رفع الفيديو للمراجعة والنشر».':'جلسة المالك متصلة بمشروع الإنتاج.','good');if(!uploadMode){if(requestedPage==='tiktok')loadTikTokAccounts();else{loadManagedChannels();loadHFProviderStatus();}}}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
+function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage(uploadMode?'intake':(requestedPage==='tiktok'?'tiktok':(requestedPage==='ads'?'ads':'connection')),false);notice('intake-msg',uploadMode?'الجلسة متصلة. اختر ملف الفيديو ثم اضغط «رفع الفيديو للمراجعة والنشر».':'جلسة المالك متصلة بمشروع الإنتاج.','good');if(!uploadMode){if(requestedPage==='tiktok')loadTikTokAccounts();else{loadManagedChannels();loadHFProviderStatus();}if(requestedPage==='ads'){adRender();adLoadSaved();}}}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
 async function ownerSession(){
  const {data,error}=await sb.auth.getSession();if(error)throw error;const session=data&&data.session;
  if(!session||!session.access_token)throw new Error('لا توجد جلسة مالك محفوظة. سجّل الدخول بحساب مالك ZOZ Pro.');
@@ -2083,8 +2083,21 @@ async function adLoadSaved(){
   host.innerHTML='';data.forEach(item=>{const el=document.createElement('div');el.className='ad-saved-item';el.innerHTML='<strong>'+esc(item.title)+'</strong><small>'+esc(item.service_name)+' · '+esc(item.platform)+' · '+esc(item.format_key)+' · '+new Date(item.created_at).toLocaleDateString('ar-EG')+'</small><div class="actions"><button type="button" class="secondary" data-ad-download="'+esc(item.id)+'">تنزيل PNG</button></div>';host.appendChild(el)});
  }catch(e){host.innerHTML='<div class="empty">تعذر تحميل المحفوظات: '+esc(e.message||String(e))+'</div>'}
 }
+async function adEditSaved(id){
+ try{
+  const {data,error}=await sb.from('zoz_pro_ad_creatives').select('id,title,service_name,target_audience,campaign_goal,platform,format_key,template_key,headline,subheadline,body_copy,call_to_action,copy_package,design_json,asset_path,logo_path').eq('id',id).single();if(error)throw error;
+  const fields={'ad-title':'title','ad-service':'service_name','ad-audience':'target_audience','ad-goal':'campaign_goal','ad-platform':'platform','ad-format':'format_key','ad-template':'template_key','ad-headline':'headline','ad-subheadline':'subheadline','ad-body':'body_copy','ad-cta':'call_to_action'};
+  for(const [field,key] of Object.entries(fields)){if(data[key]!=null&&adEl(field))adEl(field).value=data[key]}
+  adCopyPackage=data.copy_package||{};adImage=null;adLogo=null;adEl('ad-image').value='';adEl('ad-logo').value='';
+  if(data.asset_path){const {data:file,error:e}=await sb.storage.from(AD_BUCKET).download(data.asset_path);if(e)throw e;adImage=await adLoadImage(file)}
+  if(data.logo_path){const {data:file,error:e}=await sb.storage.from(AD_BUCKET).download(data.logo_path);if(e)throw e;adLogo=await adLoadImage(file)}
+  await adRender();adRenderVariants(adCopyPackage?.variants||[],adCopyPackage);
+  notice('ad-status','تم فتح التصميم المحفوظ للتعديل. الحفظ ينشئ نسخة جديدة حتى لا يضيع الأصل.','good');
+  adEl('ad-title').scrollIntoView({behavior:'smooth',block:'center'});
+ }catch(e){notice('ad-status','تعذر فتح التصميم: '+(e.message||String(e)),'bad')}
+}
 async function adDownloadSaved(id){
- try{const {data,error}=await sb.from('zoz_pro_ad_creatives').select('export_path,title').eq('id',id).single();if(error)throw error;const {data:file,error:dlError}=await sb.storage.from(AD_BUCKET).download(data.export_path);if(dlError)throw dlError;const url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download=(data.title||'ZOZ-Ad').replace(/[^\p{L}\p{N}-]+/gu,'-')+'.png';a.click();URL.revokeObjectURL(url)}catch(e){notice('ad-status','تعذر تنزيل التصميم المحفوظ: '+e.message,'bad')}
+ try{const {data,error}=await sb.from('zoz_pro_ad_creatives').select('export_path,title').eq('id',id).single();if(error)throw error;const {data:file,error:dlError}=await sb.storage.from(AD_BUCKET).download(data.export_path);if(dlError)throw dlError;const url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download=(data.title||'ZOZ-Ad').replace(/[^\\p{L}\\p{N}-]+/gu,'-')+'.png';a.click();URL.revokeObjectURL(url)}catch(e){notice('ad-status','تعذر تنزيل التصميم المحفوظ: '+e.message,'bad')}
 }
 adEl('ad-render')?.addEventListener('click',()=>adRender().then(()=>notice('ad-status','تم تحديث المعاينة.','good')));
 adEl('ad-generate-copy')?.addEventListener('click',adGenerateCopy);
@@ -2095,7 +2108,7 @@ adEl('ad-export')?.addEventListener('click',async()=>{await adRender();const a=d
 adEl('ad-logo')?.addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{if(!/^image\/(png|jpeg|webp)$/.test(f.type))throw new Error('اختر شعار PNG أو JPG أو WebP.');adLogo=await adLoadImage(f);await adRender();notice('ad-status','تم تحميل الشعار في المعاينة. سيُحفظ داخل مساحة التصميم الخاصة.','good')}catch(err){notice('ad-status',err.message||'تعذر تحميل الشعار.','bad')}});
 adEl('ad-image')?.addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{if(!/^image\/(png|jpeg|webp)$/.test(f.type))throw new Error('اختر PNG أو JPG أو WebP.');adImage=await adLoadImage(f);await adRender();notice('ad-status','تم تحميل الصورة في المعاينة. لم تُرفع بعد إلى التخزين.','good')}catch(err){notice('ad-status',err.message||'تعذر تحميل الصورة.','bad')}});
 adEl('ad-copy-variants')?.addEventListener('click',e=>{const b=e.target.closest('[data-ad-variant]');if(!b)return;const v=adCopyPackage?.variants?.[Number(b.dataset.adVariant)];if(!v)return;adEl('ad-headline').value=v.headline||'';adEl('ad-body').value=v.primary_text||'';adEl('ad-cta').value=v.call_to_action||'';adRender()});
-adEl('ad-saved-list')?.addEventListener('click',e=>{const b=e.target.closest('[data-ad-download]');if(b)adDownloadSaved(b.dataset.adDownload)});
+adEl('ad-saved-list')?.addEventListener('click',e=>{const edit=e.target.closest('[data-ad-edit]');if(edit){adEditSaved(edit.dataset.adEdit);return}const download=e.target.closest('[data-ad-download]');if(download)adDownloadSaved(download.dataset.adDownload)});
 adEl('section-nav')?.addEventListener('click',e=>{if(e.target.closest('[data-page-target="ads"]')){adRender();adLoadSaved()}});
 })();
 </script>
