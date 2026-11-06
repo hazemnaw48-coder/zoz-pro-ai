@@ -5,7 +5,7 @@ A native Android companion to the existing ZOZ Pro production project. It is an 
 
 ## Production backend now deployed
 - Project: `oxyzxbkwhafzaztraowc`.
-- New Edge Function: `zoz-pro-device-agent`, ACTIVE v3, `verify_jwt=false` because it validates either the existing owner JWT or a one-time pairing code / hashed device token itself.
+- Production Edge Function: `zoz-pro-device-agent`, ACTIVE v32, `verify_jwt=false` at the edge because the function validates the owner JWT or the device-bound hashed token internally.
 - Additive production tables:
   - `zoz_pro_device_registry`
   - `zoz_pro_device_credentials` (no direct client access; hashed tokens only)
@@ -16,13 +16,13 @@ A native Android companion to the existing ZOZ Pro production project. It is an 
   - `zoz_pro_android_app_builds`
 - A device pairing challenge is 32 hexadecimal characters, expires in five minutes, and is atomically consumed once.
 - Pair exchange creates a device-bound credential and a separate intake-only token scoped to the Hazem Ahmed channel. Only hashes are stored server-side.
-- Production function versions: `zoz-pro-device-agent` v5, `zoz-pro-agent` v39, `zoz-pro-agent-control` v6, `zoz-pro-youtube-analytics` v46.
+- The current device-agent deployment version verified for this acceptance record is v32. Older version numbers below are historical release notes, not current deployment claims.
 - Device credentials and intake tokens are stored in Android Keystore AES-GCM encrypted preferences.
 - Owner can list/revoke devices and enqueue typed tasks from the current control center. Revocation also disables the device's associated intake source.
-- Job capabilities currently allow only `device.health_check`, `flow.open`, and `flow.copy_prompt`; the app does not accept arbitrary code, shell commands, JavaScript, or tap coordinates.
+- The device-agent allow-list includes `device.health_check`, `device.ui_control`, `flow.generate_scene`, and `media.downloads.upload`; document intake registers `document.intake.upload` after storage finalization. The phone does not accept arbitrary code, shell commands, JavaScript, or raw tap coordinates.
 - Device polling is scheduled with Android WorkManager at the platform minimum interval of 15 minutes and can also be triggered while the app is open. Android may defer background work due to Doze, battery optimization, or vendor policies.
 - ZOZ agent v39 can queue up to six scene-specific Flow prompts for a recent saved draft to a paired device. The phone stores them as a durable local prompt queue, avoiding overwrite when more than one scene is waiting.
-- Upload capability is separate from the job queue: the paired app can transfer a completed MP4 through the existing resumable ZOZ intake API using its channel-scoped intake token. The asset enters `ready_for_review`; the existing ZOZ owner review and private-upload pipeline remains in force.
+- The paired app can also execute a queued `media.downloads.upload` task: it scans only the public `Downloads` directory, selects the latest eligible complete document/video matching the task filters, verifies stability and SHA-256, and transfers the file through the private document or channel-scoped video intake path. Existing owner review and private-upload rules remain in force.
 
 ## Android app implementation
 - Native Kotlin / Jetpack Compose project at `android/`, package `com.zozpro.flowbridge`.
@@ -40,17 +40,16 @@ A native Android companion to the existing ZOZ Pro production project. It is an 
 - No public YouTube publication, privacy changes, purchases, destructive actions, or account security changes are performed automatically.
 
 ## Validation status
-- Android debug APK build has succeeded previously for the earlier scaffold. A newer build containing device pairing, local assembly, and intake upload is currently being validated by GitHub Actions; do not distribute an APK until the matching latest workflow run is green and its artifact is verified.
+- Android v0.8.3 / versionCode 28 build passed GitHub Actions run `42197568489` on 2026-11-06 (commit `5c301fa2296381fb1f82123e763e421083ca23fd`; artifact ID `13492612548`). The paired vivo V2342 reported the same installed app version.
 - General repository CI has passed for the current feature branch commits.
 - Production migrations were applied additively; device/credential/job schema and owner-read policies were verified. Service-only credentials/challenges have no client policy by design.
-- Real-device pairing, file assembly across actual Flow samples, end-to-end upload, notification permission behavior, and 15-minute background execution still require a physical Android device test.
+- Real-device pairing and document Downloads intake are verified. The backend recorded `downloads_access_registered` with `capability_enabled=true`; a 10,435-byte XLSX reached private intake; subsequent automatic Downloads jobs succeeded with the same SHA-256 and duplicate protection. The latest recorded heartbeat was 2026-11-06 22:24:47 UTC (2026-11-07 00:24:47 Cairo), so that historical audit does not assert the phone is online at every later moment.
+- The automatic video Downloads branch is present in v0.8.3 but is not yet separately confirmed by a completed real-device video upload in the retrieved production logs. Real Flow clip assembly/playback and the full private YouTube upload path remain separate acceptance tests.
 
-## Next steps
-1. Verify latest APK build and install on the owner's Android phone.
-2. Pair through the existing ZOZ Pro control center and validate heartbeat/job polling.
-3. Test stream-copy assembly with real Flow clips; verify audio, duration, order, and output playback.
-4. Upload a test output to intake, approve it, and confirm the existing private YouTube upload pipeline.
-5. Only then extend approved device capabilities and evaluate a policy-compliant browser workflow for Flow/KDP.
+## Remaining acceptance work
+1. Test stream-copy assembly with representative real Flow clips; verify audio, duration, order, and output playback.
+2. Complete a separate real-device automatic Downloads-to-private-intake test for one video with its channel and synthetic-media disclosures.
+3. Approve a private video intake asset and verify the existing YouTube private-upload pipeline. Public publication remains a separate owner decision.
 
 
 ## Release v0.3.0 — 2026-10-30
