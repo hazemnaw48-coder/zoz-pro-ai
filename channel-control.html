@@ -453,6 +453,7 @@ body.upload-mode .footer{font-size:11px}
     <label for="ad-title">اسم التصميم / الحملة</label><input id="ad-title" maxlength="160" value="حملة تعريف بخدمات ZOZ Pro">
     <label for="ad-service">الخدمة أو المنتج</label><input id="ad-service" maxlength="180" value="تصميم وإنتاج محتوى وإعلانات رقمية احترافية">
     <label for="ad-audience">الجمهور المستهدف</label><input id="ad-audience" maxlength="240" value="أصحاب المشروعات الصغيرة والمتاجر وصناع المحتوى">
+    <label for="ad-sector-template">قالب جاهز حسب نوع النشاط</label><select id="ad-sector-template"><option value="">اختيار قالب...</option><option value="small-business">مشروع أو شركة صغيرة</option><option value="ecommerce">متجر إلكتروني / منتج</option><option value="creator">صانع محتوى</option><option value="local-service">خدمة محلية</option></select>
     <label for="ad-goal">هدف الإعلان</label><select id="ad-goal"><option value="awareness">زيادة الوعي بالعلامة</option><option value="leads">جذب عملاء محتملين</option><option value="sales">زيادة المبيعات والطلبات</option><option value="traffic">زيارات للموقع أو الصفحة</option><option value="engagement">التفاعل وبناء المجتمع</option></select>
     <label for="ad-platform">المنصة</label><select id="ad-platform"><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="tiktok">TikTok</option><option value="linkedin">LinkedIn</option><option value="youtube">YouTube</option><option value="multi">متعدد المنصات</option></select>
     <label for="ad-format">مقاس التصميم</label><select id="ad-format"><option value="portrait">منشور عمودي 4:5 · 1080×1350</option><option value="square">مربع 1:1 · 1080×1080</option><option value="story">ستوري / ريلز 9:16 · 1080×1920</option><option value="landscape">أفقي 16:9 · 1920×1080</option></select>
@@ -2079,7 +2080,7 @@ async function adSave(){
   if(imageFile){if(!/^image\/(png|jpeg|webp)$/.test(imageFile.type))throw new Error('الصيغ المدعومة PNG وJPG وWebP.');if(imageFile.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');assetPath=base+'/source-'+Date.now()+'.'+(imageFile.type==='image/jpeg'?'jpg':imageFile.type.split('/')[1]);const {error}=await sb.storage.from(AD_BUCKET).upload(assetPath,imageFile,{contentType:imageFile.type,upsert:false});if(error)throw error;}
   const png=await new Promise((resolve,reject)=>adEl('ad-canvas').toBlob(blob=>blob?resolve(blob):reject(new Error('تعذر تصدير التصميم إلى PNG.')),'image/png'));
   const exportPath=base+'/creative.png';const {error:pngError}=await sb.storage.from(AD_BUCKET).upload(exportPath,png,{contentType:'image/png',upsert:false});if(pngError)throw pngError;
-  const record={id,owner_id:user.id,title:adVal('ad-title')||'تصميم إعلاني',service_name:adVal('ad-service'),target_audience:adVal('ad-audience'),campaign_goal:adVal('ad-goal'),platform:adVal('ad-platform'),format_key:adVal('ad-format'),template_key:adVal('ad-template'),headline:adVal('ad-headline'),subheadline:adVal('ad-subheadline'),body_copy:adVal('ad-body'),call_to_action:adVal('ad-cta'),copy_package:adCopyPackage||{},design_json:{width:adEl('ad-canvas').width,height:adEl('ad-canvas').height,tone:adVal('ad-tone'),offer:adVal('ad-offer'),proof:adVal('ad-proof'),render_version:1},asset_path:assetPath,logo_path:logoPath,export_path:exportPath,status:'draft'};
+  const record={id,owner_id:user.id,title:adVal('ad-title')||'تصميم إعلاني',service_name:adVal('ad-service'),target_audience:adVal('ad-audience'),campaign_goal:adVal('ad-goal'),platform:adVal('ad-platform'),format_key:adVal('ad-format'),template_key:adVal('ad-template'),headline:adVal('ad-headline'),subheadline:adVal('ad-subheadline'),body_copy:adVal('ad-body'),call_to_action:adVal('ad-cta'),copy_package:adCopyPackage||{},design_json:{width:adEl('ad-canvas').width,height:adEl('ad-canvas').height,tone:adVal('ad-tone'),offer:adVal('ad-offer'),proof:adVal('ad-proof'),sector_template:adVal('ad-sector-template'),render_version:1},asset_path:assetPath,logo_path:logoPath,export_path:exportPath,status:'draft'};
   const {data,error}=await sb.from('zoz_pro_ad_creatives').insert(record).select('id,title,created_at').single();if(error)throw error;
   adCurrentId=data.id;notice('ad-status','تم حفظ التصميم والنسخة الأصلية وملف PNG في مساحة خاصة. رقم التصميم: '+data.id,'good');await adLoadSaved();
  }catch(e){notice('ad-status','لم يكتمل الحفظ: '+(e.message||String(e)),'bad')}
@@ -2098,7 +2099,7 @@ async function adEditSaved(id){
   const {data,error}=await sb.from('zoz_pro_ad_creatives').select('id,title,service_name,target_audience,campaign_goal,platform,format_key,template_key,headline,subheadline,body_copy,call_to_action,copy_package,design_json,asset_path,logo_path').eq('id',id).single();if(error)throw error;
   const fields={'ad-title':'title','ad-service':'service_name','ad-audience':'target_audience','ad-goal':'campaign_goal','ad-platform':'platform','ad-format':'format_key','ad-template':'template_key','ad-headline':'headline','ad-subheadline':'subheadline','ad-body':'body_copy','ad-cta':'call_to_action'};
   for(const [field,key] of Object.entries(fields)){if(data[key]!=null&&adEl(field))adEl(field).value=data[key]}
-  adCopyPackage=data.copy_package||{};adImage=null;adLogo=null;adEl('ad-image').value='';adEl('ad-logo').value='';
+  adCopyPackage=data.copy_package||{};if(data.design_json?.sector_template)adEl('ad-sector-template').value=data.design_json.sector_template;adImage=null;adLogo=null;adEl('ad-image').value='';adEl('ad-logo').value='';
   if(data.asset_path){const {data:file,error:e}=await sb.storage.from(AD_BUCKET).download(data.asset_path);if(e)throw e;adImage=await adLoadImage(file)}
   if(data.logo_path){const {data:file,error:e}=await sb.storage.from(AD_BUCKET).download(data.logo_path);if(e)throw e;adLogo=await adLoadImage(file)}
   await adRender();adRenderVariants(adCopyPackage?.variants||[],adCopyPackage);
@@ -2109,6 +2110,14 @@ async function adEditSaved(id){
 async function adDownloadSaved(id){
  try{const {data,error}=await sb.from('zoz_pro_ad_creatives').select('export_path,title').eq('id',id).single();if(error)throw error;const {data:file,error:dlError}=await sb.storage.from(AD_BUCKET).download(data.export_path);if(dlError)throw dlError;const url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download=(data.title||'ZOZ-Ad').replace(/[^\p{L}\p{N}-]+/gu,'-')+'.png';a.click();URL.revokeObjectURL(url)}catch(e){notice('ad-status','تعذر تنزيل التصميم المحفوظ: '+e.message,'bad')}
 }
+
+const adSectorTemplates={
+ 'small-business':{headline:'قدّم مشروعك بصورة احترافية',subheadline:'تصميم واضح يعرّف الناس بخدماتك',body:'اعرض ما تقدمه ولمن تقدمه وكيف يبدأ العميل التواصل معك، في رسالة بسيطة وسهلة القراءة.',cta:'تواصل معنا'},
+ ecommerce:{headline:'منتجك يستحق عرضًا أوضح',subheadline:'أبرز التفاصيل التي تساعد العميل على الاختيار',body:'اعرض مميزات المنتج ومقاساته وخياراته وسياسة الشحن كما هي معتمدة لديك، دون وعود غير مثبتة.',cta:'شاهد المنتج'},
+ creator:{headline:'خلّي فكرتك توصل بشكل أقوى',subheadline:'محتوى بصري ونص قصير يناسب جمهورك',body:'قدّم الفكرة في رسالة واحدة واضحة، واختم بدعوة بسيطة للمتابعة أو مشاهدة المحتوى.',cta:'تابع المحتوى'},
+ 'local-service':{headline:'خدمتك أقرب لعملائك',subheadline:'عرّف جمهورك بما تقدمه ومناطق خدمتك',body:'وضّح نوع الخدمة ونطاق التغطية وطريقة التواصل ومواعيد العمل المعتمدة.',cta:'اطلب التفاصيل'}
+};
+adEl('ad-sector-template')?.addEventListener('change',e=>{const p=adSectorTemplates[e.target.value];if(!p)return;adEl('ad-headline').value=p.headline;adEl('ad-subheadline').value=p.subheadline;adEl('ad-body').value=p.body;adEl('ad-cta').value=p.cta;adRender();notice('ad-status','تم تحميل قالب النشاط. عدّل التفاصيل لتطابق خدمتك الفعلية.','good')});
 adEl('ad-render')?.addEventListener('click',()=>adRender().then(()=>notice('ad-status','تم تحديث المعاينة.','good')));
 adEl('ad-generate-copy')?.addEventListener('click',adGenerateCopy);
 adEl('ad-save')?.addEventListener('click',adSave);
