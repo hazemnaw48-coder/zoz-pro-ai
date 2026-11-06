@@ -2080,7 +2080,7 @@ async function adLoadSaved(){
  try{
   const {data,error}=await sb.from('zoz_pro_ad_creatives').select('id,title,service_name,platform,format_key,status,created_at,export_path').order('updated_at',{ascending:false}).limit(30);if(error)throw error;
   if(!data?.length){host.innerHTML='<div class="empty">لا توجد تصاميم محفوظة بعد.</div>';return}
-  host.innerHTML='';data.forEach(item=>{const el=document.createElement('div');el.className='ad-saved-item';el.innerHTML='<strong>'+esc(item.title)+'</strong><small>'+esc(item.service_name)+' · '+esc(item.platform)+' · '+esc(item.format_key)+' · '+new Date(item.created_at).toLocaleDateString('ar-EG')+'</small><div class="actions"><button type="button" class="secondary" data-ad-download="'+esc(item.id)+'">تنزيل PNG</button></div>';host.appendChild(el)});
+  host.innerHTML='';data.forEach(item=>{const el=document.createElement('div');el.className='ad-saved-item';el.innerHTML='<strong>'+esc(item.title)+'</strong><small>'+esc(item.service_name)+' · '+esc(item.platform)+' · '+esc(item.format_key)+' · '+new Date(item.created_at).toLocaleDateString('ar-EG')+'</small><div class="actions"><button type="button" class="secondary" data-ad-edit="'+esc(item.id)+'">فتح وتعديل</button><button type="button" class="secondary" data-ad-download="'+esc(item.id)+'">تنزيل PNG</button></div>';host.appendChild(el)});
  }catch(e){host.innerHTML='<div class="empty">تعذر تحميل المحفوظات: '+esc(e.message||String(e))+'</div>'}
 }
 async function adEditSaved(id){
@@ -2097,7 +2097,7 @@ async function adEditSaved(id){
  }catch(e){notice('ad-status','تعذر فتح التصميم: '+(e.message||String(e)),'bad')}
 }
 async function adDownloadSaved(id){
- try{const {data,error}=await sb.from('zoz_pro_ad_creatives').select('export_path,title').eq('id',id).single();if(error)throw error;const {data:file,error:dlError}=await sb.storage.from(AD_BUCKET).download(data.export_path);if(dlError)throw dlError;const url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download=(data.title||'ZOZ-Ad').replace(/[^\\p{L}\\p{N}-]+/gu,'-')+'.png';a.click();URL.revokeObjectURL(url)}catch(e){notice('ad-status','تعذر تنزيل التصميم المحفوظ: '+e.message,'bad')}
+ try{const {data,error}=await sb.from('zoz_pro_ad_creatives').select('export_path,title').eq('id',id).single();if(error)throw error;const {data:file,error:dlError}=await sb.storage.from(AD_BUCKET).download(data.export_path);if(dlError)throw dlError;const url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download=(data.title||'ZOZ-Ad').replace(/[^\p{L}\p{N}-]+/gu,'-')+'.png';a.click();URL.revokeObjectURL(url)}catch(e){notice('ad-status','تعذر تنزيل التصميم المحفوظ: '+e.message,'bad')}
 }
 adEl('ad-render')?.addEventListener('click',()=>adRender().then(()=>notice('ad-status','تم تحديث المعاينة.','good')));
 adEl('ad-generate-copy')?.addEventListener('click',adGenerateCopy);
