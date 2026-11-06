@@ -108,6 +108,8 @@ body.upload-mode .footer{font-size:11px}
  <label for="zoz-device-prompt">مهمة إعداد مطالبة Google Flow</label>
  <input id="zoz-device-prompt" maxlength="12000" placeholder="اكتب وصف المشهد الذي تريد إرساله إلى الهاتف">
  <div class="actions"><button type="button" id="zoz-device-send-prompt-btn" class="secondary">إرسال المطالبة للجهاز</button></div>
+ <div class="actions"><button type="button" id="zoz-device-import-kdp-btn">أرسل للهاتف أمر استيراد أحدث تقرير Amazon Excel من Downloads</button></div>
+ <div class="small">لا يفتح نافذة اختيار ملف. الهاتف يبحث تلقائيًا عن أحدث XLSX/XLS مكتمل في مجلد Downloads ويرفعه إلى مساحة ZOZ الخاصة، ثم يحلل المركز التقرير ويحفظ الصفوف المطابقة في سجل الكتب.</div>
  <div id="zoz-device-jobs" class="stack"></div>
 </div>
 
@@ -491,6 +493,8 @@ body.upload-mode .footer{font-size:11px}
 const pageParams=new URLSearchParams(window.location.search);
 const requestedPage=pageParams.get('page')||'';
 const requestedAuthorizationChannel=String(pageParams.get('authorize_channel')||'');
+const automaticAmazonExcelRequest=pageParams.get('zoz_action')==='import-latest-amazon-excel';
+let automaticAmazonExcelStarted=false;
 const uploadMode=pageParams.get('mode')!=='full';
 if(uploadMode)document.body.classList.add('upload-mode');
 const SUPABASE_URL='https://oxyzxbkwhafzaztraowc.supabase.co';
@@ -547,7 +551,7 @@ function showPage(pageKey, scrollTop=true){
  if(indicator)indicator.textContent='القسم الحالي: '+label+' · '+step+' من '+tabs.length;
  if(scrollTop)window.scrollTo(0,0);
 }
-function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage(uploadMode?'intake':(requestedPage==='tiktok'?'tiktok':(requestedPage==='ads'?'ads':(requestedPage==='books'?'books':'connection'))),false);notice('intake-msg',uploadMode?'الجلسة متصلة. اختر ملف الفيديو ثم اضغط «رفع الفيديو للمراجعة والنشر».':'جلسة المالك متصلة بمشروع الإنتاج.','good');if(!uploadMode){if(requestedPage==='tiktok')loadTikTokAccounts();else{loadManagedChannels();loadHFProviderStatus();}if(requestedPage==='ads'){adRender();adLoadSaved();}if(requestedPage==='books'){loadBooksDashboard();kdpDocRefresh();}}}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
+function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage(uploadMode?'intake':(requestedPage==='tiktok'?'tiktok':(requestedPage==='ads'?'ads':(requestedPage==='books'?'books':'connection'))),false);notice('intake-msg',uploadMode?'الجلسة متصلة. اختر ملف الفيديو ثم اضغط «رفع الفيديو للمراجعة والنشر».':'جلسة المالك متصلة بمشروع الإنتاج.','good');if(!uploadMode){if(requestedPage==='tiktok')loadTikTokAccounts();else{loadManagedChannels();loadHFProviderStatus();}if(requestedPage==='ads'){adRender();adLoadSaved();}if(requestedPage==='books'){loadBooksDashboard();kdpDocRefresh();}if(automaticAmazonExcelRequest&&!automaticAmazonExcelStarted){automaticAmazonExcelStarted=true;setTimeout(()=>queueLatestAmazonExcelFromPhone(true),250);}}}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
 async function ownerSession(){
  const {data,error}=await sb.auth.getSession();if(error)throw error;const session=data&&data.session;
  if(!session||!session.access_token)throw new Error('لا توجد جلسة مالك محفوظة. سجّل الدخول بحساب مالك ZOZ Pro.');
@@ -1536,6 +1540,75 @@ async function refreshDeviceAgent(){
   status.className='notice good';status.textContent='تمت قراءة '+devices.length+' جهاز و'+tasks.length+' مهمة من قاعدة الإنتاج.';
  }catch(e){status.className='notice bad';status.textContent='تعذر قراءة الأجهزة: '+(e.message||e);}
 }
+
+async function queueLatestAmazonExcelFromPhone(autoTriggered=false){
+ const status=$('zoz-device-status'),button=$('zoz-device-import-kdp-btn');
+ if(button)button.disabled=true;
+ try{
+  status.className='notice warn';
+  status.textContent=autoTriggered?'تم فتح أمر الاستيراد الآلي. جارٍ التحقق من الهاتف وإرسال المهمة…':'جارٍ تجهيز أمر استيراد تقرير Amazon إلى الهاتف…';
+  const [deviceData,jobData]=await Promise.all([callDeviceAgent('device_list'),callDeviceAgent('job_list')]);
+  const device=(deviceData.devices||[]).find(x=>x.device_status==='active'&&x.app_version==='0.8.3'&&Array.isArray(x.capabilities)&&x.capabilities.includes('media.downloads.upload')&&String(x.device_name||'').toLowerCase().includes('vivo'));
+  if(!device)throw new Error('لم أجد هاتف vivo نشطًا بإصدار 0.8.3 وصلاحية Downloads التلقائية.');
+  const pending=(jobData.jobs||[]).find(x=>x.device_id===device.id&&x.capability_id==='media.downloads.upload'&&x.payload?.purpose==='amazon_kdp_report'&&['queued','running','awaiting_owner_approval'].includes(x.status));
+  let jobId;
+  if(pending){
+   jobId=pending.id;
+   status.textContent='توجد مهمة Amazon Excel قائمة بالفعل على الهاتف. لن أنشئ رفعًا مكررًا.';
+  }else{
+   const response=await callDeviceAgent('job_enqueue',{
+    device_id:device.id,
+    capability_id:'media.downloads.upload',
+    approval_required:false,
+    priority:1,
+    idempotency_key:'amazon-kdp-excel-'+device.id+'-'+crypto.randomUUID(),
+    payload:{file_kind:'document',extensions:['xlsx','xls'],select_latest:true,purpose:'amazon_kdp_report',owner_command_approved:true}
+   });
+   jobId=response.job?.id;
+   if(!jobId)throw new Error('لم يرجع الخادم رقم مهمة صالحًا.');
+   status.textContent='تم إرسال المهمة للهاتف. التطبيق الآن يبحث تلقائيًا عن أحدث ملف Excel مكتمل في Downloads.';
+  }
+  await refreshDeviceAgent();
+  await watchAmazonExcelUpload(device.id,jobId);
+ }catch(e){
+  status.className='notice bad';
+  status.textContent='تعذر تشغيل الاستيراد التلقائي: '+(e.message||e);
+ }finally{
+  if(button)button.disabled=false;
+ }
+}
+async function watchAmazonExcelUpload(deviceId,jobId){
+ const status=$('zoz-device-status');
+ for(let attempt=0;attempt<72;attempt++){
+  await new Promise(resolve=>setTimeout(resolve,5000));
+  const response=await callDeviceAgent('job_list');
+  const job=(response.jobs||[]).find(x=>x.id===jobId);
+  if(!job)continue;
+  if(job.status==='failed'||job.status==='cancelled')throw new Error(job.error_message||'فشل الهاتف في العثور على تقرير Excel أو رفعه.');
+  if(job.status==='awaiting_owner_approval')throw new Error('المهمة تنتظر موافقة إضافية من مركز الإنتاج؛ لم يبدأ الرفع.');
+  if(job.status==='succeeded'){
+   const fingerprint=String(job.result?.sha256||'').toLowerCase();
+   if(!/^[a-f0-9]{64}$/.test(fingerprint))throw new Error('اكتمل رد الهاتف لكن بصمة الملف غير موجودة للتحقق من سجل الاستقبال.');
+   status.className='notice warn';
+   status.textContent='أكد الهاتف وصول ملف Excel وبصمة SHA-256. جارٍ مطابقته مع سجل الكتب وتحليل صفوف التقرير…';
+   const {data:assets,error}=await sb.from('zoz_pro_document_intake_assets').select('id,filename,mime_type,file_size,status,source,created_at,checksum_sha256,storage_path').eq('device_id',deviceId).eq('source','android_downloads_picker').eq('status','ready').eq('checksum_sha256',fingerprint).order('created_at',{ascending:false}).limit(1);
+   if(error)throw error;
+   const asset=assets?.[0];
+   if(!asset)throw new Error('تم تأكيد الرفع من الهاتف، لكن لم يظهر سجل الملف في مساحة ZOZ الخاصة بالبصمة نفسها.');
+   const filename=String(asset.filename||'').toLowerCase();
+   if(!filename.endsWith('.xlsx')&&!filename.endsWith('.xls'))throw new Error('الملف المستلم ليس XLSX/XLS؛ لن أتعامل معه كتقرير Amazon Excel.');
+   const analyzed=await kdpDocAnalyze(asset.id);
+   if(!analyzed?.ok)throw new Error(analyzed?.error||'تم رفع التقرير، لكن تعذر حفظ صفوفه في سجل الكتب.');
+   status.className='notice good';
+   status.textContent='نجح المسار الكامل: رفع الهاتف ملف '+asset.filename+'، تم التحقق من بصمته، وحُفظ '+analyzed.saved+' صفًا في سجلات الكتب؛ مكرر '+analyzed.duplicates+'، يحتاج مراجعة '+analyzed.review+'.';
+   await refreshDeviceAgent();
+   return;
+  }
+  status.className='notice warn';
+  status.textContent='الهاتف ينفذ مهمة استيراد Excel: '+job.status+' · محاولة متابعة '+(attempt+1)+'/72.';
+ }
+ throw new Error('المهمة ما زالت في طابور الهاتف ولم تكتمل خلال فترة المتابعة الحالية. لم أعتبر الملف مرفوعًا أو البيانات محفوظة.');
+}
 async function createDevicePairCode(){
  const button=$('zoz-device-pair-code-btn'),status=$('zoz-device-status'),out=$('zoz-device-pair-code');
  button.disabled=true;status.textContent='جارٍ إنشاء رمز اقتران صالح لخمس دقائق…';out.style.display='none';
@@ -1668,6 +1741,7 @@ $('vidiq-account-refresh')?.addEventListener('click',refreshVidiqAccounts);
 $('zoz-device-pair-code-btn')?.addEventListener('click',createDevicePairCode);
 $('zoz-device-refresh-btn')?.addEventListener('click',refreshDeviceAgent);
 $('zoz-device-send-prompt-btn')?.addEventListener('click',sendDevicePrompt);
+$('zoz-device-import-kdp-btn')?.addEventListener('click',()=>queueLatestAmazonExcelFromPhone(false));
 $('zoz-agent-health-btn')?.addEventListener('click',checkZozAgentHealth);
 $('zoz-agent-overview-btn')?.addEventListener('click',()=>runZozAgentControl('operator_overview','تحديث حالة النظام'));
 $('zoz-agent-preflight-btn')?.addEventListener('click',()=>runZozAgentControl('operator_preflight','فحص الجاهزية'));
@@ -2132,6 +2206,18 @@ adEl('section-nav')?.addEventListener('click',e=>{if(e.target.closest('[data-pag
 
 // Owner-selected KDP report intake directly from the phone's browser file picker.
 const KDP_DOC_BUCKET='zoz-pro-documents';
+let kdpXlsxLoader=null;
+async function ensureKdpXlsx(){
+ if(window.XLSX)return window.XLSX;
+ if(!kdpXlsxLoader)kdpXlsxLoader=new Promise((resolve,reject)=>{
+  const script=document.createElement('script');
+  script.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+  script.onload=()=>window.XLSX?resolve(window.XLSX):reject(new Error('تعذر تهيئة قارئ Excel.'));
+  script.onerror=()=>reject(new Error('تعذر تحميل قارئ Excel.'));
+  document.head.appendChild(script);
+ });
+ return await kdpXlsxLoader;
+}
 const kdpDocEl=id=>document.getElementById(id);
 const kdpDocMime=(file)=>{
  const ext=(file.name.split('.').pop()||'').toLowerCase();
@@ -2147,7 +2233,7 @@ async function kdpDocRefresh(){
  host.innerHTML='جارٍ تحميل الملفات…';
  try{
   await ownerSession();
-  const {data,error}=await sb.from('zoz_pro_document_intake_assets').select('id,filename,mime_type,file_size,status,uploaded_at,created_at,storage_path,checksum_sha256').eq('owner_id',(await sb.auth.getUser()).data.user.id).eq('source','web_downloads_picker').order('created_at',{ascending:false}).limit(30);
+  const {data,error}=await sb.from('zoz_pro_document_intake_assets').select('id,filename,mime_type,file_size,status,uploaded_at,created_at,storage_path,checksum_sha256').eq('owner_id',(await sb.auth.getUser()).data.user.id).in('source',['web_downloads_picker','android_downloads_picker']).order('created_at',{ascending:false}).limit(30);
   if(error)throw error;
   if(!data?.length){host.innerHTML='<div class="empty">لا توجد تقارير مستوردة بعد.</div>';return}
   host.innerHTML='';
@@ -2182,7 +2268,7 @@ async function kdpDocUpload(){
    const {error:uploadError}=await sb.storage.from(KDP_DOC_BUCKET).upload(path,file,{contentType:mime,upsert:false,cacheControl:'3600'});
    if(uploadError)throw uploadError;
    const {error:insertError}=await sb.from('zoz_pro_document_intake_assets').insert({
-    id,owner_id:user.id,device_id:null,filename:file.name,mime_type:m,file_size:file.size,
+    id,owner_id:user.id,device_id:null,filename:file.name,mime_type:mime,file_size:file.size,
     storage_path:path,source:'web_downloads_picker',status:'ready',checksum_sha256:checksum,
     uploaded_at:new Date().toISOString(),metadata:{selected_by_owner:true,client:'zoz-production-center',checksum_algorithm:'SHA-256'}
    });
@@ -2210,26 +2296,73 @@ function kdpNumber(value){if(!value)return null;const n=Number(String(value).rep
 async function kdpDocAnalyze(id){
  const host=kdpDocEl('kdp-document-status');notice('kdp-document-status','جارٍ قراءة تقرير KDP ومطابقة الكتب…','warn');
  try{
-  const session=await ownerSession();const {data:fileRow,error}=await sb.from('zoz_pro_document_intake_assets').select('id,filename,storage_path,checksum_sha256,mime_type').eq('id',id).single();if(error)throw error;
-  if(!/\\.csv$/i.test(fileRow.filename))throw new Error('الاستيراد الآلي الحالي يدعم CSV. ملفات XLSX وPDF محفوظة بأمان لكنها تحتاج محولًا مخصصًا قبل إدخال الأرقام.');
+  const session=await ownerSession();
+  const {data:fileRow,error}=await sb.from('zoz_pro_document_intake_assets').select('id,filename,storage_path,checksum_sha256,mime_type').eq('id',id).single();if(error)throw error;
   const {data:blob,error:downloadError}=await sb.storage.from(KDP_DOC_BUCKET).download(fileRow.storage_path);if(downloadError)throw downloadError;
-  const rows=kdpParseCsv(await blob.text());const {data:books,error:booksError}=await sb.from('zoz_pro_books').select('id,title,asin,marketplace').order('created_at');if(booksError)throw booksError;
+  let rows=[];
+  const filename=String(fileRow.filename||'').toLowerCase();
+  if(filename.endsWith('.csv')){
+   rows=kdpParseCsv(await blob.text());
+  }else if(filename.endsWith('.xlsx')||filename.endsWith('.xls')){
+   const XLSX=await ensureKdpXlsx();
+   const workbook=XLSX.read(await blob.arrayBuffer(),{type:'array',cellDates:false});
+   const scored=workbook.SheetNames.map(name=>{
+    const data=XLSX.utils.sheet_to_json(workbook.Sheets[name],{defval:'',raw:false});
+    const normalized=data.map(row=>Object.fromEntries(Object.entries(row).map(([key,value])=>[String(key).replace(/[\s_()-]+/g,' ').trim().toLowerCase(),String(value??'').trim()])));
+    const headers=Object.keys(normalized[0]||{});
+    const score=(headers.some(h=>h.includes('asin'))?2:0)+(headers.some(h=>h.includes('title'))?2:0)+(headers.some(h=>h.includes('unit')||h.includes('royalt')||h.includes('earning')||h.includes('kenp')||h.includes('page'))?2:0);
+    return {name,rows:normalized,score};
+   }).sort((a,b)=>b.score-a.score);
+   if(!scored.length||scored[0].score<4)throw new Error('لم أجد ورقة Excel تحتوي أعمدة ASIN/Title وبيانات مبيعات أو عوائد أو KENP.');
+   rows=scored[0].rows;
+  }else{
+   throw new Error('امتداد التقرير غير مدعوم للتحليل. الملف محفوظ دون تعديل سجل الكتب.');
+  }
+  if(!rows.length)throw new Error('ورقة التقرير لا تحتوي صفوف بيانات قابلة للقراءة.');
+  const {data:books,error:booksError}=await sb.from('zoz_pro_books').select('id,title,asin,marketplace').order('created_at');if(booksError)throw booksError;
   let saved=0,review=0,duplicates=0;
   for(const row of rows){
-   const asin=kdpField(row,['asin','asin isbn']);const title=kdpField(row,['title','book title','ebook title']);let candidates=books.filter(b=>asin&&String(b.asin||'').toUpperCase()===asin.toUpperCase());
+   const asin=kdpField(row,['asin','asin isbn']);const title=kdpField(row,['title','book title','ebook title']);
+   let candidates=books.filter(b=>asin&&String(b.asin||'').toUpperCase()===asin.toUpperCase());
    if(!candidates.length&&title)candidates=books.filter(b=>String(b.title||'').trim().toLowerCase()===title.trim().toLowerCase());
    if(candidates.length!==1){review++;continue}
-   const units=kdpNumber(kdpField(row,['units sold','paid units','units']));const royalties=kdpNumber(kdpField(row,['royalties','royalty','net royalties']));const pages=kdpNumber(kdpField(row,['kenp pages read','pages read','kenp read']));
+   const units=kdpNumber(kdpField(row,['units sold','units ordered','paid units','units']));
+   const royalties=kdpNumber(kdpField(row,['net earnings','estimated royalties','royalties','royalty','net royalties','royalty amount']));
+   const pages=kdpNumber(kdpField(row,['kenp pages read','pages read','kenp read']));
    if(units===null&&royalties===null&&pages===null){review++;continue}
-   const start=kdpField(row,['start date','period start','report start date']);const end=kdpField(row,['end date','period end','report end date']);
-   const date=s=>{if(!s)return null;const d=new Date(s);return Number.isFinite(d.getTime())?d.toISOString().slice(0,10):(/^\\d{4}-\\d{2}-\\d{2}$/.test(s)?s:null)};
-   const response=await fetch(AGENT_API,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,authorization:'Bearer '+session.access_token,'content-type':'application/json'},body:JSON.stringify({action:'record_book_snapshot',book_id:candidates[0].id,units_sold:units,royalties_amount:royalties,pages_read:pages,period_start:date(start),period_end:date(end),marketplace:kdpField(row,['marketplace','store'])||candidates[0].marketplace||'Amazon.com',source:'kdp_report_import',file_fingerprint:fileRow.checksum_sha256,notes:'Imported from '+fileRow.filename+'; matched by ASIN or exact title.'}),signal:AbortSignal.timeout(25000)});
-   const result=await response.json().catch(()=>({}));if(!response.ok||!result.ok)throw new Error(result.error||'تعذر حفظ صف التقرير.');
+   const rowDate=kdpField(row,['order date','report date','transaction date','date']);
+   const start=kdpField(row,['start date','period start','report start date'])||rowDate;
+   const end=kdpField(row,['end date','period end','report end date'])||rowDate;
+   const date=s=>{if(!s)return null;const d=new Date(String(s).trim());return Number.isFinite(d.getTime())?d.toISOString().slice(0,10):null};
+   const response=await fetch(AGENT_API,{
+    method:'POST',
+    headers:{apikey:SUPABASE_PUBLISHABLE_KEY,authorization:'Bearer '+session.access_token,'content-type':'application/json'},
+    body:JSON.stringify({
+     action:'record_book_snapshot',
+     book_id:candidates[0].id,
+     units_sold:units,
+     royalties_amount:royalties,
+     pages_read:pages,
+     period_start:date(start),
+     period_end:date(end),
+     marketplace:kdpField(row,['marketplace','store'])||candidates[0].marketplace||'Amazon.com',
+     source:'kdp_report_import',
+     file_fingerprint:fileRow.checksum_sha256,
+     notes:'Imported from Android Downloads: '+fileRow.filename+'; matched by ASIN or exact title.'
+    }),
+    signal:AbortSignal.timeout(25000)
+   });
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok||!result.ok)throw new Error(result.error||'تعذر حفظ صف التقرير.');
    if(result.duplicate)duplicates++;else saved++;
   }
   notice('kdp-document-status','اكتمل تحليل '+rows.length+' صفًا: حُفظ '+saved+'، مكرر '+duplicates+'، يحتاج مراجعة '+review+'. لم تُدخل الصفوف غير المطابقة.','good');
   await kdpDocRefresh();if(typeof loadBooksDashboard==='function')await loadBooksDashboard();
- }catch(e){notice('kdp-document-status','تعذر تحليل التقرير: '+(e.message||String(e)),'bad')}
+  return {ok:true,saved,duplicates,review,total:rows.length};
+ }catch(e){
+  notice('kdp-document-status','تعذر تحليل التقرير: '+(e.message||String(e)),'bad');
+  return {ok:false,error:e.message||String(e)};
+ }
 }
 async function kdpDocDownload(id){
  try{
