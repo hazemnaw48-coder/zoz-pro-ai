@@ -419,7 +419,17 @@ body.upload-mode .footer{font-size:11px}
   <div id="books-status" class="notice">اضغط تحديث لتحميل سجل الكتب والتنبيهات.</div><div id="books-metrics" class="grid"></div><div id="books-list" class="stack"></div>
  </section>
  <section class="card">
-  <h3>تسجيل تقرير مبيعات أو عائدات</h3><p>أدخل الأرقام كما تظهر في تقرير أمازون للفترة المحددة. هذا يسجل التقرير في ZOZ Pro فقط ولا يغير حساب KDP.</p>
+  <section class="card" id="kdp-document-intake">
+<h3>استيراد تقرير KDP من تنزيلات الهاتف مباشرة</h3>
+<p>اختر ملف التقرير الذي نزّلته من Amazon KDP عبر نافذة ملفات الهاتف. يُرفع الملف إلى مساحة ZOZ Pro الخاصة بحسابك، مع تسجيل بصمة SHA-256. لا يحتاج هذا المسار إلى تحديث تطبيق Android أو إعادة الاقتران.</p>
+<label for="kdp-document-files">ملفات التقرير (CSV / Excel / PDF / TXT)</label>
+<input id="kdp-document-files" type="file" accept=".csv,.xlsx,.xls,.pdf,.txt,text/csv,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain" multiple>
+<div class="actions"><button type="button" id="kdp-document-upload">استيراد الملفات المحددة إلى ZOZ Pro</button><button type="button" class="secondary" id="kdp-document-refresh">تحديث الملفات المستوردة</button></div>
+<div id="kdp-document-status" class="notice">لم يتم اختيار ملفات بعد.</div>
+<div id="kdp-document-list" class="stack"><div class="empty">سجّل الدخول ثم حدّث القائمة لعرض الملفات.</div></div>
+<p class="small">الملفات خاصة بك، ولا تُرسل إلى Amazon ولا تُنشر. وصول الملف لا يعني أن الأرقام حُللت أو أُضيفت إلى سجل المبيعات بعد.</p>
+</section>
+<h3>تسجيل تقرير مبيعات أو عائدات</h3><p>أدخل الأرقام كما تظهر في تقرير أمازون للفترة المحددة. هذا يسجل التقرير في ZOZ Pro فقط ولا يغير حساب KDP.</p>
   <form id="books-report-form">
    <label for="books-report-book">الكتاب</label><select id="books-report-book" required style="width:100%;padding:12px;border-radius:10px;background:#091525;color:var(--text);border:1px solid var(--line);font:inherit"></select>
    <div class="grid">
@@ -2110,6 +2120,82 @@ adEl('ad-image')?.addEventListener('change',async e=>{const f=e.target.files?.[0
 adEl('ad-copy-variants')?.addEventListener('click',e=>{const b=e.target.closest('[data-ad-variant]');if(!b)return;const v=adCopyPackage?.variants?.[Number(b.dataset.adVariant)];if(!v)return;adEl('ad-headline').value=v.headline||'';adEl('ad-body').value=v.primary_text||'';adEl('ad-cta').value=v.call_to_action||'';adRender()});
 adEl('ad-saved-list')?.addEventListener('click',e=>{const edit=e.target.closest('[data-ad-edit]');if(edit){adEditSaved(edit.dataset.adEdit);return}const download=e.target.closest('[data-ad-download]');if(download)adDownloadSaved(download.dataset.adDownload)});
 adEl('section-nav')?.addEventListener('click',e=>{if(e.target.closest('[data-page-target="ads"]')){adRender();adLoadSaved()}});
+
+// Owner-selected KDP report intake directly from the phone's browser file picker.
+const KDP_DOC_BUCKET='zoz-pro-documents';
+const kdpDocEl=id=>document.getElementById(id);
+const kdpDocMime=(file)=>{
+ const ext=(file.name.split('.').pop()||'').toLowerCase();
+ const map={csv:'text/csv',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',xls:'application/vnd.ms-excel',pdf:'application/pdf',txt:'text/plain'};
+ return map[ext]||file.type||'';
+};
+const kdpDocSha256=async(file)=>{
+ const digest=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
+ return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,'0')).join('');
+};
+async function kdpDocRefresh(){
+ const host=kdpDocEl('kdp-document-list');if(!host)return;
+ host.innerHTML='جارٍ تحميل الملفات…';
+ try{
+  await ownerSession();
+  const {data,error}=await sb.from('zoz_pro_document_intake_assets').select('id,filename,mime_type,file_size,status,uploaded_at,created_at,storage_path,checksum_sha256').eq('source','web_downloads_picker').order('created_at',{ascending:false}).limit(30);
+  if(error)throw error;
+  if(!data?.length){host.innerHTML='<div class="empty">لا توجد تقارير مستوردة بعد.</div>';return}
+  host.innerHTML='';
+  data.forEach(item=>{
+   const el=document.createElement('div');el.className='ad-saved-item';
+   el.innerHTML='<strong>'+esc(item.filename)+'</strong><small>'+esc(item.status)+' · '+fmt(item.file_size)+' بايت · '+new Date(item.created_at).toLocaleString('ar-EG')+'</small><div class="actions"><button type="button" class="secondary" data-kdp-doc-download="'+esc(item.id)+'">تنزيل الملف</button></div>';
+   host.appendChild(el);
+  });
+ }catch(e){host.innerHTML='<div class="empty">تعذر تحميل الملفات: '+esc(e.message||String(e))+'</div>'}
+}
+async function kdpDocUpload(){
+ const button=kdpDocEl('kdp-document-upload'),input=kdpDocEl('kdp-document-files');
+ if(!button||!input)return;
+ const files=Array.from(input.files||[]);
+ if(!files.length){notice('kdp-document-status','اختر تقريرًا واحدًا على الأقل من ملفات الهاتف.','warn');return}
+ if(files.length>10){notice('kdp-document-status','الحد الأقصى 10 ملفات في المرة الواحدة.','warn');return}
+ button.disabled=true;
+ let completed=0;
+ try{
+  const session=await ownerSession();
+  const {data:{user},error:userError}=await sb.auth.getUser(session.access_token);if(userError||!user?.id)throw userError||new Error('تعذر تحديد حساب المالك.');
+  for(const file of files){
+   const mime=kdpDocMime(file);
+   const allowed=new Set(['text/csv','application/csv','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-excel','application/pdf','text/plain']);
+   if(!allowed.has(mime))throw new Error('صيغة غير مدعومة: '+file.name);
+   if(file.size<=0||file.size>25*1024*1024)throw new Error('حجم الملف غير صالح أو يتجاوز 25MB: '+file.name);
+   notice('kdp-document-status','جارٍ استيراد '+file.name+' ('+(completed+1)+' من '+files.length+')…','warn');
+   const id=crypto.randomUUID();
+   const safeName=file.name.normalize('NFKC').replace(/[^A-Za-z0-9._-]/g,'_').slice(-100)||'kdp-report';
+   const path=user.id+'/web/'+id+'/'+safeName;
+   const checksum=await kdpDocSha256(file);
+   const {error:uploadError}=await sb.storage.from(KDP_DOC_BUCKET).upload(path,file,{contentType:m,upsert:false,cacheControl:'3600'});
+   if(uploadError)throw uploadError;
+   const {error:insertError}=await sb.from('zoz_pro_document_intake_assets').insert({
+    id,owner_id:user.id,device_id:null,filename:file.name,mime_type:m,file_size:file.size,
+    storage_path:path,source:'web_downloads_picker',status:'ready',checksum_sha256:checksum,
+    uploaded_at:new Date().toISOString(),metadata:{selected_by_owner:true,client:'zoz-production-center',checksum_algorithm:'SHA-256'}
+   });
+   if(insertError){await sb.storage.from(KDP_DOC_BUCKET).remove([path]);throw insertError}
+   completed++;
+  }
+  input.value='';
+  notice('kdp-document-status','تم استيراد '+completed+' ملف/ملفات بنجاح وتسجيل بصمة كل ملف في قاعدة الإنتاج. الملفات محفوظة بأمان وتنتظر التحليل.','good');
+  await kdpDocRefresh();
+ }catch(e){notice('kdp-document-status','توقف الاستيراد بعد '+completed+' ملف/ملفات: '+(e.message||String(e)),'bad');await kdpDocRefresh()}
+ finally{button.disabled=false}
+}
+async function kdpDocDownload(id){
+ try{
+  const {data,error}=await sb.from('zoz_pro_document_intake_assets').select('filename,storage_path').eq('id',id).single();if(error)throw error;
+  const {data:file,error:downloadError}=await sb.storage.from(KDP_DOC_BUCKET).download(data.storage_path);if(downloadError)throw downloadError;
+  const url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download=data.filename;a.click();URL.revokeObjectURL(url);
+ }catch(e){notice('kdp-document-status','تعذر تنزيل الملف: '+(e.message||String(e)),'bad')}
+}
+kdpDocEl('kdp-document-upload')?.addEventListener('click',kdpDocUpload);
+kdpDocEl('kdp-document-refresh')?.addEventListener('click',kdpDocRefresh);
+kdpDocEl('kdp-document-list')?.addEventListener('click',e=>{const b=e.target.closest('[data-kdp-doc-download]');if(b)kdpDocDownload(b.dataset.kdpDocDownload)});
 })();
 </script>
 </body>
