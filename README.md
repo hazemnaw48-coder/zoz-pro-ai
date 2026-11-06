@@ -18,9 +18,11 @@ Independent Business Operating System. This repository does not depend on the le
 - The production `channel-control.html` workspace includes an owner-authenticated Ad Studio: editable Arabic copy, audience/goal/platform brief, four design systems, four social aspect ratios, owner-selected image and logo assets, Canvas preview, private Supabase Storage persistence, and PNG export.
 - `zoz-ad-studio` is a production Edge Function for owner-verified Gemini copy generation. It does not publish campaigns, contact prospects, or spend advertising budget.
 - Private storage buckets `zoz-pro-ad-studio` and `zoz-pro-documents` hold owner-selected creative assets and document intake files. The associated metadata tables use owner-scoped RLS.
-- The Android app source now includes a system document picker and signed-upload flow for owner-selected Downloads files. The device agent validates file metadata, verifies stored size, records SHA-256, and registers `document.intake.upload` only after upload finalization.
-- Android document import is **not yet production-verified**: a new APK must pass the Android Actions build, be installed on the owner's vivo V2342, and complete an end-to-end file selection/upload test before this capability is considered active on the phone.
-- CSV/XLSX/PDF parsing and KDP reconciliation remain a follow-up engineering task; file arrival alone does not mean a report has been parsed or sales data recorded.
+- The Android companion supports owner-scoped automatic Downloads intake for allow-listed document and video types. A queued task selects the latest matching complete file (or a specified filename), checks stability and SHA-256, and uploads to private ZOZ intake without opening Android's file picker.
+- Production document-intake acceptance was verified on the owner's vivo V2342 with app 0.8.3 / versionCode 28: Android granted Downloads access, a 10,435-byte XLSX reached private storage, and subsequent automatic scan jobs succeeded with SHA-256 duplicate detection rather than creating repeated uploads.
+- Matching Android Actions build succeeded: run 42197568489 (commit 5c301fa2296381fb1f82123e763e421083ca23fd), artifact 13492612548. Production zoz-pro-device-agent is ACTIVE v32.
+- The video Downloads scan/upload branch is included in the same APK and requires channel and synthetic-media disclosures; available production records verify the document path, not a separate end-to-end automatic video upload. Uploads remain private and never trigger public publication.
+- KDP report parsing/reconciliation is separate from phone transport. A file can arrive successfully while its workbook contains no data rows; that does not establish zero sales or create sales snapshots.
 
 ## Legacy runtime notes
 
