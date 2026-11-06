@@ -21,6 +21,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import android.os.Bundle
+import android.os.Environment
 import android.provider.OpenableColumns
 import android.provider.Settings
 import android.widget.Toast
@@ -84,12 +85,18 @@ private const val PUBLIC_KEY = "sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm"
 
 class MainActivity : ComponentActivity() {
     private val voiceoverDeepLinkRequest = mutableIntStateOf(0)
+    private val resumeRevision = mutableIntStateOf(0)
+
+    override fun onResume() {
+        super.onResume()
+        resumeRevision.intValue++
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (isVoiceoverLink(intent)) voiceoverDeepLinkRequest.intValue++
         scheduleDeviceWorker(this)
-        setContent { AppScopeControlScreen(voiceoverDeepLinkRequest.intValue) }
+        setContent { AppScopeControlScreen(voiceoverDeepLinkRequest.intValue, resumeRevision.intValue) }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -103,7 +110,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0) {
+private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0, resumeRevision: Int = 0) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     var voiceoverCardTop by remember { mutableIntStateOf(-1) }
@@ -112,6 +119,7 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0) {
     var pairingCode by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf(if (paired) "الجهاز مرتبط بوكيل ZOZ Pro." else "اربط التطبيق بمركز ZOZ Pro.") }
+    var downloadsAccessGranted by remember { mutableStateOf(Build.VERSION.SDK_INT < 30 || Environment.isExternalStorageManager()) }
     LaunchedEffect(voiceoverDeepLinkRequest, paired, voiceoverCardTop) {
         if (voiceoverDeepLinkRequest > 0 && paired && voiceoverCardTop >= 0) {
             withFrameNanos { }
@@ -151,7 +159,8 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0) {
         }
     }
 
-    LaunchedEffect(paired) {
+    LaunchedEffect(paired, resumeRevision) {
+        downloadsAccessGranted = Build.VERSION.SDK_INT < 30 || Environment.isExternalStorageManager()
         if (paired) {
             val deviceToken = DeviceTokenVault.read(context)
             if (deviceToken != null) {
@@ -162,6 +171,9 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0) {
                             apiPostWithToken("enable_phone_control", JSONObject().put("app_version", BuildConfig.VERSION_NAME), deviceToken)
                             apiPostWithToken("enable_flow_automation", JSONObject().put("app_version", BuildConfig.VERSION_NAME), deviceToken)
                         }
+                        apiPostWithToken("register_local_file_intake", JSONObject()
+                            .put("permission_granted", Build.VERSION.SDK_INT < 30 || Environment.isExternalStorageManager())
+                            .put("app_version", BuildConfig.VERSION_NAME), deviceToken)
                     }
                     serviceEnabled = FlowAutomationService.isEnabled(context)
                     status = if (serviceEnabled) {
@@ -272,6 +284,23 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0) {
                         modifier = Modifier.fillMaxWidth()) { Text("TikTok العادي") }
                     Button(enabled = !busy, onClick = { requestApp("com.google.android.youtube", "YouTube") },
                         modifier = Modifier.fillMaxWidth()) { Text("YouTube العادي") }
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("الوصول التلقائي لملفات التنزيلات", fontWeight = FontWeight.Bold)
+                            Text(if (downloadsAccessGranted) "صلاحية الملفات مفعلة. عند إرسال أمر من مركز ZOZ سيبحث التطبيق داخل مجلد Downloads عن أحدث ملف مطابق ويرفعه تلقائيًا." else "يلزم تفعيل الصلاحية مرة واحدة من إعدادات Android. سيقتصر فحص ZOZ برمجيًا على مجلد Downloads والامتدادات التي يحددها أمر الوكيل.")
+                            if (!downloadsAccessGranted) {
+                                Button(enabled = !busy, onClick = {
+                                    try {
+                                        context.startActivity(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + context.packageName)))
+                                    } catch (_: Exception) {
+                                        runCatching { context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
+                                    }
+                                }, modifier = Modifier.fillMaxWidth()) { Text("فتح إعداد صلاحية الوصول إلى الملفات") }
+                            } else {
+                                Text("✓ صلاحية الوصول متاحة — لا يقرأ التطبيق الصور أو المستندات أو الفيديوهات إلا عند وجود أمر محدد.", color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("رفع الفيديو مباشرة من الهاتف إلى مركز ZOZ", fontWeight = FontWeight.Bold)
@@ -652,7 +681,7 @@ private fun intakePost(action: String, body: JSONObject, token: String): JSONObj
     return result
 }
 
-fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kids: Boolean, channelId: String = ""): String {
+fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kids: Boolean, channelId: String = "", checksumSha256: String = ""): String {
     val intakeToken = DeviceTokenVault.readIntake(context)?.takeIf { it.length >= 32 } ?: throw IllegalStateException("رمز استقبال الفيديو غير موجود أو غير صالح. اختر القناة لإصدار رمز جديد.")
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     val name = queryName(context, uri) ?: "ZOZ-final-video.mp4"
@@ -681,7 +710,13 @@ fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kid
             .put("channel_id", channelId)
             .put("filename", name)
             .put("total_bytes", size)
-            .put("content_type", "video/mp4")
+            .put("content_type", when (name.substringAfterLast('.', "").lowercase(Locale.ROOT)) {
+                "mov" -> "video/quicktime"
+                "webm" -> "video/webm"
+                "mkv" -> "video/x-matroska"
+                else -> "video/mp4"
+            })
+            .put("file_sha256", checksumSha256)
             .put("title", name.substringBeforeLast("."))
             .put("description", "تم تجميع الفيديو محليًا على جهاز ZOZ Android؛ ينتظر مراجعة المالك.")
             .put("tags", JSONArray())
@@ -1292,6 +1327,76 @@ private fun documentMimeType(context: Context, uri: Uri, filename: String): Stri
     }
     val detected = runCatching { context.contentResolver.getType(uri) }.getOrNull()?.lowercase(Locale.ROOT).orEmpty()
     return if (byExtension.isNotBlank()) byExtension else detected
+}
+
+
+fun isDownloadsAutoAccessGranted(): Boolean =
+    Build.VERSION.SDK_INT < 30 || Environment.isExternalStorageManager()
+
+/**
+ * Searches only the public Downloads directory. It never walks outside that
+ * directory and ignores in-progress browser/download-manager temporary files.
+ */
+fun findLocalDownloadForAgent(payload: JSONObject): File {
+    if (!isDownloadsAutoAccessGranted()) {
+        throw IllegalStateException("يجب تفعيل صلاحية الوصول إلى الملفات من إعدادات Android أولًا.")
+    }
+    val kind = payload.optString("file_kind", "").lowercase(Locale.ROOT)
+    val allowed = if (kind == "video") {
+        setOf("mp4", "mov", "webm", "mkv")
+    } else if (kind == "document") {
+        setOf("csv", "xlsx", "xls", "pdf", "txt", "docx", "png", "jpg", "jpeg", "webp")
+    } else {
+        throw IllegalArgumentException("نوع الملف المطلوب غير مدعوم.")
+    }
+    val requested = payload.optJSONArray("extensions")
+    val extensions = if (requested == null || requested.length() == 0) allowed else {
+        buildSet {
+            for (i in 0 until minOf(requested.length(), 10)) {
+                val ext = requested.optString(i).trim().lowercase(Locale.ROOT).removePrefix(".")
+                if (ext in allowed) add(ext)
+            }
+        }.ifEmpty { throw IllegalArgumentException("قائمة امتدادات الملفات لا تتطابق مع نوع المهمة.") }
+    }
+    val root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+    if (!root.exists() || !root.isDirectory) throw IllegalStateException("مجلد Downloads غير متاح على الهاتف.")
+    val rootPath = runCatching { root.canonicalPath }.getOrElse { throw IllegalStateException("تعذر الوصول إلى مجلد Downloads.") }
+    val exactName = payload.optString("exact_filename", "").trim()
+    val contains = payload.optString("filename_contains", "").trim().lowercase(Locale.ROOT)
+    val after = payload.optLong("after_timestamp_ms", 0L)
+    val minSize = payload.optLong("min_size_bytes", 1L).coerceAtLeast(1L)
+    val maxSize = payload.optLong("max_size_bytes", if (kind == "video") 850L * 1024L * 1024L else 25L * 1024L * 1024L)
+        .coerceAtMost(if (kind == "video") 850L * 1024L * 1024L else 25L * 1024L * 1024L)
+    val now = System.currentTimeMillis()
+    val incomplete = listOf(".crdownload", ".part", ".download", ".tmp", ".temp")
+    val candidates = root.walkTopDown().maxDepth(3).filter { file ->
+        if (!file.isFile || file.name.startsWith(".")) return@filter false
+        val name = file.name
+        if (incomplete.any { name.lowercase(Locale.ROOT).endsWith(it) }) return@filter false
+        val ext = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
+        if (ext !in extensions) return@filter false
+        if (exactName.isNotBlank() && !name.equals(exactName, ignoreCase = true)) return@filter false
+        if (contains.isNotBlank() && !name.lowercase(Locale.ROOT).contains(contains)) return@filter false
+        if (file.lastModified() <= after || file.lastModified() > now - 60_000L) return@filter false
+        if (file.length() < minSize || file.length() > maxSize) return@filter false
+        val canonical = runCatching { file.canonicalPath }.getOrNull() ?: return@filter false
+        canonical.startsWith(rootPath + File.separator)
+    }.take(2500).toList()
+    return candidates.maxByOrNull { it.lastModified() }
+        ?: throw IllegalStateException("لم يُعثر على ملف مكتمل ومطابق داخل Downloads. لم يتم رفع أي ملف.")
+}
+
+fun sha256LocalFile(file: File): String {
+    val digest = java.security.MessageDigest.getInstance("SHA-256")
+    FileInputStream(file).use { input ->
+        val buffer = ByteArray(128 * 1024)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            digest.update(buffer, 0, count)
+        }
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
 }
 
 fun uploadDocumentToIntake(context: Context, uri: Uri, appVersion: String): String {
