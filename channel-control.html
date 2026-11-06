@@ -2218,7 +2218,8 @@ async function ensureKdpXlsx(){
  });
  return await kdpXlsxLoader;
 }
-function esc(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function kdpEscape(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+const kdpEscape=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const kdpDocEl=id=>document.getElementById(id);
 const kdpDocMime=(file)=>{
  const ext=(file.name.split('.').pop()||'').toLowerCase();
@@ -2240,10 +2241,10 @@ async function kdpDocRefresh(){
   host.innerHTML='';
   data.forEach(item=>{
    const el=document.createElement('div');el.className='ad-saved-item';
-   el.innerHTML='<strong>'+esc(item.filename)+'</strong><small>'+esc(item.status)+' · '+fmt(item.file_size)+' بايت · '+new Date(item.created_at).toLocaleString('ar-EG')+'</small><div class="actions"><button type="button" class="secondary" data-kdp-doc-analyze="'+esc(item.id)+'">تحليل واستيراد التقرير</button><button type="button" class="secondary" data-kdp-doc-download="'+esc(item.id)+'">تنزيل الملف</button></div>';
+   el.innerHTML='<strong>'+kdpEscape(item.filename)+'</strong><small>'+kdpEscape(item.status)+' · '+fmt(item.file_size)+' بايت · '+new Date(item.created_at).toLocaleString('ar-EG')+'</small><div class="actions"><button type="button" class="secondary" data-kdp-doc-analyze="'+kdpEscape(item.id)+'">تحليل واستيراد التقرير</button><button type="button" class="secondary" data-kdp-doc-download="'+kdpEscape(item.id)+'">تنزيل الملف</button></div>';
    host.appendChild(el);
   });
- }catch(e){host.innerHTML='<div class="empty">تعذر تحميل الملفات: '+esc(e.message||String(e))+'</div>'}
+ }catch(e){host.innerHTML='<div class="empty">تعذر تحميل الملفات: '+kdpEscape(e.message||String(e))+'</div>'}
 }
 async function kdpDocUpload(){
  const button=kdpDocEl('kdp-document-upload'),input=kdpDocEl('kdp-document-files');
