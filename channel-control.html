@@ -2119,7 +2119,7 @@ adEl('ad-logo')?.addEventListener('change',async e=>{const f=e.target.files?.[0]
 adEl('ad-image')?.addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{if(!/^image\/(png|jpeg|webp)$/.test(f.type))throw new Error('اختر PNG أو JPG أو WebP.');adImage=await adLoadImage(f);await adRender();notice('ad-status','تم تحميل الصورة في المعاينة. لم تُرفع بعد إلى التخزين.','good')}catch(err){notice('ad-status',err.message||'تعذر تحميل الصورة.','bad')}});
 adEl('ad-copy-variants')?.addEventListener('click',e=>{const b=e.target.closest('[data-ad-variant]');if(!b)return;const v=adCopyPackage?.variants?.[Number(b.dataset.adVariant)];if(!v)return;adEl('ad-headline').value=v.headline||'';adEl('ad-body').value=v.primary_text||'';adEl('ad-cta').value=v.call_to_action||'';adRender()});
 adEl('ad-saved-list')?.addEventListener('click',e=>{const edit=e.target.closest('[data-ad-edit]');if(edit){adEditSaved(edit.dataset.adEdit);return}const download=e.target.closest('[data-ad-download]');if(download)adDownloadSaved(download.dataset.adDownload)});
-adEl('section-nav')?.addEventListener('click',e=>{if(e.target.closest('[data-page-target="ads"]')){adRender();adLoadSaved()}});
+adEl('section-nav')?.addEventListener('click',e=>{if(e.target.closest('[data-page-target="ads"]')){adRender();adLoadSaved()}if(e.target.closest('[data-page-target="books"]')){loadBooksDashboard();kdpDocRefresh()}});
 
 // Owner-selected KDP report intake directly from the phone's browser file picker.
 const KDP_DOC_BUCKET='zoz-pro-documents';
