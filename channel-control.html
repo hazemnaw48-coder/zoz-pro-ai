@@ -2089,7 +2089,7 @@ async function adSave(){
 async function adLoadSaved(){
  const host=adEl('ad-saved-list');host.innerHTML='جارٍ تحميل التصاميم…';
  try{
-  const {data,error}=await sb.from('zoz_pro_ad_creatives').select('id,title,service_name,platform,format_key,status,created_at,export_path').order('updated_at',{ascending:false}).limit(30);if(error)throw error;
+  const {data,error}=await sb.from('zoz_pro_ad_creatives').select('id,title,service_name,platform,format_key,status,created_at,export_path').eq('owner_id',(await sb.auth.getUser()).data.user.id).order('updated_at',{ascending:false}).limit(30);if(error)throw error;
   if(!data?.length){host.innerHTML='<div class="empty">لا توجد تصاميم محفوظة بعد.</div>';return}
   host.innerHTML='';data.forEach(item=>{const el=document.createElement('div');el.className='ad-saved-item';el.innerHTML='<strong>'+esc(item.title)+'</strong><small>'+esc(item.service_name)+' · '+esc(item.platform)+' · '+esc(item.format_key)+' · '+new Date(item.created_at).toLocaleDateString('ar-EG')+'</small><div class="actions"><button type="button" class="secondary" data-ad-edit="'+esc(item.id)+'">فتح وتعديل</button><button type="button" class="secondary" data-ad-download="'+esc(item.id)+'">تنزيل PNG</button></div>';host.appendChild(el)});
  }catch(e){host.innerHTML='<div class="empty">تعذر تحميل المحفوظات: '+esc(e.message||String(e))+'</div>'}
@@ -2147,13 +2147,13 @@ async function kdpDocRefresh(){
  host.innerHTML='جارٍ تحميل الملفات…';
  try{
   await ownerSession();
-  const {data,error}=await sb.from('zoz_pro_document_intake_assets').select('id,filename,mime_type,file_size,status,uploaded_at,created_at,storage_path,checksum_sha256').eq('source','web_downloads_picker').order('created_at',{ascending:false}).limit(30);
+  const {data,error}=await sb.from('zoz_pro_document_intake_assets').select('id,filename,mime_type,file_size,status,uploaded_at,created_at,storage_path,checksum_sha256').eq('owner_id',(await sb.auth.getUser()).data.user.id).eq('source','web_downloads_picker').order('created_at',{ascending:false}).limit(30);
   if(error)throw error;
   if(!data?.length){host.innerHTML='<div class="empty">لا توجد تقارير مستوردة بعد.</div>';return}
   host.innerHTML='';
   data.forEach(item=>{
    const el=document.createElement('div');el.className='ad-saved-item';
-   el.innerHTML='<strong>'+esc(item.filename)+'</strong><small>'+esc(item.status)+' · '+fmt(item.file_size)+' بايت · '+new Date(item.created_at).toLocaleString('ar-EG')+'</small><div class="actions"><button type="button" class="secondary" data-kdp-doc-download="'+esc(item.id)+'">تنزيل الملف</button></div>';
+   el.innerHTML='<strong>'+esc(item.filename)+'</strong><small>'+esc(item.status)+' · '+fmt(item.file_size)+' بايت · '+new Date(item.created_at).toLocaleString('ar-EG')+'</small><div class="actions"><button type="button" class="secondary" data-kdp-doc-analyze="'+esc(item.id)+'">تحليل واستيراد CSV</button><button type="button" class="secondary" data-kdp-doc-download="'+esc(item.id)+'">تنزيل الملف</button></div>';
    host.appendChild(el);
   });
  }catch(e){host.innerHTML='<div class="empty">تعذر تحميل الملفات: '+esc(e.message||String(e))+'</div>'}
@@ -2179,7 +2179,7 @@ async function kdpDocUpload(){
    const safeName=file.name.normalize('NFKC').replace(/[^A-Za-z0-9._-]/g,'_').slice(-100)||'kdp-report';
    const path=user.id+'/web/'+id+'/'+safeName;
    const checksum=await kdpDocSha256(file);
-   const {error:uploadError}=await sb.storage.from(KDP_DOC_BUCKET).upload(path,file,{contentType:m,upsert:false,cacheControl:'3600'});
+   const {error:uploadError}=await sb.storage.from(KDP_DOC_BUCKET).upload(path,file,{contentType:mime,upsert:false,cacheControl:'3600'});
    if(uploadError)throw uploadError;
    const {error:insertError}=await sb.from('zoz_pro_document_intake_assets').insert({
     id,owner_id:user.id,device_id:null,filename:file.name,mime_type:m,file_size:file.size,
@@ -2195,6 +2195,42 @@ async function kdpDocUpload(){
  }catch(e){notice('kdp-document-status','توقف الاستيراد بعد '+completed+' ملف/ملفات: '+(e.message||String(e)),'bad');await kdpDocRefresh()}
  finally{button.disabled=false}
 }
+function kdpParseCsv(text){
+ const first=(text.split(/\r?\n/,1)[0]||'');const candidates=[',',';','\\t'];const delimiter=candidates.sort((a,b)=>first.split(b).length-first.split(a).length)[0];
+ const rows=[];let row=[],field='',quoted=false;
+ for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++}else quoted=!quoted}else if(ch===delimiter&&!quoted){row.push(field);field=''}else if((ch==='\\n'||ch==='\\r')&&!quoted){if(ch==='\\r'&&text[i+1]==='\\n')i++;row.push(field);if(row.some(x=>String(x).trim()))rows.push(row);row=[];field=''}else field+=ch}
+ row.push(field);if(row.some(x=>String(x).trim()))rows.push(row);
+ if(rows.length<2)throw new Error('الملف لا يحتوي صفوف بيانات قابلة للقراءة.');
+ const norm=s=>String(s||'').replace(/^\\uFEFF/,'').trim().toLowerCase().replace(/[\\s_()-]+/g,' ');
+ const headers=rows[0].map(norm);
+ return rows.slice(1).map(cells=>Object.fromEntries(headers.map((h,i)=>[h,String(cells[i]||'').trim()])));
+}
+function kdpField(row,keys){for(const key of keys){const k=key.toLowerCase();const found=Object.keys(row).find(x=>x===k||x.includes(k));if(found&&row[found]!=='')return row[found]}return ''}
+function kdpNumber(value){if(!value)return null;const n=Number(String(value).replace(/[,$£€]/g,'').replace(/,/g,''));return Number.isFinite(n)?n:null}
+async function kdpDocAnalyze(id){
+ const host=kdpDocEl('kdp-document-status');notice('kdp-document-status','جارٍ قراءة تقرير KDP ومطابقة الكتب…','warn');
+ try{
+  const session=await ownerSession();const {data:fileRow,error}=await sb.from('zoz_pro_document_intake_assets').select('id,filename,storage_path,checksum_sha256,mime_type').eq('id',id).single();if(error)throw error;
+  if(!/\\.csv$/i.test(fileRow.filename))throw new Error('الاستيراد الآلي الحالي يدعم CSV. ملفات XLSX وPDF محفوظة بأمان لكنها تحتاج محولًا مخصصًا قبل إدخال الأرقام.');
+  const {data:blob,error:downloadError}=await sb.storage.from(KDP_DOC_BUCKET).download(fileRow.storage_path);if(downloadError)throw downloadError;
+  const rows=kdpParseCsv(await blob.text());const {data:books,error:booksError}=await sb.from('zoz_pro_books').select('id,title,asin,marketplace').order('created_at');if(booksError)throw booksError;
+  let saved=0,review=0,duplicates=0;
+  for(const row of rows){
+   const asin=kdpField(row,['asin','asin isbn']);const title=kdpField(row,['title','book title','ebook title']);let candidates=books.filter(b=>asin&&String(b.asin||'').toUpperCase()===asin.toUpperCase());
+   if(!candidates.length&&title)candidates=books.filter(b=>String(b.title||'').trim().toLowerCase()===title.trim().toLowerCase());
+   if(candidates.length!==1){review++;continue}
+   const units=kdpNumber(kdpField(row,['units sold','paid units','units']));const royalties=kdpNumber(kdpField(row,['royalties','royalty','net royalties']));const pages=kdpNumber(kdpField(row,['kenp pages read','pages read','kenp read']));
+   if(units===null&&royalties===null&&pages===null){review++;continue}
+   const start=kdpField(row,['start date','period start','report start date']);const end=kdpField(row,['end date','period end','report end date']);
+   const date=s=>{if(!s)return null;const d=new Date(s);return Number.isFinite(d.getTime())?d.toISOString().slice(0,10):(/^\\d{4}-\\d{2}-\\d{2}$/.test(s)?s:null)};
+   const response=await fetch(AGENT_API,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,authorization:'Bearer '+session.access_token,'content-type':'application/json'},body:JSON.stringify({action:'record_book_snapshot',book_id:candidates[0].id,units_sold:units,royalties_amount:royalties,pages_read:pages,period_start:date(start),period_end:date(end),marketplace:kdpField(row,['marketplace','store'])||candidates[0].marketplace||'Amazon.com',source:'kdp_report_import',file_fingerprint:fileRow.checksum_sha256,notes:'Imported from '+fileRow.filename+'; matched by ASIN or exact title.'}),signal:AbortSignal.timeout(25000)});
+   const result=await response.json().catch(()=>({}));if(!response.ok||!result.ok)throw new Error(result.error||'تعذر حفظ صف التقرير.');
+   if(result.duplicate)duplicates++;else saved++;
+  }
+  notice('kdp-document-status','اكتمل تحليل '+rows.length+' صفًا: حُفظ '+saved+'، مكرر '+duplicates+'، يحتاج مراجعة '+review+'. لم تُدخل الصفوف غير المطابقة.','good');
+  await kdpDocRefresh();if(typeof loadBooksDashboard==='function')await loadBooksDashboard();
+ }catch(e){notice('kdp-document-status','تعذر تحليل التقرير: '+(e.message||String(e)),'bad')}
+}
 async function kdpDocDownload(id){
  try{
   const {data,error}=await sb.from('zoz_pro_document_intake_assets').select('filename,storage_path').eq('id',id).single();if(error)throw error;
@@ -2204,7 +2240,7 @@ async function kdpDocDownload(id){
 }
 kdpDocEl('kdp-document-upload')?.addEventListener('click',kdpDocUpload);
 kdpDocEl('kdp-document-refresh')?.addEventListener('click',kdpDocRefresh);
-kdpDocEl('kdp-document-list')?.addEventListener('click',e=>{const b=e.target.closest('[data-kdp-doc-download]');if(b)kdpDocDownload(b.dataset.kdpDocDownload)});
+kdpDocEl('kdp-document-list')?.addEventListener('click',e=>{const analyze=e.target.closest('[data-kdp-doc-analyze]');if(analyze){kdpDocAnalyze(analyze.dataset.kdpDocAnalyze);return}const b=e.target.closest('[data-kdp-doc-download]');if(b)kdpDocDownload(b.dataset.kdpDocDownload)});
 })();
 </script>
 </body>
