@@ -2291,8 +2291,93 @@ function kdpParseCsv(text){
  const headers=rows[0].map(norm);
  return rows.slice(1).map(cells=>Object.fromEntries(headers.map((h,i)=>[h,String(cells[i]||'').trim()])));
 }
-function kdpField(row,keys){for(const key of keys){const k=key.toLowerCase();const found=Object.keys(row).find(x=>x===k||x.includes(k));if(found&&row[found]!=='')return row[found]}return ''}
-function kdpNumber(value){if(!value)return null;const n=Number(String(value).replace(/[,$£€]/g,'').replace(/,/g,''));return Number.isFinite(n)?n:null}
+function kdpNormHeader(value){
+ return String(value??'').replace(/^\\uFEFF/,'').normalize('NFKC').trim().toLowerCase()
+  .replace(/[’'"`]/g,'').replace(/[\\s_()[\\]{}:;,.\\/\\\\-]+/g,' ').replace(/\\s+/g,' ').trim();
+}
+function kdpField(row,keys){
+ const entries=Object.keys(row||{});
+ for(const key of keys){
+  const wanted=kdpNormHeader(key);
+  const found=entries.find(x=>kdpNormHeader(x)===wanted);
+  if(found&&row[found]!==''&&row[found]!==null&&row[found]!==undefined)return row[found];
+ }
+ for(const key of keys){
+  const wanted=kdpNormHeader(key);
+  const found=entries.find(x=>kdpNormHeader(x).includes(wanted)&&row[x]!==''&&row[x]!==null&&row[x]!==undefined);
+  if(found)return row[found];
+ }
+ return '';
+}
+function kdpNumber(value){
+ if(value===null||value===undefined)return null;
+ let raw=String(value).trim();
+ if(!raw||/^(?:-|—|n\\/a|na)$/i.test(raw))return null;
+ const negative=/^\\s*\\(.*\\)\\s*$/.test(raw);
+ raw=raw.replace(/[()$£€¥\\s\\u00a0]/g,'').replace(/[^\\d,.\\-]/g,'');
+ if(!raw||raw==='-')return null;
+ const comma=raw.lastIndexOf(','),dot=raw.lastIndexOf('.');
+ if(comma>=0&&dot>=0){raw=comma>dot?raw.replace(/\\./g,'').replace(',','.'):raw.replace(/,/g,'')}
+ else if(comma>=0){raw=raw.length-comma-1===2?raw.replace(',','.'):raw.replace(/,/g,'')}
+ const n=Number(raw);
+ return Number.isFinite(n)?(negative?-Math.abs(n):n):null;
+}
+function kdpReadWorkbook(XLSX,workbook){
+ const sheets=[];
+ for(const name of workbook.SheetNames||[]){
+  const raw=XLSX.utils.sheet_to_json(workbook.Sheets[name],{header:1,defval:'',raw:false,blankrows:false});
+  let best=null;
+  for(let i=0;i<Math.min(raw.length,50);i++){
+   const cells=raw[i]||[];
+   const headers=cells.map(v=>kdpNormHeader(v));
+   const hasAsin=headers.some(h=>/asin|isbn/.test(h));
+   const hasTitle=headers.some(h=>/title|book name|product name/.test(h));
+   const hasUnits=headers.some(h=>/units? (sold|ordered|shipped)|paid units/.test(h));
+   const hasRoyalty=headers.some(h=>/royalt|net earning|estimated earning/.test(h));
+   const hasPages=headers.some(h=>/kenp|pages read|kindle.*read/.test(h));
+   const score=(hasAsin?4:0)+(hasTitle?4:0)+(hasUnits?3:0)+(hasRoyalty?3:0)+(hasPages?3:0);
+   if((hasAsin||hasTitle)&&score>=6&&(!best||score>best.score))best={index:i,headers,score};
+  }
+  if(!best){sheets.push({name,headers:[],rows:[],header_row:null});continue;}
+  const counts={};
+  const headers=best.headers.map((h,i)=>{
+   const base=h||'column '+(i+1);
+   counts[base]=(counts[base]||0)+1;
+   return counts[base]>1?base+' '+counts[base]:base;
+  });
+  const rows=[];
+  for(let i=best.index+1;i<raw.length;i++){
+   const cells=raw[i]||[];
+   if(!cells.some(v=>String(v??'').trim()))continue;
+   const row={};headers.forEach((h,j)=>row[h]=String(cells[j]??'').trim());
+   if(!Object.values(row).some(v=>v!==''))continue;
+   rows.push(row);
+  }
+  sheets.push({name,headers,rows,header_row:best.index+1});
+ }
+ return sheets;
+}
+function kdpMetric(row,kind){
+ const keys=Object.keys(row||{});
+ const key=keys.find(k=>{
+  const h=kdpNormHeader(k);
+  if(kind==='units')return /units? (sold|ordered|shipped)|paid units/.test(h)&&!/free|refund|promo/.test(h);
+  if(kind==='royalties')return /royalt|net earning|estimated earning/.test(h)&&!/rate|currency|per unit|percent/.test(h);
+  if(kind==='pages')return /kenp|pages read|kindle.*read/.test(h);
+  if(kind==='orders')return /^orders?$|processed orders/.test(h);
+  return false;
+ });
+ return key?kdpNumber(row[key]):null;
+}
+function kdpTitleKey(value){
+ return String(value||'').normalize('NFKD').toLowerCase().replace(/[\\u0300-\\u036f]/g,'')
+  .replace(/[^a-z0-9]+/g,' ').trim().replace(/\\s+/g,' ');
+}
+function kdpDate(value){
+ if(!value)return null;
+ const parsed=new Date(String(value).trim());
+ return Number.isFinite(parsed.getTime())?parsed.toISOString().slice(0,10):null;
+}
 async function kdpDocAnalyze(id){
  const host=kdpDocEl('kdp-document-status');notice('kdp-document-status','جارٍ قراءة تقرير KDP ومطابقة الكتب…','warn');
  try{
