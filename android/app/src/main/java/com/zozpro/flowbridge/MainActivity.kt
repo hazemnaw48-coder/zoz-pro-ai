@@ -724,6 +724,11 @@ fun uploadFinalVideoToIntake(context: Context, uri: Uri, synthetic: Boolean, kid
             .put("contains_synthetic_media", synthetic)
             .put("target_privacy_status", "public"), intakeToken)
         asset = created.getJSONObject("asset")
+        if (created.optBoolean("duplicate")) {
+            val duplicateId = asset.optString("id")
+            prefs.edit().putString("zoz_last_uploaded_asset_id", duplicateId).apply()
+            return "هذا الفيديو مرفوع بالفعل إلى استقبال القناة بالحالة ${asset.optString("status")}؛ لم يتم إنشاء نسخة مكررة. رقم الملف: $duplicateId"
+        }
         prefs.edit().putString("intake_upload_asset_id", asset.getString("id"))
              .putString("intake_upload_uri", uri.toString()).putLong("intake_upload_size", size).putString("intake_upload_channel_id", asset.optString("channel_id", channelId)).apply()
     }
