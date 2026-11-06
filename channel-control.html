@@ -530,7 +530,7 @@ if(intakeTargetAtStartup){
 let loadedVideos=[];
 let lastAnalytics=null;
 let lastVideoAnalytics=null;
-function notice(id,text,kind){const el=$(id);el.textContent=text;el.className='notice'+(kind?' '+kind:'');}
+function notice(id,text,kind){const el=$(id);if(!el)return;el.textContent=text;el.className='notice'+(kind?' '+kind:'');}
 function fmt(value){return Number(value||0).toLocaleString('ar-EG',{maximumFractionDigits:2});}
 function dateInput(d){return d.toISOString().slice(0,10);}
 function showPage(pageKey, scrollTop=true){
@@ -551,7 +551,7 @@ function showPage(pageKey, scrollTop=true){
  if(indicator)indicator.textContent='القسم الحالي: '+label+' · '+step+' من '+tabs.length;
  if(scrollTop)window.scrollTo(0,0);
 }
-function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage(uploadMode?'intake':(requestedPage==='tiktok'?'tiktok':(requestedPage==='ads'?'ads':(requestedPage==='books'?'books':'connection'))),false);notice('intake-msg',uploadMode?'الجلسة متصلة. اختر ملف الفيديو ثم اضغط «رفع الفيديو للمراجعة والنشر».':'جلسة المالك متصلة بمشروع الإنتاج.','good');if(!uploadMode){if(requestedPage==='tiktok')loadTikTokAccounts();else{loadManagedChannels();loadHFProviderStatus();}if(requestedPage==='ads'){adRender();adLoadSaved();}if(requestedPage==='books'){loadBooksDashboard();kdpDocRefresh();}if(automaticAmazonExcelRequest&&!automaticAmazonExcelStarted){automaticAmazonExcelStarted=true;setTimeout(()=>queueLatestAmazonExcelFromPhone(true),250);}}}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
+function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage(uploadMode?'intake':(requestedPage==='tiktok'?'tiktok':(requestedPage==='ads'?'ads':(requestedPage==='books'?'books':'connection'))),false);notice('intake-msg',uploadMode?'الجلسة متصلة. اختر ملف الفيديو ثم اضغط «رفع الفيديو للمراجعة والنشر».':'جلسة المالك متصلة بمشروع الإنتاج.','good');if(!uploadMode){if(requestedPage==='tiktok')loadTikTokAccounts();else{loadManagedChannels();loadHFProviderStatus();}if(requestedPage==='ads'){adRender();adLoadSaved();}if(requestedPage==='books'){loadBooksDashboard();kdpDocRefresh();}setTimeout(()=>processPendingKdpReportsOnLogin(),900);if(automaticAmazonExcelRequest&&!automaticAmazonExcelStarted){automaticAmazonExcelStarted=true;setTimeout(()=>queueLatestAmazonExcelFromPhone(true),250);}}}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
 async function ownerSession(){
  const {data,error}=await sb.auth.getSession();if(error)throw error;const session=data&&data.session;
  if(!session||!session.access_token)throw new Error('لا توجد جلسة مالك محفوظة. سجّل الدخول بحساب مالك ZOZ Pro.');
@@ -2239,7 +2239,7 @@ async function kdpDocRefresh(){
   host.innerHTML='';
   data.forEach(item=>{
    const el=document.createElement('div');el.className='ad-saved-item';
-   el.innerHTML='<strong>'+esc(item.filename)+'</strong><small>'+esc(item.status)+' · '+fmt(item.file_size)+' بايت · '+new Date(item.created_at).toLocaleString('ar-EG')+'</small><div class="actions"><button type="button" class="secondary" data-kdp-doc-analyze="'+esc(item.id)+'">تحليل واستيراد CSV</button><button type="button" class="secondary" data-kdp-doc-download="'+esc(item.id)+'">تنزيل الملف</button></div>';
+   el.innerHTML='<strong>'+esc(item.filename)+'</strong><small>'+esc(item.status)+' · '+fmt(item.file_size)+' بايت · '+new Date(item.created_at).toLocaleString('ar-EG')+'</small><div class="actions"><button type="button" class="secondary" data-kdp-doc-analyze="'+esc(item.id)+'">تحليل واستيراد التقرير</button><button type="button" class="secondary" data-kdp-doc-download="'+esc(item.id)+'">تنزيل الملف</button></div>';
    host.appendChild(el);
   });
  }catch(e){host.innerHTML='<div class="empty">تعذر تحميل الملفات: '+esc(e.message||String(e))+'</div>'}
@@ -2357,12 +2357,40 @@ async function kdpDocAnalyze(id){
    if(result.duplicate)duplicates++;else saved++;
   }
   notice('kdp-document-status','اكتمل تحليل '+rows.length+' صفًا: حُفظ '+saved+'، مكرر '+duplicates+'، يحتاج مراجعة '+review+'. لم تُدخل الصفوف غير المطابقة.','good');
+  try{const {error:markError}=await sb.from('zoz_pro_document_intake_assets').update({processing_result:{status:'processed',file_fingerprint:fileRow.checksum_sha256,analyzed_at:new Date().toISOString(),total_rows:rows.length,saved,duplicates,review}}).eq('id',id).eq('owner_id',session.user.id);if(markError)console.warn('KDP import processed marker could not be saved:',markError.message);}catch(markError){console.warn('KDP import processed marker could not be saved:',markError);}
   await kdpDocRefresh();if(typeof loadBooksDashboard==='function')await loadBooksDashboard();
   return {ok:true,saved,duplicates,review,total:rows.length};
  }catch(e){
   notice('kdp-document-status','تعذر تحليل التقرير: '+(e.message||String(e)),'bad');
   return {ok:false,error:e.message||String(e)};
  }
+}
+let kdpAutoProcessing=false;
+async function processPendingKdpReportsOnLogin(){
+ if(kdpAutoProcessing)return;
+ kdpAutoProcessing=true;
+ try{
+  const session=await ownerSession();
+  const ownerId=session.user&&session.user.id;
+  if(!ownerId)throw new Error('تعذر تحديد مالك جلسة الاستيراد.');
+  const {data:assets,error}=await sb.from('zoz_pro_document_intake_assets')
+   .select('id,filename,checksum_sha256,processing_result,created_at')
+   .eq('owner_id',ownerId).eq('source','android_downloads_picker').eq('status','ready')
+   .order('created_at',{ascending:false}).limit(20);
+  if(error)throw error;
+  const seen=new Set();
+  for(const asset of (assets||[])){
+   const filename=String(asset.filename||'').toLowerCase();
+   if(!filename.endsWith('.xlsx')&&!filename.endsWith('.xls'))continue;
+   const fingerprint=String(asset.checksum_sha256||'').toLowerCase();
+   if(!/^[a-f0-9]{64}$/.test(fingerprint)||seen.has(fingerprint))continue;
+   seen.add(fingerprint);
+   if(asset.processing_result&&asset.processing_result.status==='processed')continue;
+   const result=await kdpDocAnalyze(asset.id);
+   if(!result||!result.ok)console.warn('Pending KDP report analysis failed:',asset.filename,result&&result.error);
+  }
+ }catch(error){console.warn('Automatic KDP report recovery did not complete:',error);}
+ finally{kdpAutoProcessing=false;}
 }
 async function kdpDocDownload(id){
  try{
