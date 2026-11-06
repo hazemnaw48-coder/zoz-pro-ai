@@ -121,12 +121,20 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0) {
     var serviceEnabled by remember { mutableStateOf(FlowAutomationService.isEnabled(context)) }
     var uploadChannelId by remember { mutableStateOf("UC9fr5B0SZZkmVAApfCqEO3w") }
     var uploadVideoUri by remember { mutableStateOf<Uri?>(null) }
+    var documentUri by remember { mutableStateOf<Uri?>(null) }
     var narrationText by remember { mutableStateOf("") }
     val uploadPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
             uploadVideoUri = uri
             status = "تم اختيار الملف: ${queryName(context, uri) ?: "فيديو"} — جاهز للإرسال إلى استقبال القناة المختارة."
+        }
+    }
+    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
+            documentUri = uri
+            status = "تم اختيار الملف: ${queryName(context, uri) ?: "مستند"} — جاهز للاستيراد إلى ذاكرة ZOZ الخاصة."
         }
     }
 
@@ -284,6 +292,20 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0) {
                                     .putString("zoz_intake_channel_id", uploadChannelId).apply()
                                 uploadFinalVideoToIntake(context, uploadVideoUri!!, true, false, uploadChannelId)
                             } }, modifier = Modifier.fillMaxWidth()) { Text("رفع الملف إلى استقبال القناة المختارة") }
+                        }
+                    }
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("استيراد الملفات إلى ذاكرة ZOZ Pro", fontWeight = FontWeight.Bold)
+                            Text("اختر تقريرًا من مجلد التنزيلات أو أي مجلد تختاره بنفسك. يدعم CSV وExcel وPDF وTXT وDOCX والصور. لا يقرأ التطبيق أي ملفات أخرى.")
+                            OutlinedButton(enabled = !busy, onClick = { documentPicker.launch(arrayOf("text/*","application/pdf","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.openxmlformats-officedocument.wordprocessingml.document","image/png","image/jpeg","image/webp")) }, modifier = Modifier.fillMaxWidth()) {
+                                Text(if (documentUri == null) "اختيار ملف من التنزيلات" else "تغيير الملف المحدد")
+                            }
+                            if (documentUri != null) Text(queryName(context, documentUri!!) ?: "ملف محدد", style = MaterialTheme.typography.bodySmall)
+                            Button(enabled = !busy && paired && documentUri != null, onClick = { runAsync {
+                                uploadDocumentToIntake(context, documentUri!!, BuildConfig.VERSION_NAME)
+                            } }, modifier = Modifier.fillMaxWidth()) { Text("استيراد الملف إلى ذاكرة ZOZ Pro") }
+                            Text("الملف يبقى خاصًا بحساب المالك، ولا يُشارك أو يُنشر تلقائيًا.", style = MaterialTheme.typography.bodySmall)
                         }
                     }
                     Card(
@@ -1252,6 +1274,77 @@ private fun muxVideoWithVoiceover(context: Context, sourceUri: Uri, aacFile: Fil
         videoExtractor.release()
         audioExtractor.release()
     }
+}
+
+private fun documentMimeType(context: Context, uri: Uri, filename: String): String {
+    val ext = filename.substringAfterLast('.', "").lowercase(Locale.ROOT)
+    val byExtension = when (ext) {
+        "csv" -> "text/csv"
+        "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        "xls" -> "application/vnd.ms-excel"
+        "pdf" -> "application/pdf"
+        "txt" -> "text/plain"
+        "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        "png" -> "image/png"
+        "jpg", "jpeg" -> "image/jpeg"
+        "webp" -> "image/webp"
+        else -> ""
+    }
+    val detected = runCatching { context.contentResolver.getType(uri) }.getOrNull()?.lowercase(Locale.ROOT).orEmpty()
+    return if (byExtension.isNotBlank()) byExtension else detected
+}
+
+fun uploadDocumentToIntake(context: Context, uri: Uri, appVersion: String): String {
+    val deviceToken = DeviceTokenVault.read(context)?.takeIf { it.length >= 40 }
+        ?: throw IllegalStateException("الجهاز غير مرتبط بالوكيل.")
+    val filename = queryName(context, uri)?.take(180)?.takeIf { it.isNotBlank() }
+        ?: throw IllegalStateException("تعذر قراءة اسم الملف.")
+    val size = querySize(context, uri)
+    if (size <= 0L || size > 25L * 1024L * 1024L) throw IllegalStateException("حجم الملف غير صالح أو يتجاوز 25 ميجابايت.")
+    val mime = documentMimeType(context, uri, filename)
+    val allowed = setOf("text/csv", "application/csv", "text/plain", "application/pdf",
+        "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "image/png", "image/jpeg", "image/webp")
+    if (mime !in allowed) throw IllegalStateException("صيغة الملف غير مدعومة. استخدم CSV أو Excel أو PDF أو TXT أو DOCX أو PNG/JPG/WebP.")
+    val prepared = apiPostWithToken("document_intake_create", JSONObject()
+        .put("filename", filename)
+        .put("mime_type", mime)
+        .put("file_size", size)
+        .put("app_version", appVersion), deviceToken)
+    val assetId = prepared.optString("asset_id")
+    val uploadUrl = prepared.optString("upload_url")
+    if (assetId.length < 30 || !uploadUrl.startsWith("https://oxyzxbkwhafzaztraowc.supabase.co/storage/v1/object/upload/sign/"))
+        throw IllegalStateException("لم يصدر الخادم رابط رفع خاصًا صالحًا؛ لم يبدأ النقل.")
+    val digest = java.security.MessageDigest.getInstance("SHA-256")
+    val connection = java.net.URL(uploadUrl).openConnection() as java.net.HttpURLConnection
+    connection.requestMethod = "PUT"
+    connection.connectTimeout = 30000
+    connection.readTimeout = 120000
+    connection.doOutput = true
+    connection.setRequestProperty("content-type", mime)
+    connection.setRequestProperty("cache-control", "3600")
+    connection.setFixedLengthStreamingMode(size)
+    var sent = 0L
+    try {
+        context.contentResolver.openInputStream(uri).use { input ->
+            if (input == null) throw IllegalStateException("تعذر فتح الملف الذي اخترته.")
+            val digestInput = java.security.DigestInputStream(input, digest)
+            connection.outputStream.use { output -> sent = digestInput.copyTo(output, 64 * 1024) }
+        }
+        if (sent != size) throw IllegalStateException("عدد البايتات المرسلة لا يطابق حجم الملف الأصلي.")
+        val code = connection.responseCode
+        val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+        val responseText = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+        if (code !in 200..299) throw IllegalStateException("فشل رفع الملف إلى التخزين الخاص (HTTP $code): " + responseText.take(220))
+    } finally {
+        connection.disconnect()
+    }
+    val checksum = digest.digest().joinToString("") { "%02x".format(it) }
+    val finalized = apiPostWithToken("document_intake_finalize",
+        JSONObject().put("asset_id", assetId).put("checksum_sha256", checksum), deviceToken)
+    if (finalized.optString("status") != "ready") throw IllegalStateException("تم نقل الملف لكن الخادم لم يؤكد اكتمال الاستقبال.")
+    return "تم استيراد الملف بنجاح إلى ذاكرة ZOZ Pro.\\nالملف: $filename\\nالحجم: $sent بايت\\nبصمة SHA-256: $checksum\\nالحالة: محفوظ بأمان وينتظر تحليل الوكيل."
 }
 
 private fun apiPost(context: Context, action: String, body: JSONObject): JSONObject {
