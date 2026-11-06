@@ -454,6 +454,7 @@ body.upload-mode .footer{font-size:11px}
     <label for="ad-subheadline">العنوان المساند</label><textarea id="ad-subheadline" rows="2">استراتيجية ومحتوى وتصميمات إعلانية متكاملة لمشروعك</textarea>
     <label for="ad-body">النص على التصميم</label><textarea id="ad-body" rows="3">نساعدك على تقديم مشروعك بصورة احترافية وبمحتوى يخاطب جمهورك.</textarea>
     <label for="ad-cta">دعوة الإجراء</label><input id="ad-cta" maxlength="80" value="تواصل معنا وابدأ الآن">
+    <label for="ad-logo">شعار علامتك التجارية (PNG شفاف مفضل)</label><input id="ad-logo" type="file" accept="image/png,image/jpeg,image/webp">
     <label for="ad-image">صورة المنتج أو العمل أو الخلفية</label><input id="ad-image" type="file" accept="image/png,image/jpeg,image/webp">
     <p class="small">تُرفع الصور التي تختارها أنت فقط إلى مساحة خاصة بحسابك. لا نستخدم ملفات هاتفك دون اختيار.</p>
     <div class="actions"><button id="ad-generate-copy">✦ كتابة الإعلان بالذكاء الاصطناعي</button><button id="ad-render" class="secondary">تحديث المعاينة</button></div>
@@ -1978,7 +1979,7 @@ checkZozAgentHealth();
 /* ZOZ Pro Ad Studio: owner-authenticated copy, private assets, durable creative records. */
 const AD_API=SUPABASE_URL+'/functions/v1/zoz-ad-studio';
 const AD_BUCKET='zoz-pro-ad-studio';
-let adImage=null, adCopyPackage={}, adCurrentId=null;
+let adImage=null, adLogo=null, adCopyPackage={}, adCurrentId=null;
 const adEl=id=>document.getElementById(id);
 const adVal=id=>String(adEl(id)?.value||'').trim();
 const adThemes={
@@ -2006,6 +2007,7 @@ async function adRender(){
  for(let i=-h;i<w;i+=95){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i+h,h);ctx.stroke()}ctx.restore();
  ctx.fillStyle=t.accent;ctx.beginPath();ctx.arc(w*.12,h*.16,Math.min(w,h)*.12,0,Math.PI*2);ctx.fill();ctx.globalAlpha=.13;ctx.fillRect(0,0,w,h);ctx.globalAlpha=1;
  const margin=w*.085;let top=h*.09;
+ if(adLogo){const maxLogoW=w*.22,maxLogoH=h*.055,scale=Math.min(maxLogoW/adLogo.width,maxLogoH/adLogo.height);ctx.drawImage(adLogo,margin,top-maxLogoH*.72,adLogo.width*scale,adLogo.height*scale);}
  ctx.fillStyle=t.accent;ctx.font='700 '+Math.round(w*.024)+'px system-ui';ctx.textAlign='right';ctx.direction='rtl';ctx.fillText('ZOZ PRO  •  CREATIVE STUDIO',w-margin,top);
  ctx.fillStyle=t.accent;ctx.fillRect(w-margin-w*.15,top+22,w*.15,5);
  top+=h*.07;
@@ -2061,11 +2063,13 @@ async function adSave(){
  try{
   await adRender();const session=await ownerSession();const {data:{user},error:userErr}=await sb.auth.getUser(session.access_token);if(userErr||!user?.id)throw userErr||new Error('تعذر تحديد مالك التصميم.');
   const id=crypto.randomUUID(),base=user.id+'/'+id;let assetPath=null;
+  const logoFile=adEl('ad-logo').files?.[0];let logoPath=null;
+  if(logoFile){if(!/^image\\/(png|jpeg|webp)$/.test(logoFile.type))throw new Error('الشعار يجب أن يكون PNG أو JPG أو WebP.');if(logoFile.size>10*1024*1024)throw new Error('الشعار يتجاوز حد 10MB.');logoPath=base+'/logo-'+Date.now()+'.'+(logoFile.type==='image/jpeg'?'jpg':logoFile.type.split('/')[1]);const {error}=await sb.storage.from(AD_BUCKET).upload(logoPath,logoFile,{contentType:logoFile.type,upsert:false});if(error)throw error;}
   const imageFile=adEl('ad-image').files?.[0];
   if(imageFile){if(!/^image\/(png|jpeg|webp)$/.test(imageFile.type))throw new Error('الصيغ المدعومة PNG وJPG وWebP.');if(imageFile.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');assetPath=base+'/source-'+Date.now()+'.'+(imageFile.type==='image/jpeg'?'jpg':imageFile.type.split('/')[1]);const {error}=await sb.storage.from(AD_BUCKET).upload(assetPath,imageFile,{contentType:imageFile.type,upsert:false});if(error)throw error;}
   const png=await new Promise((resolve,reject)=>adEl('ad-canvas').toBlob(blob=>blob?resolve(blob):reject(new Error('تعذر تصدير التصميم إلى PNG.')),'image/png'));
   const exportPath=base+'/creative.png';const {error:pngError}=await sb.storage.from(AD_BUCKET).upload(exportPath,png,{contentType:'image/png',upsert:false});if(pngError)throw pngError;
-  const record={id,owner_id:user.id,title:adVal('ad-title')||'تصميم إعلاني',service_name:adVal('ad-service'),target_audience:adVal('ad-audience'),campaign_goal:adVal('ad-goal'),platform:adVal('ad-platform'),format_key:adVal('ad-format'),template_key:adVal('ad-template'),headline:adVal('ad-headline'),subheadline:adVal('ad-subheadline'),body_copy:adVal('ad-body'),call_to_action:adVal('ad-cta'),copy_package:adCopyPackage||{},design_json:{width:adEl('ad-canvas').width,height:adEl('ad-canvas').height,tone:adVal('ad-tone'),offer:adVal('ad-offer'),proof:adVal('ad-proof'),render_version:1},asset_path:assetPath,export_path:exportPath,status:'draft'};
+  const record={id,owner_id:user.id,title:adVal('ad-title')||'تصميم إعلاني',service_name:adVal('ad-service'),target_audience:adVal('ad-audience'),campaign_goal:adVal('ad-goal'),platform:adVal('ad-platform'),format_key:adVal('ad-format'),template_key:adVal('ad-template'),headline:adVal('ad-headline'),subheadline:adVal('ad-subheadline'),body_copy:adVal('ad-body'),call_to_action:adVal('ad-cta'),copy_package:adCopyPackage||{},design_json:{width:adEl('ad-canvas').width,height:adEl('ad-canvas').height,tone:adVal('ad-tone'),offer:adVal('ad-offer'),proof:adVal('ad-proof'),render_version:1},asset_path:assetPath,logo_path:logoPath,export_path:exportPath,status:'draft'};
   const {data,error}=await sb.from('zoz_pro_ad_creatives').insert(record).select('id,title,created_at').single();if(error)throw error;
   adCurrentId=data.id;notice('ad-status','تم حفظ التصميم والنسخة الأصلية وملف PNG في مساحة خاصة. رقم التصميم: '+data.id,'good');await adLoadSaved();
  }catch(e){notice('ad-status','لم يكتمل الحفظ: '+(e.message||String(e)),'bad')}
@@ -2088,6 +2092,7 @@ adEl('ad-save')?.addEventListener('click',adSave);
 adEl('ad-refresh')?.addEventListener('click',adLoadSaved);
 adEl('ad-export')?.addEventListener('click',async()=>{await adRender();const a=document.createElement('a');a.href=adEl('ad-canvas').toDataURL('image/png');a.download='ZOZ-Pro-Ad-'+adVal('ad-format')+'.png';a.click()});
 ['ad-headline','ad-subheadline','ad-body','ad-cta','ad-format','ad-template','ad-service'].forEach(id=>adEl(id)?.addEventListener('input',()=>adRender()));
+adEl('ad-logo')?.addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{if(!/^image\\/(png|jpeg|webp)$/.test(f.type))throw new Error('اختر شعار PNG أو JPG أو WebP.');adLogo=await adLoadImage(f);await adRender();notice('ad-status','تم تحميل الشعار في المعاينة. سيُحفظ داخل مساحة التصميم الخاصة.','good')}catch(err){notice('ad-status',err.message||'تعذر تحميل الشعار.','bad')}});
 adEl('ad-image')?.addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{if(!/^image\/(png|jpeg|webp)$/.test(f.type))throw new Error('اختر PNG أو JPG أو WebP.');adImage=await adLoadImage(f);await adRender();notice('ad-status','تم تحميل الصورة في المعاينة. لم تُرفع بعد إلى التخزين.','good')}catch(err){notice('ad-status',err.message||'تعذر تحميل الصورة.','bad')}});
 adEl('ad-copy-variants')?.addEventListener('click',e=>{const b=e.target.closest('[data-ad-variant]');if(!b)return;const v=adCopyPackage?.variants?.[Number(b.dataset.adVariant)];if(!v)return;adEl('ad-headline').value=v.headline||'';adEl('ad-body').value=v.primary_text||'';adEl('ad-cta').value=v.call_to_action||'';adRender()});
 adEl('ad-saved-list')?.addEventListener('click',e=>{const b=e.target.closest('[data-ad-download]');if(b)adDownloadSaved(b.dataset.adDownload)});
