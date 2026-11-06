@@ -1344,7 +1344,7 @@ fun uploadDocumentToIntake(context: Context, uri: Uri, appVersion: String): Stri
     val finalized = apiPostWithToken("document_intake_finalize",
         JSONObject().put("asset_id", assetId).put("checksum_sha256", checksum), deviceToken)
     if (finalized.optString("status") != "ready") throw IllegalStateException("تم نقل الملف لكن الخادم لم يؤكد اكتمال الاستقبال.")
-    return "تم استيراد الملف بنجاح إلى ذاكرة ZOZ Pro.\\nالملف: $filename\\nالحجم: $sent بايت\\nبصمة SHA-256: $checksum\\nالحالة: محفوظ بأمان وينتظر تحليل الوكيل."
+    return "تم استيراد الملف بنجاح إلى ذاكرة ZOZ Pro.\nالملف: $filename\nالحجم: $sent بايت\nبصمة SHA-256: $checksum\nالحالة: محفوظ بأمان وينتظر تحليل الوكيل."
 }
 
 private fun apiPost(context: Context, action: String, body: JSONObject): JSONObject {
