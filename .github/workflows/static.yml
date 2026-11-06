@@ -5,6 +5,12 @@ on:
   # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
+    paths-ignore:
+      - "channel-control.html"
+      - "company-office.html"
+      - "qwen-provider-connect.html"
+      - "video-provider-connect.html"
+      - ".github/workflows/pages.yml"
 
   # Allows this workflow to be started manually
   workflow_dispatch:
