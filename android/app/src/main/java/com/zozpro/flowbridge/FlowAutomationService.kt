@@ -96,6 +96,7 @@ class FlowAutomationService : AccessibilityService() {
     private var receiverRegistered = false
     private var controlInspectionScheduled = false
     private var agentPollScheduled = false
+    @Volatile private var activeLocalUploadJobId: String? = null
     private val networkExecutor = Executors.newSingleThreadExecutor()
 
     private fun browserAddressBarText(root: AccessibilityNodeInfo): String? {
@@ -442,6 +443,7 @@ class FlowAutomationService : AccessibilityService() {
                                 }
                             }                            "device.ui_control" -> startUiControl(this@FlowAutomationService, id, payload)
                             "device.voiceover_merge" -> startVoiceoverMerge(id, payload)
+                            "media.downloads.upload" -> startLocalFileUpload(id, payload)
                             else -> throw IllegalArgumentException("capability_not_supported_by_flow_bridge")
                         }
                     }.onFailure { error ->
@@ -460,6 +462,99 @@ class FlowAutomationService : AccessibilityService() {
                 } else {
                     scheduleAgentPoll(15000L)
                 }
+            }
+        }
+    }
+
+
+    private fun startLocalFileUpload(jobId: String, payload: JSONObject) {
+        if (activeLocalUploadJobId != null) return
+        activeLocalUploadJobId = jobId
+        DeviceNotifications.show(this, "بدأت مهمة ملفات ZOZ", "يفحص الهاتف مجلد Downloads بحثًا عن الملف المطابق للأمر.")
+        networkExecutor.execute {
+            var succeeded = false
+            var errorCode = "downloads_upload_failed"
+            var errorMessage = "تعذر رفع الملف."
+            val result = JSONObject()
+            try {
+                if (!isDownloadsAutoAccessGranted()) throw IllegalStateException("downloads_permission_required")
+                val file = findLocalDownloadForAgent(payload)
+                val checksum = sha256LocalFile(file)
+                val prefs = getSharedPreferences("zoz_auto_file_intake", Context.MODE_PRIVATE)
+                val prior = prefs.getString("uploaded_$checksum", null)
+                if (!prior.isNullOrBlank()) {
+                    result.put("duplicate", true).put("asset_id", prior)
+                        .put("filename", file.name).put("sha256", checksum)
+                        .put("message", "تم رفع هذه النسخة سابقًا؛ لم يُنشأ رفع مكرر.")
+                    succeeded = true
+                } else {
+                    val kind = payload.optString("file_kind").lowercase()
+                    if (kind == "video") {
+                        val channelId = payload.optString("channel_id")
+                        val kids = payload.opt("made_for_kids")
+                        val synthetic = payload.opt("contains_synthetic_media")
+                        if (kids !is Boolean || synthetic !is Boolean) {
+                            throw IllegalArgumentException("video_metadata_required: يجب تحديد made_for_kids و contains_synthetic_media في أمر الرفع.")
+                        }
+                        val deviceToken = DeviceTokenVault.read(this)
+                            ?: throw IllegalStateException("device_token_missing")
+                        val tokenResponse = apiPostWithToken(
+                            "device_intake_token",
+                            JSONObject().put("channel_id", channelId),
+                            deviceToken
+                        )
+                        val intakeToken = tokenResponse.optString("intake_token")
+                        if (intakeToken.length < 32) throw IllegalStateException("intake_token_invalid")
+                        DeviceTokenVault.writeIntake(this, intakeToken)
+                        prefs.edit().putString("zoz_intake_channel_id", channelId).apply()
+                        val message = uploadFinalVideoToIntake(
+                            this, Uri.fromFile(file), synthetic, kids, channelId, checksum
+                        )
+                        val assetId = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                            .getString("zoz_last_uploaded_asset_id", "") ?: ""
+                        if (assetId.isBlank()) throw IllegalStateException("video_intake_asset_id_missing")
+                        result.put("asset_id", assetId).put("channel_id", channelId)
+                            .put("intake_status", "ready_for_review")
+                            .put("filename", file.name).put("bytes", file.length())
+                            .put("sha256", checksum).put("upload_message", message)
+                            .put("publication_performed", false)
+                        prefs.edit().putString("uploaded_$checksum", assetId).apply()
+                    } else if (kind == "document") {
+                        val message = uploadDocumentToIntake(this, Uri.fromFile(file), BuildConfig.VERSION_NAME)
+                        result.put("filename", file.name).put("bytes", file.length())
+                            .put("sha256", checksum).put("intake_status", "ready")
+                            .put("upload_message", message)
+                        prefs.edit().putString("uploaded_$checksum", "document:${file.name}").apply()
+                    } else {
+                        throw IllegalArgumentException("unsupported_file_kind")
+                    }
+                    succeeded = true
+                }
+            } catch (error: Exception) {
+                errorCode = error.message?.substringBefore(':')?.take(80) ?: errorCode
+                errorMessage = error.message ?: errorCode
+            }
+            val token = DeviceTokenVault.read(this) ?: ""
+            runCatching {
+                apiPostWithToken(
+                    "complete_job",
+                    JSONObject().put("job_id", jobId)
+                        .put("outcome", if (succeeded) "succeeded" else "failed")
+                        .put("result", result)
+                        .put("error_code", if (succeeded) "" else errorCode)
+                        .put("error_message", if (succeeded) "" else errorMessage.take(500)),
+                    token
+                )
+            }
+            handler.post {
+                activeLocalUploadJobId = null
+                if (succeeded) {
+                    DeviceNotifications.show(this, "اكتمل رفع ملف ZOZ", result.optString("filename", "تمت معالجة الملف") +
+                        if (result.optBoolean("duplicate")) " — لم يُكرر الرفع." else " — محفوظ في الاستقبال الخاص.")
+                } else {
+                    DeviceNotifications.show(this, "تعذر رفع ملف ZOZ", errorMessage.take(180))
+                }
+                scheduleAgentPoll(5000L)
             }
         }
     }
