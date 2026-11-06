@@ -13,6 +13,15 @@ Independent Business Operating System. This repository does not depend on the le
 - Amazon KDP monitoring currently uses manually recorded reports; direct KDP connection is not configured.
 - Make and Runway are optional. Do not add paid services or expose secrets in GitHub or browser code.
 
+## Current additions (2026-11-06)
+
+- The production `channel-control.html` workspace includes an owner-authenticated Ad Studio: editable Arabic copy, audience/goal/platform brief, four design systems, four social aspect ratios, owner-selected image and logo assets, Canvas preview, private Supabase Storage persistence, and PNG export.
+- `zoz-ad-studio` is a production Edge Function for owner-verified Gemini copy generation. It does not publish campaigns, contact prospects, or spend advertising budget.
+- Private storage buckets `zoz-pro-ad-studio` and `zoz-pro-documents` hold owner-selected creative assets and document intake files. The associated metadata tables use owner-scoped RLS.
+- The Android app source now includes a system document picker and signed-upload flow for owner-selected Downloads files. The device agent validates file metadata, verifies stored size, records SHA-256, and registers `document.intake.upload` only after upload finalization.
+- Android document import is **not yet production-verified**: a new APK must pass the Android Actions build, be installed on the owner's vivo V2342, and complete an end-to-end file selection/upload test before this capability is considered active on the phone.
+- CSV/XLSX/PDF parsing and KDP reconciliation remain a follow-up engineering task; file arrival alone does not mean a report has been parsed or sales data recorded.
+
 ## Legacy runtime notes
 
 The following Vercel-specific worker documentation is retained as historical implementation context and is not the primary studio runtime.
