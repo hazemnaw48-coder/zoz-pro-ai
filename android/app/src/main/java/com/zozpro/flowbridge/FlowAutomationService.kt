@@ -479,6 +479,12 @@ class FlowAutomationService : AccessibilityService() {
             try {
                 if (!isDownloadsAutoAccessGranted()) throw IllegalStateException("downloads_permission_required")
                 val file = findLocalDownloadForAgent(payload)
+                val initialSize = file.length()
+                val initialModified = file.lastModified()
+                Thread.sleep(2500L)
+                if (!file.exists() || file.length() != initialSize || file.lastModified() != initialModified) {
+                    throw IllegalStateException("download_not_stable: الملف ما زال قيد التنزيل أو التعديل.")
+                }
                 val checksum = sha256LocalFile(file)
                 val prefs = getSharedPreferences("zoz_auto_file_intake", Context.MODE_PRIVATE)
                 val prior = prefs.getString("uploaded_$checksum", null)
