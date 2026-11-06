@@ -1,0 +1,132 @@
+schema: paperclip/v1
+agents:
+  ceo:
+    adapter:
+      type: gemini_local
+      config:
+        engine: cli
+        model: gemini-3.5-flash-lite
+        timeoutSec: 300
+        graceSec: 15
+    inputs:
+      env:
+        GEMINI_API_KEY:
+          kind: secret
+          requirement: optional
+  research-lead:
+    adapter:
+      type: gemini_local
+      config:
+        engine: cli
+        model: gemini-3.5-flash-lite
+        timeoutSec: 300
+        graceSec: 15
+    inputs:
+      env:
+        GEMINI_API_KEY:
+          kind: secret
+          requirement: optional
+  content-producer:
+    adapter:
+      type: gemini_local
+      config:
+        engine: cli
+        model: gemini-3.5-flash-lite
+        timeoutSec: 300
+        graceSec: 15
+    inputs:
+      env:
+        GEMINI_API_KEY:
+          kind: secret
+          requirement: optional
+  digital-product-manager:
+    adapter:
+      type: gemini_local
+      config:
+        engine: cli
+        model: gemini-3.5-flash-lite
+        timeoutSec: 300
+        graceSec: 15
+    inputs:
+      env:
+        GEMINI_API_KEY:
+          kind: secret
+          requirement: optional
+  publishing-manager:
+    adapter:
+      type: gemini_local
+      config:
+        engine: cli
+        model: gemini-3.5-flash-lite
+        timeoutSec: 300
+        graceSec: 15
+    inputs:
+      env:
+        GEMINI_API_KEY:
+          kind: secret
+          requirement: optional
+  services-manager:
+    adapter:
+      type: gemini_local
+      config:
+        engine: cli
+        model: gemini-3.5-flash-lite
+        timeoutSec: 300
+        graceSec: 15
+    inputs:
+      env:
+        GEMINI_API_KEY:
+          kind: secret
+          requirement: optional
+  software-engineer:
+    adapter:
+      type: gemini_local
+      config:
+        engine: cli
+        model: gemini-3.5-flash-lite
+        timeoutSec: 300
+        graceSec: 15
+    inputs:
+      env:
+        GEMINI_API_KEY:
+          kind: secret
+          requirement: optional
+  sales-marketing:
+    adapter:
+      type: gemini_local
+      config:
+        engine: cli
+        model: gemini-3.5-flash-lite
+        timeoutSec: 300
+        graceSec: 15
+    inputs:
+      env:
+        GEMINI_API_KEY:
+          kind: secret
+          requirement: optional
+  finance-controller:
+    adapter:
+      type: gemini_local
+      config:
+        engine: cli
+        model: gemini-3.5-flash-lite
+        timeoutSec: 300
+        graceSec: 15
+    inputs:
+      env:
+        GEMINI_API_KEY:
+          kind: secret
+          requirement: optional
+  operations-qa:
+    adapter:
+      type: gemini_local
+      config:
+        engine: cli
+        model: gemini-3.5-flash-lite
+        timeoutSec: 300
+        graceSec: 15
+    inputs:
+      env:
+        GEMINI_API_KEY:
+          kind: secret
+          requirement: optional
