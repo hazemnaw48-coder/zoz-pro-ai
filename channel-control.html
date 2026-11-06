@@ -2313,7 +2313,7 @@ async function kdpDocAnalyze(id){
     const score=(headers.some(h=>h.includes('asin'))?2:0)+(headers.some(h=>h.includes('title'))?2:0)+(headers.some(h=>h.includes('unit')||h.includes('royalt')||h.includes('earning')||h.includes('kenp')||h.includes('page'))?2:0);
     return {name,rows:normalized,score};
    }).sort((a,b)=>b.score-a.score);
-   if(!scored.length||scored[0].score<4)throw new Error('لم أجد ورقة Excel تحتوي أعمدة ASIN/Title وبيانات مبيعات أو عوائد أو KENP.');
+   if(!scored.length||scored[0].score<4)throw new Error('لم أجد أعمدة التقرير المتوقعة في أول صف من الورقة. يلزم فحص كل الأوراق وصفوف العناوين قبل استنتاج أن الملف غير مدعوم.');
    rows=scored[0].rows;
   }else{
    throw new Error('امتداد التقرير غير مدعوم للتحليل. الملف محفوظ دون تعديل سجل الكتب.');
