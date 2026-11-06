@@ -11,7 +11,7 @@
     </queries>
     <application
         android:allowBackup="false"
-        android:label="ZOZ Pro Bridge 0.8.3"
+        android:label="ZOZ Pro Bridge Auto 0.8.3"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
