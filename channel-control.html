@@ -2327,8 +2327,21 @@ async function adRunFullProduction(){
 }
 async function adCanvaConnect(){
  const b=adEl('ad-canva-connect');if(b)b.disabled=true;
- try{const session=await ownerSession();const {data,error}=await sb.functions.invoke('zoz-canva-connect',{body:{action:'authorize'}});if(error)throw error;if(!data?.authorization_url)throw new Error(data?.error||'تعذر بدء تفويض Canva.');window.location.assign(data.authorization_url)}
- catch(e){notice('ad-status','تعذر بدء ربط Canva: '+(e.message||String(e)),'bad');if(b)b.disabled=false}
+ try{
+  const session=await ownerSession();
+  const endpoint=SUPABASE_URL+'/functions/v1/zoz-canva-connect';
+  let response,data,lastError;
+  for(let attempt=0;attempt<2;attempt++){
+   try{
+    response=await fetch(endpoint,{method:'POST',mode:'cors',cache:'no-store',headers:{'content-type':'application/json','apikey':SUPABASE_PUBLISHABLE_KEY,'authorization':'Bearer '+session.access_token},body:JSON.stringify({action:'authorize'}),signal:AbortSignal.timeout(30000)});
+    data=await response.json().catch(()=>({}));
+    if(response.ok&&data?.authorization_url)break;
+    throw new Error(data?.error||('خدمة Canva أعادت HTTP '+response.status));
+   }catch(e){lastError=e;if(attempt===0)await new Promise(r=>setTimeout(r,1200));}
+  }
+  if(!response?.ok||!data?.authorization_url)throw lastError||new Error('لم يصل رد صالح من خدمة Canva.');
+  window.location.assign(data.authorization_url);
+ }catch(e){notice('ad-status','تعذر بدء ربط Canva: '+(e.message||String(e))+' — لم يصل طلب التفويض إلى نهايته؛ تحقق من الاتصال ثم أعد المحاولة.','bad');if(b)b.disabled=false}
 }
 async function adBlobBase64(blob){
  const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';const step=0x8000;
