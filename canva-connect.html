@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>ZOZ Pro — ربط Canva</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{color-scheme:dark}body{margin:0;padding:20px;max-width:760px;margin-inline:auto;background:#0b1220;color:#e5edf7;font:16px system-ui}.card{background:#142238;border:1px solid #30465f;border-radius:16px;padding:18px;margin:14px 0}input,button{box-sizing:border-box;width:100%;padding:13px;margin:7px 0;border-radius:10px;border:1px solid #49617b;background:#081525;color:white}button{background:#087eb7;border:0;font-weight:700}button:disabled{opacity:.5}.muted{color:#9fb2c8;font-size:13px}.ok{color:#86efac}.bad{color:#fca5a5}.hidden{display:none!important}a{color:#7dd3fc}
+</style>
+</head>
+<body>
+<h1>ZOZ Pro — ربط Canva</h1>
+<p class="muted">هذه الصفحة مخصصة لحساب Hazem Now فقط. سجّل الدخول أولاً، ثم احفظ بيانات تطبيق Canva في الخزنة الآمنة. لا تضع كلمة المرور أو مفاتيح التطبيق في المحادثة.</p>
+<section id="login" class="card">
+<h3>دخول المالك</h3>
+<input id="email" type="email" value="hazemnaw48@gmail.com" autocomplete="username">
+<input id="password" type="password" autocomplete="current-password" placeholder="كلمة المرور">
+<button id="signin">دخول</button><p id="loginmsg"></p>
+</section>
+<section id="app" class="card hidden">
+<p>جلسة المالك: <b id="who"></b></p>
+<h3>إعداد تطبيق Canva</h3>
+<p class="muted">أدخل Client ID وClient Secret من إعدادات تطبيق Canva الخاص بحساب Hazem Now. تُرسل البيانات إلى دالة محمية وتحفظ في Supabase Vault.</p>
+<input id="clientid" autocomplete="off" placeholder="Canva Client ID">
+<input id="clientsecret" type="password" autocomplete="new-password" placeholder="Canva Client Secret">
+<button id="savecreds">حفظ بيانات التطبيق بأمان</button>
+<button id="authorize">1 — ربط حساب Canva (Hazem Now)</button>
+<button id="test">2 — اختبار الاتصال</button>
+<button id="designs">3 — قراءة قائمة التصاميم</button>
+<button id="logout">تسجيل الخروج</button>
+<p id="msg"></p><pre id="result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+</section>
+<p><a href="https://hazemnaw48-coder.github.io/zoz-pro-ai/channel-control.html">العودة إلى مركز إنتاج ZOZ Pro</a></p>
+<script>
+"use strict";
+const SUPABASE_URL="https://oxyzxbkwhafzaztraowc.supabase.co";
+const SUPABASE_KEY="sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm";
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const el=id=>document.getElementById(id);
+async function getSession(){const {data,error}=await sb.auth.getSession();if(error)throw error;return data.session;}
+async function invokeFunction(slug,payload){
+  const session=await getSession();
+  if(!session)throw new Error("سجّل الدخول أولاً");
+  const response=await fetch(SUPABASE_URL+"/functions/v1/"+slug,{
+    method:"POST",
+    headers:{apikey:SUPABASE_KEY,authorization:"Bearer "+session.access_token,"content-type":"application/json"},
+    body:JSON.stringify(payload)
+  });
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
+  return data;
+}
+async function showApp(){
+  const session=await getSession();
+  if(!session)return;
+  el("login").classList.add("hidden");
+  el("app").classList.remove("hidden");
+  el("who").textContent=session.user.email||"المالك";
+}
+function showMessage(target,message,kind){
+  el(target).textContent=message;
+  el(target).className=kind||"";
+}
+el("signin").addEventListener("click",async()=>{
+  try{
+    const {error}=await sb.auth.signInWithPassword({email:el("email").value.trim(),password:el("password").value});
+    if(error)throw error;
+    await showApp();
+  }catch(error){showMessage("loginmsg",error.message,"bad");}
+});
+el("savecreds").addEventListener("click",async()=>{
+  const button=el("savecreds");
+  try{
+    button.disabled=true;
+    const session=await getSession();
+    if(!session)throw new Error("سجّل الدخول أولاً");
+    const clientId=el("clientid").value.trim();
+    const clientSecret=el("clientsecret").value.trim();
+    if(!clientId||!clientSecret)throw new Error("أدخل Client ID وClient Secret");
+    const {data,error}=await sb.rpc("zoz_canva_store_client_credentials",{
+      p_owner_id:session.user.id,p_client_id:clientId,p_client_secret:clientSecret
+    });
+    if(error)throw error;
+    if(!data||data.ok!==true)throw new Error("لم يؤكد الخادم حفظ بيانات Canva");
+    el("clientid").value="";
+    el("clientsecret").value="";
+    showMessage("msg","تم تأكيد حفظ بيانات التطبيق في Supabase Vault لحساب Hazem Now.","ok");
+  }catch(error){showMessage("msg",error.message,"bad");}
+  finally{button.disabled=false;}
+});
+el("authorize").addEventListener("click",async()=>{
+  const button=el("authorize");
+  try{
+    button.disabled=true;
+    showMessage("msg","جارٍ تجهيز التفويض الآمن…","");
+    const data=await invokeFunction("zoz-canva-connect",{});
+    if(!data.authorization_url)throw new Error("لم يرجع الخادم رابط التفويض");
+    window.location.assign(data.authorization_url);
+  }catch(error){showMessage("msg",error.message,"bad");button.disabled=false;}
+});
+async function runAdapter(action){
+  try{
+    showMessage("msg","جارٍ تنفيذ الاختبار…","");
+    const data=await invokeFunction("zoz-canva-adapter",{action});
+    showMessage("msg","اكتمل الطلب بنجاح.","ok");
+    el("result").textContent=JSON.stringify(data.result??data,null,2);
+  }catch(error){showMessage("msg",error.message,"bad");}
+}
+el("test").addEventListener("click",()=>runAdapter("test_connection"));
+el("designs").addEventListener("click",()=>runAdapter("list_designs"));
+el("logout").addEventListener("click",async()=>{await sb.auth.signOut();window.location.reload();});
+showApp().catch(error=>showMessage("loginmsg",error.message,"bad"));
+</script>
+</body>
+</html>
