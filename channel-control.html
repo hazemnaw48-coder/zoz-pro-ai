@@ -2238,9 +2238,9 @@ function adQualityCheck(){
  checks.push({label:'دعوة إجراء موجودة',ok:!!cta,level:'error'});
  checks.push({label:'المقاس مطابق لاختيار المنصة',ok:!!adVal('ad-format'),level:'error'});
  checks.push({label:'عنصر بصري متوفر',ok:!!adImage||adRenderMetrics.artMode==='built-in-vector-scene',level:'error'});
- checks.push({label:'العنوان ضمن مساحة القراءة',ok:adRenderMetrics.titleLines<=3,level:'warning'});
+ checks.push({label:'العنوان ضمن مساحة القراءة',ok:adRenderMetrics.titleLines<=3,level:'error'});
  checks.push({label:'النص المساند مختصر',ok:adRenderMetrics.subLines<=2,level:'warning'});
- checks.push({label:'النص التفصيلي لا يتجاوز المساحة',ok:adRenderMetrics.bodyLines<=2,level:'warning'});
+ checks.push({label:'النص التفصيلي لا يتجاوز المساحة',ok:adRenderMetrics.bodyLines<=2,level:'error'});
  checks.push({label:'الادعاءات تستند إلى معلومات الموجز',ok:!adVal('ad-proof')||adVal('ad-proof').length>0,level:'warning'});
  const blocking=checks.filter(x=>x.level==='error'&&!x.ok),warnings=checks.filter(x=>x.level==='warning'&&!x.ok);
  adLastQA={ready:blocking.length===0,passed:checks.filter(x=>x.ok).length,total:checks.length,blocking:blocking.length,warnings:warnings.length,checks,checked_at:new Date().toISOString()};
@@ -2350,7 +2350,7 @@ async function adEditSaved(id){
   const {data,error}=await sb.from('zoz_pro_ad_creatives').select('id,title,service_name,target_audience,campaign_goal,platform,format_key,template_key,headline,subheadline,body_copy,call_to_action,copy_package,design_json,asset_path,logo_path').eq('id',id).single();if(error)throw error;
   const fields={'ad-title':'title','ad-service':'service_name','ad-audience':'target_audience','ad-goal':'campaign_goal','ad-platform':'platform','ad-format':'format_key','ad-template':'template_key','ad-headline':'headline','ad-subheadline':'subheadline','ad-body':'body_copy','ad-cta':'call_to_action'};
   for(const [field,key] of Object.entries(fields)){if(data[key]!=null&&adEl(field))adEl(field).value=data[key]}
-  adCopyPackage=data.copy_package||{};if(data.design_json?.sector_template)adEl('ad-sector-template').value=data.design_json.sector_template;if(data.design_json?.composition&&adEl('ad-composition'))adEl('ad-composition').value=data.design_json.composition;adImage=null;adLogo=null;adEl('ad-image').value='';adEl('ad-logo').value='';
+  adCopyPackage=data.copy_package||{};if(data.design_json?.sector_template)adEl('ad-sector-template').value=data.design_json.sector_template;if(data.design_json?.composition&&adEl('ad-composition'))adEl('ad-composition').value=data.design_json.composition;if(data.design_json?.tone&&adEl('ad-tone'))adEl('ad-tone').value=data.design_json.tone;if(adEl('ad-offer'))adEl('ad-offer').value=data.design_json?.offer||'';if(adEl('ad-proof'))adEl('ad-proof').value=data.design_json?.proof||'';adImage=null;adLogo=null;adEl('ad-image').value='';adEl('ad-logo').value='';
   if(data.asset_path){const {data:file,error:e}=await sb.storage.from(AD_BUCKET).download(data.asset_path);if(e)throw e;adImage=await adLoadImage(file)}
   if(data.logo_path){const {data:file,error:e}=await sb.storage.from(AD_BUCKET).download(data.logo_path);if(e)throw e;adLogo=await adLoadImage(file)}
   await adRender();adRenderVariants(adCopyPackage?.variants||[],adCopyPackage);
