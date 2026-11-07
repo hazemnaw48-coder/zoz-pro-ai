@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#101827">
 <title>ZOZ Pro — مركز التحليل ورفع الفيديو</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>if(!window.supabase){document.write('<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"><\\/script>')}</script>
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <style>
 :root{color-scheme:dark;--bg:#0c1422;--panel:#121f31;--line:#2b3c53;--text:#eef4ff;--muted:#a9bad0;--accent:#80a9ff;--good:#50d5a0;--warn:#ffca70;--bad:#ff8989}
@@ -2616,7 +2616,7 @@ adEl('ad-export')?.addEventListener('click',async()=>{await adRender();const a=d
 ['ad-image-starches','ad-image-butcher'].forEach(id=>adEl(id)?.addEventListener('change',async e=>{
  const file=e.target.files?.[0];if(!file)return;
  try{
-  if(!/^image\\/(png|jpeg|webp)$/.test(file.type))throw new Error('اختر صورة PNG أو JPG أو WebP.');
+  if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw new Error('اختر صورة PNG أو JPG أو WebP.');
   if(file.size>25*1024*1024)throw new Error('الصورة تتجاوز 25MB.');
   const section=id==='ad-image-butcher'?'butcher':'starches';adLoadedAssetPaths[section]=null;
   if(id===adCurrentImageInputId()){adImage=await adLoadImage(file);await adRender();adQualityCheck()}
