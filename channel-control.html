@@ -2314,26 +2314,28 @@ async function adSave(){
 }
 async function adSavePack(){
  const b=adEl('ad-save-pack');if(b)b.disabled=true;
- const originalFormat=adVal('ad-format');
+ const originalFormat=adVal('ad-format'),uploadedPaths=[];let committed=false;
  try{
   await adRender();const qa=adQualityCheck();if(!qa.ready)throw new Error('أصلح نقاط الفحص الأساسية قبل حفظ الحزمة.');
   const session=await ownerSession();const {data:{user},error:userErr}=await sb.auth.getUser(session.access_token);if(userErr||!user?.id)throw userErr||new Error('تعذر تحديد مالك التصميم.');
   const packId=crypto.randomUUID(),base=user.id+'/'+packId;let assetPath=null,logoPath=null;
-  const uploadOptional=async(inputId,prefix)=>{const file=adEl(inputId).files?.[0];if(!file)return null;if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw new Error('الصيغ المدعومة PNG وJPG وWebP.');if(file.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');const ext=file.type==='image/jpeg'?'jpg':file.type.split('/')[1],path=base+'/'+prefix+'.'+ext;const {error}=await sb.storage.from(AD_BUCKET).upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;return path};
+  const uploadOptional=async(inputId,prefix)=>{const file=adEl(inputId).files?.[0];if(!file)return null;if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw new Error('الصيغ المدعومة PNG وJPG وWebP.');if(file.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');const ext=file.type==='image/jpeg'?'jpg':file.type.split('/')[1],path=base+'/'+prefix+'.'+ext;const {error}=await sb.storage.from(AD_BUCKET).upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;uploadedPaths.push(path);return path};
   logoPath=await uploadOptional('ad-logo','brand-logo');assetPath=await uploadOptional('ad-image','source-image');
   const formats=[{key:'portrait',size:[1080,1350]},{key:'square',size:[1080,1080]},{key:'story',size:[1080,1920]},{key:'landscape',size:[1920,1080]}];
   const records=[];
   for(const item of formats){
    adEl('ad-format').value=item.key;await adRender();const check=adQualityCheck();
    const blob=await new Promise((resolve,reject)=>adEl('ad-canvas').toBlob(v=>v?resolve(v):reject(new Error('تعذر تصدير '+item.key)),'image/png'));
-   const exportPath=base+'/creative-'+item.key+'.png';const {error:pngError}=await sb.storage.from(AD_BUCKET).upload(exportPath,blob,{contentType:'image/png',upsert:false});if(pngError)throw pngError;
+   const exportPath=base+'/creative-'+item.key+'.png';const {error:pngError}=await sb.storage.from(AD_BUCKET).upload(exportPath,blob,{contentType:'image/png',upsert:false});if(pngError)throw pngError;uploadedPaths.push(exportPath);
    const id=crypto.randomUUID();
    records.push({id,owner_id:user.id,title:(adVal('ad-title')||'تصميم إعلاني')+' · '+item.key,service_name:adVal('ad-service'),target_audience:adVal('ad-audience'),campaign_goal:adVal('ad-goal'),platform:adVal('ad-platform'),format_key:item.key,template_key:adVal('ad-template'),headline:adVal('ad-headline'),subheadline:adVal('ad-subheadline'),body_copy:adVal('ad-body'),call_to_action:adVal('ad-cta'),copy_package:adCopyPackage||{},design_json:{width:item.size[0],height:item.size[1],tone:adVal('ad-tone'),offer:adVal('ad-offer'),proof:adVal('ad-proof'),sector_template:adVal('ad-sector-template'),composition:adVal('ad-composition'),render_version:2,pack_id:packId,quality_report:check,art_mode:adRenderMetrics.artMode},asset_path:assetPath,logo_path:logoPath,export_path:exportPath,status:'draft'});
   }
   const {error}=await sb.from('zoz_pro_ad_creatives').insert(records);if(error)throw error;
-  adCurrentId=records[0].id;notice('ad-status','تم حفظ حزمة من 4 تصميمات PNG بالمقاسات 4:5 و1:1 و9:16 و16:9 داخل مساحة ZOZ Pro الخاصة.','good');await adLoadSaved();
- }catch(e){notice('ad-status','لم يكتمل حفظ الحزمة: '+(e.message||String(e)),'bad')}
- finally{adEl('ad-format').value=originalFormat;await adRender();adQualityCheck();if(b)b.disabled=false}
+  committed=true;adCurrentId=records[0].id;notice('ad-status','تم حفظ حزمة من 4 تصميمات PNG بالمقاسات 4:5 و1:1 و9:16 و16:9 داخل مساحة ZOZ Pro الخاصة.','good');await adLoadSaved();
+ }catch(e){
+  if(!committed&&uploadedPaths.length){const {error:cleanupError}=await sb.storage.from(AD_BUCKET).remove(uploadedPaths);if(cleanupError)console.warn('Ad pack rollback cleanup failed:',cleanupError)}
+  notice('ad-status','لم يكتمل حفظ الحزمة: '+(e.message||String(e))+(uploadedPaths.length?' · تم طلب تنظيف الملفات المؤقتة.':''),'bad')
+ }finally{adEl('ad-format').value=originalFormat;await adRender();adQualityCheck();if(b)b.disabled=false}
 }
 async function adLoadSaved(){
  const host=adEl('ad-saved-list');host.innerHTML='جارٍ تحميل التصاميم…';
@@ -2348,7 +2350,7 @@ async function adEditSaved(id){
   const {data,error}=await sb.from('zoz_pro_ad_creatives').select('id,title,service_name,target_audience,campaign_goal,platform,format_key,template_key,headline,subheadline,body_copy,call_to_action,copy_package,design_json,asset_path,logo_path').eq('id',id).single();if(error)throw error;
   const fields={'ad-title':'title','ad-service':'service_name','ad-audience':'target_audience','ad-goal':'campaign_goal','ad-platform':'platform','ad-format':'format_key','ad-template':'template_key','ad-headline':'headline','ad-subheadline':'subheadline','ad-body':'body_copy','ad-cta':'call_to_action'};
   for(const [field,key] of Object.entries(fields)){if(data[key]!=null&&adEl(field))adEl(field).value=data[key]}
-  adCopyPackage=data.copy_package||{};if(data.design_json?.sector_template)adEl('ad-sector-template').value=data.design_json.sector_template;adImage=null;adLogo=null;adEl('ad-image').value='';adEl('ad-logo').value='';
+  adCopyPackage=data.copy_package||{};if(data.design_json?.sector_template)adEl('ad-sector-template').value=data.design_json.sector_template;if(data.design_json?.composition&&adEl('ad-composition'))adEl('ad-composition').value=data.design_json.composition;adImage=null;adLogo=null;adEl('ad-image').value='';adEl('ad-logo').value='';
   if(data.asset_path){const {data:file,error:e}=await sb.storage.from(AD_BUCKET).download(data.asset_path);if(e)throw e;adImage=await adLoadImage(file)}
   if(data.logo_path){const {data:file,error:e}=await sb.storage.from(AD_BUCKET).download(data.logo_path);if(e)throw e;adLogo=await adLoadImage(file)}
   await adRender();adRenderVariants(adCopyPackage?.variants||[],adCopyPackage);
