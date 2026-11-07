@@ -5,9 +5,80 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#101827">
 <title>ZOZ Pro — مركز التحليل ورفع الفيديو</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<script>
+/* Non-blocking Supabase loader with a visible failure state. */
+window.__zozSupabaseReady = new Promise((resolve, reject) => {
+  const sources = [
+    "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
+    "https://unpkg.com/@supabase/supabase-js@2"
+  ];
+  let index = 0;
+  const finish = (error) => {
+    if (error) reject(error);
+    else resolve(window.supabase);
+  };
+  const next = () => {
+    if (window.supabase && typeof window.supabase.createClient === "function") {
+      finish();
+      return;
+    }
+    if (index >= sources.length) {
+      finish(new Error("تعذر تحميل مكتبة الاتصال من مصدري الخدمة."));
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = sources[index++];
+    script.async = true;
+    let settled = false;
+    const fail = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      script.onload = null;
+      script.onerror = null;
+      script.remove();
+      next();
+    };
+    const timer = window.setTimeout(fail, 8000);
+    script.onload = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      if (window.supabase && typeof window.supabase.createClient === "function") finish();
+      else next();
+    };
+    script.onerror = fail;
+    document.head.appendChild(script);
+  };
+  next();
+});
+window.addEventListener("error", (event) => {
+  const show = () => {
+    const msg = document.getElementById("login-msg");
+    if (msg && event.message) {
+      msg.className = "notice bad";
+      msg.textContent = "تعذر تشغيل جزء من مركز الأقسام: " + event.message;
+    }
+    const pill = document.getElementById("login-pill");
+    if (pill) pill.textContent = "خطأ في تشغيل المركز";
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", show, { once: true });
+  else show();
+});
+window.addEventListener("unhandledrejection", (event) => {
+  const show = () => {
+    const msg = document.getElementById("login-msg");
+    if (msg) {
+      msg.className = "notice bad";
+      msg.textContent = "تعذر إكمال تهيئة المركز: " + String(event.reason && (event.reason.message || event.reason) || "خطأ غير معروف");
+    }
+    const pill = document.getElementById("login-pill");
+    if (pill) pill.textContent = "تعذر تهيئة المركز";
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", show, { once: true });
+  else show();
+});
+</script>
 <style>
 :root{color-scheme:dark;--bg:#0c1422;--panel:#121f31;--line:#2b3c53;--text:#eef4ff;--muted:#a9bad0;--accent:#80a9ff;--good:#50d5a0;--warn:#ffca70;--bad:#ff8989}
 *{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#0b1422,#101c2d);color:var(--text);font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -509,9 +580,18 @@ body.upload-mode .footer{font-size:11px}
 <div class="footer small">إدارة محكومة: تبقى الفيديوهات خاصة حتى اكتمال مراجعة المالك وتأكيد النشر صراحةً. <span>·</span> <a href="https://github.com/hazemnaw48-coder/zoz-pro-ai/blob/main/ZOZ-PRO-EXECUTION-NOTES.md" target="_blank" rel="noopener">سجل تنفيذ المركز والملاحظات</a></div>
 </main>
 <script>
-(function(){
+(async function(){
 'use strict';
-if(!window.supabase){const msg=document.getElementById('login-msg');if(msg){msg.className='notice bad';msg.textContent='تعذر تحميل مكتبة تسجيل الدخول من مصادر الخدمة. حدّث الصفحة أو افتحها في متصفح آخر؛ لم يتم تغيير حسابك أو كلمة مروره.';}const button=document.getElementById('login');if(button)button.disabled=true;return;}
+try {
+ await window.__zozSupabaseReady;
+ if(!window.supabase||typeof window.supabase.createClient!=='function')throw new Error('مكتبة Supabase غير جاهزة.');
+} catch(loaderError) {
+ const msg=document.getElementById('login-msg');
+ if(msg){msg.className='notice bad';msg.textContent='تعذر تحميل مكتبة الاتصال. تأكد من الإنترنت ثم أعد فتح المركز. لم يتم تغيير الحساب أو كلمة المرور.';}
+ const button=document.getElementById('login');if(button)button.disabled=true;
+ const pill=document.getElementById('login-pill');if(pill)pill.textContent='تعذر تحميل الاتصال';
+ return;
+}
 const pageParams=new URLSearchParams(window.location.search);
 const requestedPage=pageParams.get('page')||'';
 const requestedAuthorizationChannel=String(pageParams.get('authorize_channel')||'');
@@ -528,6 +608,12 @@ const API=SUPABASE_URL+'/functions/v1/zoz-pro-youtube-analytics';
 const AGENT_API=SUPABASE_URL+'/functions/v1/zoz-pro-agent';
 const AGENT_CONTROL_API=SUPABASE_URL+'/functions/v1/zoz-pro-agent-control';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+function getSessionSafely(){
+ return new Promise((resolve,reject)=>{
+  const timer=window.setTimeout(()=>reject(new Error('استغرق فحص الجلسة أكثر من 12 ثانية. تحقق من اتصال الإنترنت ثم أعد المحاولة.')),12000);
+  sb.auth.getSession().then(result=>{window.clearTimeout(timer);resolve(result);},error=>{window.clearTimeout(timer);reject(error);});
+ });
+}
 const $=id=>document.getElementById(id);
 const FEKRA_UPLOAD_CHANNEL_ID='UC9fr5B0SZZkmVAApfCqEO3w';
 const HAZEM_UPLOAD_CHANNEL_ID='UCIael48cvwPG3gKj--c7HKw';
@@ -575,7 +661,7 @@ function showPage(pageKey, scrollTop=true){
 }
 function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage(uploadMode?'intake':(requestedPage==='tiktok'?'tiktok':(requestedPage==='ads'?'ads':(requestedPage==='books'?'books':'connection'))),false);notice('intake-msg',uploadMode?'الجلسة متصلة. اختر ملف الفيديو ثم اضغط «رفع الفيديو للمراجعة والنشر».':'جلسة المالك متصلة بمشروع الإنتاج.','good');if(!uploadMode){if(requestedPage==='tiktok')loadTikTokAccounts();else{loadManagedChannels();loadHFProviderStatus();}if(requestedPage==='ads'){adRender();adQualityCheck();adCheckHealth();adLoadSaved();}if(requestedPage==='books'){loadBooksDashboard();kdpDocRefresh();}setTimeout(()=>processPendingKdpReportsOnLogin(),900);if(automaticAmazonExcelRequest&&!automaticAmazonExcelStarted){automaticAmazonExcelStarted=true;setTimeout(()=>queueLatestAmazonExcelFromPhone(true),250);}}}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
 async function ownerSession(){
- const {data,error}=await sb.auth.getSession();if(error)throw error;const session=data&&data.session;
+ const {data,error}=await getSessionSafely();if(error)throw error;const session=data&&data.session;
  if(!session||!session.access_token)throw new Error('لا توجد جلسة مالك محفوظة. سجّل الدخول بحساب مالك ZOZ Pro.');
  const {data:userData,error:userError}=await sb.auth.getUser(session.access_token);if(userError)throw userError;
  const user=userData&&userData.user;
@@ -926,7 +1012,7 @@ async function runZozPostproduction(){
  if(!source.type.startsWith('video/')&&!/\.(mp4|mov|webm|mkv)$/i.test(source.name))throw new Error('الملف المحدد ليس ملف فيديو معروفًا.');
  if(source.size>850*1024*1024)throw new Error('حجم الفيديو يتجاوز الحد المسموح للمعالجة في المتصفح.');
  if(narration.length<40||narration.length>1800)throw new Error('نص التعليق يجب أن يكون بين 40 و1800 حرف.');
- const {data:sessionData,error:sessionError}=await sb.auth.getSession();
+ const {data:sessionData,error:sessionError}=await getSessionSafely();
  if(sessionError||!sessionData?.session?.access_token)throw new Error('سجّل دخول المالك إلى ZOZ Pro أولًا ثم أعد المحاولة.');
  const token=sessionData.session.access_token;
  const userEmail=String(sessionData.session.user?.email||'').toLowerCase();
@@ -1484,7 +1570,7 @@ const end=new Date(Date.now()-86400000);const start=new Date(end);start.setDate(
 $('load-calendar')?.addEventListener('click',async()=>{try{await loadContentCalendar()}catch(e){notice('calendar-msg',e.message||'تعذر تحميل التقويم.','bad')}});
 $('generate-calendar')?.addEventListener('click',async()=>{const b=$('generate-calendar');b.disabled=true;try{await generateContentCalendar()}catch(e){notice('calendar-msg',e.message||'تعذر إنشاء التقويم.','bad')}finally{b.disabled=false}});
 (async()=>{
- try{const {data}=await sb.auth.getSession();if(data&&data.session){await ownerSession();setSigned(true);notice('login-msg','تم العثور على جلسة مالك محفوظة في مشروع الإنتاج.','good');if(requestedAuthorizationChannel){await startRequestedGoogleAuthorization();return;}if(uploadMode)await loadIntakeAssets();else await refreshStatus();}else{setSigned(false);notice('login-msg',requestedAuthorizationChannel?'سجّل الدخول بحساب مالك ZOZ Pro وسيبدأ تفويض Hazem Ahmed تلقائيًا.':'لم توجد جلسة إنتاج محفوظة. سجّل الدخول فقط؛ لن نعيد تفويض Google.');}}
+ try{const {data}=await getSessionSafely();if(data&&data.session){await ownerSession();setSigned(true);notice('login-msg','تم العثور على جلسة مالك محفوظة في مشروع الإنتاج.','good');if(requestedAuthorizationChannel){await startRequestedGoogleAuthorization();return;}if(uploadMode)await loadIntakeAssets();else await refreshStatus();}else{setSigned(false);notice('login-msg',requestedAuthorizationChannel?'سجّل الدخول بحساب مالك ZOZ Pro وسيبدأ تفويض Hazem Ahmed تلقائيًا.':'لم توجد جلسة إنتاج محفوظة. سجّل الدخول فقط؛ لن نعيد تفويض Google.');}}
  catch(e){setSigned(false);notice('login-msg',e.message||'تعذر استعادة الجلسة.','bad');}
 })();
 
