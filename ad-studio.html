@@ -198,7 +198,8 @@ function setSector(key){
  sector=key;const p=presets[key];
  $("ad-title").value=p.title;$("ad-headline").value=p.headline;$("ad-subheadline").value=p.subheadline;$("ad-body").value=p.body;$("ad-cta").value=p.cta;$("ad-tag").value=p.tag;
  $("preset-starches").classList.toggle("active",key==="starches");$("preset-butcher").classList.toggle("active",key==="butcher");
- photo=null;$("ad-photo").value="";render();quality();
+ $("ad-photo").value="";restoreAssets();
+ render();quality();
  $("status").textContent=key==="starches"?"تم تجهيز رواية النشويات: اختيار الطبق ← تكملة الوجبة ← سفرة الأكابر.":"تم تجهيز رواية اللحوم: اختيار القطعة ← تجهيزها ← على سفرتك.";
 }
 function loadImage(file,done){if(!file)return;if(!/^image\/(png|jpeg|webp)$/.test(file.type)){ $("status").textContent="الصورة يجب أن تكون PNG أو JPG أو WebP.";return}if(file.size>20*1024*1024){$("status").textContent="حجم الصورة يتجاوز 20MB.";return}const url=URL.createObjectURL(file),img=new Image();img.onload=()=>{done(img);URL.revokeObjectURL(url);render();};img.onerror=()=>{$("status").textContent="تعذر قراءة الصورة المختارة.";URL.revokeObjectURL(url)};img.src=url}
@@ -244,11 +245,17 @@ function restoreDraft(){try{const saved=JSON.parse(localStorage.getItem(draftKey
 $("preset-starches").addEventListener("click",()=>setSector("starches"));
 $("preset-butcher").addEventListener("click",()=>setSector("butcher"));
 ["ad-title","ad-headline","ad-subheadline","ad-body","ad-cta","ad-tag","ad-format","ad-theme"].forEach(id=>$(id).addEventListener("input",()=>{render();quality();saveDraft()}));
-$("ad-photo").addEventListener("change",e=>loadImage(e.target.files&&e.target.files[0],img=>{photo=img;$("status").textContent="تم إدراج الصورة الأصلية. الصور لا تُحفظ بعد إغلاق الصفحة."}));
-$("ad-logo").addEventListener("change",e=>loadImage(e.target.files&&e.target.files[0],img=>{logo=img;$("status").textContent="تم إدراج الشعار. الصور لا تُحفظ بعد إغلاق الصفحة."}));
+const assetDbName="zoz-akaber-studio-assets-v1";
+function openAssetDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open(assetDbName,1);req.onupgradeneeded=()=>req.result.createObjectStore("assets");req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
+async function putAsset(key,blob){const db=await openAssetDb();return new Promise((resolve,reject)=>{const tx=db.transaction("assets","readwrite");tx.objectStore("assets").put(blob,key);tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>{db.close();reject(tx.error)}})}
+async function getAsset(key){const db=await openAssetDb();return new Promise((resolve,reject)=>{const tx=db.transaction("assets","readonly"),req=tx.objectStore("assets").get(key);req.onsuccess=()=>{db.close();resolve(req.result||null)};req.onerror=()=>{db.close();reject(req.error)}})}
+async function restoreAsset(key,done){try{const blob=await getAsset(key);if(!blob)return;const url=URL.createObjectURL(blob),img=new Image();img.onload=()=>{done(img);URL.revokeObjectURL(url);render()};img.onerror=()=>URL.revokeObjectURL(url);img.src=url}catch(e){$("status").textContent="تعذر استعادة أحد الأصول المحفوظة على هذا الجهاز."}}
+function restoreAssets(){photo=null;logo=null;restoreAsset("photo-"+sector,img=>photo=img);restoreAsset("logo",img=>logo=img)}
+$("ad-photo").addEventListener("change",e=>{const file=e.target.files&&e.target.files[0];if(!file)return;loadImage(file,img=>{photo=img;putAsset("photo-"+sector,file).then(()=>{$("status").textContent="تم حفظ صورة القسم على هذا الجهاز واستعادتها تلقائيًا لاحقًا."}).catch(()=>$("status").textContent="أُدرجت الصورة، لكن تعذر حفظها الدائم على هذا الجهاز.")})});
+$("ad-logo").addEventListener("change",e=>{const file=e.target.files&&e.target.files[0];if(!file)return;loadImage(file,img=>{logo=img;putAsset("logo",file).then(()=>{$("status").textContent="تم حفظ شعار المطعم على هذا الجهاز واستعادته تلقائيًا لاحقًا."}).catch(()=>$("status").textContent="أُدرج الشعار، لكن تعذر حفظه الدائم على هذا الجهاز.")})});
 $("render").addEventListener("click",()=>{render();quality();saveDraft();$("status").textContent="تم تحديث التصميم وحفظ المسودة على هذا الجهاز."});
 $("download").addEventListener("click",downloadCurrent);$("download-pack").addEventListener("click",downloadPack);
-if(restoreDraft()){render();quality();$("status").textContent="تم استعادة آخر مسودة نصية. أعد اختيار الصورة أو الشعار عند الحاجة."}else setSector("starches");
+if(restoreDraft()){restoreAssets();render();quality();$("status").textContent="تم استعادة المسودة والصور والشعار المحفوظة على هذا الجهاز."}else setSector("starches");
 })();
 </script>
 </body>
