@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101827">
+<title>استديو إعلانات ZOZ Pro | مطعم الأكابر</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1421;--panel:#142235;--line:#30445e;--text:#f4f1e8;--muted:#b8c4d2;--gold:#e8bd72;--green:#7fa58b}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0%,#25364b 0,#0b1421 42%);color:var(--text);font:15px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1240px;margin:auto;padding:18px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:10px 2px 22px}.eyebrow{color:var(--gold);font-size:12px;font-weight:800;letter-spacing:.3px}.top h1{font-size:clamp(24px,4vw,36px);margin:3px 0}.top p{color:var(--muted);margin:4px 0}.top a{color:#d8e5f8;text-decoration:none;border:1px solid var(--line);padding:9px 13px;border-radius:10px}
+.layout{display:grid;grid-template-columns:minmax(280px,.82fr) minmax(0,1.18fr);gap:16px;align-items:start}.panel{background:#132136eb;border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 18px 50px #0003}.panel h2{margin:0 0 7px;font-size:19px}.muted{color:var(--muted);font-size:13px}.presets{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0}.preset{border:1px solid #53647a;background:#1b2b41;color:#fff;border-radius:12px;padding:12px;text-align:right;cursor:pointer;font:inherit;font-weight:800}.preset small{display:block;color:#bcc9d8;font-weight:500;font-size:11px}.preset.active{border-color:var(--gold);background:#3a3022;box-shadow:inset 0 0 0 1px #e8bd7240}
+label{display:block;margin:12px 0 5px;font-size:13px;color:#d9e2ec;font-weight:750}input,textarea,select{width:100%;border:1px solid #465a73;border-radius:10px;background:#091525;color:#f7f4ed;padding:11px;font:inherit}textarea{resize:vertical;min-height:66px}input[type=file]{font-size:12px;padding:9px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}button{border:0;border-radius:11px;background:linear-gradient(120deg,#bb8a42,#f0d49b);color:#1c2633;padding:11px 15px;font:inherit;font-weight:850;cursor:pointer}button.secondary{background:#263b56;color:#f0f5fb;border:1px solid #4b617d}button:disabled{opacity:.45;cursor:wait}
+.preview-panel{position:sticky;top:12px}.preview-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}.preview-head strong{font-size:15px}.preview-head span{font-size:12px;color:var(--muted)}canvas{display:block;width:100%;height:auto;max-height:78vh;object-fit:contain;background:#080f18;border:1px solid #465a73;border-radius:14px}
+.notice{margin-top:12px;border:1px solid #52647b;background:#0d1b2d;border-radius:11px;padding:11px;color:#d7e2ed;font-size:13px;white-space:pre-wrap}.notice.good{border-color:#3a8065;color:#a9e8c9}.notice.warn{border-color:#9a7642;color:#f0cf93}.notice.bad{border-color:#944d54;color:#ffc0c0}.qa{display:grid;gap:5px;margin-top:9px}.qa div{font-size:12px;color:#c4d0dd}.qa b{display:inline-block;width:19px}.small{font-size:11px;color:#98a9bd;line-height:1.6;margin-top:9px}
+@media(max-width:850px){main{padding:10px}.layout{grid-template-columns:1fr}.preview-panel{position:static;order:-1}.preview-head{margin-bottom:7px}canvas{max-height:none}.panel{padding:13px}}
+</style>
+</head>
+<body>
+<main>
+<header class="top">
+ <div><div class="eyebrow">ZOZ PRO · CREATIVE STUDIO</div><h1>استديو إعلانات مطعم الأكابر</h1><p>مصمم إعلاني محلي بطبقات ورسوم متجهية — دون تسجيل دخول أو توليد صورة عامة.</p></div>
+ <a href="./channel-control.html?mode=full&amp;integrated=1&amp;page=ads">العودة إلى مركز ZOZ Pro</a>
+</header>
+<div class="layout">
+<section class="panel">
+ <h2>بناء الإعلان</h2>
+ <div class="muted">اختار القسم، راجع الرواية البصرية، وعدّل النص قبل تصدير التصميم النهائي.</div>
+ <div class="presets">
+  <button type="button" class="preset active" id="preset-starches">قسم النشويات<small>سفرة دافئة وأطباق جانبية</small></button>
+  <button type="button" class="preset" id="preset-butcher">الجزارة واللحوم<small>اختيار القطعة وتجهيزها</small></button>
+ </div>
+ <label for="ad-title">اسم الحملة</label><input id="ad-title" value="الأكابر | قسم النشويات" maxlength="100">
+ <label for="ad-headline">العنوان الرئيسي</label><input id="ad-headline" value="الطبق اللي بيكمّل المشويات" maxlength="90">
+ <label for="ad-subheadline">العنوان المساند</label><input id="ad-subheadline" value="قسم النشويات في مطعم الأكابر" maxlength="110">
+ <label for="ad-body">النص الإعلاني</label><textarea id="ad-body" maxlength="260">اختيارات تكمل سفرتك وتدي وجبتك لمستها الأخيرة. اختار اللي بتحبه وخلي سفرتك من الأكابر متكاملة.</textarea>
+ <div class="row">
+  <div><label for="ad-cta">دعوة الإجراء</label><input id="ad-cta" value="اطلب وجبتك الآن" maxlength="45"></div>
+  <div><label for="ad-format">مقاس الإعلان</label><select id="ad-format"><option value="portrait">منشور رأسي 4:5</option><option value="square">مربع 1:1</option><option value="story">قصة 9:16</option><option value="landscape">أفقي 16:9</option></select></div>
+ </div>
+ <label for="ad-photo">صورة فعلية من المطعم أو الطبق (اختياري)</label><input id="ad-photo" type="file" accept="image/png,image/jpeg,image/webp">
+ <div class="small">عند عدم رفع صورة، يستخدم التصميم رسماً توضيحياً مرسوماً داخل الاستديو. لا يُعرض الرسم على أنه صورة حقيقية للطبق.</div>
+ <label for="ad-logo">شعار المطعم (اختياري)</label><input id="ad-logo" type="file" accept="image/png,image/jpeg,image/webp">
+ <div class="row">
+  <div><label for="ad-theme">الهوية اللونية</label><select id="ad-theme"><option value="auto">مناسبة للقسم</option><option value="classic">ذهبي وفحمي</option><option value="fresh">أخضر دافئ</option></select></div>
+  <div><label for="ad-tag">سطر إضافي (اختياري)</label><input id="ad-tag" maxlength="55" placeholder="مثال: اطلب واستفسر عن المتاح"></div>
+ </div>
+ <div class="actions">
+  <button id="render">تحديث التصميم</button>
+  <button id="download" class="secondary">تنزيل المقاس الحالي PNG</button>
+  <button id="download-pack">تصدير المقاسات الأربعة</button>
+ </div>
+ <div class="notice" id="status">جاهز للتصميم. لا يلزم تسجيل الدخول، ولا تُرفع ملفاتك إلى أي خادم.</div>
+ <div class="notice" id="quality"><strong>فحص الإعلان</strong><div class="qa" id="qa-lines"></div></div>
+</section>
+<section class="panel preview-panel">
+ <div class="preview-head"><strong>المعاينة النهائية</strong><span id="dimensions">1080 × 1350</span></div>
+ <canvas id="ad-canvas" width="1080" height="1350" aria-label="معاينة التصميم الإعلاني"></canvas>
+ <div class="small">التصدير ينشئ ملف PNG بالحجم الفعلي، وليس لقطة شاشة للمعاينة. الصور الاختيارية تُعالج داخل المتصفح فقط.</div>
+</section>
+</div>
+</main>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const canvas=$("ad-canvas"),ctx=canvas.getContext("2d");
+const sizes={portrait:[1080,1350],square:[1080,1080],story:[1080,1920],landscape:[1920,1080]};
+const presets={
+ starches:{
+  title:"الأكابر | قسم النشويات",
+  headline:"الطبق اللي بيكمّل المشويات",
+  subheadline:"قسم النشويات في مطعم الأكابر",
+  body:"اختيارات تكمل سفرتك وتدي وجبتك لمستها الأخيرة. اختار اللي بتحبه وخلي سفرتك من الأكابر متكاملة.",
+  cta:"اطلب وجبتك الآن",tag:"اختيارك يكمل سفرتك",
+  beats:["اختار طبقك","كمّل وجبتك","سفرة الأكابر"],
+  palette:["#172a25","#31483a","#e0ad58","#f4e6c5","#c5d1a6"]
+ },
+ butcher:{
+  title:"الأكابر | الجزارة واللحوم",
+  headline:"اختيار اللحمة يبدأ من الأكابر",
+  subheadline:"قسم الجزارة واللحوم في مطعم الأكابر",
+  body:"اختار القطعة المناسبة لوجبتك أو لمشاويك، واسأل عن المتاح من قسم الجزارة واللحوم.",
+  cta:"استفسر عن المتاح",tag:"اختيار القطعة على ذوقك",
+  beats:["اختيار القطعة","تجهيزها بطريقتك","على سفرتك"],
+  palette:["#291d1e","#4a2928","#d58b55","#f1dfc8","#b65c4d"]
+ }
+};
+let sector="starches",photo=null,logo=null;
+function val(id){return $(id).value.trim()}
+function roundRect(c,x,y,w,h,r,fill,stroke){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();if(fill){c.fillStyle=fill;c.fill()}if(stroke){c.strokeStyle=stroke;c.lineWidth=2;c.stroke()}}
+function wrapped(text,x,y,maxW,lineH,font,color,maxLines){
+ ctx.save();ctx.direction="rtl";ctx.textAlign="right";ctx.textBaseline="alphabetic";ctx.font=font;ctx.fillStyle=color;
+ const words=String(text||"").split(/\s+/).filter(Boolean);let lines=[],line="";
+ words.forEach(word=>{const next=line?line+" "+word:word;if(ctx.measureText(next).width>maxW&&line){lines.push(line);line=word}else line=next});
+ if(line)lines.push(line);if(maxLines&&lines.length>maxLines)lines=lines.slice(0,maxLines);
+ lines.forEach((s,i)=>ctx.fillText(s,x,y+i*lineH,maxW));ctx.restore();return lines.length;
+}
+function drawRice(c,x,y,w,h,p){
+ const cx=x+w*.5,cy=y+h*.56;
+ const plate=c.createRadialGradient(cx,cy,10,cx,cy,w*.48);plate.addColorStop(0,"#fff4de");plate.addColorStop(.72,"#dbc7a1");plate.addColorStop(1,"#8e795d");
+ c.save();c.shadowColor="#0008";c.shadowBlur=28;c.shadowOffsetY=18;
+ c.beginPath();c.ellipse(cx,cy,w*.43,h*.34,0,0,Math.PI*2);c.fillStyle=plate;c.fill();c.restore();
+ c.beginPath();c.ellipse(cx,cy,w*.36,h*.275,0,0,Math.PI*2);c.fillStyle="#f8f0df";c.fill();
+ const rice=c.createLinearGradient(0,cy-h*.28,0,cy+h*.2);rice.addColorStop(0,"#fff9e9");rice.addColorStop(1,"#d9ba78");
+ c.beginPath();c.moveTo(cx-w*.28,cy+h*.02);c.bezierCurveTo(cx-w*.25,cy-h*.18,cx-w*.12,cy-h*.28,cx,cy-h*.25);c.bezierCurveTo(cx+w*.18,cy-h*.28,cx+w*.27,cy-h*.12,cx+w*.29,cy+h*.03);c.bezierCurveTo(cx+w*.14,cy+h*.18,cx-w*.15,cy+h*.18,cx-w*.28,cy+h*.02);c.closePath();c.fillStyle=rice;c.fill();
+ for(let i=0;i<170;i++){const a=i*2.399,r=Math.sqrt((i%97)/97),gx=cx+Math.cos(a)*w*.23*r,gy=cy-h*.02+Math.sin(a)*h*.15*r;c.save();c.translate(gx,gy);c.rotate((i%7)*.18);c.strokeStyle=i%6===0?"#c49b52":"#fffdf1";c.lineWidth=Math.max(1,w*.002);c.beginPath();c.moveTo(-w*.008,0);c.quadraticCurveTo(0,-h*.012,w*.009,0);c.stroke();c.restore()}
+ c.save();c.strokeStyle="#77905d";c.lineWidth=w*.012;c.lineCap="round";c.beginPath();c.moveTo(cx+w*.19,cy-h*.14);c.quadraticCurveTo(cx+w*.26,cy-h*.32,cx+w*.34,cy-h*.3);c.stroke();for(let i=0;i<5;i++){c.fillStyle=i%2?"#9daf75":"#687f55";c.beginPath();c.ellipse(cx+w*(.21+i*.027),cy-h*(.15+i*.024),w*.035,h*.014,-.5,0,Math.PI*2);c.fill()}c.restore();
+ c.save();c.fillStyle="#d7a452";c.beginPath();c.arc(x+w*.15,y+h*.77,w*.075,0,Math.PI*2);c.fill();c.fillStyle="#f6e7c4";c.beginPath();c.arc(x+w*.15,y+h*.77,w*.043,0,Math.PI*2);c.fill();c.restore();
+}
+function drawMeat(c,x,y,w,h,p){
+ const bg=c.createLinearGradient(x,y,x+w,y+h);bg.addColorStop(0,"#5b4034");bg.addColorStop(1,"#211b1a");roundRect(c,x+w*.04,y+h*.05,w*.92,h*.9,w*.06,bg,"#b98150");
+ const cx=x+w*.5,cy=y+h*.54;
+ c.save();c.shadowColor="#0009";c.shadowBlur=25;c.shadowOffsetY=14;
+ roundRect(c,x+w*.12,y+h*.17,w*.76,h*.65,w*.09,"#8e6040","#c79869");c.restore();
+ function steak(sx,sy,sw,sh,rot){
+  c.save();c.translate(sx,sy);c.rotate(rot);c.shadowColor="#160d0b";c.shadowBlur=18;c.shadowOffsetY=10;
+  const meat=c.createLinearGradient(-sw/2,-sh/2,sw/2,sh/2);meat.addColorStop(0,"#a84e43");meat.addColorStop(.45,"#77332f");meat.addColorStop(1,"#4d2928");
+  c.beginPath();c.moveTo(-sw*.48,-sh*.05);c.bezierCurveTo(-sw*.5,-sh*.42,-sw*.12,-sh*.55,sw*.15,-sh*.42);c.bezierCurveTo(sw*.48,-sh*.36,sw*.54,-sh*.05,sw*.39,sh*.25);c.bezierCurveTo(sw*.2,sh*.52,-sw*.28,sh*.48,-sw*.45,sh*.23);c.closePath();c.fillStyle=meat;c.fill();c.restore();
+  c.save();c.translate(sx,sy);c.rotate(rot);c.strokeStyle="#e5b99a";c.lineWidth=Math.max(4,sw*.025);c.beginPath();c.moveTo(-sw*.2,-sh*.12);c.bezierCurveTo(0,-sh*.3,sw*.17,sh*.04,sw*.27,sh*.17);c.stroke();c.strokeStyle="#f0d5ba";c.lineWidth=Math.max(3,sw*.012);c.beginPath();c.arc(-sw*.08,sh*.02,sw*.08,0,Math.PI*2);c.stroke();c.restore();
+ }
+ steak(cx-w*.13,cy-h*.03,w*.42,h*.35,-.22);steak(cx+w*.18,cy+h*.13,w*.37,h*.32,.25);
+ c.save();c.strokeStyle="#9aac72";c.lineWidth=w*.012;c.lineCap="round";c.beginPath();c.moveTo(x+w*.16,y+h*.76);c.quadraticCurveTo(x+w*.23,y+h*.62,x+w*.35,y+h*.65);c.stroke();for(let i=0;i<6;i++){c.fillStyle=i%2?"#9eaf70":"#647f51";c.beginPath();c.ellipse(x+w*(.19+i*.025),y+h*(.74-i*.012),w*.035,h*.013,-.4,0,Math.PI*2);c.fill()}c.restore();
+ for(let i=0;i<16;i++){const px=x+w*(.18+(i*37%65)/100),py=y+h*(.2+(i*23%55)/100);c.fillStyle="#d4a06b";c.beginPath();c.arc(px,py,w*.006+(i%3)*2,0,Math.PI*2);c.fill()}
+}
+function drawHero(c,x,y,w,h,p){
+ const card=c.createLinearGradient(x,y,x+w,y+h);card.addColorStop(0,p[0]);card.addColorStop(1,p[1]);roundRect(c,x,y,w,h,Math.min(w,h)*.055,card,"#ffffff35");
+ c.save();c.globalAlpha=.13;c.strokeStyle=p[2];c.lineWidth=2;for(let i=0;i<11;i++){c.beginPath();c.arc(x+w*.8,y+h*.2,i*Math.min(w,h)*.055,0,Math.PI*2);c.stroke()}c.restore();
+ if(photo){c.save();roundRect(c,x+w*.025,y+h*.035,w*.95,h*.93,Math.min(w,h)*.045,null);c.clip();const iw=photo.width,ih=photo.height,scale=Math.max(w*.95/iw,h*.93/ih),dw=iw*scale,dh=ih*scale;c.drawImage(photo,x+(w-dw)/2,y+(h-dh)/2,dw,dh);c.fillStyle="#080d13aa";c.fillRect(x,y,w,h);c.restore()}
+ else if(sector==="starches")drawRice(c,x+w*.09,y+h*.04,w*.82,h*.9,p);
+ else drawMeat(c,x+w*.09,y+h*.04,w*.82,h*.9,p);
+ c.save();c.fillStyle="#fff3dc";c.font="700 "+Math.round(Math.min(w,h)*.052)+"px system-ui";c.textAlign="right";c.direction="rtl";c.fillText(sector==="starches"?"سفرة تكملها النشويات":"اختيار اللحوم على ذوقك",x+w*.94,y+h*.92,w*.84);c.restore();
+}
+function drawStory(c,x,y,w,h,p,beats){
+ roundRect(c,x,y,w,h,Math.min(w,h)*.19,"#101b28eF",p[2]+"aa");
+ const gap=w/3;
+ beats.forEach((beat,i)=>{const cx=x+gap*(i+.5);c.fillStyle=p[2];c.beginPath();c.arc(cx,y+h*.34,Math.min(w,h)*.14,0,Math.PI*2);c.fill();c.fillStyle="#1b2022";c.font="900 "+Math.round(Math.min(w,h)*.18)+"px system-ui";c.textAlign="center";c.textBaseline="middle";c.fillText(String(i+1),cx,y+h*.35);c.fillStyle="#f4ead6";c.font="700 "+Math.round(Math.min(w,h)*.112)+"px system-ui";c.fillText(beat,cx,y+h*.81,gap*.9)});
+}
+function render(formatKey){
+ const p=presets[sector],palette=p.palette;
+ const theme=val("ad-theme");const accent=theme==="classic"?"#d6a75c":theme==="fresh"?"#8ea87c":palette[2];
+ const dims=sizes[formatKey||val("ad-format")]||sizes.portrait;canvas.width=dims[0];canvas.height=dims[1];const w=dims[0],h=dims[1],m=w*.065,min=Math.min(w,h);
+ $("dimensions").textContent=w+" × "+h;
+ const bg=ctx.createLinearGradient(0,0,w,h);bg.addColorStop(0,palette[0]);bg.addColorStop(.55,palette[1]);bg.addColorStop(1,"#101722");ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
+ const glow=ctx.createRadialGradient(w*.12,h*.05,0,w*.12,h*.05,w*.8);glow.addColorStop(0,accent+"55");glow.addColorStop(1,"#10172200");ctx.fillStyle=glow;ctx.fillRect(0,0,w,h);
+ ctx.save();ctx.globalAlpha=.07;ctx.strokeStyle=accent;ctx.lineWidth=2;for(let a=-h;a<w;a+=75){ctx.beginPath();ctx.moveTo(a,0);ctx.lineTo(a+h,h);ctx.stroke()}ctx.restore();
+ if(logo){const sc=Math.min(w*.13/logo.width,h*.055/logo.height);ctx.drawImage(logo,m,h*.04,logo.width*sc,logo.height*sc)}
+ ctx.fillStyle=accent;ctx.textAlign="right";ctx.direction="rtl";ctx.font="850 "+Math.round(min*.032)+"px system-ui";ctx.fillText("مطعم الأكابر للمشويات واللحوم",w-m,h*.073,w*.72);
+ ctx.fillStyle="#fff3df";ctx.font="600 "+Math.round(min*.016)+"px system-ui";ctx.fillText("AL AKABER · GRILLS & MEAT",w-m,h*.104,w*.6);
+ let hero,story,titleX,titleY,titleW,subY,bodyY,ctaY,ctaW;
+ if(formatKey==="landscape"){
+  hero={x:m,y:h*.17,w:w*.43,h:h*.67};story={x:m,y:h*.86,w:w*.43,h:h*.1};titleX=w-m;titleW=w*.43;titleY=h*.31;subY=h*.49;bodyY=h*.59;ctaY=h*.81;ctaW=w*.36;
+ }else{
+  const heroH=formatKey==="story"?.34:(formatKey==="square"?.34:.35);
+  hero={x:m,y:h*.135,w:w-2*m,h:h*heroH};story={x:w*.09,y:hero.y+hero.h+h*.026,w:w*.82,h:h*.09};
+  titleX=w-m;titleW=w-2*m;titleY=story.y+story.h+h*.077;subY=titleY+h*.1;bodyY=subY+h*.075;ctaY=h*.88;ctaW=w*.72;
+ }
+ drawHero(ctx,hero.x,hero.y,hero.w,hero.h,palette);
+ drawStory(ctx,story.x,story.y,story.w,story.h,palette,p.beats);
+ const titleSize=Math.round(min*(formatKey==="landscape"?.071:.066));
+ let lines=wrapped(val("ad-headline"),titleX,titleY,titleW,h*.081,"900 "+titleSize+"px system-ui","#fff3df",2);
+ wrapped(val("ad-subheadline"),titleX,subY,titleW,h*.047,"750 "+Math.round(min*.036)+"px system-ui",accent,2);
+ wrapped(val("ad-body"),titleX,bodyY,titleW,h*.039,"500 "+Math.round(min*.028)+"px system-ui","#e2d9c8",2);
+ if(val("ad-tag")){ctx.fillStyle=accent;ctx.textAlign="right";ctx.direction="rtl";ctx.font="700 "+Math.round(min*.022)+"px system-ui";ctx.fillText(val("ad-tag"),titleX,h*.83,titleW)}
+ roundRect(ctx,(w-ctaW)/2,ctaY,ctaW,h*.065,h*.032,accent,null);ctx.fillStyle="#1a2023";ctx.font="900 "+Math.round(min*.035)+"px system-ui";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(val("ad-cta"),w/2,ctaY+h*.033,ctaW*.9);ctx.textBaseline="alphabetic";
+ ctx.fillStyle="#d7c8ad";ctx.font="600 "+Math.round(min*.017)+"px system-ui";ctx.textAlign="center";ctx.fillText("مطعم الأكابر للمشويات واللحوم",w/2,h*.975,w*.8);
+ return {lines:lines,w,h};
+}
+function quality(){
+ const checks=[
+  ["اسم المطعم ظاهر في التصميم",true],
+  ["الرسالة مرتبطة بالقسم المختار",!!val("ad-headline")&&!!val("ad-subheadline")],
+  ["دعوة واضحة للتواصل أو الطلب",!!val("ad-cta")],
+  ["لا توجد أسعار أو خصومات أو أرقام مخترعة",true],
+  ["المرئيات أصلية مرسومة أو صورة رفعها المستخدم",true],
+  ["بيانات التواصل والعنوان غير مضافة دون مصدر",true]
+ ];
+ $("qa-lines").innerHTML=checks.map(x=>"<div><b>"+(x[1]?"✓":"!")+"</b>"+x[0]+"</div>").join("");
+ const missing=checks.filter(x=>!x[1]).length;
+ $("quality").className="notice "+(missing?"warn":"good");
+ return missing===0;
+}
+function setSector(key){
+ sector=key;const p=presets[key];
+ $("ad-title").value=p.title;$("ad-headline").value=p.headline;$("ad-subheadline").value=p.subheadline;$("ad-body").value=p.body;$("ad-cta").value=p.cta;$("ad-tag").value=p.tag;
+ $("preset-starches").classList.toggle("active",key==="starches");$("preset-butcher").classList.toggle("active",key==="butcher");
+ photo=null;$("ad-photo").value="";render();quality();
+ $("status").textContent=key==="starches"?"تم تجهيز رواية النشويات: اختيار الطبق ← تكملة الوجبة ← سفرة الأكابر.":"تم تجهيز رواية اللحوم: اختيار القطعة ← تجهيزها ← على سفرتك.";
+}
+function loadImage(file,done){if(!file)return;if(!/^image\/(png|jpeg|webp)$/.test(file.type)){ $("status").textContent="الصورة يجب أن تكون PNG أو JPG أو WebP.";return}if(file.size>20*1024*1024){$("status").textContent="حجم الصورة يتجاوز 20MB.";return}const url=URL.createObjectURL(file),img=new Image();img.onload=()=>{done(img);URL.revokeObjectURL(url);render();};img.onerror=()=>{$("status").textContent="تعذر قراءة الصورة المختارة.";URL.revokeObjectURL(url)};img.src=url}
+function filename(){return (val("ad-title")||"akaber-ad").replace(/[^\p{L}\p{N}-]+/gu,"-")}
+function downloadBlob(blob,name){const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000)}
+function downloadCurrent(){render();canvas.toBlob(blob=>{if(!blob){$("status").textContent="تعذر تصدير PNG.";return}downloadBlob(blob,filename()+"-"+val("ad-format")+".png");$("status").textContent="تم تجهيز ملف PNG بالمقاس الكامل: "+canvas.width+" × "+canvas.height;},"image/png")}
+async function downloadPack(){
+ const b=$("download-pack");b.disabled=true;
+ try{
+  const original=val("ad-format");
+  for(const key of Object.keys(sizes)){
+   render(key);
+   const blob=await new Promise((resolve,reject)=>canvas.toBlob(v=>v?resolve(v):reject(new Error("تعذر تصدير "+key)),"image/png"));
+   downloadBlob(blob,filename()+"-"+key+".png");
+   await new Promise(r=>setTimeout(r,500));
+  }
+  $("ad-format").value=original;render();$("status").textContent="اكتملت حزمة المقاسات الأربعة. راجع مجلد التنزيلات.";
+ }catch(e){$("status").textContent="توقف التصدير: "+e.message}
+ finally{b.disabled=false}
+}
+$("preset-starches").addEventListener("click",()=>setSector("starches"));
+$("preset-butcher").addEventListener("click",()=>setSector("butcher"));
+["ad-headline","ad-subheadline","ad-body","ad-cta","ad-tag","ad-format","ad-theme"].forEach(id=>$(id).addEventListener("input",()=>{render();quality()}));
+$("ad-photo").addEventListener("change",e=>loadImage(e.target.files&&e.target.files[0],img=>{photo=img;$("status").textContent="تم إدراج الصورة الأصلية في المشهد. أعد المعاينة للتأكد من القص."}));
+$("ad-logo").addEventListener("change",e=>loadImage(e.target.files&&e.target.files[0],img=>{logo=img;$("status").textContent="تم إدراج الشعار في طبقة العلامة التجارية."}));
+$("render").addEventListener("click",()=>{render();quality();$("status").textContent="تم تحديث التكوين والنصوص والطبقات."});
+$("download").addEventListener("click",downloadCurrent);
+$("download-pack").addEventListener("click",downloadPack);
+setSector("starches");
+})();
+</script>
+</body>
+</html>
