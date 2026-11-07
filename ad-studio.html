@@ -138,9 +138,10 @@ function drawStory(c,x,y,w,h,p,beats){
  beats.forEach((beat,i)=>{const cx=x+gap*(i+.5);c.fillStyle=p[2];c.beginPath();c.arc(cx,y+h*.34,Math.min(w,h)*.14,0,Math.PI*2);c.fill();c.fillStyle="#1b2022";c.font="900 "+Math.round(Math.min(w,h)*.18)+"px system-ui";c.textAlign="center";c.textBaseline="middle";c.fillText(String(i+1),cx,y+h*.35);c.fillStyle="#f4ead6";c.font="700 "+Math.round(Math.min(w,h)*.112)+"px system-ui";c.fillText(beat,cx,y+h*.81,gap*.9)});
 }
 function render(formatKey){
- const p=presets[sector],palette=p.palette;
- const theme=val("ad-theme");const accent=theme==="classic"?"#d6a75c":theme==="fresh"?"#8ea87c":palette[2];
- const dims=sizes[formatKey||val("ad-format")]||sizes.portrait;canvas.width=dims[0];canvas.height=dims[1];const w=dims[0],h=dims[1],m=w*.065,min=Math.min(w,h);
+ const p=presets[sector],palette=p.palette,key=formatKey||val("ad-format");
+ const theme=val("ad-theme"),accent=theme==="classic"?"#d6a75c":theme==="fresh"?"#8ea87c":palette[2];
+ const dims=sizes[key]||sizes.portrait;canvas.width=dims[0];canvas.height=dims[1];
+ const w=dims[0],h=dims[1],m=w*.065,min=Math.min(w,h);
  $("dimensions").textContent=w+" × "+h;
  const bg=ctx.createLinearGradient(0,0,w,h);bg.addColorStop(0,palette[0]);bg.addColorStop(.55,palette[1]);bg.addColorStop(1,"#101722");ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
  const glow=ctx.createRadialGradient(w*.12,h*.05,0,w*.12,h*.05,w*.8);glow.addColorStop(0,accent+"55");glow.addColorStop(1,"#10172200");ctx.fillStyle=glow;ctx.fillRect(0,0,w,h);
@@ -148,24 +149,37 @@ function render(formatKey){
  if(logo){const sc=Math.min(w*.13/logo.width,h*.055/logo.height);ctx.drawImage(logo,m,h*.04,logo.width*sc,logo.height*sc)}
  ctx.fillStyle=accent;ctx.textAlign="right";ctx.direction="rtl";ctx.font="850 "+Math.round(min*.032)+"px system-ui";ctx.fillText("مطعم الأكابر للمشويات واللحوم",w-m,h*.073,w*.72);
  ctx.fillStyle="#fff3df";ctx.font="600 "+Math.round(min*.016)+"px system-ui";ctx.fillText("AL AKABER · GRILLS & MEAT",w-m,h*.104,w*.6);
- let hero,story,titleX,titleY,titleW,subY,bodyY,ctaY,ctaW;
- if(formatKey==="landscape"){
-  hero={x:m,y:h*.17,w:w*.43,h:h*.67};story={x:m,y:h*.86,w:w*.43,h:h*.1};titleX=w-m;titleW=w*.43;titleY=h*.31;subY=h*.49;bodyY=h*.59;ctaY=h*.81;ctaW=w*.36;
+ let hero,story,titleX,titleY,titleW,subY,bodyY,tagY,ctaY,ctaW,titleLH,subLH,bodyLH;
+ if(key==="landscape"){
+  hero={x:m,y:h*.15,w:w*.43,h:h*.66};story={x:m+w*.025,y:h*.72,w:w*.38,h:h*.13};
+  titleX=w-m;titleW=w*.43;titleY=h*.27;titleLH=h*.085;subY=h*.47;subLH=h*.052;bodyY=h*.59;bodyLH=h*.045;tagY=h*.76;ctaY=h*.82;ctaW=w*.36;
  }else{
-  const heroH=formatKey==="story"?.34:(formatKey==="square"?.34:.35);
-  hero={x:m,y:h*.135,w:w-2*m,h:h*heroH};story={x:w*.09,y:hero.y+hero.h+h*.026,w:w*.82,h:h*.09};
-  titleX=w-m;titleW=w-2*m;titleY=story.y+story.h+h*.077;subY=titleY+h*.1;bodyY=subY+h*.075;ctaY=h*.88;ctaW=w*.72;
+  const square=key==="square",storyMode=key==="story";
+  const heroY=storyMode?.12:.13,heroH=storyMode?.34:(square?.28:.32);
+  hero={x:m,y:h*heroY,w:w-2*m,h:h*heroH};story={x:w*.09,y:hero.y+hero.h+h*.025,w:w*.82,h:h*(square?.065:.073)};
+  titleX=w-m;titleW=w-2*m;titleY=h*(square?.535:.58);titleLH=h*.052;subLH=h*.034;bodyLH=h*(square?.028:.03);ctaY=h*(square?.89:.89);ctaW=w*.72;tagY=h*.855;
  }
- drawHero(ctx,hero.x,hero.y,hero.w,hero.h,palette);
- drawStory(ctx,story.x,story.y,story.w,story.h,palette,p.beats);
- const titleSize=Math.round(min*(formatKey==="landscape"?.071:.066));
- let lines=wrapped(val("ad-headline"),titleX,titleY,titleW,h*.081,"900 "+titleSize+"px system-ui","#fff3df",2);
- wrapped(val("ad-subheadline"),titleX,subY,titleW,h*.047,"750 "+Math.round(min*.036)+"px system-ui",accent,2);
- wrapped(val("ad-body"),titleX,bodyY,titleW,h*.039,"500 "+Math.round(min*.028)+"px system-ui","#e2d9c8",2);
- if(val("ad-tag")){ctx.fillStyle=accent;ctx.textAlign="right";ctx.direction="rtl";ctx.font="700 "+Math.round(min*.022)+"px system-ui";ctx.fillText(val("ad-tag"),titleX,h*.83,titleW)}
- roundRect(ctx,(w-ctaW)/2,ctaY,ctaW,h*.065,h*.032,accent,null);ctx.fillStyle="#1a2023";ctx.font="900 "+Math.round(min*.035)+"px system-ui";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(val("ad-cta"),w/2,ctaY+h*.033,ctaW*.9);ctx.textBaseline="alphabetic";
+ drawHero(ctx,hero.x,hero.y,hero.w,hero.h,palette);drawStory(ctx,story.x,story.y,story.w,story.h,palette,p.beats);
+ if(key!=="landscape"){
+  const titleSize=Math.round(min*.058),subSize=Math.round(min*.029),bodySize=Math.round(min*.025);
+  const titleLines=wrapped(val("ad-headline"),titleX,titleY,titleW,titleLH,"900 "+titleSize+"px system-ui","#fff3df",2);
+  subY=titleY+Math.max(1,titleLines)*titleLH+h*.014;
+  const subLines=wrapped(val("ad-subheadline"),titleX,subY,titleW,subLH,"750 "+subSize+"px system-ui",accent,2);
+  bodyY=subY+Math.max(1,subLines)*subLH+h*.018;
+  wrapped(val("ad-body"),titleX,bodyY,titleW,bodyLH,"500 "+bodySize+"px system-ui","#e2d9c8",2);
+  ctx.fillStyle=accent;ctx.textAlign="right";ctx.direction="rtl";ctx.font="700 "+Math.round(min*.021)+"px system-ui";ctx.fillText(val("ad-tag"),titleX,tagY,titleW);
+ }else{
+  const titleLines=wrapped(val("ad-headline"),titleX,titleY,titleW,titleLH,"900 "+Math.round(min*.069)+"px system-ui","#fff3df",2);
+  subY=titleY+Math.max(1,titleLines)*titleLH+h*.015;
+  const subLines=wrapped(val("ad-subheadline"),titleX,subY,titleW,subLH,"750 "+Math.round(min*.035)+"px system-ui",accent,2);
+  bodyY=subY+Math.max(1,subLines)*subLH+h*.018;
+  wrapped(val("ad-body"),titleX,bodyY,titleW,bodyLH,"500 "+Math.round(min*.029)+"px system-ui","#e2d9c8",2);
+  ctx.fillStyle=accent;ctx.textAlign="right";ctx.direction="rtl";ctx.font="700 "+Math.round(min*.023)+"px system-ui";ctx.fillText(val("ad-tag"),titleX,tagY,titleW);
+ }
+ roundRect(ctx,(w-ctaW)/2,ctaY,ctaW,h*(key==="landscape"?.085:.06),h*.03,accent,null);
+ ctx.fillStyle="#1a2023";ctx.font="900 "+Math.round(min*.034)+"px system-ui";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(val("ad-cta"),w/2,ctaY+h*(key==="landscape"?.0425:.03),ctaW*.9);ctx.textBaseline="alphabetic";
  ctx.fillStyle="#d7c8ad";ctx.font="600 "+Math.round(min*.017)+"px system-ui";ctx.textAlign="center";ctx.fillText("مطعم الأكابر للمشويات واللحوم",w/2,h*.975,w*.8);
- return {lines:lines,w,h};
+ return {w,h};
 }
 function quality(){
  const checks=[
