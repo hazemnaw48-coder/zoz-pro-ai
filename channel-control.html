@@ -2272,6 +2272,7 @@ function adDrawHeroImage(ctx,x,y,w,h,t){
   adRenderMetrics.artMode='built-in-vector-scene';
  }
  ctx.restore();
+ adDrawStoryOverlay(ctx,x,y,w,h,t,adVal('ad-sector-template'));
 }
 function adDrawStoryOverlay(ctx,x,y,w,h,t,sector){
  const story=adRestaurantStories[sector];if(!story)return;
@@ -2286,7 +2287,6 @@ function adDrawStoryOverlay(ctx,x,y,w,h,t,sector){
   if(i<2){ctx.strokeStyle=t.accent;ctx.lineWidth=Math.max(2,Math.min(w,h)*.004);ctx.beginPath();ctx.moveTo(px+colW*.27,py);ctx.lineTo(px+colW*.47,py);ctx.stroke()}
  });
  ctx.restore();
- adDrawStoryOverlay(ctx,x,y,w,h,t,adVal('ad-sector-template'));
 }
 function adBuildLayerManifest(){
  const canvas=adEl('ad-canvas'),w=canvas?.width||1080,h=canvas?.height||1350;
