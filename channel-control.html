@@ -7,6 +7,30 @@
 <title>ZOZ Pro — مركز التحليل ورفع الفيديو</title>
 <script>
 /* Non-blocking Supabase loader with a visible failure state. */
+window.__zozLoadFFmpeg = () => {
+  if (window.FFmpeg && window.FFmpeg.createFFmpeg) return Promise.resolve(window.FFmpeg);
+  if (window.__zozFFmpegPromise) return window.__zozFFmpegPromise;
+  window.__zozFFmpegPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js";
+    const timer = window.setTimeout(() => {
+      script.remove();
+      reject(new Error("انتهت مهلة تحميل محرك دمج الفيديو."));
+    }, 20000);
+    script.onload = () => {
+      window.clearTimeout(timer);
+      if (window.FFmpeg && window.FFmpeg.createFFmpeg) resolve(window.FFmpeg);
+      else reject(new Error("تعذر تهيئة محرك دمج الفيديو."));
+    };
+    script.onerror = () => {
+      window.clearTimeout(timer);
+      script.remove();
+      reject(new Error("تعذر تحميل محرك دمج الفيديو."));
+    };
+    document.head.appendChild(script);
+  });
+  return window.__zozFFmpegPromise;
+};
 window.__zozSupabaseReady = new Promise((resolve, reject) => {
   const sources = [
     "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
@@ -1027,7 +1051,7 @@ async function runZozPostproduction(){
   const voiceData=await voiceResponse.json().catch(()=>({}));
   if(!voiceResponse.ok||!voiceData.ok||!voiceData.audio_url)throw new Error(voiceData.error||'تعذر توليد التعليق الصوتي.');
   status.textContent='2/4 — تم إنشاء الصوت. جارٍ تحميل محرك دمج الفيديو…';
-  if(!window.FFmpeg||!window.FFmpeg.createFFmpeg)throw new Error('مكتبة دمج الفيديو لم تُحمّل. أعد فتح الصفحة مع اتصال إنترنت ثم حاول مجددًا.');
+  if(!window.FFmpeg||!window.FFmpeg.createFFmpeg)await window.__zozLoadFFmpeg();if(!window.FFmpeg||!window.FFmpeg.createFFmpeg)throw new Error('مكتبة دمج الفيديو لم تُحمّل. أعد فتح الصفحة مع اتصال إنترنت ثم حاول مجددًا.');
   const {createFFmpeg,fetchFile}=window.FFmpeg;
   const ffmpeg=createFFmpeg({log:false,corePath:'https://unpkg.com/@ffmpeg/core@0.11.5/dist/ffmpeg-core.js'});
   await ffmpeg.load();
