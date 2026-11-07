@@ -2114,9 +2114,10 @@ function adWrap(ctx,text,x,y,maxWidth,lineHeight,maxLines,font,color,align='righ
  return {height:shown.length*lineHeight,totalLines:lines.length,visibleLines:shown.length};
 }
 const adRestaurantStories={
- starches:{title:'مطعم الأكابر | قسم النشويات',service:'قسم النشويات في مطعم الأكابر',audience:'العائلات ومحبو الوجبات المصرية',headline:'الوجبة الحلوة.. لازم تكملها',subheadline:'أرز ومكرونة وأطباق جانبية على سفرتك',body:'اختار النشويات اللي بتحبها وكمل وجبتك من مطعم الأكابر.',cta:'اطلب إضافات وجبتك',tone:'ودودة وقريبة',theme:'vibrant',visualTitle:'من الطبق للسفرة',beats:['تجهيز الأطباق','أرز ومكرونة','سفرة تكتمل']},
- butcher:{title:'مطعم الأكابر | قسم الجزارة واللحوم',service:'قسم الجزارة واللحوم في مطعم الأكابر',audience:'محبو اللحوم والمشويات والعائلات',headline:'اختيار اللحمة.. أول حكاية الطعم',subheadline:'قسم الجزارة واللحوم في مطعم الأكابر',body:'تعرّف على القطع المتاحة واسأل عن تجهيز طلبك بالطريقة المناسبة.',cta:'اسأل واطلب الآن',tone:'فاخرة وراقية',theme:'midnight',visualTitle:'من اختيار القطعة إلى تجهيز الطلب',beats:['اختيار القطعة','تجهيز الطلب','اختيار المشويات']}
+ starches:{campaignKey:'akaber-starches-v1',title:'مطعم الأكابر | قسم النشويات',service:'قسم النشويات في مطعم الأكابر',audience:'العائلات ومحبو الوجبات المصرية',headline:'الوجبة الحلوة.. لازم تكملها',subheadline:'أرز ومكرونة وأطباق جانبية على سفرتك',body:'اختار النشويات اللي بتحبها وكمل وجبتك من مطعم الأكابر.',cta:'اطلب إضافات وجبتك',tone:'ودودة وقريبة',theme:'vibrant',visualTitle:'من الطبق للسفرة',beats:['تجهيز الأطباق','أرز ومكرونة','سفرة تكتمل']},
+ butcher:{campaignKey:'akaber-butcher-v1',title:'مطعم الأكابر | قسم الجزارة واللحوم',service:'قسم الجزارة واللحوم في مطعم الأكابر',audience:'محبو اللحوم والمشويات والعائلات',headline:'اختيار اللحمة.. أول حكاية الطعم',subheadline:'قسم الجزارة واللحوم في مطعم الأكابر',body:'تعرّف على القطع المتاحة واسأل عن تجهيز طلبك بالطريقة المناسبة.',cta:'اسأل واطلب الآن',tone:'فاخرة وراقية',theme:'midnight',visualTitle:'من اختيار القطعة إلى تجهيز الطلب',beats:['اختيار القطعة','تجهيز الطلب','اختيار المشويات']}
 };
+let adLoadedAssetPaths={};
 function adCurrentImageInputId(){return adVal('ad-sector-template')==='butcher'?'ad-image-butcher':'ad-image-starches'}
 function adStoryDefinition(){return adRestaurantStories[adVal('ad-sector-template')]||null}
 function adUpdateStoryBoard(){
@@ -2125,14 +2126,16 @@ function adUpdateStoryBoard(){
  host.innerHTML='<strong>الرواية البصرية: '+esc(story.visualTitle)+'</strong><div class="ad-story-beats">'+story.beats.map((beat,i)=>'<div class="ad-story-beat"><b>0'+(i+1)+'</b><span>'+esc(beat)+'</span></div>').join('')+'</div>';
 }
 async function adLoadSectionImage(){
- const file=adEl(adCurrentImageInputId())?.files?.[0];if(!file){adImage=null;return}
- if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw new Error('اختر صورة PNG أو JPG أو WebP.');
- if(file.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');
- adImage=await adLoadImage(file);
+ const section=adVal('ad-sector-template')||'generic';
+ const file=adEl(adCurrentImageInputId())?.files?.[0];
+ if(file){if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw new Error('اختر صورة PNG أو JPG أو WebP.');if(file.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');adLoadedAssetPaths[section]=null;adImage=await adLoadImage(file);return;}
+ const savedPath=adLoadedAssetPaths[section];
+ if(savedPath){const {data:file,error}=await sb.storage.from(AD_BUCKET).download(savedPath);if(error)throw error;adImage=await adLoadImage(file);return;}
+ adImage=null;
 }
 function adApplyRestaurantPreset(section){
  const p=adRestaurantStories[section];if(!p)throw new Error('القسم الإعلاني غير معروف.');
- const values={'ad-title':p.title,'ad-service':p.service,'ad-audience':p.audience,'ad-brand':'مطعم الأكابر','ad-goal':'sales','ad-platform':'multi','ad-format':'portrait','ad-composition':'product','ad-template':p.theme,'ad-tone':p.tone,'ad-headline':p.headline,'ad-subheadline':p.subheadline,'ad-body':p.body,'ad-cta':p.cta,'ad-sector-template':section};
+ const values={'ad-title':p.title,'ad-service':p.service,'ad-audience':p.audience,'ad-brand':'مطعم الأكابر','ad-goal':'sales','ad-platform':'multi','ad-format':'portrait','ad-composition':'product','ad-template':p.theme,'ad-tone':p.tone,'ad-headline':p.headline,'ad-subheadline':p.subheadline,'ad-body':p.body,'ad-cta':p.cta,'ad-offer':'','ad-proof':'','ad-sector-template':section};
  for(const [id,value] of Object.entries(values))if(adEl(id))adEl(id).value=value;
  adCopyPackage={campaign_angle:p.visualTitle,visual_direction:p.visualTitle,story_beats:p.beats};adUpdateStoryBoard();
 }
@@ -2433,7 +2436,8 @@ async function adSave(){
   const logoFile=adEl('ad-logo').files?.[0];let logoPath=null;
   if(logoFile){if(!/^image\/(png|jpeg|webp)$/.test(logoFile.type))throw new Error('الشعار يجب أن يكون PNG أو JPG أو WebP.');if(logoFile.size>10*1024*1024)throw new Error('الشعار يتجاوز حد 10MB.');logoPath=base+'/logo-'+Date.now()+'.'+(logoFile.type==='image/jpeg'?'jpg':logoFile.type.split('/')[1]);const {error}=await sb.storage.from(AD_BUCKET).upload(logoPath,logoFile,{contentType:logoFile.type,upsert:false});if(error)throw error;}
   const imageFile=adEl(adCurrentImageInputId())?.files?.[0];
-  if(imageFile){if(!/^image\/(png|jpeg|webp)$/.test(imageFile.type))throw new Error('الصيغ المدعومة PNG وJPG وWebP.');if(imageFile.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');assetPath=base+'/source-'+Date.now()+'.'+(imageFile.type==='image/jpeg'?'jpg':imageFile.type.split('/')[1]);const {error}=await sb.storage.from(AD_BUCKET).upload(assetPath,imageFile,{contentType:imageFile.type,upsert:false});if(error)throw error;}
+  if(imageFile){if(!/^image\/(png|jpeg|webp)$/.test(imageFile.type))throw new Error('الصيغ المدعومة PNG وJPG وWebP.');if(imageFile.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');assetPath=base+'/source-'+Date.now()+'.'+(imageFile.type==='image/jpeg'?'jpg':imageFile.type.split('/')[1]);const {error}=await sb.storage.from(AD_BUCKET).upload(assetPath,imageFile,{contentType:imageFile.type,upsert:false});if(error)throw error;adLoadedAssetPaths[adVal('ad-sector-template')||'generic']=assetPath;}
+  if(!assetPath)assetPath=adLoadedAssetPaths[adVal('ad-sector-template')||'generic']||null;
   const png=await new Promise((resolve,reject)=>adEl('ad-canvas').toBlob(blob=>blob?resolve(blob):reject(new Error('تعذر تصدير التصميم إلى PNG.')),'image/png'));
   const exportPath=base+'/creative.png';const {error:pngError}=await sb.storage.from(AD_BUCKET).upload(exportPath,png,{contentType:'image/png',upsert:false});if(pngError)throw pngError;
   const record={id,owner_id:user.id,title:adVal('ad-title')||'تصميم إعلاني',service_name:adVal('ad-service'),target_audience:adVal('ad-audience'),campaign_goal:adVal('ad-goal'),platform:adVal('ad-platform'),format_key:adVal('ad-format'),template_key:adVal('ad-template'),headline:adVal('ad-headline'),subheadline:adVal('ad-subheadline'),body_copy:adVal('ad-body'),call_to_action:adVal('ad-cta'),copy_package:adCopyPackage||{},design_json:{width:adEl('ad-canvas').width,height:adEl('ad-canvas').height,brand_name:adVal('ad-brand'),tone:adVal('ad-tone'),offer:adVal('ad-offer'),proof:adVal('ad-proof'),sector_template:adVal('ad-sector-template'),render_version:3,renderer:'zoz-native-layout-engine',design_mode:'editable-layer-composition',layers:adBuildLayerManifest(),composition:adVal('ad-composition'),quality_report:qa,art_mode:adRenderMetrics.artMode},asset_path:assetPath,logo_path:logoPath,export_path:exportPath,status:'draft'};
@@ -2445,18 +2449,24 @@ async function adSave(){
 let adPackSaveSuccess=false;
 async function adCreateRestaurantPair(){
  const button=adEl('ad-create-pair');if(button)button.disabled=true;
- const created=[];
+ const created=[],skipped=[];
  try{
   const session=await ownerSession();if(!session?.access_token)throw new Error('جلسة المالك غير جاهزة.');
+  const {data:{user},error:userError}=await sb.auth.getUser(session.access_token);if(userError||!user?.id)throw userError||new Error('تعذر تحديد مالك التصميم.');
   for(const section of ['starches','butcher']){
+   const preset=adRestaurantStories[section];
+   const {data:existing,error:lookupError}=await sb.from('zoz_pro_ad_creatives').select('id,format_key').eq('owner_id',user.id).contains('design_json',{campaign_key:preset.campaignKey});
+   if(lookupError)throw lookupError;
+   if(existing?.length===4&&['portrait','square','story','landscape'].every(format=>existing.some(row=>row.format_key===format))){skipped.push(section);continue;}
+   if(existing?.length)throw new Error('توجد حزمة سابقة غير مكتملة للقسم '+section+'؛ لم أنشئ نسخة مكررة.');
    adApplyRestaurantPreset(section);await adLoadSectionImage();await adRender();
-   const qa=adQualityCheck();if(!qa.ready)throw new Error('فشل فحص إعلان '+(section==='starches'?'النشويات':'الجزارة واللحوم')+'.');
+   if(!adQualityCheck().ready)throw new Error('فشل فحص إعلان '+(section==='starches'?'النشويات':'الجزارة واللحوم')+'.');
    adPackSaveSuccess=false;await adSavePack();
    if(!adPackSaveSuccess)throw new Error('لم يؤكد النظام حفظ حزمة '+(section==='starches'?'النشويات':'الجزارة واللحوم')+'.');
    created.push(section);
   }
   adApplyRestaurantPreset('butcher');await adLoadSectionImage();await adRender();adQualityCheck();await adLoadSaved();
-  notice('ad-status','اكتمل إنشاء الإعلانين وحفظ 8 ملفات تصميم: 4 مقاسات لقسم النشويات و4 مقاسات لقسم الجزارة واللحوم. لكل قسم قصة بصرية وصورة وطبقات مستقلة.','good');
+  notice('ad-status','اكتمل فحص الحملة: حُفظت '+created.length+' حزمة جديدة وتأكد وجود '+skipped.length+' حزمة سابقة، دون تكرار. إجمالي المقاسات المطلوبة 8.','good');
   return true;
  }catch(e){
   notice('ad-status','تم حفظ '+created.length+' قسم قبل التوقف. '+(e.message||String(e))+' · راجع معرض التصميمات قبل إعادة المحاولة لتجنب التكرار.','warn');return false;
@@ -2531,7 +2541,10 @@ async function adSavePack(){
   const session=await ownerSession();const {data:{user},error:userErr}=await sb.auth.getUser(session.access_token);if(userErr||!user?.id)throw userErr||new Error('تعذر تحديد مالك التصميم.');
   const packId=crypto.randomUUID(),base=user.id+'/'+packId;let assetPath=null,logoPath=null;
   const uploadOptional=async(inputId,prefix)=>{const file=adEl(inputId).files?.[0];if(!file)return null;if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw new Error('الصيغ المدعومة PNG وJPG وWebP.');if(file.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');const ext=file.type==='image/jpeg'?'jpg':file.type.split('/')[1],path=base+'/'+prefix+'.'+ext;const {error}=await sb.storage.from(AD_BUCKET).upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;uploadedPaths.push(path);return path};
-  logoPath=await uploadOptional('ad-logo','brand-logo');assetPath=await uploadOptional(adCurrentImageInputId(),'source-image');
+  logoPath=await uploadOptional('ad-logo','brand-logo');
+  const activeSection=adVal('ad-sector-template')||'generic';
+  assetPath=await uploadOptional(adCurrentImageInputId(),'source-image');
+  if(assetPath)adLoadedAssetPaths[activeSection]=assetPath;else assetPath=adLoadedAssetPaths[activeSection]||null;
   const formats=[{key:'portrait',size:[1080,1350]},{key:'square',size:[1080,1080]},{key:'story',size:[1080,1920]},{key:'landscape',size:[1920,1080]}];
   const records=[];
   for(const item of formats){
@@ -2539,7 +2552,7 @@ async function adSavePack(){
    const blob=await new Promise((resolve,reject)=>adEl('ad-canvas').toBlob(v=>v?resolve(v):reject(new Error('تعذر تصدير '+item.key)),'image/png'));
    const exportPath=base+'/creative-'+item.key+'.png';const {error:pngError}=await sb.storage.from(AD_BUCKET).upload(exportPath,blob,{contentType:'image/png',upsert:false});if(pngError)throw pngError;uploadedPaths.push(exportPath);
    const id=crypto.randomUUID();
-   records.push({id,owner_id:user.id,title:(adVal('ad-title')||'تصميم إعلاني')+' · '+item.key,service_name:adVal('ad-service'),target_audience:adVal('ad-audience'),campaign_goal:adVal('ad-goal'),platform:adVal('ad-platform'),format_key:item.key,template_key:adVal('ad-template'),headline:adVal('ad-headline'),subheadline:adVal('ad-subheadline'),body_copy:adVal('ad-body'),call_to_action:adVal('ad-cta'),copy_package:adCopyPackage||{},design_json:{width:item.size[0],height:item.size[1],brand_name:adVal('ad-brand'),tone:adVal('ad-tone'),offer:adVal('ad-offer'),proof:adVal('ad-proof'),sector_template:adVal('ad-sector-template'),composition:adVal('ad-composition'),render_version:3,renderer:'zoz-native-layout-engine',design_mode:'editable-layer-composition',layers:adBuildLayerManifest(),pack_id:packId,quality_report:check,art_mode:adRenderMetrics.artMode},asset_path:assetPath,logo_path:logoPath,export_path:exportPath,status:'draft'});
+   records.push({id,owner_id:user.id,title:(adVal('ad-title')||'تصميم إعلاني')+' · '+item.key,service_name:adVal('ad-service'),target_audience:adVal('ad-audience'),campaign_goal:adVal('ad-goal'),platform:adVal('ad-platform'),format_key:item.key,template_key:adVal('ad-template'),headline:adVal('ad-headline'),subheadline:adVal('ad-subheadline'),body_copy:adVal('ad-body'),call_to_action:adVal('ad-cta'),copy_package:adCopyPackage||{},design_json:{width:item.size[0],height:item.size[1],brand_name:adVal('ad-brand'),campaign_key:adRestaurantStories[adVal('ad-sector-template')]?.campaignKey||null,tone:adVal('ad-tone'),offer:adVal('ad-offer'),proof:adVal('ad-proof'),sector_template:adVal('ad-sector-template'),composition:adVal('ad-composition'),render_version:4,renderer:'zoz-native-layout-engine',design_mode:'editable-layer-composition',layers:adBuildLayerManifest(),pack_id:packId,quality_report:check,art_mode:adRenderMetrics.artMode},asset_path:assetPath,logo_path:logoPath,export_path:exportPath,status:'draft'});
   }
   const {error}=await sb.from('zoz_pro_ad_creatives').insert(records);if(error)throw error;
   committed=true;adPackSaveSuccess=true;adCurrentId=records[0].id;notice('ad-status','تم حفظ حزمة من 4 تصميمات PNG بالمقاسات 4:5 و1:1 و9:16 و16:9 داخل مساحة ZOZ Pro الخاصة.','good');await adLoadSaved();
@@ -2563,7 +2576,7 @@ async function adEditSaved(id){
   adEl('ad-brand').value=data.design_json?.brand_name||'';
   for(const [field,key] of Object.entries(fields)){if(data[key]!=null&&adEl(field))adEl(field).value=data[key]}
   adCopyPackage=data.copy_package||{};if(data.design_json?.sector_template)adEl('ad-sector-template').value=data.design_json.sector_template;if(data.design_json?.composition&&adEl('ad-composition'))adEl('ad-composition').value=data.design_json.composition;if(data.design_json?.tone&&adEl('ad-tone'))adEl('ad-tone').value=data.design_json.tone;if(adEl('ad-offer'))adEl('ad-offer').value=data.design_json?.offer||'';if(adEl('ad-proof'))adEl('ad-proof').value=data.design_json?.proof||'';adImage=null;adLogo=null;adEl('ad-image-starches').value='';adEl('ad-image-butcher').value='';adEl('ad-logo').value='';
-  if(data.asset_path){const {data:file,error:e}=await sb.storage.from(AD_BUCKET).download(data.asset_path);if(e)throw e;adImage=await adLoadImage(file)}
+  if(data.asset_path){const {data:file,error:e}=await sb.storage.from(AD_BUCKET).download(data.asset_path);if(e)throw e;adImage=await adLoadImage(file);adLoadedAssetPaths[data.design_json?.sector_template||'generic']=data.asset_path}
   if(data.logo_path){const {data:file,error:e}=await sb.storage.from(AD_BUCKET).download(data.logo_path);if(e)throw e;adLogo=await adLoadImage(file)}
   await adRender();adRenderVariants(adCopyPackage?.variants||[],adCopyPackage);
   notice('ad-status','تم فتح التصميم المحفوظ للتعديل. الحفظ ينشئ نسخة جديدة حتى لا يضيع الأصل.','good');
@@ -2601,8 +2614,9 @@ adEl('ad-export')?.addEventListener('click',async()=>{await adRender();const a=d
 ['ad-image-starches','ad-image-butcher'].forEach(id=>adEl(id)?.addEventListener('change',async e=>{
  const file=e.target.files?.[0];if(!file)return;
  try{
-  if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw new Error('اختر صورة PNG أو JPG أو WebP.');
+  if(!/^image\\/(png|jpeg|webp)$/.test(file.type))throw new Error('اختر صورة PNG أو JPG أو WebP.');
   if(file.size>25*1024*1024)throw new Error('الصورة تتجاوز 25MB.');
+  const section=id==='ad-image-butcher'?'butcher':'starches';adLoadedAssetPaths[section]=null;
   if(id===adCurrentImageInputId()){adImage=await adLoadImage(file);await adRender();adQualityCheck()}
   notice('ad-status','تم تحميل الصورة الأصلية للقسم المحدد، وستبقى مستقلة عن صورة القسم الآخر.','good');
  }catch(err){notice('ad-status',err.message||'تعذر تحميل الصورة.','bad')}
