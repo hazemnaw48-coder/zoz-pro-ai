@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#101827">
 <title>ZOZ Pro — مركز التحليل ورفع الفيديو</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>if(!window.supabase){document.write('<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"><\\/script>')}</script>
 <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <style>
 :root{color-scheme:dark;--bg:#0c1422;--panel:#121f31;--line:#2b3c53;--text:#eef4ff;--muted:#a9bad0;--accent:#80a9ff;--good:#50d5a0;--warn:#ffca70;--bad:#ff8989}
@@ -510,6 +511,7 @@ body.upload-mode .footer{font-size:11px}
 <script>
 (function(){
 'use strict';
+if(!window.supabase){const msg=document.getElementById('login-msg');if(msg){msg.className='notice bad';msg.textContent='تعذر تحميل مكتبة تسجيل الدخول من مصادر الخدمة. حدّث الصفحة أو افتحها في متصفح آخر؛ لم يتم تغيير حسابك أو كلمة مروره.';}const button=document.getElementById('login');if(button)button.disabled=true;return;}
 const pageParams=new URLSearchParams(window.location.search);
 const requestedPage=pageParams.get('page')||'';
 const requestedAuthorizationChannel=String(pageParams.get('authorize_channel')||'');
