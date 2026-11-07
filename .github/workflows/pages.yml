@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "channel-control.html"
+      - "ad-studio.html"
       - "company-office.html"
       - "qwen-provider-connect.html"
       - "video-provider-connect.html"
