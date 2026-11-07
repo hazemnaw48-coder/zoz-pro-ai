@@ -487,7 +487,7 @@ body.upload-mode .footer{font-size:11px}
    <div class="ads-preview">
     <div class="row"><h3>معاينة التصميم النهائي</h3><span class="small" id="ad-dimensions">1080 × 1350</span></div>
     <canvas id="ad-canvas" width="1080" height="1350" aria-label="معاينة الإعلان النهائي"></canvas>
-    <div class="actions"><button id="ad-export" class="secondary">تنزيل PNG عالي الجودة</button><button id="ad-save">حفظ التصميم الحالي</button><button id="ad-save-pack">حفظ حزمة المقاسات الأربع</button></div>
+    <div class="actions"><button id="ad-export" class="secondary">تنزيل PNG عالي الجودة</button><button id="ad-save">حفظ التصميم الحالي</button><button id="ad-save-pack">حفظ حزمة المقاسات الأربع</button></div><div class="actions"><button id="ad-canva-connect" class="secondary">ربط Canva بحساب Hazem Now</button><button id="ad-canva-publish" class="secondary">حفظ آخر حزمة داخل Canva</button></div><p class="small">بعد تفويض Canva مرة واحدة، يحفظ النظام نسخ التصميمات الأربع تلقائيًا في حساب Canva المحدد، مع إبقاء ملفات PNG وسجلاتها داخل ZOZ Pro.</p>
     <div id="ad-copy-variants" class="stack"></div>
     <h3 class="section-gap">معرض التصميمات المحفوظة</h3><div id="ad-saved-list" class="stack"><div class="empty">لا توجد تصميمات محفوظة بعد؛ سيتم عرض أعمالك هنا بعد الحفظ.</div></div>
     <button id="ad-refresh" class="secondary">تحديث معرض التصميمات</button>
@@ -2312,6 +2312,42 @@ async function adSave(){
  }catch(e){notice('ad-status','لم يكتمل الحفظ: '+(e.message||String(e)),'bad')}
  finally{b.disabled=false}
 }
+async function adCanvaConnect(){
+ const b=adEl('ad-canva-connect');if(b)b.disabled=true;
+ try{const session=await ownerSession();const {data,error}=await sb.functions.invoke('zoz-canva-connect',{body:{action:'authorize'}});if(error)throw error;if(!data?.authorization_url)throw new Error(data?.error||'تعذر بدء تفويض Canva.');window.location.assign(data.authorization_url)}
+ catch(e){notice('ad-status','تعذر بدء ربط Canva: '+(e.message||String(e)),'bad');if(b)b.disabled=false}
+}
+async function adBlobBase64(blob){
+ const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';const step=0x8000;
+ for(let i=0;i<bytes.length;i+=step)binary+=String.fromCharCode(...bytes.subarray(i,i+step));
+ return btoa(binary)
+}
+async function adPublishLatestPack(){
+ const b=adEl('ad-canva-publish');if(b)b.disabled=true;
+ try{
+  const session=await ownerSession();const {data:{user},error:userErr}=await sb.auth.getUser(session.access_token);if(userErr||!user?.id)throw userErr||new Error('تعذر تحديد مالك التصميم.');
+  const {data:rows,error}=await sb.from('zoz_pro_ad_creatives').select('*').eq('owner_id',user.id).order('created_at',{ascending:false}).limit(20);if(error)throw error;
+  if(!rows?.length)throw new Error('لا توجد تصميمات محفوظة لإرسالها إلى Canva.');
+  const packId=rows[0].design_json?.pack_id;if(!packId)throw new Error('آخر تصميم ليس جزءًا من حزمة المقاسات الأربع.');
+  const pack=rows.filter(x=>x.design_json?.pack_id===packId).sort((a,b)=>['portrait','square','story','landscape'].indexOf(a.format_key)-['portrait','square','story','landscape'].indexOf(b.format_key));
+  if(pack.length!==4)throw new Error('الحزمة الأخيرة غير مكتملة؛ يلزم وجود المقاسات الأربعة قبل الإرسال.');
+  const results=[];
+  for(const row of pack){
+   if(row.design_json?.canva?.design_id){results.push({row,existing:true,canva:row.design_json.canva});continue}
+   const {data:blob,error:downloadError}=await sb.storage.from(AD_BUCKET).download(row.export_path);if(downloadError||!blob)throw downloadError||new Error('تعذر قراءة ملف '+row.format_key);
+   const payload={action:'publish_creative',title:row.title,width:Number(row.design_json?.width),height:Number(row.design_json?.height),format:'png',image_base64:await adBlobBase64(blob)};
+   const {data,error:invokeError}=await sb.functions.invoke('zoz-canva-adapter',{body:payload});if(invokeError)throw invokeError;if(!data?.ok||!data?.result?.design_id)throw new Error(data?.error||'Canva لم يؤكد إنشاء '+row.format_key);
+   const canva={...data.result,stored_at:new Date().toISOString()};
+   const nextDesign={...(row.design_json||{}),canva};
+   const {error:updateError}=await sb.from('zoz_pro_ad_creatives').update({design_json:nextDesign}).eq('id',row.id).eq('owner_id',user.id);if(updateError)throw updateError;
+   results.push({row,canva})
+  }
+  const links=results.map(x=>x.canva?.edit_url).filter(Boolean);
+  notice('ad-status','تم حفظ الحزمة في Canva: '+results.length+' تصميمات. '+links.join(' | '),'good');
+  await adLoadSaved()
+ }catch(e){notice('ad-status','لم يكتمل الحفظ في Canva: '+(e.message||String(e))+' · ملفات ZOZ الأصلية تبقى محفوظة كما هي.','warn')}
+ finally{if(b)b.disabled=false}
+}
 async function adSavePack(){
  const b=adEl('ad-save-pack');if(b)b.disabled=true;
  const originalFormat=adVal('ad-format'),uploadedPaths=[];let committed=false;
@@ -2373,6 +2409,8 @@ adEl('ad-render')?.addEventListener('click',async()=>{await adRender();const q=a
 adEl('ad-generate-copy')?.addEventListener('click',()=>adGenerateCopy(false));
 adEl('ad-generate-complete')?.addEventListener('click',adGenerateComplete);
 adEl('ad-save-pack')?.addEventListener('click',adSavePack);
+adEl('ad-canva-connect')?.addEventListener('click',adCanvaConnect);
+adEl('ad-canva-publish')?.addEventListener('click',adPublishLatestPack);
 adEl('ad-save')?.addEventListener('click',adSave);
 adEl('ad-refresh')?.addEventListener('click',adLoadSaved);
 adEl('ad-export')?.addEventListener('click',async()=>{await adRender();const a=document.createElement('a');a.href=adEl('ad-canvas').toDataURL('image/png');a.download='ZOZ-Pro-Ad-'+adVal('ad-format')+'.png';a.click()});
