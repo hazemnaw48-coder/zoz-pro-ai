@@ -2598,6 +2598,15 @@ adEl('ad-save')?.addEventListener('click',adSave);
 adEl('ad-refresh')?.addEventListener('click',adLoadSaved);
 adEl('ad-export')?.addEventListener('click',async()=>{await adRender();const a=document.createElement('a');a.href=adEl('ad-canvas').toDataURL('image/png');a.download='ZOZ-Pro-Ad-'+adVal('ad-format')+'.png';a.click()});
 ['ad-headline','ad-subheadline','ad-body','ad-cta','ad-format','ad-template','ad-service','ad-brand','ad-composition','ad-sector-template','ad-offer'].forEach(id=>adEl(id)?.addEventListener('input',()=>{adRender();adUpdateStoryBoard()}));
+['ad-image-starches','ad-image-butcher'].forEach(id=>adEl(id)?.addEventListener('change',async e=>{
+ const file=e.target.files?.[0];if(!file)return;
+ try{
+  if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw new Error('اختر صورة PNG أو JPG أو WebP.');
+  if(file.size>25*1024*1024)throw new Error('الصورة تتجاوز 25MB.');
+  if(id===adCurrentImageInputId()){adImage=await adLoadImage(file);await adRender();adQualityCheck()}
+  notice('ad-status','تم تحميل الصورة الأصلية للقسم المحدد، وستبقى مستقلة عن صورة القسم الآخر.','good');
+ }catch(err){notice('ad-status',err.message||'تعذر تحميل الصورة.','bad')}
+}));
 adEl('ad-logo')?.addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{if(!/^image\/(png|jpeg|webp)$/.test(f.type))throw new Error('اختر شعار PNG أو JPG أو WebP.');adLogo=await adLoadImage(f);await adRender();notice('ad-status','تم تحميل الشعار الحقيقي في طبقة العلامة التجارية.','good')}catch(err){notice('ad-status',err.message||'تعذر تحميل الشعار.','bad')}});
 ['ad-image-starches','ad-image-butcher'].forEach(id=>adEl(id)?.addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw new Error('اختر PNG أو JPG أو WebP.');if(file.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');if(id===adCurrentImageInputId())adImage=await adLoadImage(file);await adRender();notice('ad-status','تم تحميل الصورة الأصلية للقسم. لن تُستخدم بدل صورة القسم الآخر.','good')}catch(err){notice('ad-status',err.message||'تعذر تحميل الصورة.','bad')}}));
 adEl('ad-copy-variants')?.addEventListener('click',e=>{const b=e.target.closest('[data-ad-variant]');if(!b)return;const v=adCopyPackage?.variants?.[Number(b.dataset.adVariant)];if(!v)return;adEl('ad-headline').value=v.headline||'';adEl('ad-body').value=v.primary_text||'';adEl('ad-cta').value=v.call_to_action||'';adRender()});
