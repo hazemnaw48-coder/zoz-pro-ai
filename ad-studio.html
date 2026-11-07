@@ -238,15 +238,18 @@ async function downloadPack(){
  }catch(e){$('ad-format').value=original;render();quality();$('status').textContent='توقف التصدير: '+e.message}
  finally{btn.disabled=false}
 }
+const draftKey="zoz-pro-akaber-ad-draft-v2";
+const draftFields=["ad-title","ad-headline","ad-subheadline","ad-body","ad-cta","ad-format","ad-theme","ad-tag"];
+function saveDraft(){try{const values={};draftFields.forEach(id=>values[id]=$(id).value);localStorage.setItem(draftKey,JSON.stringify({sector,values,savedAt:new Date().toISOString()}))}catch(e){}}
+function restoreDraft(){try{const saved=JSON.parse(localStorage.getItem(draftKey)||"null");if(!saved||!saved.values||!["starches","butcher"].includes(saved.sector))return false;sector=saved.sector;draftFields.forEach(id=>{if(typeof saved.values[id]==="string")$(id).value=saved.values[id]});$("preset-starches").classList.toggle("active",sector==="starches");$("preset-butcher").classList.toggle("active",sector==="butcher");return true}catch(e){return false}}
 $("preset-starches").addEventListener("click",()=>setSector("starches"));
 $("preset-butcher").addEventListener("click",()=>setSector("butcher"));
-["ad-headline","ad-subheadline","ad-body","ad-cta","ad-tag","ad-format","ad-theme"].forEach(id=>$(id).addEventListener("input",()=>{render();quality()}));
-$("ad-photo").addEventListener("change",e=>loadImage(e.target.files&&e.target.files[0],img=>{photo=img;$("status").textContent="تم إدراج الصورة الأصلية في المشهد. أعد المعاينة للتأكد من القص."}));
-$("ad-logo").addEventListener("change",e=>loadImage(e.target.files&&e.target.files[0],img=>{logo=img;$("status").textContent="تم إدراج الشعار في طبقة العلامة التجارية."}));
-$("render").addEventListener("click",()=>{render();quality();$("status").textContent="تم تحديث التكوين والنصوص والطبقات."});
-$("download").addEventListener("click",downloadCurrent);
-$("download-pack").addEventListener("click",downloadPack);
-setSector("starches");
+["ad-title","ad-headline","ad-subheadline","ad-body","ad-cta","ad-tag","ad-format","ad-theme"].forEach(id=>$(id).addEventListener("input",()=>{render();quality();saveDraft()}));
+$("ad-photo").addEventListener("change",e=>loadImage(e.target.files&&e.target.files[0],img=>{photo=img;$("status").textContent="تم إدراج الصورة الأصلية. الصور لا تُحفظ بعد إغلاق الصفحة."}));
+$("ad-logo").addEventListener("change",e=>loadImage(e.target.files&&e.target.files[0],img=>{logo=img;$("status").textContent="تم إدراج الشعار. الصور لا تُحفظ بعد إغلاق الصفحة."}));
+$("render").addEventListener("click",()=>{render();quality();saveDraft();$("status").textContent="تم تحديث التصميم وحفظ المسودة على هذا الجهاز."});
+$("download").addEventListener("click",downloadCurrent);$("download-pack").addEventListener("click",downloadPack);
+if(restoreDraft()){render();quality();$("status").textContent="تم استعادة آخر مسودة نصية. أعد اختيار الصورة أو الشعار عند الحاجة."}else setSector("starches");
 })();
 </script>
 </body>
