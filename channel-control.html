@@ -76,6 +76,11 @@ body.upload-mode .footer{font-size:11px}
 #ad-generate-complete{flex:1 1 100%}
 #ad-save-pack{flex:1 1 100%}
 .ad-health-detail{font-size:12px;opacity:.9}
+.ad-story-beats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.ad-story-beat{border:1px solid #52627a;border-radius:10px;padding:9px;background:#101e30;text-align:center;min-width:0}
+.ad-story-beat b{display:block;color:#f0cd86;font-size:12px;margin-bottom:3px}
+.ad-story-beat span{display:block;font-size:12px;line-height:1.45}
+@media(max-width:480px){.ad-story-beats{gap:5px}.ad-story-beat{padding:7px 4px}.ad-story-beat span{font-size:11px}}
 .ads-controls .small{line-height:1.7}
 .ad-variant p{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:800px){.ads-layout{grid-template-columns:1fr}.ads-preview{order:-1}#ad-canvas{max-height:none}}
@@ -465,7 +470,7 @@ body.upload-mode .footer{font-size:11px}
     <label for="ad-brand">اسم العلامة التجارية الظاهر على الإعلان</label><input id="ad-brand" maxlength="100" placeholder="مثال: مطعم الأكابر">
     <label for="ad-service">الخدمة أو المنتج</label><input id="ad-service" maxlength="180" value="تصميم وإنتاج محتوى وإعلانات رقمية احترافية">
     <label for="ad-audience">الجمهور المستهدف</label><input id="ad-audience" maxlength="240" value="أصحاب المشروعات الصغيرة والمتاجر وصناع المحتوى">
-    <label for="ad-sector-template">نوع النشاط / المشهد البصري</label><select id="ad-sector-template"><option value="">مشهد عام احترافي</option><option value="small-business">مشروع أو شركة صغيرة</option><option value="ecommerce">متجر إلكتروني / منتج</option><option value="restaurant">مطعم / مشويات / أطعمة</option><option value="creator">صانع محتوى</option><option value="local-service">خدمة محلية</option></select>
+    <label for="ad-sector-template">نوع النشاط / المشهد البصري</label><select id="ad-sector-template"><option value="">مشهد عام احترافي</option><option value="small-business">مشروع أو شركة صغيرة</option><option value="ecommerce">متجر إلكتروني / منتج</option><option value="restaurant">مطعم / مشويات / أطعمة</option><option value="starches">قسم النشويات</option><option value="butcher">قسم الجزارة واللحوم</option><option value="creator">صانع محتوى</option><option value="local-service">خدمة محلية</option></select>
     <label for="ad-goal">هدف الإعلان</label><select id="ad-goal"><option value="awareness">زيادة الوعي بالعلامة</option><option value="leads">جذب عملاء محتملين</option><option value="sales">زيادة المبيعات والطلبات</option><option value="traffic">زيارات للموقع أو الصفحة</option><option value="engagement">التفاعل وبناء المجتمع</option></select>
     <label for="ad-platform">المنصة المستهدفة</label><select id="ad-platform"><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="tiktok">TikTok</option><option value="linkedin">LinkedIn</option><option value="youtube">YouTube</option><option value="multi">متعدد المنصات</option></select>
     <label for="ad-format">مقاس المعاينة</label><select id="ad-format"><option value="portrait">منشور 4:5 · 1080×1350</option><option value="square">مربع 1:1 · 1080×1080</option><option value="story">ستوري / ريلز 9:16 · 1080×1920</option><option value="landscape">أفقي 16:9 · 1920×1080</option></select>
@@ -479,10 +484,13 @@ body.upload-mode .footer{font-size:11px}
     <label for="ad-body">النص على التصميم</label><textarea id="ad-body" rows="3">نساعدك على تقديم مشروعك بصورة احترافية وبمحتوى يخاطب جمهورك.</textarea>
     <label for="ad-cta">دعوة الإجراء</label><input id="ad-cta" maxlength="80" value="تواصل معنا وابدأ الآن">
     <label for="ad-logo">شعار علامتك التجارية (اختياري)</label><input id="ad-logo" type="file" accept="image/png,image/jpeg,image/webp">
-    <label for="ad-image">صورة حقيقية للمنتج أو الأطباق أو الخدمة (اختياري)</label><input id="ad-image" type="file" accept="image/png,image/jpeg,image/webp">
+    <label for="ad-image-starches">صورة حقيقية لأطباق قسم النشويات (اختياري)</label><input id="ad-image-starches" type="file" accept="image/png,image/jpeg,image/webp">
+    <label for="ad-image-butcher">صورة حقيقية لقطع اللحوم أو قسم الجزارة (اختياري)</label><input id="ad-image-butcher" type="file" accept="image/png,image/jpeg,image/webp">
     <p class="small">المحرك لا ينشئ صورًا بالذكاء الاصطناعي: يستخدم الصورة الأصلية التي ترفعها، ويصمم حولها العناوين والخطوط والألوان والأشكال والشرائط والعناصر المتجهة. عند عدم وجود صورة، يظهر رسم توضيحي متجهي واضح وليس صورة فوتوغرافية مزيفة.</p>
-    <div class="actions"><button id="ad-generate-complete">✦ بناء التصميم من الطبقات الحالية</button><button id="ad-auto-production">⚙ تصميم وحفظ المقاسات الأربع</button><button id="ad-generate-copy" class="secondary">اقتراح نصوص إعلانية بالذكاء الاصطناعي (اختياري)</button><button id="ad-render" class="secondary">تحديث المعاينة وفحص الجودة</button></div>
+    <div class="actions"><button id="ad-preset-starches" class="secondary">تهيئة إعلان النشويات</button><button id="ad-preset-butcher" class="secondary">تهيئة إعلان الجزارة واللحوم</button><button id="ad-create-pair">✦ إنشاء الإعلانين وحفظ 8 مقاسات</button></div>
+    <div class="actions"><button id="ad-generate-complete">✦ بناء التصميم من الطبقات الحالية</button><button id="ad-auto-production">⚙ تصميم وحفظ المقاسات الأربع للقسم الحالي</button><button id="ad-generate-copy" class="secondary">اقتراح نصوص إعلانية بالذكاء الاصطناعي (اختياري)</button><button id="ad-render" class="secondary">تحديث المعاينة وفحص الجودة</button></div>
     <div id="ad-status" class="notice">أدخل موجز النشاط ثم أنشئ الإعلان كاملاً. يمكنك تعديل كل النصوص قبل الحفظ.</div>
+    <div id="ad-storyboard" class="notice" style="margin-top:10px"><strong>الرواية البصرية</strong><div class="ad-story-beats">اختر قسم النشويات أو الجزارة واللحوم لعرض تسلسل القصة.</div></div>
     <div id="ad-qa" class="notice" style="margin-top:10px">سيظهر هنا تقرير فحص التكوين، المقاس، النصوص، ووضوح الدعوة للإجراء.</div>
    </div>
    <div class="ads-preview">
@@ -2105,6 +2113,29 @@ function adWrap(ctx,text,x,y,maxWidth,lineHeight,maxLines,font,color,align='righ
  shown.forEach((item,i)=>ctx.fillText(item,x,y+i*lineHeight,maxWidth));
  return {height:shown.length*lineHeight,totalLines:lines.length,visibleLines:shown.length};
 }
+const adRestaurantStories={
+ starches:{title:'مطعم الأكابر | قسم النشويات',service:'قسم النشويات في مطعم الأكابر',audience:'العائلات ومحبو الوجبات المصرية',headline:'الوجبة الحلوة.. لازم تكملها',subheadline:'أرز ومكرونة وأطباق جانبية على سفرتك',body:'اختار النشويات اللي بتحبها وكمل وجبتك من مطعم الأكابر.',cta:'اطلب إضافات وجبتك',tone:'ودودة وقريبة',theme:'vibrant',visualTitle:'من الطبق للسفرة',beats:['تجهيز الأطباق','أرز ومكرونة','سفرة تكتمل']},
+ butcher:{title:'مطعم الأكابر | قسم الجزارة واللحوم',service:'قسم الجزارة واللحوم في مطعم الأكابر',audience:'محبو اللحوم والمشويات والعائلات',headline:'اختيار اللحمة.. أول حكاية الطعم',subheadline:'قسم الجزارة واللحوم في مطعم الأكابر',body:'تعرّف على القطع المتاحة واسأل عن تجهيز طلبك بالطريقة المناسبة.',cta:'اسأل واطلب الآن',tone:'فاخرة وراقية',theme:'midnight',visualTitle:'من اختيار القطعة إلى تجهيز الطلب',beats:['اختيار القطعة','تجهيز الطلب','اختيار المشويات']}
+};
+function adCurrentImageInputId(){return adVal('ad-sector-template')==='butcher'?'ad-image-butcher':'ad-image-starches'}
+function adStoryDefinition(){return adRestaurantStories[adVal('ad-sector-template')]||null}
+function adUpdateStoryBoard(){
+ const host=adEl('ad-storyboard');if(!host)return;const story=adStoryDefinition();
+ if(!story){host.innerHTML='<strong>الرواية البصرية</strong><div class="ad-story-beats">اختر قسم النشويات أو الجزارة واللحوم لعرض تسلسل القصة الإعلانية.</div>';return}
+ host.innerHTML='<strong>الرواية البصرية: '+esc(story.visualTitle)+'</strong><div class="ad-story-beats">'+story.beats.map((beat,i)=>'<div class="ad-story-beat"><b>0'+(i+1)+'</b><span>'+esc(beat)+'</span></div>').join('')+'</div>';
+}
+async function adLoadSectionImage(){
+ const file=adEl(adCurrentImageInputId())?.files?.[0];if(!file){adImage=null;return}
+ if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw new Error('اختر صورة PNG أو JPG أو WebP.');
+ if(file.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');
+ adImage=await adLoadImage(file);
+}
+function adApplyRestaurantPreset(section){
+ const p=adRestaurantStories[section];if(!p)throw new Error('القسم الإعلاني غير معروف.');
+ const values={'ad-title':p.title,'ad-service':p.service,'ad-audience':p.audience,'ad-brand':'مطعم الأكابر','ad-goal':'sales','ad-platform':'multi','ad-format':'portrait','ad-composition':'product','ad-template':p.theme,'ad-tone':p.tone,'ad-headline':p.headline,'ad-subheadline':p.subheadline,'ad-body':p.body,'ad-cta':p.cta,'ad-sector-template':section};
+ for(const [id,value] of Object.entries(values))if(adEl(id))adEl(id).value=value;
+ adCopyPackage={campaign_angle:p.visualTitle,visual_direction:p.visualTitle,story_beats:p.beats};adUpdateStoryBoard();
+}
 function adDrawScene(ctx,x,y,w,h,t,sector,composition){
  ctx.save();
  const glow=ctx.createRadialGradient(x+w*.54,y+h*.4,5,x+w*.54,y+h*.4,w*.64);
@@ -2137,6 +2168,32 @@ function adDrawScene(ctx,x,y,w,h,t,sector,composition){
   ctx.strokeStyle=accent;ctx.lineWidth=unit*.012;ctx.beginPath();ctx.arc(sx+sw*.5,sy,sw*.24,Math.PI,Math.PI*2);ctx.stroke();
   adRoundRect(ctx,x+w*.68,y+h*.16,w*.16,h*.09,unit*.03,t.bg+'dd',accent+'88');
   ctx.fillStyle=accent2;ctx.font='800 '+Math.round(unit*.055)+'px system-ui';ctx.textAlign='center';ctx.fillText('SHOP',x+w*.76,y+h*.218);
+ }else if(kind==='starches'){
+  // Warm Egyptian meal still-life: rice with vermicelli, pasta and potato sides.
+  const plateW=w*.72,plateH=h*.43,plateY=cy-h*.24;
+  ctx.save();ctx.shadowColor='#00000070';ctx.shadowBlur=unit*.04;ctx.shadowOffsetY=unit*.02;
+  ctx.beginPath();ctx.ellipse(cx,plateY+plateH*.63,plateW*.5,plateH*.43,0,0,Math.PI*2);ctx.fillStyle='#f5eee0';ctx.fill();ctx.lineWidth=unit*.014;ctx.strokeStyle='#cba86a';ctx.stroke();
+  ctx.beginPath();ctx.ellipse(cx,plateY+plateH*.57,plateW*.43,plateH*.34,0,0,Math.PI*2);ctx.fillStyle='#fffaf0';ctx.fill();ctx.restore();
+  ctx.beginPath();ctx.moveTo(cx-plateW*.29,plateY+plateH*.58);ctx.bezierCurveTo(cx-plateW*.3,plateY+plateH*.08,cx+plateW*.3,plateY+plateH*.08,cx+plateW*.29,plateY+plateH*.58);ctx.quadraticCurveTo(cx,plateY+plateH*.83,cx-plateW*.29,plateY+plateH*.58);ctx.fillStyle='#f1dfb5';ctx.fill();
+  ctx.save();ctx.strokeStyle='#c49a54';ctx.lineWidth=unit*.009;ctx.lineCap='round';for(let i=0;i<23;i++){const px=cx-plateW*.23+(i%8)*plateW*.065,py=plateY+plateH*(.28+Math.floor(i/8)*.09);ctx.beginPath();ctx.moveTo(px,py);ctx.quadraticCurveTo(px+plateW*.025,py-plateH*.06,px+plateW*.045,py+plateH*.025);ctx.stroke()}ctx.restore();
+  const bx=x+w*.13,by=cy+h*.12,bw=w*.23,bh=h*.2;
+  ctx.beginPath();ctx.ellipse(bx+bw*.5,by+bh*.38,bw*.5,bh*.42,0,0,Math.PI*2);ctx.fillStyle='#f3e8d5';ctx.fill();ctx.strokeStyle='#cba86a';ctx.lineWidth=unit*.012;ctx.stroke();
+  for(let i=0;i<7;i++){ctx.beginPath();ctx.moveTo(bx+bw*(.13+i*.1),by+bh*.25);ctx.bezierCurveTo(bx+bw*(.03+i*.1),by+bh*.02,bx+bw*(.26+i*.1),by+bh*.02,bx+bw*(.2+i*.1),by+bh*.36);ctx.strokeStyle=i%2?'#d5a04d':'#c26b3e';ctx.lineWidth=unit*.014;ctx.stroke()}
+  const px=x+w*.67,py=cy+h*.12,pw=w*.22,ph=h*.2;
+  ctx.beginPath();ctx.ellipse(px+pw*.5,py+ph*.38,pw*.5,ph*.42,0,0,Math.PI*2);ctx.fillStyle='#f3e8d5';ctx.fill();ctx.strokeStyle='#cba86a';ctx.stroke();
+  for(let i=0;i<5;i++){ctx.save();ctx.translate(px+pw*(.2+i*.13),py+ph*(.35+(i%2)*.08));ctx.rotate(-.45+i*.13);adRoundRect(ctx,-pw*.055,-ph*.18,pw*.11,ph*.35,unit*.018,'#d59a3c','#9c652e');ctx.restore()}
+  ctx.save();ctx.strokeStyle='#fff0cf';ctx.globalAlpha=.8;ctx.lineWidth=unit*.012;for(let i=0;i<3;i++){const sx=cx+(i-1)*unit*.14;ctx.beginPath();ctx.moveTo(sx,plateY+plateH*.08);ctx.bezierCurveTo(sx-unit*.08,plateY-unit*.04,sx+unit*.07,plateY-unit*.09,sx,plateY-unit*.2);ctx.stroke()}ctx.restore();
+  ctx.fillStyle=accent2;ctx.font='800 '+Math.round(unit*.032)+'px system-ui';ctx.textAlign='center';ctx.fillText('أرز  •  مكرونة  •  إضافات',cx,y+h*.66,w*.78);
+ }else if(kind==='butcher'){
+  // Premium, clean butcher counter: meat cuts, marbling and herbs, without gore.
+  const boardX=x+w*.12,boardY=y+h*.2,boardW=w*.76,boardH=h*.47;
+  adRoundRect(ctx,boardX,boardY,boardW,boardH,unit*.055,'#6d3f2c','#d2a76b');
+  ctx.save();ctx.globalAlpha=.22;ctx.strokeStyle='#f0c08b';ctx.lineWidth=unit*.009;for(let i=0;i<7;i++){ctx.beginPath();ctx.moveTo(boardX+boardW*.08,boardY+boardH*(.12+i*.12));ctx.bezierCurveTo(boardX+boardW*.35,boardY+boardH*(.03+i*.12),boardX+boardW*.65,boardY+boardH*(.21+i*.12),boardX+boardW*.92,boardY+boardH*(.1+i*.12));ctx.stroke()}ctx.restore();
+  const cuts=[{x:boardX+boardW*.27,y:boardY+boardH*.48,rx:boardW*.19,ry:boardH*.29,rot:-.13},{x:boardX+boardW*.65,y:boardY+boardH*.49,rx:boardW*.16,ry:boardH*.25,rot:.2}];
+  cuts.forEach((cut,index)=>{ctx.save();ctx.translate(cut.x,cut.y);ctx.rotate(cut.rot);ctx.beginPath();ctx.ellipse(0,0,cut.rx,cut.ry,0,0,Math.PI*2);ctx.fillStyle=index?'#8b382f':'#a94435';ctx.fill();ctx.lineWidth=unit*.014;ctx.strokeStyle='#e4b58a';ctx.stroke();ctx.beginPath();ctx.ellipse(0,0,cut.rx*.72,cut.ry*.75,0,0,Math.PI*2);ctx.strokeStyle='#f1d7b4';ctx.lineWidth=unit*.024;ctx.stroke();ctx.strokeStyle='#f0d8bd';ctx.lineWidth=unit*.014;ctx.lineCap='round';for(let j=0;j<4;j++){ctx.beginPath();ctx.moveTo(-cut.rx*.45,(-.45+j*.25)*cut.ry);ctx.quadraticCurveTo(0,(-.62+j*.24)*cut.ry,cut.rx*.42,(-.28+j*.22)*cut.ry);ctx.stroke()}ctx.restore()});
+  ctx.save();ctx.strokeStyle='#55764b';ctx.lineWidth=unit*.013;ctx.lineCap='round';for(let sprig=0;sprig<3;sprig++){const sx=boardX+boardW*(.12+sprig*.06),sy=boardY+boardH*(.72+sprig*.025);ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+boardW*.16,sy-boardH*.16);ctx.stroke();for(let leaf=0;leaf<5;leaf++){const lx=sx+boardW*(.025+leaf*.028),ly=sy-boardH*(.025+leaf*.028);ctx.beginPath();ctx.ellipse(lx,ly,unit*.018,unit*.009,-.5,0,Math.PI*2);ctx.fillStyle='#6f955b';ctx.fill()}}ctx.restore();
+  ctx.save();ctx.translate(boardX+boardW*.79,boardY+boardH*.68);ctx.rotate(-.32);ctx.fillStyle='#c9d3d8';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(boardW*.12,-boardH*.46);ctx.lineTo(boardW*.2,-boardH*.4);ctx.lineTo(boardW*.06,boardH*.02);ctx.closePath();ctx.fill();adRoundRect(ctx,-unit*.016,0,unit*.04,unit*.12,unit*.012,'#51372b',null);ctx.restore();
+  ctx.fillStyle=accent2;ctx.font='800 '+Math.round(unit*.032)+'px system-ui';ctx.textAlign='center';ctx.fillText('قسم الجزارة واللحوم',cx,y+h*.75,w*.78);
  }else if(kind==='restaurant'){
   // Original vector illustration for food layouts. Real dish photography is preferred
   // and is used whenever the owner uploads an actual restaurant photo.
@@ -2216,13 +2273,30 @@ function adDrawHeroImage(ctx,x,y,w,h,t){
  }
  ctx.restore();
 }
+function adDrawStoryOverlay(ctx,x,y,w,h,t,sector){
+ const story=adRestaurantStories[sector];if(!story)return;
+ const panelY=y+h*.79,panelH=h*.145,panelX=x+w*.045,panelW=w*.91;
+ ctx.save();ctx.globalAlpha=.94;adRoundRect(ctx,panelX,panelY,panelW,panelH,Math.min(w,h)*.025,'#091321dd',t.accent+'99');ctx.globalAlpha=1;
+ const colW=panelW/3;
+ story.beats.forEach((label,i)=>{
+  const px=panelX+colW*(i+.5),py=panelY+panelH*.36;
+  ctx.beginPath();ctx.arc(px,py,Math.min(w,h)*.026,0,Math.PI*2);ctx.fillStyle=t.accent;ctx.fill();
+  ctx.fillStyle='#101827';ctx.font='800 '+Math.round(Math.min(w,h)*.025)+'px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(i+1),px,py);
+  ctx.fillStyle='#fff6e5';ctx.font='650 '+Math.round(Math.min(w,h)*.023)+'px system-ui';ctx.fillText(label,px,panelY+panelH*.78,colW*.9);
+  if(i<2){ctx.strokeStyle=t.accent;ctx.lineWidth=Math.max(2,Math.min(w,h)*.004);ctx.beginPath();ctx.moveTo(px+colW*.27,py);ctx.lineTo(px+colW*.47,py);ctx.stroke()}
+ });
+ ctx.restore();
+ adDrawStoryOverlay(ctx,x,y,w,h,t,adVal('ad-sector-template'));
+}
 function adBuildLayerManifest(){
  const canvas=adEl('ad-canvas'),w=canvas?.width||1080,h=canvas?.height||1350;
  const brand=adVal('ad-brand')||adVal('ad-service')||'علامتك التجارية';
+ const story=adStoryDefinition();
  return [
   {id:'background',name:'الخلفية والهوية اللونية',type:'shape',position:'full-bleed',editable:true,visible:true},
   {id:'brand',name:'اسم العلامة والشعار',type:adLogo?'image+text':'text',text:brand,position:'top-right',editable:true,visible:true},
   {id:'hero',name:'الصورة الرئيسية',type:adImage?'uploaded-original-photo':'native-vector-art',asset:'owner-upload-only',position:'hero-frame',editable:true,visible:true},
+  ...(story?[{id:'story-steps',name:'الرواية البصرية: '+story.visualTitle,type:'three-step-story',steps:story.beats,position:'hero-overlay',editable:true,visible:true}]:[]),
   {id:'headline',name:'العنوان الرئيسي',type:'text',text:adVal('ad-headline'),position:'headline',editable:true,visible:!!adVal('ad-headline')},
   {id:'subheadline',name:'العنوان المساند',type:'text',text:adVal('ad-subheadline'),position:'supporting-copy',editable:true,visible:!!adVal('ad-subheadline')},
   {id:'body',name:'النص التفصيلي',type:'text',text:adVal('ad-body'),position:'body-copy',editable:true,visible:!!adVal('ad-body')},
@@ -2294,6 +2368,7 @@ function adQualityCheck(){
  checks.push({label:'المقاس مطابق لاختيار المنصة',ok:!!adVal('ad-format'),level:'error'});
  checks.push({label:'عنصر بصري متوفر',ok:!!adImage||adRenderMetrics.artMode==='built-in-vector-scene',level:'error'});
  checks.push({label:'الطبقات منظمة وقابلة لإعادة التعديل',ok:adBuildLayerManifest().length>=6,level:'error'});
+ if(adStoryDefinition())checks.push({label:'الرواية البصرية تحتوي ثلاث مراحل مترابطة',ok:adStoryDefinition().beats.length===3,level:'error'});
  checks.push({label:'إضافة صورة حقيقية للمنتج / الأطباق (مستحسن)',ok:!!adImage,level:'warning'});
  checks.push({label:'العنوان ضمن مساحة القراءة',ok:adRenderMetrics.titleLines<=3,level:'error'});
  checks.push({label:'النص المساند مختصر',ok:adRenderMetrics.subLines<=2,level:'warning'});
@@ -2357,7 +2432,7 @@ async function adSave(){
   const id=crypto.randomUUID(),base=user.id+'/'+id;let assetPath=null;
   const logoFile=adEl('ad-logo').files?.[0];let logoPath=null;
   if(logoFile){if(!/^image\/(png|jpeg|webp)$/.test(logoFile.type))throw new Error('الشعار يجب أن يكون PNG أو JPG أو WebP.');if(logoFile.size>10*1024*1024)throw new Error('الشعار يتجاوز حد 10MB.');logoPath=base+'/logo-'+Date.now()+'.'+(logoFile.type==='image/jpeg'?'jpg':logoFile.type.split('/')[1]);const {error}=await sb.storage.from(AD_BUCKET).upload(logoPath,logoFile,{contentType:logoFile.type,upsert:false});if(error)throw error;}
-  const imageFile=adEl('ad-image').files?.[0];
+  const imageFile=adEl(adCurrentImageInputId())?.files?.[0];
   if(imageFile){if(!/^image\/(png|jpeg|webp)$/.test(imageFile.type))throw new Error('الصيغ المدعومة PNG وJPG وWebP.');if(imageFile.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');assetPath=base+'/source-'+Date.now()+'.'+(imageFile.type==='image/jpeg'?'jpg':imageFile.type.split('/')[1]);const {error}=await sb.storage.from(AD_BUCKET).upload(assetPath,imageFile,{contentType:imageFile.type,upsert:false});if(error)throw error;}
   const png=await new Promise((resolve,reject)=>adEl('ad-canvas').toBlob(blob=>blob?resolve(blob):reject(new Error('تعذر تصدير التصميم إلى PNG.')),'image/png'));
   const exportPath=base+'/creative.png';const {error:pngError}=await sb.storage.from(AD_BUCKET).upload(exportPath,png,{contentType:'image/png',upsert:false});if(pngError)throw pngError;
@@ -2368,6 +2443,25 @@ async function adSave(){
  finally{b.disabled=false}
 }
 let adPackSaveSuccess=false;
+async function adCreateRestaurantPair(){
+ const button=adEl('ad-create-pair');if(button)button.disabled=true;
+ const created=[];
+ try{
+  const session=await ownerSession();if(!session?.access_token)throw new Error('جلسة المالك غير جاهزة.');
+  for(const section of ['starches','butcher']){
+   adApplyRestaurantPreset(section);await adLoadSectionImage();await adRender();
+   const qa=adQualityCheck();if(!qa.ready)throw new Error('فشل فحص إعلان '+(section==='starches'?'النشويات':'الجزارة واللحوم')+'.');
+   adPackSaveSuccess=false;await adSavePack();
+   if(!adPackSaveSuccess)throw new Error('لم يؤكد النظام حفظ حزمة '+(section==='starches'?'النشويات':'الجزارة واللحوم')+'.');
+   created.push(section);
+  }
+  adApplyRestaurantPreset('butcher');await adLoadSectionImage();await adRender();adQualityCheck();await adLoadSaved();
+  notice('ad-status','اكتمل إنشاء الإعلانين وحفظ 8 ملفات تصميم: 4 مقاسات لقسم النشويات و4 مقاسات لقسم الجزارة واللحوم. لكل قسم قصة بصرية وصورة وطبقات مستقلة.','good');
+  return true;
+ }catch(e){
+  notice('ad-status','تم حفظ '+created.length+' قسم قبل التوقف. '+(e.message||String(e))+' · راجع معرض التصميمات قبل إعادة المحاولة لتجنب التكرار.','warn');return false;
+ }finally{if(button)button.disabled=false}
+}
 async function adRunFullProduction(){
  const b=adEl('ad-auto-production');if(b)b.disabled=true;
  try{
@@ -2437,7 +2531,7 @@ async function adSavePack(){
   const session=await ownerSession();const {data:{user},error:userErr}=await sb.auth.getUser(session.access_token);if(userErr||!user?.id)throw userErr||new Error('تعذر تحديد مالك التصميم.');
   const packId=crypto.randomUUID(),base=user.id+'/'+packId;let assetPath=null,logoPath=null;
   const uploadOptional=async(inputId,prefix)=>{const file=adEl(inputId).files?.[0];if(!file)return null;if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw new Error('الصيغ المدعومة PNG وJPG وWebP.');if(file.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');const ext=file.type==='image/jpeg'?'jpg':file.type.split('/')[1],path=base+'/'+prefix+'.'+ext;const {error}=await sb.storage.from(AD_BUCKET).upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;uploadedPaths.push(path);return path};
-  logoPath=await uploadOptional('ad-logo','brand-logo');assetPath=await uploadOptional('ad-image','source-image');
+  logoPath=await uploadOptional('ad-logo','brand-logo');assetPath=await uploadOptional(adCurrentImageInputId(),'source-image');
   const formats=[{key:'portrait',size:[1080,1350]},{key:'square',size:[1080,1080]},{key:'story',size:[1080,1920]},{key:'landscape',size:[1920,1080]}];
   const records=[];
   for(const item of formats){
@@ -2468,7 +2562,7 @@ async function adEditSaved(id){
   const fields={'ad-title':'title','ad-service':'service_name','ad-audience':'target_audience','ad-goal':'campaign_goal','ad-platform':'platform','ad-format':'format_key','ad-template':'template_key','ad-headline':'headline','ad-subheadline':'subheadline','ad-body':'body_copy','ad-cta':'call_to_action'};
   adEl('ad-brand').value=data.design_json?.brand_name||'';
   for(const [field,key] of Object.entries(fields)){if(data[key]!=null&&adEl(field))adEl(field).value=data[key]}
-  adCopyPackage=data.copy_package||{};if(data.design_json?.sector_template)adEl('ad-sector-template').value=data.design_json.sector_template;if(data.design_json?.composition&&adEl('ad-composition'))adEl('ad-composition').value=data.design_json.composition;if(data.design_json?.tone&&adEl('ad-tone'))adEl('ad-tone').value=data.design_json.tone;if(adEl('ad-offer'))adEl('ad-offer').value=data.design_json?.offer||'';if(adEl('ad-proof'))adEl('ad-proof').value=data.design_json?.proof||'';adImage=null;adLogo=null;adEl('ad-image').value='';adEl('ad-logo').value='';
+  adCopyPackage=data.copy_package||{};if(data.design_json?.sector_template)adEl('ad-sector-template').value=data.design_json.sector_template;if(data.design_json?.composition&&adEl('ad-composition'))adEl('ad-composition').value=data.design_json.composition;if(data.design_json?.tone&&adEl('ad-tone'))adEl('ad-tone').value=data.design_json.tone;if(adEl('ad-offer'))adEl('ad-offer').value=data.design_json?.offer||'';if(adEl('ad-proof'))adEl('ad-proof').value=data.design_json?.proof||'';adImage=null;adLogo=null;adEl('ad-image-starches').value='';adEl('ad-image-butcher').value='';adEl('ad-logo').value='';
   if(data.asset_path){const {data:file,error:e}=await sb.storage.from(AD_BUCKET).download(data.asset_path);if(e)throw e;adImage=await adLoadImage(file)}
   if(data.logo_path){const {data:file,error:e}=await sb.storage.from(AD_BUCKET).download(data.logo_path);if(e)throw e;adLogo=await adLoadImage(file)}
   await adRender();adRenderVariants(adCopyPackage?.variants||[],adCopyPackage);
@@ -2485,22 +2579,27 @@ const adSectorTemplates={
  ecommerce:{headline:'منتجك يستحق عرضًا أوضح',subheadline:'أبرز التفاصيل التي تساعد العميل على الاختيار',body:'اعرض مميزات المنتج ومقاساته وخياراته وسياسة الشحن كما هي معتمدة لديك، دون وعود غير مثبتة.',cta:'شاهد المنتج'},
  creator:{headline:'خلّي فكرتك توصل بشكل أقوى',subheadline:'محتوى بصري ونص قصير يناسب جمهورك',body:'قدّم الفكرة في رسالة واحدة واضحة، واختم بدعوة بسيطة للمتابعة أو مشاهدة المحتوى.',cta:'تابع المحتوى'},
  restaurant:{headline:'ريحة المشويات بتقول حكاية',subheadline:'مطعم الأكابر للمشويات واللحوم',body:'اختار وجبتك واستمتع بطعم المشويات واللحوم.',cta:'اطلب الآن'},
+ starches:{headline:adRestaurantStories.starches.headline,subheadline:adRestaurantStories.starches.subheadline,body:adRestaurantStories.starches.body,cta:adRestaurantStories.starches.cta},
+ butcher:{headline:adRestaurantStories.butcher.headline,subheadline:adRestaurantStories.butcher.subheadline,body:adRestaurantStories.butcher.body,cta:adRestaurantStories.butcher.cta},
  'local-service':{headline:'خدمتك أقرب لعملائك',subheadline:'عرّف جمهورك بما تقدمه ومناطق خدمتك',body:'وضّح نوع الخدمة ونطاق التغطية وطريقة التواصل ومواعيد العمل المعتمدة.',cta:'اطلب التفاصيل'}
 };
-adEl('ad-sector-template')?.addEventListener('change',e=>{const p=adSectorTemplates[e.target.value];if(!p)return;adEl('ad-headline').value=p.headline;adEl('ad-subheadline').value=p.subheadline;adEl('ad-body').value=p.body;adEl('ad-cta').value=p.cta;adRender();notice('ad-status','تم تحميل قالب النشاط. عدّل التفاصيل لتطابق خدمتك الفعلية.','good')});
+adEl('ad-sector-template')?.addEventListener('change',async e=>{const section=e.target.value;if(adRestaurantStories[section]){adApplyRestaurantPreset(section);try{await adLoadSectionImage()}catch(err){notice('ad-status',err.message||String(err),'bad');return}await adRender();adQualityCheck();notice('ad-status','تم تجهيز الرواية البصرية: '+adRestaurantStories[section].visualTitle+'. راجع التفاصيل قبل الحفظ.','good');return}const p=adSectorTemplates[section];if(!p)return;adEl('ad-headline').value=p.headline;adEl('ad-subheadline').value=p.subheadline;adEl('ad-body').value=p.body;adEl('ad-cta').value=p.cta;adUpdateStoryBoard();adRender();notice('ad-status','تم تحميل قالب النشاط. عدّل التفاصيل لتطابق خدمتك الفعلية.','good')});
 adEl('ad-render')?.addEventListener('click',async()=>{await adRender();const q=adQualityCheck();notice('ad-status',q.ready?'تم تحديث المعاينة واجتياز الفحص الأساسي.':'تم تحديث المعاينة؛ راجع تقرير الجودة قبل الحفظ.',q.ready?'good':'warn')});
 adEl('ad-generate-copy')?.addEventListener('click',()=>adGenerateCopy(false));
 adEl('ad-generate-complete')?.addEventListener('click',adGenerateComplete);
 adEl('ad-auto-production')?.addEventListener('click',adRunFullProduction);
 adEl('ad-save-pack')?.addEventListener('click',adSavePack);
+adEl('ad-preset-starches')?.addEventListener('click',async()=>{try{adApplyRestaurantPreset('starches');await adLoadSectionImage();await adRender();adQualityCheck();notice('ad-status','تم تجهيز إعلان قسم النشويات للمراجعة والتعديل.','good')}catch(e){notice('ad-status',e.message||String(e),'bad')}});
+adEl('ad-preset-butcher')?.addEventListener('click',async()=>{try{adApplyRestaurantPreset('butcher');await adLoadSectionImage();await adRender();adQualityCheck();notice('ad-status','تم تجهيز إعلان قسم الجزارة واللحوم للمراجعة والتعديل.','good')}catch(e){notice('ad-status',e.message||String(e),'bad')}});
+adEl('ad-create-pair')?.addEventListener('click',adCreateRestaurantPair);
 adEl('ad-canva-connect')?.addEventListener('click',adCanvaConnect);
 adEl('ad-canva-publish')?.addEventListener('click',adPublishLatestPack);
 adEl('ad-save')?.addEventListener('click',adSave);
 adEl('ad-refresh')?.addEventListener('click',adLoadSaved);
 adEl('ad-export')?.addEventListener('click',async()=>{await adRender();const a=document.createElement('a');a.href=adEl('ad-canvas').toDataURL('image/png');a.download='ZOZ-Pro-Ad-'+adVal('ad-format')+'.png';a.click()});
-['ad-headline','ad-subheadline','ad-body','ad-cta','ad-format','ad-template','ad-service','ad-brand','ad-composition','ad-sector-template','ad-offer'].forEach(id=>adEl(id)?.addEventListener('input',()=>adRender()));
+['ad-headline','ad-subheadline','ad-body','ad-cta','ad-format','ad-template','ad-service','ad-brand','ad-composition','ad-sector-template','ad-offer'].forEach(id=>adEl(id)?.addEventListener('input',()=>{adRender();adUpdateStoryBoard()}));
 adEl('ad-logo')?.addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{if(!/^image\/(png|jpeg|webp)$/.test(f.type))throw new Error('اختر شعار PNG أو JPG أو WebP.');adLogo=await adLoadImage(f);await adRender();notice('ad-status','تم تحميل الشعار الحقيقي في طبقة العلامة التجارية.','good')}catch(err){notice('ad-status',err.message||'تعذر تحميل الشعار.','bad')}});
-adEl('ad-image')?.addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{if(!/^image\/(png|jpeg|webp)$/.test(f.type))throw new Error('اختر PNG أو JPG أو WebP.');adImage=await adLoadImage(f);await adRender();notice('ad-status','تم تحميل الصورة الأصلية في طبقة الصورة الرئيسية. لم يتم توليد صورة بديلة.','good')}catch(err){notice('ad-status',err.message||'تعذر تحميل الصورة.','bad')}});
+['ad-image-starches','ad-image-butcher'].forEach(id=>adEl(id)?.addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw new Error('اختر PNG أو JPG أو WebP.');if(file.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');if(id===adCurrentImageInputId())adImage=await adLoadImage(file);await adRender();notice('ad-status','تم تحميل الصورة الأصلية للقسم. لن تُستخدم بدل صورة القسم الآخر.','good')}catch(err){notice('ad-status',err.message||'تعذر تحميل الصورة.','bad')}}));
 adEl('ad-copy-variants')?.addEventListener('click',e=>{const b=e.target.closest('[data-ad-variant]');if(!b)return;const v=adCopyPackage?.variants?.[Number(b.dataset.adVariant)];if(!v)return;adEl('ad-headline').value=v.headline||'';adEl('ad-body').value=v.primary_text||'';adEl('ad-cta').value=v.call_to_action||'';adRender()});
 adEl('ad-saved-list')?.addEventListener('click',e=>{const edit=e.target.closest('[data-ad-edit]');if(edit){adEditSaved(edit.dataset.adEdit);return}const download=e.target.closest('[data-ad-download]');if(download)adDownloadSaved(download.dataset.adDownload)});
 adEl('section-nav')?.addEventListener('click',e=>{if(e.target.closest('[data-page-target="ads"]')){adRender();adQualityCheck();adCheckHealth();adLoadSaved()}if(e.target.closest('[data-page-target="books"]')){loadBooksDashboard();kdpDocRefresh()}});
