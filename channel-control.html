@@ -480,7 +480,7 @@ body.upload-mode .footer{font-size:11px}
     <label for="ad-logo">شعار علامتك التجارية (اختياري)</label><input id="ad-logo" type="file" accept="image/png,image/jpeg,image/webp">
     <label for="ad-image">صورة منتج أو صورة عمل حقيقية (اختياري)</label><input id="ad-image" type="file" accept="image/png,image/jpeg,image/webp">
     <p class="small">عند عدم اختيار صورة، يرسم محرك التصميم مشهداً توضيحياً مدمجاً حسب نوع النشاط. الصور والشعارات التي تختارها تُحفظ في مساحة خاصة. لا يتم استدعاء مولّد صور مدفوع أو نشر الإعلان تلقائياً.</p>
-    <div class="actions"><button id="ad-generate-complete">✦ إنشاء إعلان احترافي كامل</button><button id="ad-generate-copy" class="secondary">إنشاء نسخ نصية بديلة</button><button id="ad-render" class="secondary">تحديث المعاينة وفحص الجودة</button></div>
+    <div class="actions"><button id="ad-generate-complete">✦ إنشاء إعلان احترافي كامل</button><button id="ad-auto-production">⚙ إنشاء وحفظ وإرسال Canva تلقائياً</button><button id="ad-generate-copy" class="secondary">إنشاء نسخ نصية بديلة</button><button id="ad-render" class="secondary">تحديث المعاينة وفحص الجودة</button></div>
     <div id="ad-status" class="notice">أدخل موجز النشاط ثم أنشئ الإعلان كاملاً. يمكنك تعديل كل النصوص قبل الحفظ.</div>
     <div id="ad-qa" class="notice" style="margin-top:10px">سيظهر هنا تقرير فحص التكوين، المقاس، النصوص، ووضوح الدعوة للإجراء.</div>
    </div>
@@ -2312,6 +2312,19 @@ async function adSave(){
  }catch(e){notice('ad-status','لم يكتمل الحفظ: '+(e.message||String(e)),'bad')}
  finally{b.disabled=false}
 }
+let adPackSaveSuccess=false;
+async function adRunFullProduction(){
+ const b=adEl('ad-auto-production');if(b)b.disabled=true;
+ try{
+  notice('ad-status','بدأ خط الإنتاج: وكيل الكتابة ← المصمم ← فحص الجودة ← حفظ 4 مقاسات في ZOZ ← تسليم Canva…','warn');
+  const generated=await adGenerateComplete();if(!generated)throw new Error('توقف المسار لأن التوليد أو فحص الجودة لم ينجح.');
+  adPackSaveSuccess=false;await adSavePack();if(!adPackSaveSuccess)throw new Error('لم يتم تأكيد حفظ الحزمة في قاعدة البيانات والتخزين.');
+  const sent=await adPublishLatestPack();if(!sent)throw new Error('حُفظت الحزمة في ZOZ، لكن تسليم Canva لم يكتمل. راجع اتصال Canva ورسالة الحالة.');
+  notice('ad-status','اكتملت دورة الإعلان: النص والتصميم وفحص الجودة وحفظ 4 مقاسات في ZOZ وتسليمها إلى Canva.','good');
+  return true;
+ }catch(e){notice('ad-status','توقفت دورة الإنتاج بأمان: '+(e.message||String(e)),'warn');return false}
+ finally{if(b)b.disabled=false}
+}
 async function adCanvaConnect(){
  const b=adEl('ad-canva-connect');if(b)b.disabled=true;
  try{const session=await ownerSession();const {data,error}=await sb.functions.invoke('zoz-canva-connect',{body:{action:'authorize'}});if(error)throw error;if(!data?.authorization_url)throw new Error(data?.error||'تعذر بدء تفويض Canva.');window.location.assign(data.authorization_url)}
@@ -2344,11 +2357,12 @@ async function adPublishLatestPack(){
   }
   const links=results.map(x=>x.canva?.edit_url).filter(Boolean);
   notice('ad-status','تم حفظ الحزمة في Canva: '+results.length+' تصميمات. '+links.join(' | '),'good');
-  await adLoadSaved()
- }catch(e){notice('ad-status','لم يكتمل الحفظ في Canva: '+(e.message||String(e))+' · ملفات ZOZ الأصلية تبقى محفوظة كما هي.','warn')}
+  await adLoadSaved();return true
+ }catch(e){notice('ad-status','لم يكتمل الحفظ في Canva: '+(e.message||String(e))+' · ملفات ZOZ الأصلية تبقى محفوظة كما هي.','warn');return false}
  finally{if(b)b.disabled=false}
 }
 async function adSavePack(){
+ adPackSaveSuccess=false;
  const b=adEl('ad-save-pack');if(b)b.disabled=true;
  const originalFormat=adVal('ad-format'),uploadedPaths=[];let committed=false;
  try{
@@ -2367,7 +2381,7 @@ async function adSavePack(){
    records.push({id,owner_id:user.id,title:(adVal('ad-title')||'تصميم إعلاني')+' · '+item.key,service_name:adVal('ad-service'),target_audience:adVal('ad-audience'),campaign_goal:adVal('ad-goal'),platform:adVal('ad-platform'),format_key:item.key,template_key:adVal('ad-template'),headline:adVal('ad-headline'),subheadline:adVal('ad-subheadline'),body_copy:adVal('ad-body'),call_to_action:adVal('ad-cta'),copy_package:adCopyPackage||{},design_json:{width:item.size[0],height:item.size[1],tone:adVal('ad-tone'),offer:adVal('ad-offer'),proof:adVal('ad-proof'),sector_template:adVal('ad-sector-template'),composition:adVal('ad-composition'),render_version:2,pack_id:packId,quality_report:check,art_mode:adRenderMetrics.artMode},asset_path:assetPath,logo_path:logoPath,export_path:exportPath,status:'draft'});
   }
   const {error}=await sb.from('zoz_pro_ad_creatives').insert(records);if(error)throw error;
-  committed=true;adCurrentId=records[0].id;notice('ad-status','تم حفظ حزمة من 4 تصميمات PNG بالمقاسات 4:5 و1:1 و9:16 و16:9 داخل مساحة ZOZ Pro الخاصة.','good');await adLoadSaved();
+  committed=true;adPackSaveSuccess=true;adCurrentId=records[0].id;notice('ad-status','تم حفظ حزمة من 4 تصميمات PNG بالمقاسات 4:5 و1:1 و9:16 و16:9 داخل مساحة ZOZ Pro الخاصة.','good');await adLoadSaved();
  }catch(e){
   if(!committed&&uploadedPaths.length){const {error:cleanupError}=await sb.storage.from(AD_BUCKET).remove(uploadedPaths);if(cleanupError)console.warn('Ad pack rollback cleanup failed:',cleanupError)}
   notice('ad-status','لم يكتمل حفظ الحزمة: '+(e.message||String(e))+(uploadedPaths.length?' · تم طلب تنظيف الملفات المؤقتة.':''),'bad')
@@ -2408,6 +2422,7 @@ adEl('ad-sector-template')?.addEventListener('change',e=>{const p=adSectorTempla
 adEl('ad-render')?.addEventListener('click',async()=>{await adRender();const q=adQualityCheck();notice('ad-status',q.ready?'تم تحديث المعاينة واجتياز الفحص الأساسي.':'تم تحديث المعاينة؛ راجع تقرير الجودة قبل الحفظ.',q.ready?'good':'warn')});
 adEl('ad-generate-copy')?.addEventListener('click',()=>adGenerateCopy(false));
 adEl('ad-generate-complete')?.addEventListener('click',adGenerateComplete);
+adEl('ad-auto-production')?.addEventListener('click',adRunFullProduction);
 adEl('ad-save-pack')?.addEventListener('click',adSavePack);
 adEl('ad-canva-connect')?.addEventListener('click',adCanvaConnect);
 adEl('ad-canva-publish')?.addEventListener('click',adPublishLatestPack);
