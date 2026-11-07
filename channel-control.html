@@ -69,6 +69,14 @@ body.upload-mode .footer{font-size:11px}
 .ad-saved-item strong{display:block}
 .ad-saved-item small{color:var(--muted)}
 .ad-variant{padding:10px;border:1px solid var(--line);border-radius:10px;background:#101e30}
+#ad-qa{line-height:1.7}
+#ad-qa .qa-line{display:flex;gap:8px;align-items:flex-start;padding:3px 0}
+#ad-qa .qa-mark{font-weight:800;min-width:18px}
+#ad-generate-complete,#ad-save-pack{background:linear-gradient(120deg,#c99c4d,#f0d99c);color:#182235;font-weight:800}
+#ad-generate-complete{flex:1 1 100%}
+#ad-save-pack{flex:1 1 100%}
+.ad-health-detail{font-size:12px;opacity:.9}
+.ads-controls .small{line-height:1.7}
 .ad-variant p{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:800px){.ads-layout{grid-template-columns:1fr}.ads-preview{order:-1}#ad-canvas{max-height:none}}
 </style>
@@ -447,39 +455,42 @@ body.upload-mode .footer{font-size:11px}
 </div>
 
 <div class="page-panel" data-page="ads" id="page-ads">
- <section class="card">
-  <div class="row"><div><h2>١٣. استوديو الإعلانات والتصميم</h2><p class="small">إنشاء إعلانات عربية احترافية بمقاسات المنصات، كتابة إعلانية بالذكاء الاصطناعي، معاينة، حفظ وتصدير بجودة عالية.</p></div><span class="small">ZOZ PRO CREATIVE</span></div>
+ <section class="card" id="zoz-ad-studio-app">
+  <div class="row"><div><h2>١٣. استوديو الإعلانات الاحترافي</h2><p class="small">إنتاج تصميمات مكتملة بهوية متناسقة، نصوص مولدة بالذكاء الاصطناعي، مشاهد توضيحية مدمجة، فحص جودة، وحفظ حزمة المقاسات الأربع.</p></div><span class="small">ZOZ PRO CREATIVE</span></div>
+  <div id="ad-health" class="notice" style="margin:10px 0">جارٍ فحص محرك الكتابة والحفظ…</div>
   <div class="ads-layout">
    <div class="ads-controls">
-    <h3>موجز الحملة</h3>
+    <h3>موجز الإعلان</h3>
     <label for="ad-title">اسم التصميم / الحملة</label><input id="ad-title" maxlength="160" value="حملة تعريف بخدمات ZOZ Pro">
     <label for="ad-service">الخدمة أو المنتج</label><input id="ad-service" maxlength="180" value="تصميم وإنتاج محتوى وإعلانات رقمية احترافية">
     <label for="ad-audience">الجمهور المستهدف</label><input id="ad-audience" maxlength="240" value="أصحاب المشروعات الصغيرة والمتاجر وصناع المحتوى">
-    <label for="ad-sector-template">قالب جاهز حسب نوع النشاط</label><select id="ad-sector-template"><option value="">اختيار قالب...</option><option value="small-business">مشروع أو شركة صغيرة</option><option value="ecommerce">متجر إلكتروني / منتج</option><option value="creator">صانع محتوى</option><option value="local-service">خدمة محلية</option></select>
+    <label for="ad-sector-template">نوع النشاط / المشهد البصري</label><select id="ad-sector-template"><option value="">مشهد عام احترافي</option><option value="small-business">مشروع أو شركة صغيرة</option><option value="ecommerce">متجر إلكتروني / منتج</option><option value="creator">صانع محتوى</option><option value="local-service">خدمة محلية</option></select>
     <label for="ad-goal">هدف الإعلان</label><select id="ad-goal"><option value="awareness">زيادة الوعي بالعلامة</option><option value="leads">جذب عملاء محتملين</option><option value="sales">زيادة المبيعات والطلبات</option><option value="traffic">زيارات للموقع أو الصفحة</option><option value="engagement">التفاعل وبناء المجتمع</option></select>
-    <label for="ad-platform">المنصة</label><select id="ad-platform"><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="tiktok">TikTok</option><option value="linkedin">LinkedIn</option><option value="youtube">YouTube</option><option value="multi">متعدد المنصات</option></select>
-    <label for="ad-format">مقاس التصميم</label><select id="ad-format"><option value="portrait">منشور عمودي 4:5 · 1080×1350</option><option value="square">مربع 1:1 · 1080×1080</option><option value="story">ستوري / ريلز 9:16 · 1080×1920</option><option value="landscape">أفقي 16:9 · 1920×1080</option></select>
+    <label for="ad-platform">المنصة المستهدفة</label><select id="ad-platform"><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="tiktok">TikTok</option><option value="linkedin">LinkedIn</option><option value="youtube">YouTube</option><option value="multi">متعدد المنصات</option></select>
+    <label for="ad-format">مقاس المعاينة</label><select id="ad-format"><option value="portrait">منشور 4:5 · 1080×1350</option><option value="square">مربع 1:1 · 1080×1080</option><option value="story">ستوري / ريلز 9:16 · 1080×1920</option><option value="landscape">أفقي 16:9 · 1920×1080</option></select>
+    <label for="ad-composition">التكوين الفني</label><select id="ad-composition"><option value="auto">اختيار تلقائي حسب المقاس</option><option value="product">تركيز على المنتج / الخدمة</option><option value="editorial">تحريري راقٍ</option><option value="split">صورة ونص متقابلان</option><option value="bold">عنوان جريء ومساحة فنية</option></select>
     <label for="ad-template">الهوية البصرية</label><select id="ad-template"><option value="midnight">Midnight Luxury · كحلي وذهبي</option><option value="ocean">Digital Ocean · أزرق وفيروزي</option><option value="minimal">Clean Minimal · أبيض وأسود</option><option value="vibrant">Bold Energy · ألوان جريئة</option></select>
     <label for="ad-tone">نبرة الإعلان</label><select id="ad-tone"><option value="احترافية وواثقة">احترافية وواثقة</option><option value="ودودة وقريبة">ودودة وقريبة</option><option value="فاخرة وراقية">فاخرة وراقية</option><option value="مباشرة وتحفيزية">مباشرة وتحفيزية</option></select>
-    <label for="ad-offer">العرض / السعر (اختياري)</label><input id="ad-offer" maxlength="300" placeholder="لا تضف عرضاً إذا لم يكن موجوداً">
-    <label for="ad-proof">ميزة أو دليل حقيقي (اختياري)</label><input id="ad-proof" maxlength="300" placeholder="مثال: نماذج أعمال منشورة أو خبرة مثبتة">
+    <label for="ad-offer">العرض / السعر (اختياري)</label><input id="ad-offer" maxlength="300" placeholder="أدخل عرضاً معتمداً فقط">
+    <label for="ad-proof">ميزة أو دليل حقيقي (اختياري)</label><input id="ad-proof" maxlength="300" placeholder="ميزة مثبتة أو دليل حقيقي فقط">
     <label for="ad-headline">العنوان الرئيسي</label><textarea id="ad-headline" rows="2">حوّل فكرتك إلى حضور رقمي يلفت الانتباه</textarea>
     <label for="ad-subheadline">العنوان المساند</label><textarea id="ad-subheadline" rows="2">استراتيجية ومحتوى وتصميمات إعلانية متكاملة لمشروعك</textarea>
     <label for="ad-body">النص على التصميم</label><textarea id="ad-body" rows="3">نساعدك على تقديم مشروعك بصورة احترافية وبمحتوى يخاطب جمهورك.</textarea>
     <label for="ad-cta">دعوة الإجراء</label><input id="ad-cta" maxlength="80" value="تواصل معنا وابدأ الآن">
-    <label for="ad-logo">شعار علامتك التجارية (PNG شفاف مفضل)</label><input id="ad-logo" type="file" accept="image/png,image/jpeg,image/webp">
-    <label for="ad-image">صورة المنتج أو العمل أو الخلفية</label><input id="ad-image" type="file" accept="image/png,image/jpeg,image/webp">
-    <p class="small">تُرفع الصور التي تختارها أنت فقط إلى مساحة خاصة بحسابك. لا نستخدم ملفات هاتفك دون اختيار.</p>
-    <div class="actions"><button id="ad-generate-copy">✦ كتابة الإعلان بالذكاء الاصطناعي</button><button id="ad-render" class="secondary">تحديث المعاينة</button></div>
-    <div id="ad-status" class="notice">عدّل النصوص ثم حدّث المعاينة أو اطلب من الوكيل كتابة نسخة إعلانية.</div>
+    <label for="ad-logo">شعار علامتك التجارية (اختياري)</label><input id="ad-logo" type="file" accept="image/png,image/jpeg,image/webp">
+    <label for="ad-image">صورة منتج أو صورة عمل حقيقية (اختياري)</label><input id="ad-image" type="file" accept="image/png,image/jpeg,image/webp">
+    <p class="small">عند عدم اختيار صورة، يرسم محرك التصميم مشهداً توضيحياً مدمجاً حسب نوع النشاط. الصور والشعارات التي تختارها تُحفظ في مساحة خاصة. لا يتم استدعاء مولّد صور مدفوع أو نشر الإعلان تلقائياً.</p>
+    <div class="actions"><button id="ad-generate-complete">✦ إنشاء إعلان احترافي كامل</button><button id="ad-generate-copy" class="secondary">إنشاء نسخ نصية بديلة</button><button id="ad-render" class="secondary">تحديث المعاينة وفحص الجودة</button></div>
+    <div id="ad-status" class="notice">أدخل موجز النشاط ثم أنشئ الإعلان كاملاً. يمكنك تعديل كل النصوص قبل الحفظ.</div>
+    <div id="ad-qa" class="notice" style="margin-top:10px">سيظهر هنا تقرير فحص التكوين، المقاس، النصوص، ووضوح الدعوة للإجراء.</div>
    </div>
    <div class="ads-preview">
-    <div class="row"><h3>معاينة التصميم</h3><span class="small" id="ad-dimensions">1080 × 1350</span></div>
-    <canvas id="ad-canvas" width="1080" height="1350" aria-label="معاينة الإعلان"></canvas>
-    <div class="actions"><button id="ad-export" class="secondary">تنزيل PNG عالي الجودة</button><button id="ad-save">حفظ التصميم في ZOZ Pro</button></div>
+    <div class="row"><h3>معاينة التصميم النهائي</h3><span class="small" id="ad-dimensions">1080 × 1350</span></div>
+    <canvas id="ad-canvas" width="1080" height="1350" aria-label="معاينة الإعلان النهائي"></canvas>
+    <div class="actions"><button id="ad-export" class="secondary">تنزيل PNG عالي الجودة</button><button id="ad-save">حفظ التصميم الحالي</button><button id="ad-save-pack">حفظ حزمة المقاسات الأربع</button></div>
     <div id="ad-copy-variants" class="stack"></div>
-    <h3 class="section-gap">التصاميم المحفوظة</h3><div id="ad-saved-list" class="stack"><div class="empty">اضغط «تحديث التصاميم» لقراءة محفوظاتك.</div></div>
-    <button id="ad-refresh" class="secondary">تحديث التصاميم المحفوظة</button>
+    <h3 class="section-gap">معرض التصميمات المحفوظة</h3><div id="ad-saved-list" class="stack"><div class="empty">لا توجد تصميمات محفوظة بعد؛ سيتم عرض أعمالك هنا بعد الحفظ.</div></div>
+    <button id="ad-refresh" class="secondary">تحديث معرض التصميمات</button>
    </div>
   </div>
  </section>
@@ -551,7 +562,7 @@ function showPage(pageKey, scrollTop=true){
  if(indicator)indicator.textContent='القسم الحالي: '+label+' · '+step+' من '+tabs.length;
  if(scrollTop)window.scrollTo(0,0);
 }
-function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage(uploadMode?'intake':(requestedPage==='tiktok'?'tiktok':(requestedPage==='ads'?'ads':(requestedPage==='books'?'books':'connection'))),false);notice('intake-msg',uploadMode?'الجلسة متصلة. اختر ملف الفيديو ثم اضغط «رفع الفيديو للمراجعة والنشر».':'جلسة المالك متصلة بمشروع الإنتاج.','good');if(!uploadMode){if(requestedPage==='tiktok')loadTikTokAccounts();else{loadManagedChannels();loadHFProviderStatus();}if(requestedPage==='ads'){adRender();adLoadSaved();}if(requestedPage==='books'){loadBooksDashboard();kdpDocRefresh();}setTimeout(()=>processPendingKdpReportsOnLogin(),900);if(automaticAmazonExcelRequest&&!automaticAmazonExcelStarted){automaticAmazonExcelStarted=true;setTimeout(()=>queueLatestAmazonExcelFromPhone(true),250);}}}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
+function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage(uploadMode?'intake':(requestedPage==='tiktok'?'tiktok':(requestedPage==='ads'?'ads':(requestedPage==='books'?'books':'connection'))),false);notice('intake-msg',uploadMode?'الجلسة متصلة. اختر ملف الفيديو ثم اضغط «رفع الفيديو للمراجعة والنشر».':'جلسة المالك متصلة بمشروع الإنتاج.','good');if(!uploadMode){if(requestedPage==='tiktok')loadTikTokAccounts();else{loadManagedChannels();loadHFProviderStatus();}if(requestedPage==='ads'){adRender();adQualityCheck();adCheckHealth();adLoadSaved();}if(requestedPage==='books'){loadBooksDashboard();kdpDocRefresh();}setTimeout(()=>processPendingKdpReportsOnLogin(),900);if(automaticAmazonExcelRequest&&!automaticAmazonExcelStarted){automaticAmazonExcelStarted=true;setTimeout(()=>queueLatestAmazonExcelFromPhone(true),250);}}}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
 async function ownerSession(){
  const {data,error}=await sb.auth.getSession();if(error)throw error;const session=data&&data.session;
  if(!session||!session.access_token)throw new Error('لا توجد جلسة مالك محفوظة. سجّل الدخول بحساب مالك ZOZ Pro.');
@@ -2081,59 +2092,200 @@ function adWrap(ctx,text,x,y,maxWidth,lineHeight,maxLines,font,color,align='righ
  lines.forEach((item,i)=>ctx.fillText(item,x,y+i*lineHeight,maxWidth));
  return lines.length*lineHeight;
 }
-function adLoadImage(file){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src=URL.createObjectURL(file)})}
-async function adRender(){
- const canvas=adEl('ad-canvas'),ctx=canvas.getContext('2d');if(!ctx)return;
- const dims={portrait:[1080,1350],square:[1080,1080],story:[1080,1920],landscape:[1920,1080]}[adVal('ad-format')]||[1080,1350];
- canvas.width=dims[0];canvas.height=dims[1];adEl('ad-dimensions').textContent=dims[0]+' × '+dims[1];
- const t=adThemes[adVal('ad-template')]||adThemes.midnight,w=canvas.width,h=canvas.height;
- const g=ctx.createLinearGradient(0,0,w,h);g.addColorStop(0,t.bg);g.addColorStop(1,t.panel);ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
- ctx.save();ctx.globalAlpha=.18;ctx.strokeStyle=t.accent;ctx.lineWidth=3;
- for(let i=-h;i<w;i+=95){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i+h,h);ctx.stroke()}ctx.restore();
- ctx.fillStyle=t.accent;ctx.beginPath();ctx.arc(w*.12,h*.16,Math.min(w,h)*.12,0,Math.PI*2);ctx.fill();ctx.globalAlpha=.13;ctx.fillRect(0,0,w,h);ctx.globalAlpha=1;
- const margin=w*.085;let top=h*.09;
- if(adLogo){const maxLogoW=w*.22,maxLogoH=h*.055,scale=Math.min(maxLogoW/adLogo.width,maxLogoH/adLogo.height);ctx.drawImage(adLogo,margin,top-maxLogoH*.72,adLogo.width*scale,adLogo.height*scale);}
- ctx.fillStyle=t.accent;ctx.font='700 '+Math.round(w*.024)+'px system-ui';ctx.textAlign='right';ctx.direction='rtl';ctx.fillText('ZOZ PRO  •  CREATIVE STUDIO',w-margin,top);
- ctx.fillStyle=t.accent;ctx.fillRect(w-margin-w*.15,top+22,w*.15,5);
- top+=h*.07;
- if(adImage){
-  const areaY=h*.24,areaH=h*(adVal('ad-format')==='story'?.31:.35);
-  const iw=adImage.width,ih=adImage.height,scale=Math.max(w*.82/iw,areaH/ih),dw=iw*scale,dh=ih*scale;
-  ctx.save();ctx.beginPath();ctx.roundRect(margin,areaY,w-2*margin,areaH,24);ctx.clip();ctx.drawImage(adImage,margin+(w-2*margin-dw)/2,areaY+(areaH-dh)/2,dw,dh);
-  const overlay=ctx.createLinearGradient(0,areaY,0,areaY+areaH);overlay.addColorStop(0,'#00000000');overlay.addColorStop(1,t.bg+'cc');ctx.fillStyle=overlay;ctx.fillRect(margin,areaY,w-2*margin,areaH);ctx.restore();
-  top=areaY+areaH+h*.07;
+function adLoadImage(file){return new Promise((resolve,reject)=>{const img=new Image();const url=URL.createObjectURL(file);img.onload=()=>{URL.revokeObjectURL(url);resolve(img)};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('تعذر قراءة الصورة.'))};img.src=url})}
+let adRenderMetrics={titleLines:0,subLines:0,bodyLines:0,artMode:'vector'};
+let adLastQA={ready:false,checks:[]};
+function adRoundRect(ctx,x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke()}}
+function adWrap(ctx,text,x,y,maxWidth,lineHeight,maxLines,font,color,align='right'){
+ ctx.font=font;ctx.fillStyle=color;ctx.textAlign=align;ctx.textBaseline='alphabetic';ctx.direction='rtl';
+ const words=String(text||'').trim().split(/\s+/).filter(Boolean);let line='',lines=[];
+ for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word}else line=test}
+ if(line)lines.push(line);const shown=lines.slice(0,maxLines);
+ shown.forEach((item,i)=>ctx.fillText(item,x,y+i*lineHeight,maxWidth));
+ return {height:shown.length*lineHeight,totalLines:lines.length,visibleLines:shown.length};
+}
+function adDrawScene(ctx,x,y,w,h,t,sector,composition){
+ ctx.save();
+ const glow=ctx.createRadialGradient(x+w*.54,y+h*.4,5,x+w*.54,y+h*.4,w*.64);
+ glow.addColorStop(0,t.accent+'55');glow.addColorStop(1,t.bg+'00');ctx.fillStyle=glow;ctx.fillRect(x-w*.12,y-h*.12,w*1.24,h*1.24);
+ const cardFill=ctx.createLinearGradient(x,y,x+w,y+h);cardFill.addColorStop(0,t.panel+'f5');cardFill.addColorStop(1,t.bg+'e8');
+ adRoundRect(ctx,x+w*.045,y+h*.055,w*.91,h*.88,Math.min(w,h)*.07,cardFill,t.accent+'66');
+ ctx.save();ctx.globalAlpha=.14;ctx.strokeStyle=t.accent;ctx.lineWidth=Math.max(2,w*.003);
+ for(let i=1;i<7;i++){ctx.beginPath();ctx.moveTo(x+w*i/7,y+h*.11);ctx.lineTo(x+w*i/7,y+h*.87);ctx.stroke()}
+ for(let i=1;i<5;i++){ctx.beginPath();ctx.moveTo(x+w*.08,y+h*i/5);ctx.lineTo(x+w*.92,y+h*i/5);ctx.stroke()}
+ ctx.restore();
+ const kind=sector||'small-business';
+ const cx=x+w*.51,cy=y+h*.49,unit=Math.min(w,h);
+ const accent=t.accent,accent2=t.accent2,ink=t.text,muted=t.muted;
+ // Decorative orbit and product pedestal make a coherent art-directed hero scene.
+ ctx.save();ctx.strokeStyle=accent;ctx.globalAlpha=.6;ctx.lineWidth=Math.max(3,unit*.009);
+ ctx.beginPath();ctx.ellipse(cx,cy+h*.2,w*.31,h*.095,-.09,0,Math.PI*2);ctx.stroke();
+ ctx.globalAlpha=.22;ctx.beginPath();ctx.arc(cx,cy,unit*.36,Math.PI*.05,Math.PI*.88);ctx.stroke();ctx.restore();
+ if(kind==='ecommerce'){
+  const bx=cx-w*.12,by=cy-h*.13,bw=w*.25,bh=h*.35;
+  ctx.save();ctx.shadowColor='#00000055';ctx.shadowBlur=unit*.035;ctx.shadowOffsetY=unit*.018;
+  ctx.beginPath();ctx.moveTo(bx,by+bh*.13);ctx.lineTo(bx+bw*.48,by);ctx.lineTo(bx+bw,by+bh*.13);ctx.lineTo(bx+bw*.52,by+bh*.29);ctx.closePath();ctx.fillStyle=accent2;ctx.fill();
+  ctx.beginPath();ctx.moveTo(bx,by+bh*.13);ctx.lineTo(bx+bw*.52,by+bh*.29);ctx.lineTo(bx+bw*.52,by+bh);ctx.lineTo(bx,by+bh*.81);ctx.closePath();ctx.fillStyle=accent;ctx.fill();
+  ctx.beginPath();ctx.moveTo(bx+bw*.52,by+bh*.29);ctx.lineTo(bx+bw,by+bh*.13);ctx.lineTo(bx+bw,by+bh*.81);ctx.lineTo(bx+bw*.52,by+bh);ctx.closePath();ctx.fillStyle=t.panel;ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle=ink;ctx.lineWidth=Math.max(3,unit*.01);ctx.beginPath();ctx.moveTo(bx+bw*.35,by+bh*.1);ctx.quadraticCurveTo(bx+bw*.52,by-bh*.16,bx+bw*.68,by+bh*.1);ctx.stroke();
+  ctx.fillStyle=accent2;ctx.beginPath();ctx.arc(bx+bw*.52,by+bh*.52,unit*.04,0,Math.PI*2);ctx.fill();
+  // Shopping bag accent.
+  const sx=bx+bw*1.15,sy=by+bh*.33,sw=bw*.56,sh=bh*.5;
+  adRoundRect(ctx,sx,sy,sw,sh,unit*.025,accent2+'ee',null);
+  ctx.strokeStyle=accent;ctx.lineWidth=unit*.012;ctx.beginPath();ctx.arc(sx+sw*.5,sy,sw*.24,Math.PI,Math.PI*2);ctx.stroke();
+  adRoundRect(ctx,x+w*.68,y+h*.16,w*.16,h*.09,unit*.03,t.bg+'dd',accent+'88');
+  ctx.fillStyle=accent2;ctx.font='800 '+Math.round(unit*.055)+'px system-ui';ctx.textAlign='center';ctx.fillText('SHOP',x+w*.76,y+h*.218);
+ }else if(kind==='creator'){
+  const pw=w*.31,ph=h*.67,px=cx-pw*.5,py=cy-ph*.48;
+  ctx.save();ctx.shadowColor='#00000077';ctx.shadowBlur=unit*.04;ctx.shadowOffsetY=unit*.02;
+  adRoundRect(ctx,px,py,pw,ph,unit*.045,'#071320',accent+'aa');
+  ctx.restore();
+  adRoundRect(ctx,px+pw*.055,py+ph*.055,pw*.89,ph*.88,unit*.025,t.panel,null);
+  ctx.fillStyle=accent;ctx.fillRect(px+pw*.14,py+ph*.16,pw*.72,ph*.035);
+  adRoundRect(ctx,px+pw*.14,py+ph*.25,pw*.72,ph*.32,unit*.025,accent+'25',accent+'55');
+  ctx.beginPath();ctx.arc(cx,py+ph*.41,unit*.09,0,Math.PI*2);ctx.fillStyle=accent2+'dd';ctx.fill();
+  ctx.beginPath();ctx.moveTo(cx-unit*.022,py+ph*.41-unit*.04);ctx.lineTo(cx+unit*.05,py+ph*.41);ctx.lineTo(cx-unit*.022,py+ph*.41+unit*.04);ctx.closePath();ctx.fillStyle=t.bg;ctx.fill();
+  for(let i=0;i<3;i++){adRoundRect(ctx,px+pw*.14,py+ph*(.65+i*.07),pw*(.66-i*.08),unit*.012,unit*.006,muted+'88',null)}
+  ctx.fillStyle=accent2;ctx.font='700 '+Math.round(unit*.035)+'px system-ui';ctx.textAlign='center';ctx.fillText('CREATE  •  SHARE',cx,y+h*.88);
+ }else if(kind==='local-service'){
+  const sw=w*.55,sh=h*.42,sx=cx-sw*.5,sy=cy-sh*.27;
+  adRoundRect(ctx,sx,sy+sh*.22,sw,sh*.72,unit*.025,t.panel,accent+'bb');
+  ctx.fillStyle=accent2;ctx.fillRect(sx+sw*.12,sy+sh*.4,sw*.76,sh*.14);
+  ctx.fillStyle=accent;ctx.beginPath();ctx.moveTo(sx+sw*.08,sy+sh*.4);ctx.lineTo(sx+sw*.18,sy+sh*.12);ctx.lineTo(sx+sw*.82,sy+sh*.12);ctx.lineTo(sx+sw*.92,sy+sh*.4);ctx.closePath();ctx.fill();
+  for(let i=0;i<5;i++){ctx.fillStyle=i%2?accent2:t.panel;ctx.fillRect(sx+sw*(.13+i*.15),sy+sh*.25,sw*.15,sh*.15)}
+  adRoundRect(ctx,sx+sw*.4,sy+sh*.58,sw*.2,sh*.36,unit*.018,t.bg,accent+'88');
+  ctx.fillStyle=accent2;ctx.beginPath();ctx.arc(sx+sw*.76,sy+sh*.63,unit*.045,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=accent;ctx.font='800 '+Math.round(unit*.045)+'px system-ui';ctx.textAlign='center';ctx.fillText('YOUR SERVICE',cx,y+h*.88);
  }else{
-  ctx.save();ctx.strokeStyle=t.accent;ctx.globalAlpha=.65;ctx.lineWidth=Math.max(5,w*.008);
-  const cx=w*.5,cy=h*.32,r=Math.min(w,h)*.14;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(cx,cy,r*.72,0,Math.PI*2);ctx.stroke();ctx.fillStyle=t.accent;ctx.font='800 '+Math.round(r*.7)+'px system-ui';ctx.textAlign='center';ctx.fillText('ZOZ',cx,cy+r*.24);ctx.restore();
-  top=h*.53;
+  // A dashboard workstation: monitor, floating analytics card, and tangible service cues.
+  const mw=w*.52,mh=h*.39,mx=cx-mw*.5,my=cy-mh*.34;
+  ctx.save();ctx.shadowColor='#00000077';ctx.shadowBlur=unit*.04;ctx.shadowOffsetY=unit*.02;
+  adRoundRect(ctx,mx,my,mw,mh,unit*.03,t.bg,accent+'bb');
+  ctx.restore();
+  adRoundRect(ctx,mx+mw*.04,my+mh*.08,mw*.92,mh*.78,unit*.018,t.panel,null);
+  ctx.fillStyle=accent;ctx.fillRect(mx+mw*.12,my+mh*.17,mw*.48,mh*.045);
+  for(let i=0;i<3;i++){adRoundRect(ctx,mx+mw*(.12+i*.25),my+mh*.31,mw*.18,mh*.28,unit*.012,accent+'22',accent+'55')}
+  ctx.strokeStyle=accent2;ctx.lineWidth=unit*.013;ctx.beginPath();ctx.moveTo(mx+mw*.18,my+mh*.72);ctx.lineTo(mx+mw*.4,my+mh*.59);ctx.lineTo(mx+mw*.57,my+mh*.65);ctx.lineTo(mx+mw*.8,my+mh*.43);ctx.stroke();
+  ctx.fillStyle=accent2;ctx.beginPath();ctx.moveTo(cx-w*.13,my+mh);ctx.lineTo(cx+w*.13,my+mh);ctx.lineTo(cx+w*.2,my+mh+h*.09);ctx.lineTo(cx-w*.2,my+mh+h*.09);ctx.closePath();ctx.fill();
+  adRoundRect(ctx,x+w*.68,y+h*.15,w*.18,h*.18,unit*.02,accent+'22',accent+'66');
+  ctx.fillStyle=ink;ctx.font='800 '+Math.round(unit*.04)+'px system-ui';ctx.textAlign='center';ctx.fillText('IDEAS',x+w*.77,y+h*.235);
  }
+ // Small controlled sparkle accents, not random clutter.
+ [[.17,.25],[.82,.3],[.2,.74],[.82,.72]].forEach((p,i)=>{const sx=x+w*p[0],sy=y+h*p[1],r=unit*(i%2?.012:.017);ctx.fillStyle=i%2?accent2:accent;ctx.beginPath();ctx.moveTo(sx,sy-r*2);ctx.lineTo(sx+r*.55,sy-r*.55);ctx.lineTo(sx+r*2,sy);ctx.lineTo(sx+r*.55,sy+r*.55);ctx.lineTo(sx,sy+r*2);ctx.lineTo(sx-r*.55,sy+r*.55);ctx.lineTo(sx-r*2,sy);ctx.lineTo(sx-r*.55,sy-r*.55);ctx.closePath();ctx.fill()});
+ ctx.restore();
+}
+function adDrawHeroImage(ctx,x,y,w,h,t){
+ ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,Math.min(w,h)*.055);ctx.clip();
+ if(adImage){
+  const scale=Math.max(w/adImage.width,h/adImage.height),dw=adImage.width*scale,dh=adImage.height*scale;
+  ctx.drawImage(adImage,x+(w-dw)/2,y+(h-dh)/2,dw,dh);
+  const wash=ctx.createLinearGradient(x,y,x+w,y+h);wash.addColorStop(0,t.bg+'08');wash.addColorStop(1,t.bg+'55');ctx.fillStyle=wash;ctx.fillRect(x,y,w,h);
+  adRenderMetrics.artMode='uploaded-photo';
+ }else{
+  adDrawScene(ctx,x,y,w,h,t,adVal('ad-sector-template'),adVal('ad-composition'));
+  adRenderMetrics.artMode='built-in-vector-scene';
+ }
+ ctx.restore();
+}
+async function adRender(){
+ const canvas=adEl('ad-canvas'),ctx=canvas?.getContext('2d');if(!ctx)return;
+ const dims={portrait:[1080,1350],square:[1080,1080],story:[1080,1920],landscape:[1920,1080]}[adVal('ad-format')]||[1080,1350];
+ canvas.width=dims[0];canvas.height=dims[1];const [w,h]=dims;adEl('ad-dimensions').textContent=w+' × '+h;
+ const t=adThemes[adVal('ad-template')]||adThemes.midnight,margin=w*.075,minDim=Math.min(w,h);
+ adRenderMetrics={titleLines:0,subLines:0,bodyLines:0,artMode:'vector'};
+ const bg=ctx.createLinearGradient(0,0,w,h);bg.addColorStop(0,t.bg);bg.addColorStop(1,t.panel);ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
+ const halo=ctx.createRadialGradient(w*.85,h*.05,0,w*.85,h*.05,Math.max(w,h)*.75);halo.addColorStop(0,t.accent+'2a');halo.addColorStop(1,t.bg+'00');ctx.fillStyle=halo;ctx.fillRect(0,0,w,h);
+ ctx.save();ctx.globalAlpha=.075;ctx.strokeStyle=t.accent;ctx.lineWidth=2;for(let x=-h;x<w;x+=90){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+h,h);ctx.stroke()}ctx.restore();
+ // Header / brand lockup.
+ if(adLogo){const maxW=w*.19,maxH=h*.05,sc=Math.min(maxW/adLogo.width,maxH/adLogo.height);ctx.drawImage(adLogo,margin,h*.045,adLogo.width*sc,adLogo.height*sc)}
+ const brandX=adLogo? w-margin-w*.23 : w-margin;
+ ctx.textAlign='right';ctx.direction='rtl';ctx.fillStyle=t.accent;ctx.font='800 '+Math.round(minDim*.026)+'px system-ui';ctx.fillText('ZOZ PRO  •  CREATIVE',brandX,h*.085);
+ ctx.fillStyle=t.accent;ctx.fillRect(brandX-w*.13,h*.105,w*.13,5);
+ const format=adVal('ad-format'),composition=adVal('ad-composition');
+ let sceneX,sceneY,sceneW,sceneH,copyX,copyY,copyW,ctaY;
+ if(format==='landscape'||composition==='split'){
+  sceneX=margin;sceneY=h*.18;sceneW=w*.42;sceneH=h*.66;copyX=w-margin;copyY=h*.255;copyW=w*.43;ctaY=h*.79;
+ }else{
+  sceneX=margin;sceneY=h*(format==='story'?.145:.15);sceneW=w-2*margin;sceneH=h*(format==='story'?.315:(format==='square'?.285:.325));copyX=w-margin;copyY=sceneY+sceneH+h*.052;copyW=w-2*margin;ctaY=h*(format==='story'?.865:(format==='square'?.855:.84));
+  if(composition==='bold'){sceneH*=.82;copyY=sceneY+sceneH+h*.05}
+  if(composition==='editorial'){sceneX=w*.15;sceneW=w*.78;sceneH*=.88;copyY=sceneY+sceneH+h*.05}
+ }
+ // Scene card and art-directed typography.
+ adDrawHeroImage(ctx,sceneX,sceneY,sceneW,sceneH,t);
  const title=adVal('ad-headline'),sub=adVal('ad-subheadline'),body=adVal('ad-body');
- const titleSize=Math.round(w*(adVal('ad-format')==='story'?.075:.068));
- const titleHeight=adWrap(ctx,title,w-margin,top,w-2*margin,titleSize*1.2,3,'800 '+titleSize+'px system-ui',t.text);
- top+=titleHeight+h*.022;
- top+=adWrap(ctx,sub,w-margin,top,w-2*margin,Math.round(w*.038),3,'600 '+Math.round(w*.036)+'px system-ui',t.accent2);
- top+=h*.025;
- adWrap(ctx,body,w-margin,top,w-2*margin,Math.round(w*.032),3,'400 '+Math.round(w*.029)+'px system-ui',t.muted);
- const cta=adVal('ad-cta')||'تواصل معنا';
- const ctaW=w*.66,ctaH=h*.075,ctaX=(w-ctaW)/2,ctaY=h*.84;
- ctx.fillStyle=t.accent;ctx.beginPath();ctx.roundRect(ctaX,ctaY,ctaW,ctaH,ctaH/2);ctx.fill();
- ctx.fillStyle=adVal('ad-template')==='minimal'?'#ffffff':'#081426';ctx.font='800 '+Math.round(w*.034)+'px system-ui';ctx.textAlign='center';ctx.direction='rtl';ctx.fillText(cta,w/2,ctaY+ctaH*.64,ctaW*.9);
- ctx.fillStyle=t.muted;ctx.font='500 '+Math.round(w*.018)+'px system-ui';ctx.fillText(adVal('ad-service')||'ZOZ Pro',w/2,h*.94,w*.82);
+ const titleScale=composition==='bold'?.073:.061;
+ const titleFont='800 '+Math.round(minDim*titleScale)+'px system-ui';
+ const subFont='650 '+Math.round(minDim*.033)+'px system-ui';
+ const bodyFont='450 '+Math.round(minDim*.027)+'px system-ui';
+ const titleLine=Math.round(minDim*(composition==='bold'?.086:.074));
+ const subLine=Math.round(minDim*.043),bodyLine=Math.round(minDim*.037);
+ let cursor=copyY;
+ const titleBlock=adWrap(ctx,title,copyX,cursor,copyW,titleLine,3,titleFont,t.text);adRenderMetrics.titleLines=titleBlock.totalLines;cursor+=titleBlock.height+h*.014;
+ const subBlock=adWrap(ctx,sub,copyX,cursor,copyW,subLine,2,subFont,t.accent2);adRenderMetrics.subLines=subBlock.totalLines;cursor+=subBlock.height+h*.014;
+ const bodyBlock=adWrap(ctx,body,copyX,cursor,copyW,bodyLine,2,bodyFont,t.muted);adRenderMetrics.bodyLines=bodyBlock.totalLines;
+ // CTA remains anchored to a safe bottom band across all four ratios.
+ const cta=adVal('ad-cta')||'تواصل معنا',ctaW=format==='landscape'?copyW*.9:w*.72,ctaH=Math.min(h*.07,minDim*.105),ctaX=format==='landscape'?copyX-ctaW:(w-ctaW)/2;
+ adRoundRect(ctx,ctaX,ctaY,ctaW,ctaH,ctaH*.35,t.accent,null);
+ ctx.fillStyle=adVal('ad-template')==='minimal'?'#ffffff':'#0b1727';ctx.font='800 '+Math.round(minDim*.033)+'px system-ui';ctx.textAlign='center';ctx.direction='rtl';ctx.textBaseline='middle';ctx.fillText(cta,ctaX+ctaW/2,ctaY+ctaH/2,ctaW*.9);
+ ctx.textBaseline='alphabetic';ctx.fillStyle=t.muted;ctx.font='600 '+Math.round(minDim*.017)+'px system-ui';ctx.textAlign='center';ctx.fillText(adVal('ad-service')||'ZOZ Pro',w/2,h*.965,w*.8);
 }
 function adBrief(){return {service:adVal('ad-service'),audience:adVal('ad-audience'),goal:adVal('ad-goal'),platform:adVal('ad-platform'),tone:adVal('ad-tone'),offer:adVal('ad-offer'),proof:adVal('ad-proof'),language:'ar-EG'}}
-async function adGenerateCopy(){
- const b=adEl('ad-generate-copy');b.disabled=true;notice('ad-status','الوكيل يكتب الحزمة الإعلانية ويراجع الادعاءات…','warn');
+function adQualityCheck(){
+ const checks=[],headline=adVal('ad-headline'),service=adVal('ad-service'),cta=adVal('ad-cta');
+ checks.push({label:'موجز الخدمة / المنتج مكتمل',ok:!!service,level:'error'});
+ checks.push({label:'عنوان رئيسي واضح',ok:!!headline,level:'error'});
+ checks.push({label:'دعوة إجراء موجودة',ok:!!cta,level:'error'});
+ checks.push({label:'المقاس مطابق لاختيار المنصة',ok:!!adVal('ad-format'),level:'error'});
+ checks.push({label:'عنصر بصري متوفر',ok:!!adImage||adRenderMetrics.artMode==='built-in-vector-scene',level:'error'});
+ checks.push({label:'العنوان ضمن مساحة القراءة',ok:adRenderMetrics.titleLines<=3,level:'warning'});
+ checks.push({label:'النص المساند مختصر',ok:adRenderMetrics.subLines<=2,level:'warning'});
+ checks.push({label:'النص التفصيلي لا يتجاوز المساحة',ok:adRenderMetrics.bodyLines<=2,level:'warning'});
+ checks.push({label:'الادعاءات تستند إلى معلومات الموجز',ok:!adVal('ad-proof')||adVal('ad-proof').length>0,level:'warning'});
+ const blocking=checks.filter(x=>x.level==='error'&&!x.ok),warnings=checks.filter(x=>x.level==='warning'&&!x.ok);
+ adLastQA={ready:blocking.length===0,passed:checks.filter(x=>x.ok).length,total:checks.length,blocking:blocking.length,warnings:warnings.length,checks,checked_at:new Date().toISOString()};
+ const host=adEl('ad-qa');
+ if(host){host.innerHTML='<strong>'+ (adLastQA.ready?'فحص التصميم: جاهز للمراجعة':'فحص التصميم: توجد نقاط يجب إصلاحها') +'</strong><div class="ad-health-detail">'+checks.map(x=>'<div class="qa-line"><span class="qa-mark">'+(x.ok?'✓':(x.level==='error'?'!':'•'))+'</span><span>'+esc(x.label)+'</span></div>').join('')+'</div>' ;host.className='notice '+(blocking.length?'bad':warnings.length?'warn':'good')}
+ return adLastQA;
+}
+async function adCheckHealth(){
+ const host=adEl('ad-health');if(!host)return;
+ try{
+  const session=await ownerSession();
+  const response=await fetch(AD_API,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,authorization:'Bearer '+session.access_token,'content-type':'application/json'},body:JSON.stringify({action:'health'}),signal:AbortSignal.timeout(12000),cache:'no-store'});
+  const data=await response.json().catch(()=>({}));if(!response.ok||!data.ok)throw new Error(data.error||'تعذر فحص خدمة الإعلانات.');
+  host.textContent='خدمة الكتابة: '+(data.copy_generation?'متاحة':'غير مهيأة')+' · محرك التصميم: '+(data.visual_engine||'built-in renderer')+' · الأصول: مساحة خاصة · توليد الصور المدفوع: غير مستخدم';
+  host.className='notice '+(data.copy_generation?'good':'warn');
+ }catch(e){host.textContent='تعذر تأكيد اتصال محرك الكتابة: '+(e.message||String(e))+' · يمكنك معاينة التصميمات المدمجة دون توليد نص آلي.';host.className='notice warn'}
+}
+async function adGenerateCopy(silent=false){
+ const b=adEl('ad-generate-copy');if(b)b.disabled=true;
+ if(!silent)notice('ad-status','وكيل الكتابة يصوغ الرسالة الإعلانية ويمنع الادعاءات غير المثبتة…','warn');
  try{
   const session=await ownerSession();
   const response=await fetch(AD_API,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,authorization:'Bearer '+session.access_token,'content-type':'application/json'},body:JSON.stringify({action:'generate_copy',brief:adBrief()}),signal:AbortSignal.timeout(40000)});
   const data=await response.json().catch(()=>({}));if(!response.ok||!data.ok)throw new Error(data.error||'تعذر توليد النص الإعلاني.');
-  adCopyPackage=data.copy_package||data.copy||{};
+  adCopyPackage=data.copy||{};
   const c=data.copy||{};
   for(const [id,key] of [['ad-headline','headline'],['ad-subheadline','subheadline'],['ad-body','body_copy'],['ad-cta','call_to_action']])if(c[key])adEl(id).value=c[key];
-  adRender();adRenderVariants(c.variants||[],c);
-  notice('ad-status','تم إعداد النص الإعلاني عبر '+data.model+'؛ راجع النص والحقائق قبل اعتماد التصميم.','good');
- }catch(e){notice('ad-status','تعذر توليد النص: '+(e.message||String(e)),'bad')}
- finally{b.disabled=false}
+  adRenderVariants(c.variants||[],c);
+  if(!silent)notice('ad-status','اكتمل النص الإعلاني من '+data.model+'؛ تم تحديث المعاينة ويمكنك تعديل كل عنصر قبل الحفظ.','good');
+  return true;
+ }catch(e){if(!silent)notice('ad-status','تعذر توليد النص: '+(e.message||String(e)),'bad');return false}
+ finally{if(b)b.disabled=false}
+}
+async function adGenerateComplete(){
+ const b=adEl('ad-generate-complete');if(b)b.disabled=true;
+ try{
+  if(!adVal('ad-service')||!adVal('ad-audience'))throw new Error('أدخل الخدمة والجمهور المستهدف أولاً.');
+  notice('ad-status','الوكيل ينشئ النص، ثم يكوّن التصميم والمشهد البصري ويفحص المقاس والتوازن…','warn');
+  const copied=await adGenerateCopy(true);
+  if(!copied)throw new Error('لم ينجح توليد النص؛ لم يتم إخفاء الخطأ أو استبداله بنص وهمي.');
+  await adRender();const qa=adQualityCheck();
+  notice('ad-status',qa.ready?'تم إنشاء الإعلان كاملاً ومعاينته. راجع النص والهوية ثم احفظ التصميم أو حزمة المقاسات الأربع.':'تم إنشاء المسودة، لكن فحص الجودة وجد عناصر مطلوبة قبل الحفظ.','good');
+  return qa.ready;
+ }catch(e){notice('ad-status','لم يكتمل إنشاء الإعلان: '+(e.message||String(e)),'bad');return false}
+ finally{if(b)b.disabled=false}
 }
 function adRenderVariants(variants,copy){
  const host=adEl('ad-copy-variants');if(!host)return;host.innerHTML='';
@@ -2146,7 +2298,7 @@ function adRenderVariants(variants,copy){
 async function adSave(){
  const b=adEl('ad-save');b.disabled=true;
  try{
-  await adRender();const session=await ownerSession();const {data:{user},error:userErr}=await sb.auth.getUser(session.access_token);if(userErr||!user?.id)throw userErr||new Error('تعذر تحديد مالك التصميم.');
+  await adRender();const qa=adQualityCheck();if(!qa.ready)throw new Error('يجب إصلاح نقاط الفحص الأساسية قبل الحفظ.');const session=await ownerSession();const {data:{user},error:userErr}=await sb.auth.getUser(session.access_token);if(userErr||!user?.id)throw userErr||new Error('تعذر تحديد مالك التصميم.');
   const id=crypto.randomUUID(),base=user.id+'/'+id;let assetPath=null;
   const logoFile=adEl('ad-logo').files?.[0];let logoPath=null;
   if(logoFile){if(!/^image\/(png|jpeg|webp)$/.test(logoFile.type))throw new Error('الشعار يجب أن يكون PNG أو JPG أو WebP.');if(logoFile.size>10*1024*1024)throw new Error('الشعار يتجاوز حد 10MB.');logoPath=base+'/logo-'+Date.now()+'.'+(logoFile.type==='image/jpeg'?'jpg':logoFile.type.split('/')[1]);const {error}=await sb.storage.from(AD_BUCKET).upload(logoPath,logoFile,{contentType:logoFile.type,upsert:false});if(error)throw error;}
@@ -2154,11 +2306,34 @@ async function adSave(){
   if(imageFile){if(!/^image\/(png|jpeg|webp)$/.test(imageFile.type))throw new Error('الصيغ المدعومة PNG وJPG وWebP.');if(imageFile.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');assetPath=base+'/source-'+Date.now()+'.'+(imageFile.type==='image/jpeg'?'jpg':imageFile.type.split('/')[1]);const {error}=await sb.storage.from(AD_BUCKET).upload(assetPath,imageFile,{contentType:imageFile.type,upsert:false});if(error)throw error;}
   const png=await new Promise((resolve,reject)=>adEl('ad-canvas').toBlob(blob=>blob?resolve(blob):reject(new Error('تعذر تصدير التصميم إلى PNG.')),'image/png'));
   const exportPath=base+'/creative.png';const {error:pngError}=await sb.storage.from(AD_BUCKET).upload(exportPath,png,{contentType:'image/png',upsert:false});if(pngError)throw pngError;
-  const record={id,owner_id:user.id,title:adVal('ad-title')||'تصميم إعلاني',service_name:adVal('ad-service'),target_audience:adVal('ad-audience'),campaign_goal:adVal('ad-goal'),platform:adVal('ad-platform'),format_key:adVal('ad-format'),template_key:adVal('ad-template'),headline:adVal('ad-headline'),subheadline:adVal('ad-subheadline'),body_copy:adVal('ad-body'),call_to_action:adVal('ad-cta'),copy_package:adCopyPackage||{},design_json:{width:adEl('ad-canvas').width,height:adEl('ad-canvas').height,tone:adVal('ad-tone'),offer:adVal('ad-offer'),proof:adVal('ad-proof'),sector_template:adVal('ad-sector-template'),render_version:1},asset_path:assetPath,logo_path:logoPath,export_path:exportPath,status:'draft'};
+  const record={id,owner_id:user.id,title:adVal('ad-title')||'تصميم إعلاني',service_name:adVal('ad-service'),target_audience:adVal('ad-audience'),campaign_goal:adVal('ad-goal'),platform:adVal('ad-platform'),format_key:adVal('ad-format'),template_key:adVal('ad-template'),headline:adVal('ad-headline'),subheadline:adVal('ad-subheadline'),body_copy:adVal('ad-body'),call_to_action:adVal('ad-cta'),copy_package:adCopyPackage||{},design_json:{width:adEl('ad-canvas').width,height:adEl('ad-canvas').height,tone:adVal('ad-tone'),offer:adVal('ad-offer'),proof:adVal('ad-proof'),sector_template:adVal('ad-sector-template'),render_version:2,composition:adVal('ad-composition'),quality_report:qa,art_mode:adRenderMetrics.artMode},asset_path:assetPath,logo_path:logoPath,export_path:exportPath,status:'draft'};
   const {data,error}=await sb.from('zoz_pro_ad_creatives').insert(record).select('id,title,created_at').single();if(error)throw error;
   adCurrentId=data.id;notice('ad-status','تم حفظ التصميم والنسخة الأصلية وملف PNG في مساحة خاصة. رقم التصميم: '+data.id,'good');await adLoadSaved();
  }catch(e){notice('ad-status','لم يكتمل الحفظ: '+(e.message||String(e)),'bad')}
  finally{b.disabled=false}
+}
+async function adSavePack(){
+ const b=adEl('ad-save-pack');if(b)b.disabled=true;
+ const originalFormat=adVal('ad-format');
+ try{
+  await adRender();const qa=adQualityCheck();if(!qa.ready)throw new Error('أصلح نقاط الفحص الأساسية قبل حفظ الحزمة.');
+  const session=await ownerSession();const {data:{user},error:userErr}=await sb.auth.getUser(session.access_token);if(userErr||!user?.id)throw userErr||new Error('تعذر تحديد مالك التصميم.');
+  const packId=crypto.randomUUID(),base=user.id+'/'+packId;let assetPath=null,logoPath=null;
+  const uploadOptional=async(inputId,prefix)=>{const file=adEl(inputId).files?.[0];if(!file)return null;if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw new Error('الصيغ المدعومة PNG وJPG وWebP.');if(file.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');const ext=file.type==='image/jpeg'?'jpg':file.type.split('/')[1],path=base+'/'+prefix+'.'+ext;const {error}=await sb.storage.from(AD_BUCKET).upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;return path};
+  logoPath=await uploadOptional('ad-logo','brand-logo');assetPath=await uploadOptional('ad-image','source-image');
+  const formats=[{key:'portrait',size:[1080,1350]},{key:'square',size:[1080,1080]},{key:'story',size:[1080,1920]},{key:'landscape',size:[1920,1080]}];
+  const records=[];
+  for(const item of formats){
+   adEl('ad-format').value=item.key;await adRender();const check=adQualityCheck();
+   const blob=await new Promise((resolve,reject)=>adEl('ad-canvas').toBlob(v=>v?resolve(v):reject(new Error('تعذر تصدير '+item.key)),'image/png'));
+   const exportPath=base+'/creative-'+item.key+'.png';const {error:pngError}=await sb.storage.from(AD_BUCKET).upload(exportPath,blob,{contentType:'image/png',upsert:false});if(pngError)throw pngError;
+   const id=crypto.randomUUID();
+   records.push({id,owner_id:user.id,title:(adVal('ad-title')||'تصميم إعلاني')+' · '+item.key,service_name:adVal('ad-service'),target_audience:adVal('ad-audience'),campaign_goal:adVal('ad-goal'),platform:adVal('ad-platform'),format_key:item.key,template_key:adVal('ad-template'),headline:adVal('ad-headline'),subheadline:adVal('ad-subheadline'),body_copy:adVal('ad-body'),call_to_action:adVal('ad-cta'),copy_package:adCopyPackage||{},design_json:{width:item.size[0],height:item.size[1],tone:adVal('ad-tone'),offer:adVal('ad-offer'),proof:adVal('ad-proof'),sector_template:adVal('ad-sector-template'),composition:adVal('ad-composition'),render_version:2,pack_id:packId,quality_report:check,art_mode:adRenderMetrics.artMode},asset_path:assetPath,logo_path:logoPath,export_path:exportPath,status:'draft'});
+  }
+  const {error}=await sb.from('zoz_pro_ad_creatives').insert(records);if(error)throw error;
+  adCurrentId=records[0].id;notice('ad-status','تم حفظ حزمة من 4 تصميمات PNG بالمقاسات 4:5 و1:1 و9:16 و16:9 داخل مساحة ZOZ Pro الخاصة.','good');await adLoadSaved();
+ }catch(e){notice('ad-status','لم يكتمل حفظ الحزمة: '+(e.message||String(e)),'bad')}
+ finally{adEl('ad-format').value=originalFormat;await adRender();adQualityCheck();if(b)b.disabled=false}
 }
 async function adLoadSaved(){
  const host=adEl('ad-saved-list');host.innerHTML='جارٍ تحميل التصاميم…';
@@ -2192,17 +2367,19 @@ const adSectorTemplates={
  'local-service':{headline:'خدمتك أقرب لعملائك',subheadline:'عرّف جمهورك بما تقدمه ومناطق خدمتك',body:'وضّح نوع الخدمة ونطاق التغطية وطريقة التواصل ومواعيد العمل المعتمدة.',cta:'اطلب التفاصيل'}
 };
 adEl('ad-sector-template')?.addEventListener('change',e=>{const p=adSectorTemplates[e.target.value];if(!p)return;adEl('ad-headline').value=p.headline;adEl('ad-subheadline').value=p.subheadline;adEl('ad-body').value=p.body;adEl('ad-cta').value=p.cta;adRender();notice('ad-status','تم تحميل قالب النشاط. عدّل التفاصيل لتطابق خدمتك الفعلية.','good')});
-adEl('ad-render')?.addEventListener('click',()=>adRender().then(()=>notice('ad-status','تم تحديث المعاينة.','good')));
-adEl('ad-generate-copy')?.addEventListener('click',adGenerateCopy);
+adEl('ad-render')?.addEventListener('click',async()=>{await adRender();const q=adQualityCheck();notice('ad-status',q.ready?'تم تحديث المعاينة واجتياز الفحص الأساسي.':'تم تحديث المعاينة؛ راجع تقرير الجودة قبل الحفظ.',q.ready?'good':'warn')});
+adEl('ad-generate-copy')?.addEventListener('click',()=>adGenerateCopy(false));
+adEl('ad-generate-complete')?.addEventListener('click',adGenerateComplete);
+adEl('ad-save-pack')?.addEventListener('click',adSavePack);
 adEl('ad-save')?.addEventListener('click',adSave);
 adEl('ad-refresh')?.addEventListener('click',adLoadSaved);
 adEl('ad-export')?.addEventListener('click',async()=>{await adRender();const a=document.createElement('a');a.href=adEl('ad-canvas').toDataURL('image/png');a.download='ZOZ-Pro-Ad-'+adVal('ad-format')+'.png';a.click()});
-['ad-headline','ad-subheadline','ad-body','ad-cta','ad-format','ad-template','ad-service'].forEach(id=>adEl(id)?.addEventListener('input',()=>adRender()));
+['ad-headline','ad-subheadline','ad-body','ad-cta','ad-format','ad-template','ad-service','ad-composition','ad-sector-template'].forEach(id=>adEl(id)?.addEventListener('input',()=>adRender()));
 adEl('ad-logo')?.addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{if(!/^image\/(png|jpeg|webp)$/.test(f.type))throw new Error('اختر شعار PNG أو JPG أو WebP.');adLogo=await adLoadImage(f);await adRender();notice('ad-status','تم تحميل الشعار في المعاينة. سيُحفظ داخل مساحة التصميم الخاصة.','good')}catch(err){notice('ad-status',err.message||'تعذر تحميل الشعار.','bad')}});
 adEl('ad-image')?.addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{if(!/^image\/(png|jpeg|webp)$/.test(f.type))throw new Error('اختر PNG أو JPG أو WebP.');adImage=await adLoadImage(f);await adRender();notice('ad-status','تم تحميل الصورة في المعاينة. لم تُرفع بعد إلى التخزين.','good')}catch(err){notice('ad-status',err.message||'تعذر تحميل الصورة.','bad')}});
 adEl('ad-copy-variants')?.addEventListener('click',e=>{const b=e.target.closest('[data-ad-variant]');if(!b)return;const v=adCopyPackage?.variants?.[Number(b.dataset.adVariant)];if(!v)return;adEl('ad-headline').value=v.headline||'';adEl('ad-body').value=v.primary_text||'';adEl('ad-cta').value=v.call_to_action||'';adRender()});
 adEl('ad-saved-list')?.addEventListener('click',e=>{const edit=e.target.closest('[data-ad-edit]');if(edit){adEditSaved(edit.dataset.adEdit);return}const download=e.target.closest('[data-ad-download]');if(download)adDownloadSaved(download.dataset.adDownload)});
-adEl('section-nav')?.addEventListener('click',e=>{if(e.target.closest('[data-page-target="ads"]')){adRender();adLoadSaved()}if(e.target.closest('[data-page-target="books"]')){loadBooksDashboard();kdpDocRefresh()}});
+adEl('section-nav')?.addEventListener('click',e=>{if(e.target.closest('[data-page-target="ads"]')){adRender();adQualityCheck();adCheckHealth();adLoadSaved()}if(e.target.closest('[data-page-target="books"]')){loadBooksDashboard();kdpDocRefresh()}});
 
 // Owner-selected KDP report intake directly from the phone's browser file picker.
 const KDP_DOC_BUCKET='zoz-pro-documents';
