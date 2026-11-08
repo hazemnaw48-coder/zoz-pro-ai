@@ -4,6 +4,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <queries>
+        <package android:name="com.google.android.apps.labs.whisk" />
         <package android:name="com.ss.android.tt.creator" />
         <package android:name="com.google.android.apps.youtube.creator" />
         <package android:name="com.zhiliaoapp.musically" />
@@ -11,7 +12,7 @@
     </queries>
     <application
         android:allowBackup="false"
-        android:label="ZOZ Pro Bridge Auto 0.8.3"
+        android:label="ZOZ Pro Bridge Auto 0.8.4"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
