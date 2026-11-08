@@ -942,6 +942,11 @@ class FlowAutomationService : AccessibilityService() {
                 "Google Flow requested sign-in, verification, CAPTCHA, or account confirmation. The automation stopped without interacting with the security challenge.")
             return
         }
+        val desiredFlowAccount = task.optString("flow_account_email", "").trim()
+        if (desiredFlowAccount.isNotBlank() && !task.optBoolean("flow_account_verified", false)) {
+            inspectFlowAccountSelection(task, root, allText)
+            return
+        }
         if (task.optString("task_type") == "flow_control_diagnostic") {
             inspectFlowControlDiagnostic(task, root)
             return
@@ -1244,6 +1249,80 @@ class FlowAutomationService : AccessibilityService() {
             }
             else -> finishTask(task, false, "flow_diagnostic_state_invalid",
                 "حالة اختبار التحكم في Google Flow غير صالحة؛ تم إيقاف الاختبار دون توليد.")
+        }
+    }
+
+    private fun inspectFlowAccountSelection(
+        task: JSONObject,
+        root: AccessibilityNodeInfo,
+        visibleText: String
+    ) {
+        val desired = task.optString("flow_account_email", "").trim().lowercase()
+        if (desired.isBlank()) {
+            task.put("flow_account_verified", true)
+            updatePhase(task, if (task.optString("task_type") == "flow_control_diagnostic") "diagnostic_waiting_editor" else "waiting_editor")
+            handler.postDelayed({ inspectCurrentPage() }, 500)
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        if (!task.has("flow_account_started_at_ms")) {
+            task.put("flow_account_started_at_ms", now)
+            prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+        }
+
+        val pickerOpened = task.optBoolean("flow_account_picker_opened", false)
+        val selectionClicked = task.optBoolean("flow_account_selection_clicked", false)
+
+        if (selectionClicked) {
+            if (visibleText.contains(desired, ignoreCase = true)) {
+                task.put("flow_account_verified", true)
+                task.put("flow_account_verified_at_ms", now)
+                updatePhase(task, if (task.optString("task_type") == "flow_control_diagnostic") "diagnostic_waiting_editor" else "waiting_editor")
+                handler.postDelayed({ inspectCurrentPage() }, 900)
+                return
+            }
+        } else if (!pickerOpened && visibleText.contains(desired, ignoreCase = true)) {
+            // The requested account is already visible on the native Flow screen.
+            task.put("flow_account_verified", true)
+            task.put("flow_account_verified_at_ms", now)
+            updatePhase(task, if (task.optString("task_type") == "flow_control_diagnostic") "diagnostic_waiting_editor" else "waiting_editor")
+            handler.postDelayed({ inspectCurrentPage() }, 700)
+            return
+        } else if (pickerOpened) {
+            // Select only a unique visible account row that exactly contains the saved email.
+            val accountRow = findUniqueClickableContaining(root, setOf(desired))
+            if (accountRow != null && accountRow.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                task.put("flow_account_selection_clicked", true)
+                prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+                lastActionAt = now
+                handler.postDelayed({ inspectCurrentPage() }, 1400)
+                return
+            }
+        } else {
+            // Open only a semantically identified account/profile control. Never touch sign-out,
+            // password, Google account security, or verification controls.
+            val profile = findUniqueClickableContaining(root, setOf(
+                "profile", "account menu", "google account", "account", "profile picture"
+            ))
+            if (profile != null && profile.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                task.put("flow_account_picker_opened", true)
+                prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+                lastActionAt = now
+                handler.postDelayed({ inspectCurrentPage() }, 1000)
+                return
+            }
+        }
+
+        val started = task.optLong("flow_account_started_at_ms", now)
+        val attempts = task.optInt("flow_account_scan_attempts", 0) + 1
+        task.put("flow_account_scan_attempts", attempts)
+        prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+        if (now - started > 45000L || attempts > 35) {
+            finishTask(task, false, "flow_account_switch_required",
+                "لم يتمكن ZOZ من التحقق من الحساب المطلوب داخل تطبيق Google Flow أو اختياره من قائمة الحسابات الظاهرة. افتح حساب Flow المطلوب وسجّل الدخول أو بدّل الحساب يدويًا، ثم أعد المهمة. لم تُستخدم أي بيانات دخول أو رموز تحقق.")
+        } else {
+            handler.postDelayed({ inspectCurrentPage() }, 1200)
         }
     }
 
@@ -1748,7 +1827,8 @@ class FlowAutomationService : AccessibilityService() {
                 }
                 val total = task.optInt("total_scenes", 0)
                 val index = task.optInt("scene_index", 0)
-                if (success && !diagnostic && total > 0 && index >= total) {
+                if (success && !diagnostic && total > 0 && index >= total &&
+                    !task.optBoolean("save_only", true)) {
                     handler.postDelayed({ assembleAndUpload(task.optString("campaign_id"), total, task.optString("channel_id")) }, 800)
                 } else {
                     scheduleAgentPoll(1200L)
@@ -1911,6 +1991,9 @@ class FlowAutomationService : AccessibilityService() {
                 .put("flow_target_package", FLOW_APP_PACKAGE)
                 .put("editor_scan_attempts", 0)
                 .put("video_mode_selected", false)
+                .put("flow_account_email", payload.optString("flow_account_email",
+                    prefs.getString("flow_selected_account", "") ?: "").trim())
+                .put("save_only", payload.optBoolean("save_only", true))
             prefs.edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
             val runningService = activeService
             if (runningService != null && runningService.isFlowInForeground()) {
