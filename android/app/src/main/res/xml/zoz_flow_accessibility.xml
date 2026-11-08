@@ -6,5 +6,5 @@
     android:notificationTimeout="250"
     android:canRetrieveWindowContent="true"
     android:canPerformGestures="false"
-    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows|flagIncludeNotImportantViews"
     android:packageNames="com.google.android.apps.labs.whisk,com.ss.android.tt.creator,com.google.android.apps.youtube.creator,com.zhiliaoapp.musically,com.google.android.youtube,com.android.chrome,com.google.android.googlequicksearchbox" />
