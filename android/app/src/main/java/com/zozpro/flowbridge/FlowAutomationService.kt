@@ -108,10 +108,17 @@ class FlowAutomationService : AccessibilityService() {
     private fun isVerifiedFlowPage(root: AccessibilityNodeInfo): Boolean =
         root.packageName?.toString() == FLOW_APP_PACKAGE
 
-    private fun isFlowInForeground(): Boolean {
-        val root = rootInActiveWindow ?: return false
-        return isVerifiedFlowPage(root)
+    private fun flowWindowRoot(): AccessibilityNodeInfo? {
+        val appWindowRoot = runCatching {
+            windows.firstNotNullOfOrNull { window ->
+                val candidate = window.root
+                if (candidate != null && isVerifiedFlowPage(candidate)) candidate else null
+            }
+        }.getOrNull()
+        return appWindowRoot ?: rootInActiveWindow?.takeIf(::isVerifiedFlowPage)
     }
+
+    private fun isFlowInForeground(): Boolean = flowWindowRoot() != null
 
     private val downloadReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -915,6 +922,18 @@ class FlowAutomationService : AccessibilityService() {
         }
     }
 
+    private fun writePromptText(editor: AccessibilityNodeInfo, value: String, clipboardLabel: String): Boolean {
+        editor.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+        val args = android.os.Bundle().apply {
+            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value)
+        }
+        if (editor.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) return true
+
+        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText(clipboardLabel, value))
+        return editor.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+    }
+
     private fun inspectCurrentPage() {
         val task = activeTask() ?: return
         val phase = task.optString("phase", "waiting_editor")
@@ -930,8 +949,8 @@ class FlowAutomationService : AccessibilityService() {
             return
         }
 
-        val root = rootInActiveWindow
-        if (root == null || !isVerifiedFlowPage(root)) {
+        val root = flowWindowRoot()
+        if (root == null) {
             retryFlowOriginScan(task)
             return
         }
@@ -977,21 +996,14 @@ class FlowAutomationService : AccessibilityService() {
                         finishTask(task, false, "prompt_empty", "The scene prompt is empty.")
                         return
                     }
-                    val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("وصف مشهد Google Flow", prompt))
-                    editor.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-                    val pasted = editor.performAction(AccessibilityNodeInfo.ACTION_PASTE)
-                    val args = android.os.Bundle().apply {
-                        putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, prompt)
-                    }
-                    val set = pasted || editor.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+                    val set = writePromptText(editor, prompt, "وصف مشهد Google Flow")
                     if (set) {
-                        task.put("prompt_entered", true)
+                        task.put("prompt_write_attempts", 1)
                         task.put("prompt_language", "ar")
                         task.put("prompt_chars", prompt.length)
-                        updatePhase(task, "waiting_send")
+                        updatePhase(task, "verifying_prompt_entry")
                         lastActionAt = System.currentTimeMillis()
-                        handler.postDelayed({ inspectCurrentPage() }, 1300)
+                        handler.postDelayed({ inspectCurrentPage() }, 900)
                     } else {
                         retryEditorScan(task)
                     }
@@ -1074,8 +1086,33 @@ class FlowAutomationService : AccessibilityService() {
                     retryVideoOptionScan(task, step)
                 }
             }
+            "verifying_prompt_entry" -> {
+                val prompt = task.optString("prompt", "").take(12000)
+                val editor = findEditor(root)
+                val editorText = editor?.text?.toString().orEmpty()
+                val screenText = collectText(root).joinToString("\n")
+                val verified = prompt.isNotBlank() &&
+                    (editorText.contains(prompt) || screenText.contains(prompt))
+                if (verified) {
+                    task.put("prompt_entered", true)
+                    task.put("prompt_entry_verified", true)
+                    updatePhase(task, "waiting_send")
+                    lastActionAt = System.currentTimeMillis()
+                    handler.postDelayed({ inspectCurrentPage() }, 900)
+                } else if (task.optInt("prompt_write_attempts", 0) < 2 && editor != null) {
+                    val set = writePromptText(editor, prompt, "وصف مشهد Google Flow")
+                    task.put("prompt_write_attempts", task.optInt("prompt_write_attempts", 0) + 1)
+                    prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+                    if (set) handler.postDelayed({ inspectCurrentPage() }, 900)
+                    else finishTask(task, false, "flow_prompt_entry_failed",
+                        "لم يقبل محرر Google Flow كتابة النص. تم إيقاف الإرسال قبل التوليد.")
+                } else {
+                    finishTask(task, false, "flow_prompt_entry_not_verified",
+                        "أرسل Android أمر الكتابة، لكن نص المطالبة لم يظهر داخل محرر Flow؛ لم يتم الضغط على زر التوليد.")
+                }
+            }
             "waiting_send" -> {
-                if (!task.optBoolean("prompt_entered", false)) {
+                if (!task.optBoolean("prompt_entered", false) || !task.optBoolean("prompt_entry_verified", false)) {
                     finishTask(task, false, "prompt_not_entered", "لم يؤكد التطبيق إدخال وصف المشهد داخل محرر Google Flow.")
                     return
                 }
@@ -1217,8 +1254,7 @@ class FlowAutomationService : AccessibilityService() {
                     lastActionAt = System.currentTimeMillis()
                     handler.postDelayed({ inspectCurrentPage() }, 900)
                 } else if (editor != null && (visibleText.contains("video") || visibleText.contains("فيديو"))) {
-                    // The editor is already in Video mode; no further UI change is needed.
-                    completeFlowControlDiagnostic(task, root, visibleText, false)
+                    beginDiagnosticPromptEntry(task, root, false)
                 } else {
                     retryControlDiagnostic(task, "flow_image_mode_control_not_found",
                         "ظهر تطبيق Flow الأصلي، لكن تعذر تحديد عنصر وضع الصور بشكل فريد وآمن.")
@@ -1241,10 +1277,39 @@ class FlowAutomationService : AccessibilityService() {
             "diagnostic_verify_video" -> {
                 if (findEditor(root) != null &&
                     (visibleText.contains("video") || visibleText.contains("فيديو"))) {
-                    completeFlowControlDiagnostic(task, root, visibleText, true)
+                    beginDiagnosticPromptEntry(task, root, true)
                 } else {
                     retryControlDiagnostic(task, "flow_video_mode_not_verified",
                         "نفذ الهاتف التفاعل داخل Flow، لكن لم يمكن تأكيد ظهور محرر الفيديو بعد الاختيار.")
+                }
+            }
+            "diagnostic_verify_prompt" -> {
+                val expected = task.optString("diagnostic_prompt", "")
+                val editor = findEditor(root)
+                val editorText = editor?.text?.toString().orEmpty()
+                val screenText = collectText(root).joinToString("\n")
+                if (expected.isNotBlank() &&
+                    (editorText.contains(expected) || screenText.contains(expected))) {
+                    completeFlowControlDiagnostic(
+                        task,
+                        root,
+                        visibleText,
+                        task.optBoolean("diagnostic_video_mode_clicked", false)
+                    )
+                } else if (!task.optBoolean("diagnostic_prompt_retry", false) && editor != null) {
+                    task.put("diagnostic_prompt_retry", true)
+                    val set = writePromptText(editor, expected, "اختبار إدخال ZOZ")
+                    if (set) {
+                        updatePhase(task, "diagnostic_verify_prompt")
+                        lastActionAt = System.currentTimeMillis()
+                        handler.postDelayed({ inspectCurrentPage() }, 1000)
+                    } else {
+                        retryControlDiagnostic(task, "flow_prompt_write_rejected",
+                            "حقل المطالبة ظهر، لكن لم يقبل إعادة كتابة نص الاختبار.")
+                    }
+                } else {
+                    retryControlDiagnostic(task, "flow_prompt_entry_not_verified",
+                        "حاول ZOZ الكتابة في حقل المطالبة، لكن النص لم يظهر داخل Flow. لم يتم الضغط على زر التوليد.")
                 }
             }
             else -> finishTask(task, false, "flow_diagnostic_state_invalid",
@@ -1326,6 +1391,31 @@ class FlowAutomationService : AccessibilityService() {
         }
     }
 
+    private fun beginDiagnosticPromptEntry(
+        task: JSONObject,
+        root: AccessibilityNodeInfo,
+        videoModeClicked: Boolean
+    ) {
+        val editor = findEditor(root)
+        if (editor == null) {
+            retryControlDiagnostic(task, "flow_prompt_editor_not_found",
+                "وصل ZOZ إلى محرر Flow، لكن حقل المطالبة غير قابل للوصول للكتابة.")
+            return
+        }
+        val probe = "اختبار تحكم ZOZ: تم إدخال النص في حقل مطالبة الفيديو."
+        if (!writePromptText(editor, probe, "اختبار إدخال ZOZ")) {
+            retryControlDiagnostic(task, "flow_prompt_write_rejected",
+                "فتح ZOZ حقل المطالبة، لكن محرر Flow رفض أمر إدخال النص.")
+            return
+        }
+        task.put("diagnostic_prompt", probe)
+        task.put("diagnostic_prompt_write_attempted", true)
+        task.put("diagnostic_video_mode_clicked", videoModeClicked)
+        updatePhase(task, "diagnostic_verify_prompt")
+        lastActionAt = System.currentTimeMillis()
+        handler.postDelayed({ inspectCurrentPage() }, 1000)
+    }
+
     private fun completeFlowControlDiagnostic(
         task: JSONObject,
         root: AccessibilityNodeInfo,
@@ -1339,6 +1429,10 @@ class FlowAutomationService : AccessibilityService() {
             .put("accessibility_screen_readable", true)
             .put("accessible_text_node_count", collectText(root).size)
             .put("prompt_editor_detected", findEditor(root) != null)
+            .put("prompt_entry_verified", true)
+            .put("diagnostic_prompt_chars", task.optString("diagnostic_prompt", "").length)
+            .put("send_button_detected", findGenerateButton(root) != null)
+            .put("send_button_clicked", false)
             .put("video_mode_clicked_by_zoz", videoModeClicked)
             .put("video_mode_label_visible", visibleText.contains("video") || visibleText.contains("فيديو"))
             .put("generate_button_clicked", false)
@@ -1819,7 +1913,10 @@ class FlowAutomationService : AccessibilityService() {
                     DeviceNotifications.show(
                         this,
                         if (success) "نجح اختبار التحكم في Google Flow" else "تعذر اختبار التحكم في Google Flow",
-                        if (success) "وصل ZOZ إلى تطبيق Flow الأصلي واختبر الانتقال إلى وضع الفيديو دون بدء أي توليد." else message
+                        if (success && result.optBoolean("prompt_entry_verified", false))
+                            "كتب ZOZ نص الاختبار داخل حقل Flow وتحقق من ظهوره. تم فحص زر الإرسال دون الضغط عليه أو استهلاك رصيد."
+                        else if (success) "وصل ZOZ إلى تطبيق Flow الأصلي واختبر وضع الفيديو دون بدء توليد."
+                        else message
                     )
                 } else {
                     DeviceNotifications.show(this, if (success) "اكتمل مشهد Flow" else "توقف تنفيذ مشهد Flow",
