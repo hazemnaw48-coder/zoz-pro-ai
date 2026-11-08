@@ -934,6 +934,26 @@ class FlowAutomationService : AccessibilityService() {
         return editor.performAction(AccessibilityNodeInfo.ACTION_PASTE)
     }
 
+    /**
+     * Google Flow can open directly in Video mode. In that state the Image switcher
+     * is not exposed as a clickable accessibility node, so do not fail or try to
+     * switch modes again. Accept only a visible, exact, non-clickable Video mode label.
+     */
+    private fun isVideoModeAlreadySelected(root: AccessibilityNodeInfo): Boolean {
+        val accepted = setOf("video", "video mode", "video generation", "فيديو", "وضع الفيديو", "توليد فيديو")
+        var confirmed = false
+        walk(root) { node ->
+            if (confirmed || !node.isVisibleToUser) return@walk
+            val label = accessibleLabel(node).lowercase()
+                .replace('_', ' ')
+                .replace(Regex("\\s+"), " ")
+                .trim()
+            val clickable = node.isClickable || node.parent?.isClickable == true
+            if (!clickable && label in accepted) confirmed = true
+        }
+        return confirmed
+    }
+
     private fun inspectCurrentPage() {
         val task = activeTask() ?: return
         val phase = task.optString("phase", "waiting_editor")
@@ -986,6 +1006,13 @@ class FlowAutomationService : AccessibilityService() {
                             updatePhase(task, "selecting_video_mode")
                             lastActionAt = System.currentTimeMillis()
                             handler.postDelayed({ inspectCurrentPage() }, 900)
+                        } else if (isVideoModeAlreadySelected(root)) {
+                            // The editor is already on Video mode; the Image switcher is absent.
+                            task.put("video_mode_selected", true)
+                            task.put("video_mode_verified_from_visible_label", true)
+                            prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+                            lastActionAt = System.currentTimeMillis()
+                            handler.postDelayed({ inspectCurrentPage() }, 650)
                         } else {
                             retryVideoModeScan(task)
                         }
@@ -1028,6 +1055,12 @@ class FlowAutomationService : AccessibilityService() {
                             updatePhase(task, "selecting_video_mode")
                             lastActionAt = System.currentTimeMillis()
                             handler.postDelayed({ inspectCurrentPage() }, 900)
+                        } else if (isVideoModeAlreadySelected(root)) {
+                            task.put("video_mode_selected", true)
+                            task.put("video_mode_verified_from_visible_label", true)
+                            prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+                            lastActionAt = System.currentTimeMillis()
+                            handler.postDelayed({ inspectCurrentPage() }, 650)
                         } else {
                             retryVideoModeScan(task)
                         }
