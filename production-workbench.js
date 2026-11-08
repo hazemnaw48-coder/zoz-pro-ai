@@ -118,8 +118,8 @@ function sceneText(scene,i){
  const narration=scene.narration||scene.text||"";
  return [
   "المشهد "+(scene.scene_number||i+1)+(time?" · "+time:""),
-  "تعليمات الفيديو في Google Flow: لقطة وثائقية سينمائية عمودية 9:16، واقعية عالية التفاصيل، حركة كاميرا هادئة ومقصودة، إضاءة طبيعية متحفية، ألوان حجرية مصرية طبيعية، واستمرارية بصرية متسقة بين المشاهد.",
-  "الدقة الأثرية: إذا ظهر تمثال أو نقش حقيقي، أرفق صورة مرجعية حقيقية ومرخصة داخل Flow واستخدمها كمرجع/إطار. حافظ على هندسة القطعة وتفاصيلها الأصلية؛ لا تخترع قطعة أثرية أو نقوشًا ولا تغيّر ملامح الأثر.",
+  "تعليمات أداة التوليد المختارة: لقطة وثائقية سينمائية عمودية 9:16، واقعية عالية التفاصيل، حركة كاميرا هادئة ومقصودة، إضاءة طبيعية متحفية، ألوان حجرية مصرية طبيعية، واستمرارية بصرية متسقة بين المشاهد.",
+  "الدقة الأثرية: إذا ظهر تمثال أو نقش حقيقي، أرفق صورة مرجعية حقيقية ومرخصة داخل أداة التوليد واستخدمها كمرجع/إطار. حافظ على هندسة القطعة وتفاصيلها الأصلية؛ لا تخترع قطعة أثرية أو نقوشًا ولا تغيّر ملامح الأثر.",
   "النص البصري الخاص بالمشهد: "+visual,
   "التعليق الصوتي لهذا التوقيت: "+narration,
   "الصوت: عند توفر توليد صوت موثوق، انطق الجملة العربية أعلاه كما هي تمامًا بلهجة مصرية واضحة وطبيعية ومن دون كلمات إضافية؛ وإلا اترك اللقطة بلا كلام وأضف التعليق في مرحلة التجميع. لا موسيقى مضافة ولا مؤثرات تغطي الصوت.",
@@ -131,6 +131,11 @@ function sceneText(scene,i){
 const visualStyles = document.createElement("style");
 visualStyles.textContent = ".visual-image-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0}.visual-image-card{margin:0;min-width:0;background:#0c1727;border:1px solid #40536d;border-radius:10px;overflow:hidden}.visual-image-card img{display:block;width:100%;aspect-ratio:9/16;object-fit:cover;background:#182a43}.visual-image-card figcaption{font-size:12px;padding:7px;color:var(--muted);overflow-wrap:anywhere}@media(min-width:700px){.visual-image-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}";
 document.head.appendChild(visualStyles);
+function primaryIntakeHref(){
+ const allowed=new Set(["UC9fr5B0SZZkmVAApfCqEO3w","UCIael48cvwPG3gKj--c7HKw","UC-FimUUFXRd0MOSoikzczcQ"]);
+ const channel=String(job?.channel_id||job?.script_json?.channel_id||"");
+ return "./channel-control.html?page=intake"+(allowed.has(channel)?"&channel_id="+encodeURIComponent(channel):"");
+}
 function showJob(j){
  job=j;
  window.ZOZVisualProductionBridge={
@@ -149,11 +154,12 @@ function showJob(j){
  $("job-meta").textContent="المهمة: "+j.id+" · "+(j.duration_seconds||s.duration_seconds||45)+" ثانية · "+(j.language||"ar");
  $("job-brief").textContent="عنوان YouTube: "+(s.seo_title||s.title||j.topic)+"\n\nالوصف: "+(s.description||s.caption||"—")+"\n\nالكلمات المفتاحية: "+(s.tags||[]).join("، ")+"\n\nالصورة المصغرة: "+(s.thumbnail_brief||"—")+"\n\nملاحظات المصادر: "+(s.source_notes||[]).map(x=>typeof x==="string"?x:(x.name||"")+" "+(x.url||"")).join("\n");
  $("scenes-list").innerHTML=scenes.map((sc,i)=>'<details class="scene" open><summary>'+esc("المشهد "+(sc.scene_number||i+1)+" · "+(sc.time||((sc.seconds||"")+" ثانية")))+'</summary><div class="prewrap">'+esc(sceneText(sc,i))+'</div><div class="actions"><button class="secondary" type="button" data-copy-scene="'+i+'">نسخ تعليمات هذا المشهد</button></div></details>').join("")||'<div class="status warn">لا توجد مشاهد بعد. إذا كانت هذه توصية تحليل، وافق على إعداد المشاهد أولًا.</div>';
- $("visual-production-host").innerHTML='<div class="card"><h3>مسار الإنتاج المعتمد: Google Flow / ZOZ NOW</h3><p class="muted">تم إيقاف التوليد الداخلي للصور والصوت في هذه الورشة لأن النتائج السابقة لم تكن مناسبة للنشر ومحرك الصوت المجاني تعطل. أنشئ اللقطات في Flow باستخدام أوصاف المشاهد أدناه، ثم اجمعها في فيديو MP4 نهائي وارفعه إلى هذه الصفحة. لن يُنشر الفيديو تلقائيًا.</p><div class="row"><a class="button" href="https://labs.google/fx/tools/flow" target="_blank" rel="noopener">فتح Google Flow</a></div><div class="status warn">للقطع الأثرية: أضف صورة مرجعية حقيقية ومرخصة داخل Flow قبل التحريك، وحافظ على شكلها الأصلي. لا تعتمد على توليد شكل إخناتون من الوصف وحده. بعد التصدير، ارفع MP4 من خانة «الفيديو النهائي» ثم اضغط «رفع MP4 النهائي للمراجعة».</div></div>';
+ $("visual-production-host").innerHTML='<div class="card"><h3>مسار التوليد الخارجي المعتمد</h3><p class="muted">شغّل أداة توليد فيديو تستطيع التحكم فيها مباشرة من الهاتف، ونفّذ المشاهد واحدًا تلو الآخر باستخدام الأوصاف أدناه. هذه الورشة تجهّز النصوص ولا تحاول التحكم في Google Flow أو الضغط على زر التوليد. اجمع المشاهد والصوت في ملف نهائي واحد، ثم انتقل إلى مركز الإنتاج الرئيسي لرفعه إلى القناة.</p><div class="status warn">للمواد التاريخية: استخدم صورًا مرجعية حقيقية ومرخصة عند ظهور آثار محددة، وحافظ على شكلها الأصلي. لا تخلط بين المشاهد أو الشخصيات. النشر يظل خاصًا أولًا ثم ينتظر مراجعة المالك وموافقته.</div></div>';
+ $("open-main-intake-button").onclick=()=>{window.location.href=primaryIntakeHref();};
  $("prepare-scenes-button").classList.toggle("hidden",!(s.recommendation_context&&!(Array.isArray(s.scenes)&&s.scenes.length)));
  $("prepare-scenes-button").disabled=false;
  $("step-incoming").classList.add("done");$("step-scenes").classList.add("active");$("step-review").classList.remove("active");
- notice("scene-message",scenes.length?"تم تحميل "+scenes.length+" مشاهد من قاعدة الإنتاج. انسخ تعليمات كل مشهد إلى Google Flow / ZOZ NOW، ثم ارفع MP4 النهائي للمراجعة.":"وصلت التوصية إلى الإنتاج، لكن لم تُنشأ المشاهد بعد. راجعها وأعد إعدادها في مركز التحليل قبل تنفيذها في Google Flow.","good");
+ notice("scene-message",scenes.length?"تم تحميل "+scenes.length+" مشاهد من قاعدة الإنتاج. انسخ تعليمات كل مشهد إلى أداة التوليد الخارجية التي تتحكم فيها من الهاتف، ثم افتح مركز الإنتاج الرئيسي لرفع الملف النهائي.":"وصلت التوصية إلى الإنتاج، لكن لم تُنشأ المشاهد بعد. راجعها وأعد إعدادها في مركز التحليل قبل تنفيذها في أداة التوليد المختارة.","good");
 }
 async function prepareScenes(){
  if(!job)return;
@@ -225,7 +231,7 @@ function bind(){
  $("refresh-jobs-button").addEventListener("click",refreshJobs);
  $("reload-job-button").addEventListener("click",()=>refreshJobs().then(loadExistingJob));
  $("prepare-scenes-button").addEventListener("click",prepareScenes);
- $("upload-final-button").addEventListener("click",uploadFinal);
+ $("open-main-intake-button").addEventListener("click",()=>{window.location.href=primaryIntakeHref();});
  $("download-plan-button").addEventListener("click",downloadPlan);
  $("copy-all-button").addEventListener("click",async()=>{if(!job)return notice("scene-message","افتح مهمة إنتاج أولًا.","warn");const text=(job.script_json?.scenes||[]).map(sceneText).join("\n\n");notice("scene-message",await copyText(text)?"تم نسخ تعليمات كل المشاهد.":"تعذر النسخ التلقائي؛ استخدم تنزيل TXT.","good");});
  $("scenes-list").addEventListener("click",async e=>{const b=e.target.closest("[data-copy-scene]");if(!b||!job)return;const sc=job.script_json?.scenes?.[Number(b.dataset.copyScene)];notice("scene-message",await copyText(sceneText(sc,Number(b.dataset.copyScene)))?"تم نسخ تعليمات المشهد.":"تعذر النسخ؛ نزّل ملف TXT.","good");});

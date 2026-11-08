@@ -42,3 +42,10 @@ Turn Flow and other user-generated clips into a reviewed final asset without rou
 - Output can be decoded and duration/order are correct.
 - Interrupted upload resumes without duplicate intake records.
 - Owner can cancel and inspect progress.
+
+
+## 2026-11-08 workflow decision — external generation, single publishing path
+- Do not treat unattended Google Flow Android control as a prerequisite or as a completed capability. The current Flow accessibility bridge did not pass real-device UI-tree acceptance; it must not trigger paid generation attempts.
+- Create prompts and scene plans in the production workbench, then execute them in a video-generation tool the owner can operate directly from the phone. Tool choice is metadata only; ZOZ does not claim to launch, control, or press Generate in that external app.
+- Export/assemble one final video with its intended audio. Keep the source files unchanged. Do not create a second upload route from the production workbench.
+- The only channel-publishing intake is the main ZOZ Pro Production Center: choose the correct active channel, review title/description/tags and synthetic-media / made-for-kids disclosures, upload the final file once, wait for private YouTube upload and processing, review it, then require owner approval before Public/Unlisted visibility changes. Verify the video in the public channel feed before recording Published.

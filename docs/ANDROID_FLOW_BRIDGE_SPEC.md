@@ -64,3 +64,9 @@ A native Android companion to the existing ZOZ Pro production project. It is an 
 - Google Flow mobile app is supported in Egypt. The official Flow Agent feature is currently web/PC only; the Android app can prepare prompts, open Flow, accept shared clips, assemble and upload them, but it cannot run Flow Agent autonomously or bypass its credit/identity checks.
 - Physical-device acceptance tests still required: pair the owner's phone, verify heartbeat and prompt delivery, share real Flow clips, verify audio/order/duration after assembly, upload to intake, approve private upload, and approve the final publication task.
 - Repository Edge Function source replaces the private owner email with the server environment variable `ZOZ_OWNER_EMAIL`. Set this server-only secret before redeploying those source files; never commit the real email or any OAuth/service-role tokens.
+
+
+## 2026-11-08 operational status
+- Native Google Flow UI automation is not accepted as a working generator-control path: the latest v0.9.5 device diagnostic could not obtain the Flow window root and did not enter a prompt or tap Generate. Keep this bridge out of the content publishing critical path.
+- The content workflow uses an external video-generation tool that the owner can operate directly on the phone. ZOZ prepares prompts and receives only the completed exported video through the main Production Center intake.
+- Do not queue generation retries on stale device records. Do not use the workbench's alternate media-upload path for final publishing. The main Production Center remains the only channel intake and publishing route.
