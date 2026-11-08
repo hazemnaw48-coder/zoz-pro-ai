@@ -1680,8 +1680,8 @@ async function queueLatestAmazonExcelFromPhone(autoTriggered=false){
   status.className='notice warn';
   status.textContent=autoTriggered?'تم فتح أمر الاستيراد الآلي. جارٍ التحقق من الهاتف وإرسال المهمة…':'جارٍ تجهيز أمر استيراد تقرير Amazon إلى الهاتف…';
   const [deviceData,jobData]=await Promise.all([callDeviceAgent('device_list'),callDeviceAgent('job_list')]);
-  const device=(deviceData.devices||[]).find(x=>x.device_status==='active'&&x.app_version==='0.8.3'&&Array.isArray(x.capabilities)&&x.capabilities.includes('media.downloads.upload')&&String(x.device_name||'').toLowerCase().includes('vivo'));
-  if(!device)throw new Error('لم أجد هاتف vivo نشطًا بإصدار 0.8.3 وصلاحية Downloads التلقائية.');
+  const device=(deviceData.devices||[]).filter(x=>x.device_status==='active'&&Array.isArray(x.capabilities)&&x.capabilities.includes('media.downloads.upload')&&String(x.device_name||'').toLowerCase().includes('vivo')).sort((a,b)=>Date.parse(b.last_heartbeat_at||b.last_seen_at||b.created_at||0)-Date.parse(a.last_heartbeat_at||a.last_seen_at||a.created_at||0))[0];
+  if(!device)throw new Error('لم أجد هاتف vivo نشطًا لديه صلاحية Downloads التلقائية. افتح تطبيق ZOZ Bridge واترك الاتصال نشطًا ثم حدّث الأجهزة.');
   const pending=(jobData.jobs||[]).find(x=>x.device_id===device.id&&x.capability_id==='media.downloads.upload'&&x.payload?.purpose==='amazon_kdp_report'&&['queued','running','awaiting_owner_approval'].includes(x.status));
   let jobId;
   if(pending){
