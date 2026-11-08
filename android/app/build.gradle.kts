@@ -8,11 +8,11 @@ android {
     namespace = "com.zozpro.flowbridge"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.zozpro.flowbridge.auto"
+        applicationId = "com.zozpro.flowbridge.auto2"
         minSdk = 26
         targetSdk = 35
-        versionCode = 31
-        versionName = "0.8.6"
+        versionCode = 40
+        versionName = "0.9.0"
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
