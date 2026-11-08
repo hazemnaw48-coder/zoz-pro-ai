@@ -30,6 +30,7 @@ private const val TIKTOK_STUDIO_PACKAGE = "com.ss.android.tt.creator"
 private const val YOUTUBE_STUDIO_PACKAGE = "com.google.android.apps.youtube.creator"
 private const val TIKTOK_PACKAGE = "com.zhiliaoapp.musically"
 private const val YOUTUBE_PACKAGE = "com.google.android.youtube"
+private const val FLOW_APP_PACKAGE = "com.google.android.apps.labs.whisk"
 private const val VOICEOVER_CHANNEL_ID = "UCIael48cvwPG3gKj--c7HKw"
 private const val VOICEOVER_SOURCE_PREFIX = "/storage/v1/object/sign/zoz-pro-intake/voiceover-source/"
 private const val VOICEOVER_MAX_SOURCE_BYTES = 100L * 1024L * 1024L
@@ -99,43 +100,12 @@ class FlowAutomationService : AccessibilityService() {
     @Volatile private var activeLocalUploadJobId: String? = null
     private val networkExecutor = Executors.newSingleThreadExecutor()
 
-    private fun browserAddressBarText(root: AccessibilityNodeInfo): String? {
-        var address: String? = null
-        walk(root) { node ->
-            val id = node.viewIdResourceName.orEmpty().lowercase()
-            if (id.contains("url_bar") || id.contains("omnibox")) {
-                val candidate = listOf(
-                    node.text?.toString(),
-                    node.contentDescription?.toString(),
-                    node.hintText?.toString()
-                ).firstOrNull { !it.isNullOrBlank() }?.trim()
-                if (!candidate.isNullOrBlank()) address = candidate
-            }
-        }
-        return address
-    }
-
-    private fun isVerifiedFlowPage(root: AccessibilityNodeInfo): Boolean {
-        val pkg = root.packageName?.toString().orEmpty()
-        if (pkg !in setOf("com.android.chrome", "com.google.android.googlequicksearchbox")) return false
-        val address = browserAddressBarText(root)?.lowercase()
-        if (address != null) {
-            val normalized = address.removePrefix("https://").removePrefix("http://")
-                .removePrefix("www.").substringBefore(' ')
-            val host = normalized.substringBefore('/').substringBefore(':').trim()
-            if (host == "labs.google") return true
-            if (host.contains('.')) return false
-        }
-        val task = activeTask() ?: return false
-        val launchedAt = task.optLong("flow_launch_requested_at_ms", 0L)
-        val age = System.currentTimeMillis() - launchedAt
-        if (launchedAt <= 0L || age < 0L || age > 300000L) return false
-        if (!task.optString("url", "").startsWith("https://labs.google/fx/tools/flow")) return false
-        val pageText = collectText(root).joinToString(" ").lowercase()
-        val hasFlowBrand = pageText.contains("flow") || pageText.contains("labs.google")
-        val hasEditorControl = listOf("new project", "create project", "describe your idea", "generate video", "scene", "prompt").any(pageText::contains)
-        return hasFlowBrand && hasEditorControl
-    }
+    /**
+     * Accept only the official native Google Flow Android package.
+     * Browser/Chrome pages are deliberately excluded from this control path.
+     */
+    private fun isVerifiedFlowPage(root: AccessibilityNodeInfo): Boolean =
+        root.packageName?.toString() == FLOW_APP_PACKAGE
 
     private fun isFlowInForeground(): Boolean {
         val root = rootInActiveWindow ?: return false
@@ -972,6 +942,22 @@ class FlowAutomationService : AccessibilityService() {
             "waiting_editor" -> {
                 val editor = findEditor(root)
                 if (editor != null && System.currentTimeMillis() - lastActionAt > 1800) {
+                    // Google Flow Android starts in Image mode. Switch to Video explicitly
+                    // before entering the scene prompt so the agent never creates a still image.
+                    if (!task.optBoolean("video_mode_selected", false)) {
+                        val imageMode = findUniqueExactClickable(root, setOf(
+                            "image", "image mode", "image generation", "صورة", "وضع الصورة"
+                        ))
+                        if (imageMode != null && imageMode.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                            task.put("video_mode_menu_opened", true)
+                            updatePhase(task, "selecting_video_mode")
+                            lastActionAt = System.currentTimeMillis()
+                            handler.postDelayed({ inspectCurrentPage() }, 900)
+                        } else {
+                            retryVideoModeScan(task)
+                        }
+                        return
+                    }
                     val prompt = task.optString("prompt", "").take(12000)
                     if (prompt.isBlank()) {
                         finishTask(task, false, "prompt_empty", "The scene prompt is empty.")
@@ -1010,6 +996,20 @@ class FlowAutomationService : AccessibilityService() {
                     } else {
                         retryEditorScan(task)
                     }
+                }
+            }
+            "selecting_video_mode" -> {
+                val videoMode = findUniqueExactClickable(root, setOf(
+                    "video", "video mode", "video generation", "فيديو", "وضع الفيديو", "توليد فيديو"
+                ))
+                if (videoMode != null && videoMode.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    task.put("video_mode_selected", true)
+                    task.put("video_mode_selected_at_ms", System.currentTimeMillis())
+                    updatePhase(task, "waiting_editor")
+                    lastActionAt = System.currentTimeMillis()
+                    handler.postDelayed({ inspectCurrentPage() }, 1100)
+                } else {
+                    retryVideoModeScan(task)
                 }
             }
             "waiting_send" -> {
@@ -1068,18 +1068,52 @@ class FlowAutomationService : AccessibilityService() {
                 }
             }
             "waiting_download" -> {
-                val download = findButton(root, setOf("download", "download video", "تنزيل", "تحميل الفيديو"))
-                if (download != null && System.currentTimeMillis() - lastActionAt > 5000) {
-                    if (download.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                        updatePhase(task, "download_started")
-                        lastActionAt = System.currentTimeMillis()
-                        handler.postDelayed({ inspectCurrentPage() }, 2500)
-                    }
+                val download = findButton(root, setOf("download", "download video", "download asset", "تنزيل", "تحميل الفيديو"))
+                if (download != null && System.currentTimeMillis() - lastActionAt > 1800) {
+                    beginFlowDownload(task, download)
                 } else {
-                    handler.postDelayed({ inspectCurrentPage() }, 4000)
+                    // On the native app, a generated asset is saved in the project first.
+                    // Select the tile associated with this scene prompt before opening its menu.
+                    val asset = findGeneratedPromptAsset(root, task.optString("prompt", ""))
+                    if (asset != null && System.currentTimeMillis() - lastActionAt > 1800 &&
+                        asset.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                        updatePhase(task, "flow_asset_selected")
+                        lastActionAt = System.currentTimeMillis()
+                        handler.postDelayed({ inspectCurrentPage() }, 1000)
+                    } else {
+                        retryAssetScan(task)
+                    }
                 }
             }
-            "download_started" -> handler.postDelayed({ inspectCurrentPage() }, 4000)
+            "flow_asset_selected" -> {
+                val more = findUniqueExactClickable(root, setOf(
+                    "more", "more options", "more actions", "options", "المزيد", "خيارات إضافية", "خيارات"
+                ))
+                if (more != null && more.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    updatePhase(task, "flow_asset_menu_open")
+                    lastActionAt = System.currentTimeMillis()
+                    handler.postDelayed({ inspectCurrentPage() }, 700)
+                } else {
+                    retryAssetMenuScan(task)
+                }
+            }
+            "flow_asset_menu_open" -> {
+                val download = findButton(root, setOf("download", "download video", "download asset", "تنزيل", "تحميل الفيديو"))
+                if (download != null && download.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    markFlowDownloadStarted(task)
+                } else {
+                    retryAssetMenuScan(task)
+                }
+            }
+            "download_started" -> {
+                // The native Flow app may save through MediaStore rather than Android DownloadManager.
+                // Watch the public Downloads folder as well as the DownloadManager completion receiver.
+                if (!task.optBoolean("downloads_folder_watch_started", false)) {
+                    task.put("downloads_folder_watch_started", true)
+                    prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+                    handler.postDelayed({ pollFlowDownloadsFolder(task) }, 1200)
+                }
+            }
         }
     }
 
@@ -1131,6 +1165,156 @@ class FlowAutomationService : AccessibilityService() {
         return null
     }
 
+    private fun findUniqueExactClickable(
+        root: AccessibilityNodeInfo,
+        acceptedLabels: Set<String>
+    ): AccessibilityNodeInfo? {
+        val candidates = mutableListOf<AccessibilityNodeInfo>()
+        walk(root) { node ->
+            if (!node.isVisibleToUser || !node.isEnabled) return@walk
+            val label = accessibleLabel(node).lowercase()
+                .replace('_', ' ')
+                .replace(Regex("\\s+"), " ")
+                .trim()
+            if (label !in acceptedLabels) return@walk
+            val target = when {
+                node.isClickable -> node
+                node.parent?.isClickable == true -> node.parent
+                else -> null
+            } ?: return@walk
+            val bounds = android.graphics.Rect().also(target::getBoundsInScreen)
+            if (candidates.none { android.graphics.Rect().also(it::getBoundsInScreen) == bounds }) {
+                candidates.add(target)
+            }
+        }
+        return candidates.singleOrNull()
+    }
+
+    private fun findGeneratedPromptAsset(root: AccessibilityNodeInfo, prompt: String): AccessibilityNodeInfo? {
+        val needle = prompt.trim().lowercase().replace(Regex("\\s+"), " ").take(36)
+        if (needle.length < 18) return null
+        val candidates = mutableListOf<AccessibilityNodeInfo>()
+        walk(root) { node ->
+            if (!node.isVisibleToUser || node.isEditable) return@walk
+            val label = accessibleLabel(node).lowercase().replace(Regex("\\s+"), " ").trim()
+            if (!label.contains(needle)) return@walk
+            val target = when {
+                node.isClickable -> node
+                node.parent?.isClickable == true -> node.parent
+                else -> null
+            } ?: return@walk
+            if (target.isEditable) return@walk
+            val bounds = android.graphics.Rect().also(target::getBoundsInScreen)
+            if (candidates.none { android.graphics.Rect().also(it::getBoundsInScreen) == bounds }) {
+                candidates.add(target)
+            }
+        }
+        return candidates.singleOrNull()
+    }
+
+    private fun retryVideoModeScan(task: JSONObject) {
+        val now = System.currentTimeMillis()
+        val started = task.optLong("phase_started_at_ms", task.optLong("started_at_ms", now))
+        val attempts = task.optInt("video_mode_scan_attempts", 0) + 1
+        task.put("video_mode_scan_attempts", attempts)
+        prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+        if (now - started > 45000L) {
+            finishTask(task, false, "flow_video_mode_not_found",
+                "تم فتح تطبيق Google Flow الأصلي، لكن لم يتمكن الهاتف من اختيار وضع Video بشكل مؤكد. لم يتم الضغط على التوليد.")
+            return
+        }
+        handler.postDelayed({ inspectCurrentPage() }, 1200)
+    }
+
+    private fun retryAssetScan(task: JSONObject) {
+        val now = System.currentTimeMillis()
+        val started = task.optLong("generation_started_at_ms", task.optLong("started_at_ms", now))
+        if (now - started > 10 * 60 * 1000L) {
+            finishTask(task, false, "flow_generated_asset_not_found",
+                "لم يظهر في مشروع Google Flow الأصلي مقطع يمكن ربطه بوصف المشهد. لم يتم تنزيل ملف آخر أو رفعه.")
+            return
+        }
+        handler.postDelayed({ inspectCurrentPage() }, 3000)
+    }
+
+    private fun retryAssetMenuScan(task: JSONObject) {
+        val now = System.currentTimeMillis()
+        val started = task.optLong("asset_selected_at_ms", task.optLong("generation_started_at_ms", now))
+        if (now - started > 90000L) {
+            finishTask(task, false, "flow_asset_menu_not_found",
+                "تم فتح نتيجة Google Flow، لكن لم يتم العثور على قائمة خيارات تنزيل المقطع بشكل فريد.")
+            return
+        }
+        handler.postDelayed({ inspectCurrentPage() }, 1200)
+    }
+
+    private fun beginFlowDownload(task: JSONObject, button: AccessibilityNodeInfo) {
+        if (!button.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+            retryAssetMenuScan(task)
+            return
+        }
+        markFlowDownloadStarted(task)
+    }
+
+    private fun markFlowDownloadStarted(task: JSONObject) {
+        val requestedAt = System.currentTimeMillis()
+        task.put("download_requested_at_ms", requestedAt - 2000L)
+        updatePhase(task, "download_started")
+        lastActionAt = requestedAt
+        handler.postDelayed({ pollFlowDownloadsFolder(task) }, 1800)
+    }
+
+    private fun pollFlowDownloadsFolder(task: JSONObject) {
+        val jobId = task.optString("job_id")
+        if (activeTask()?.optString("job_id") != jobId) return
+        val startedAt = task.optLong("download_requested_at_ms", System.currentTimeMillis())
+        networkExecutor.execute {
+            val found = runCatching {
+                if (!isDownloadsAutoAccessGranted()) throw IllegalStateException("downloads_permission_required")
+                val filter = JSONObject()
+                    .put("file_kind", "video")
+                    .put("extensions", JSONArray().put("mp4"))
+                    .put("after_timestamp_ms", startedAt)
+                    .put("min_size_bytes", 10240L)
+                    .put("max_size_bytes", 850L * 1024L * 1024L)
+                val file = findLocalDownloadForAgent(filter)
+                val firstSize = file.length()
+                val firstModified = file.lastModified()
+                Thread.sleep(2500L)
+                if (!file.exists() || file.length() != firstSize || file.lastModified() != firstModified) return@runCatching null
+                val isMp4 = FileInputStream(file).use { input ->
+                    val header = ByteArray(12)
+                    val count = input.read(header)
+                    count >= 8 && String(header, 4, 4, Charsets.US_ASCII) == "ftyp"
+                }
+                if (!isMp4) throw IllegalStateException("flow_download_not_mp4")
+                file
+            }.getOrNull()
+            handler.post {
+                if (activeTask()?.optString("job_id") != jobId) return@post
+                if (found != null) {
+                    val checksum = runCatching { sha256LocalFile(found) }.getOrDefault("")
+                    val uri = Uri.fromFile(found)
+                    appendClip(uri, found.name, found.length(), task.optInt("scene_index", 1), task.optString("campaign_id"))
+                    val result = JSONObject()
+                        .put("downloaded", true)
+                        .put("source_app_package", FLOW_APP_PACKAGE)
+                        .put("uri", uri.toString())
+                        .put("name", found.name)
+                        .put("size_bytes", found.length())
+                        .put("sha256", checksum)
+                        .put("scene_index", task.optInt("scene_index", 1))
+                    finishTask(task, true, "", "", result)
+                } else if (System.currentTimeMillis() - startedAt > 8 * 60 * 1000L) {
+                    finishTask(task, false, "flow_download_not_detected",
+                        "لم يظهر ملف MP4 جديد ومكتمل في Downloads بعد التنزيل من تطبيق Google Flow الأصلي.")
+                } else {
+                    handler.postDelayed({ pollFlowDownloadsFolder(task) }, 3500)
+                }
+            }
+        }
+    }
+
     private fun retryFlowOriginScan(task: JSONObject) {
         val now = System.currentTimeMillis()
         val phaseStarted = task.optLong("phase_started_at_ms", task.optLong("started_at_ms", now))
@@ -1139,7 +1323,7 @@ class FlowAutomationService : AccessibilityService() {
         prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
         if (now - phaseStarted > 60000L) {
             finishTask(task, false, "manual_intervention_required",
-                "توقف التنفيذ الآلي بأمان: لم يتمكن التطبيق من التحقق أن الصفحة المفتوحة هي labs.google. لم يُلصق النص في أي دردشة أخرى ولم يتم الضغط على توليد.")
+                "توقف التنفيذ الآلي بأمان: التطبيق الظاهر ليس تطبيق Google Flow الرسمي على Android. لم يُلصق النص ولم يتم الضغط على التوليد.")
             return
         }
         handler.removeCallbacksAndMessages(null)
@@ -1199,9 +1383,9 @@ class FlowAutomationService : AccessibilityService() {
 
     private fun findGenerateButton(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
         val acceptedLabels = setOf(
-            "generate", "generate video", "create video", "send", "send prompt",
-            "send arrow", "arrow up", "arrow upward", "submit", "submit prompt",
-            "توليد", "إنشاء", "إنشاء فيديو", "إرسال", "إرسال للتوليد"
+            "generate", "generate video", "generate image", "create video", "create clip",
+            "generate image video", "send", "send prompt", "send arrow", "arrow up", "arrow upward",
+            "submit", "submit prompt", "توليد", "إنشاء", "إنشاء فيديو", "إرسال", "إرسال للتوليد"
         )
         val candidates = mutableListOf<AccessibilityNodeInfo>()
         walk(root) { node ->
@@ -1290,6 +1474,7 @@ class FlowAutomationService : AccessibilityService() {
 
     private fun finishTask(task: JSONObject, success: Boolean, code: String, message: String, extra: JSONObject = JSONObject()) {
         val id = task.optString("job_id")
+        if (id.isBlank() || activeTask()?.optString("job_id") != id) return
         val result = JSONObject(extra.toString()).put("phase", task.optString("phase"))
         prefs().edit().remove(KEY_ACTIVE_TASK).apply()
         networkExecutor.execute {
@@ -1448,6 +1633,10 @@ class FlowAutomationService : AccessibilityService() {
             if (prefs.getString(KEY_ACTIVE_TASK, null) != null) throw IllegalStateException("هناك مشهد آخر قيد التنفيذ على الهاتف.")
             if (index == 1) prefs.edit().putString(PREF_CLIPS, "[]").apply()
             val startedAt = System.currentTimeMillis()
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(FLOW_APP_PACKAGE)
+                ?: throw IllegalStateException(
+                    "google_flow_app_not_installed: ثبّت تطبيق Google Flow الرسمي من Google Play على الهاتف ثم أعد المحاولة. لن يتم استخدام Chrome كبديل."
+                )
             val task = JSONObject(payload.toString())
                 .put("campaign_id", campaign)
                 .put("total_scenes", total)
@@ -1455,23 +1644,22 @@ class FlowAutomationService : AccessibilityService() {
                 .put("phase", "waiting_editor")
                 .put("started_at_ms", startedAt)
                 .put("phase_started_at_ms", startedAt)
-                .put("flow_origin_guard_version", 2)
-                .put("flow_launch_requested_at_ms", startedAt)
+                .put("flow_origin_guard_version", 3)
+                .put("flow_target_package", FLOW_APP_PACKAGE)
                 .put("editor_scan_attempts", 0)
+                .put("video_mode_selected", false)
             prefs.edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
-            val url = payload.optString("url", "https://labs.google/fx/tools/flow")
-            if (!url.startsWith("https://labs.google/")) {
-                prefs.edit().remove(KEY_ACTIVE_TASK).apply()
-                throw IllegalArgumentException("Flow URL is not allow-listed.")
-            }
             val runningService = activeService
             if (runningService != null && runningService.isFlowInForeground()) {
                 runningService.handler.postDelayed({ runningService.inspectCurrentPage() }, 250)
             } else {
                 try {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                } catch (_: Exception) {
-                    DeviceNotifications.showFlow(context, url)
+                    context.startActivity(launchIntent.addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    ))
+                } catch (error: Exception) {
+                    prefs.edit().remove(KEY_ACTIVE_TASK).apply()
+                    throw IllegalStateException("flow_native_launch_failed: تعذر فتح تطبيق Google Flow الأصلي: ${error.message}")
                 }
             }
             runningService?.scheduleAgentPoll(1200L)
