@@ -1879,7 +1879,7 @@ class FlowAutomationService : AccessibilityService() {
 
         fun startScene(context: Context, jobId: String, payload: JSONObject) {
             if (!isEnabled(context)) throw IllegalStateException("فعّل خدمة ZOZ Flow Automation مرة واحدة من إعدادات إمكانية الوصول.")
-                val diagnostic = payload.optString("task_type") == "flow_control_diagnostic"
+            val diagnostic = payload.optString("task_type") == "flow_control_diagnostic"
             val duration = payload.optDouble("duration_seconds", 8.0)
             if (!diagnostic && (duration <= 0.0 || duration > 8.0)) {
                 throw IllegalArgumentException("كل مشهد Google Flow يجب ألا يتجاوز 8 ثوانٍ.")
