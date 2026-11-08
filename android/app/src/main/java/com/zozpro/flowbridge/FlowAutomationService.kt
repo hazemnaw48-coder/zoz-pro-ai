@@ -1085,21 +1085,18 @@ class FlowAutomationService : AccessibilityService() {
                 }
             }
             "waiting_download" -> {
-                val download = findButton(root, setOf("download", "download video", "download asset", "تنزيل", "تحميل الفيديو"))
-                if (download != null && System.currentTimeMillis() - lastActionAt > 1800) {
-                    beginFlowDownload(task, download)
+                // Never click a generic Download button from the project gallery: it may
+                // belong to an older scene. First bind the newly-created asset to this
+                // scene's distinctive visual-action text, then open only that asset.
+                val asset = findGeneratedPromptAsset(root, task.optString("prompt", ""))
+                if (asset != null && System.currentTimeMillis() - lastActionAt > 1800 &&
+                    asset.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    task.put("asset_selected_at_ms", System.currentTimeMillis())
+                    updatePhase(task, "flow_asset_selected")
+                    lastActionAt = System.currentTimeMillis()
+                    handler.postDelayed({ inspectCurrentPage() }, 1000)
                 } else {
-                    // On the native app, a generated asset is saved in the project first.
-                    // Select the tile associated with this scene prompt before opening its menu.
-                    val asset = findGeneratedPromptAsset(root, task.optString("prompt", ""))
-                    if (asset != null && System.currentTimeMillis() - lastActionAt > 1800 &&
-                        asset.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                        updatePhase(task, "flow_asset_selected")
-                        lastActionAt = System.currentTimeMillis()
-                        handler.postDelayed({ inspectCurrentPage() }, 1000)
-                    } else {
-                        retryAssetScan(task)
-                    }
+                    retryAssetScan(task)
                 }
             }
             "flow_asset_selected" -> {
@@ -1208,7 +1205,13 @@ class FlowAutomationService : AccessibilityService() {
     }
 
     private fun findGeneratedPromptAsset(root: AccessibilityNodeInfo, prompt: String): AccessibilityNodeInfo? {
-        val needle = prompt.trim().lowercase().replace(Regex("\\s+"), " ").take(36)
+        val normalizedPrompt = prompt.trim().lowercase().replace(Regex("\\s+"), " ")
+        // All ZOZ prompts share a generic preamble. Bind to the scene-specific visual
+        // action instead, otherwise an older gallery card could match the wrong scene.
+        val visualMarker = normalizedPrompt.substringAfter("visual action:", "")
+            .substringBefore("exact egyptian arabic voiceover")
+            .trim()
+        val needle = visualMarker.take(52)
         if (needle.length < 18) return null
         val candidates = mutableListOf<AccessibilityNodeInfo>()
         walk(root) { node ->
