@@ -942,6 +942,11 @@ class FlowAutomationService : AccessibilityService() {
                 "Google Flow requested sign-in, verification, CAPTCHA, or account confirmation. The automation stopped without interacting with the security challenge.")
             return
         }
+        if (task.optString("task_type") == "flow_control_diagnostic") {
+            inspectFlowControlDiagnostic(task, root)
+            return
+        }
+
         when (phase) {
             "waiting_editor" -> {
                 val editor = findEditor(root)
@@ -1169,6 +1174,111 @@ class FlowAutomationService : AccessibilityService() {
                     handler.postDelayed({ pollFlowDownloadsFolder(task) }, 1200)
                 }
             }
+        }
+    }
+
+    /**
+     * Non-generating verification path. It opens the native Flow editor, switches
+     * Image -> Video using visible accessibility nodes, and stops before any prompt
+     * is entered or any Generate/Download action is touched.
+     */
+    private fun inspectFlowControlDiagnostic(task: JSONObject, root: AccessibilityNodeInfo) {
+        val phase = task.optString("phase", "diagnostic_waiting_editor")
+        val visibleText = collectText(root).joinToString(" ").lowercase()
+        when (phase) {
+            "diagnostic_waiting_editor" -> {
+                val editor = findEditor(root)
+                if (editor == null && !task.optBoolean("flow_setup_clicked", false)) {
+                    val setup = findNewProjectButton(root)
+                    if (setup != null && setup.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                        task.put("flow_setup_clicked", true)
+                        task.put("diagnostic_editor_navigation_clicked", true)
+                        updatePhase(task, "diagnostic_waiting_editor")
+                        lastActionAt = System.currentTimeMillis()
+                        handler.postDelayed({ inspectCurrentPage() }, 1400)
+                    } else {
+                        retryControlDiagnostic(task, "flow_editor_navigation_not_found",
+                            "وصل الهاتف إلى تطبيق Google Flow الأصلي، لكن لم يظهر زر واضح لفتح محرر مشروع جديد.")
+                    }
+                    return
+                }
+
+                val imageMode = findUniqueExactClickable(root, setOf(
+                    "image", "image mode", "image generation", "صورة", "وضع الصورة"
+                ))
+                if (imageMode != null && imageMode.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    task.put("diagnostic_image_mode_opened", true)
+                    updatePhase(task, "diagnostic_select_video")
+                    lastActionAt = System.currentTimeMillis()
+                    handler.postDelayed({ inspectCurrentPage() }, 900)
+                } else if (editor != null && (visibleText.contains("video") || visibleText.contains("فيديو"))) {
+                    // The editor is already in Video mode; no further UI change is needed.
+                    completeFlowControlDiagnostic(task, root, visibleText, false)
+                } else {
+                    retryControlDiagnostic(task, "flow_image_mode_control_not_found",
+                        "ظهر تطبيق Flow الأصلي، لكن تعذر تحديد عنصر وضع الصور بشكل فريد وآمن.")
+                }
+            }
+            "diagnostic_select_video" -> {
+                val videoMode = findUniqueExactClickable(root, setOf(
+                    "video", "video mode", "video generation", "فيديو", "وضع الفيديو", "توليد فيديو"
+                ))
+                if (videoMode != null && videoMode.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    task.put("diagnostic_video_mode_clicked", true)
+                    updatePhase(task, "diagnostic_verify_video")
+                    lastActionAt = System.currentTimeMillis()
+                    handler.postDelayed({ inspectCurrentPage() }, 1200)
+                } else {
+                    retryControlDiagnostic(task, "flow_video_mode_control_not_found",
+                        "تم فتح قائمة الأوضاع داخل Flow، لكن تعذر تحديد خيار الفيديو بشكل فريد وآمن.")
+                }
+            }
+            "diagnostic_verify_video" -> {
+                if (findEditor(root) != null &&
+                    (visibleText.contains("video") || visibleText.contains("فيديو"))) {
+                    completeFlowControlDiagnostic(task, root, visibleText, true)
+                } else {
+                    retryControlDiagnostic(task, "flow_video_mode_not_verified",
+                        "نفذ الهاتف التفاعل داخل Flow، لكن لم يمكن تأكيد ظهور محرر الفيديو بعد الاختيار.")
+                }
+            }
+            else -> finishTask(task, false, "flow_diagnostic_state_invalid",
+                "حالة اختبار التحكم في Google Flow غير صالحة؛ تم إيقاف الاختبار دون توليد.")
+        }
+    }
+
+    private fun completeFlowControlDiagnostic(
+        task: JSONObject,
+        root: AccessibilityNodeInfo,
+        visibleText: String,
+        videoModeClicked: Boolean
+    ) {
+        val result = JSONObject()
+            .put("test_type", "native_flow_control_diagnostic")
+            .put("native_package", root.packageName?.toString().orEmpty())
+            .put("native_app_verified", isVerifiedFlowPage(root))
+            .put("accessibility_screen_readable", true)
+            .put("accessible_text_node_count", collectText(root).size)
+            .put("prompt_editor_detected", findEditor(root) != null)
+            .put("video_mode_clicked_by_zoz", videoModeClicked)
+            .put("video_mode_label_visible", visibleText.contains("video") || visibleText.contains("فيديو"))
+            .put("generate_button_clicked", false)
+            .put("generation_started", false)
+            .put("video_created", false)
+            .put("download_started", false)
+        finishTask(task, true, "", "", result)
+    }
+
+    private fun retryControlDiagnostic(task: JSONObject, code: String, message: String) {
+        val now = System.currentTimeMillis()
+        val phaseStarted = task.optLong("phase_started_at_ms", task.optLong("started_at_ms", now))
+        val attempts = task.optInt("diagnostic_scan_attempts", 0) + 1
+        task.put("diagnostic_scan_attempts", attempts)
+        prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+        if (now - phaseStarted > 45000L) {
+            finishTask(task, false, code, message)
+        } else {
+            handler.postDelayed({ inspectCurrentPage() }, 1200)
         }
     }
 
@@ -1625,11 +1735,20 @@ class FlowAutomationService : AccessibilityService() {
                     DeviceTokenVault.read(this) ?: "")
             }
             handler.post {
-                DeviceNotifications.show(this, if (success) "اكتمل مشهد Flow" else "توقف تنفيذ مشهد Flow",
-                    if (success) "تم تنزيل المقطع وتسجيل نتيجة المهمة." else message)
+                val diagnostic = task.optString("task_type") == "flow_control_diagnostic"
+                if (diagnostic) {
+                    DeviceNotifications.show(
+                        this,
+                        if (success) "نجح اختبار التحكم في Google Flow" else "تعذر اختبار التحكم في Google Flow",
+                        if (success) "وصل ZOZ إلى تطبيق Flow الأصلي واختبر الانتقال إلى وضع الفيديو دون بدء أي توليد." else message
+                    )
+                } else {
+                    DeviceNotifications.show(this, if (success) "اكتمل مشهد Flow" else "توقف تنفيذ مشهد Flow",
+                        if (success) "تم تنزيل المقطع وتسجيل نتيجة المهمة." else message)
+                }
                 val total = task.optInt("total_scenes", 0)
                 val index = task.optInt("scene_index", 0)
-                if (success && total > 0 && index >= total) {
+                if (success && !diagnostic && total > 0 && index >= total) {
                     handler.postDelayed({ assembleAndUpload(task.optString("campaign_id"), total, task.optString("channel_id")) }, 800)
                 } else {
                     scheduleAgentPoll(1200L)
@@ -1760,18 +1879,21 @@ class FlowAutomationService : AccessibilityService() {
 
         fun startScene(context: Context, jobId: String, payload: JSONObject) {
             if (!isEnabled(context)) throw IllegalStateException("فعّل خدمة ZOZ Flow Automation مرة واحدة من إعدادات إمكانية الوصول.")
+                val diagnostic = payload.optString("task_type") == "flow_control_diagnostic"
             val duration = payload.optDouble("duration_seconds", 8.0)
-            if (duration <= 0.0 || duration > 8.0) throw IllegalArgumentException("كل مشهد Google Flow يجب ألا يتجاوز 8 ثوانٍ.")
+            if (!diagnostic && (duration <= 0.0 || duration > 8.0)) {
+                throw IllegalArgumentException("كل مشهد Google Flow يجب ألا يتجاوز 8 ثوانٍ.")
+            }
             val index = payload.optInt("scene_index", 0)
             val total = payload.optInt("total_scenes", payload.optInt("scene_count", 0))
             val campaign = payload.optString("campaign_id", payload.optString("proposal_id", ""))
             val prompt = payload.optString("prompt", "")
-            if (index < 1 || total < 1 || index > total || campaign.isBlank() || prompt.isBlank()) {
+            if (!diagnostic && (index < 1 || total < 1 || index > total || campaign.isBlank() || prompt.isBlank())) {
                 throw IllegalArgumentException("بيانات المشهد أو الحملة غير مكتملة.")
             }
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             if (prefs.getString(KEY_ACTIVE_TASK, null) != null) throw IllegalStateException("هناك مشهد آخر قيد التنفيذ على الهاتف.")
-            if (index == 1) prefs.edit().putString(PREF_CLIPS, "[]").apply()
+            if (!diagnostic && index == 1) prefs.edit().putString(PREF_CLIPS, "[]").apply()
             val startedAt = System.currentTimeMillis()
             val launchIntent = context.packageManager.getLaunchIntentForPackage(FLOW_APP_PACKAGE)
                 ?: throw IllegalStateException(
@@ -1781,7 +1903,8 @@ class FlowAutomationService : AccessibilityService() {
                 .put("campaign_id", campaign)
                 .put("total_scenes", total)
                 .put("job_id", jobId)
-                .put("phase", "waiting_editor")
+                .put("phase", if (diagnostic) "diagnostic_waiting_editor" else "waiting_editor")
+                .put("task_type", if (diagnostic) "flow_control_diagnostic" else payload.optString("task_type", "scene_generation"))
                 .put("started_at_ms", startedAt)
                 .put("phase_started_at_ms", startedAt)
                 .put("flow_origin_guard_version", 3)
