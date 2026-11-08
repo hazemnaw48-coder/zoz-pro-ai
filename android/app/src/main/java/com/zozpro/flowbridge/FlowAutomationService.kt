@@ -98,6 +98,9 @@ class FlowAutomationService : AccessibilityService() {
     private var receiverRegistered = false
     private var controlInspectionScheduled = false
     private var agentPollScheduled = false
+    private var lastAccessibilityEventPackage = ""
+    private var lastAccessibilityEventType = -1
+    private var lastAccessibilityEventAtMs = 0L
     @Volatile private var activeLocalUploadJobId: String? = null
     @Volatile private var sceneReconciliationRunning = false
     private val networkExecutor = Executors.newSingleThreadExecutor()
@@ -147,6 +150,11 @@ class FlowAutomationService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val pkg = event?.packageName?.toString().orEmpty()
+        if (pkg.isNotBlank()) {
+            lastAccessibilityEventPackage = pkg
+            lastAccessibilityEventType = event?.eventType ?: -1
+            lastAccessibilityEventAtMs = System.currentTimeMillis()
+        }
         if (event?.eventType !in listOf(
                 AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
                 AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
@@ -251,6 +259,17 @@ class FlowAutomationService : AccessibilityService() {
             agentPollScheduled = false
             pollAgentQueue()
         }, delayMs.coerceAtLeast(1000L))
+    }
+
+    /**
+     * Flow retry paths must not silently disable the device queue.
+     * The old broad Handler clear also removed the scheduled queue-poll callback
+     * but left agentPollScheduled=true, permanently suppressing future polls.
+     */
+    private fun clearScheduledAutomationCallbacks() {
+        handler.removeCallbacksAndMessages(null)
+        agentPollScheduled = false
+        controlInspectionScheduled = false
     }
 
 
@@ -1238,6 +1257,11 @@ class FlowAutomationService : AccessibilityService() {
                         task.put("send_clicked", true)
                         task.put("generate_clicked_at_ms", System.currentTimeMillis())
                         task.put("generation_started_at_ms", System.currentTimeMillis())
+                        DeviceNotifications.show(
+                            this,
+                            "بدأ توليد فيديو Google Flow",
+                            "أكد ZOZ الضغط على Generate بعد التحقق من النص؛ يراقب الآن ظهور نتيجة هذا المشهد."
+                        )
                         updatePhase(task, "waiting_download")
                         lastActionAt = System.currentTimeMillis()
                         handler.postDelayed({ inspectCurrentPage() }, 5000)
@@ -1254,6 +1278,11 @@ class FlowAutomationService : AccessibilityService() {
                 if (asset != null && System.currentTimeMillis() - lastActionAt > 1800 &&
                     asset.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
                     task.put("asset_selected_at_ms", System.currentTimeMillis())
+                    DeviceNotifications.show(
+                        this,
+                        "اكتمل توليد مشهد Google Flow",
+                        "ظهرت نتيجة المشهد المطابقة؛ يفتح ZOZ الفيديو الآن لبدء تنزيل النسخة النهائية."
+                    )
                     updatePhase(task, "flow_asset_selected")
                     lastActionAt = System.currentTimeMillis()
                     handler.postDelayed({ inspectCurrentPage() }, 1000)
@@ -1742,6 +1771,11 @@ class FlowAutomationService : AccessibilityService() {
         val requestedAt = System.currentTimeMillis()
         task.put("download_requested_at_ms", requestedAt - 2000L)
         updatePhase(task, "download_started")
+        DeviceNotifications.show(
+            this,
+            "بدأ تنزيل فيديو Google Flow",
+            "يراقب ZOZ اكتمال ملف MP4 والتحقق من صلاحيته قبل حفظه في مركز الإنتاج."
+        )
         lastActionAt = requestedAt
         handler.postDelayed({ pollFlowDownloadsFolder(task) }, 1800)
     }
@@ -1804,11 +1838,30 @@ class FlowAutomationService : AccessibilityService() {
         task.put("origin_scan_attempts", attempts)
         prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
         if (now - phaseStarted > 60000L) {
+            val windowRootPackages = JSONArray()
+            runCatching {
+                windows.forEach { window ->
+                    val name = window.root?.packageName?.toString().orEmpty()
+                    if (name.isNotBlank()) windowRootPackages.put(name)
+                }
+            }
+            val activeRootPackage = runCatching {
+                rootInActiveWindow?.packageName?.toString().orEmpty()
+            }.getOrDefault("")
+            val evidence = JSONObject()
+                .put("expected_native_package", FLOW_APP_PACKAGE)
+                .put("native_app_installed", packageManager.getLaunchIntentForPackage(FLOW_APP_PACKAGE) != null)
+                .put("active_root_package", activeRootPackage)
+                .put("last_accessibility_event_package", lastAccessibilityEventPackage)
+                .put("last_accessibility_event_type", lastAccessibilityEventType)
+                .put("last_accessibility_event_age_ms", if (lastAccessibilityEventAtMs > 0L) now - lastAccessibilityEventAtMs else -1L)
+                .put("window_root_packages", windowRootPackages)
             finishTask(task, false, "manual_intervention_required",
-                "توقف التنفيذ الآلي بأمان: التطبيق الظاهر ليس تطبيق Google Flow الرسمي على Android. لم يُلصق النص ولم يتم الضغط على التوليد.")
+                "تطبيق Google Flow الرسمي موجود، لكن خدمة إمكانية الوصول لم تتمكن من قراءة شجرة نافذته خلال 60 ثانية. لم يتم إدخال النص أو الضغط على Generate. سُجلت بيانات النوافذ لتحديد سبب تعذر الوصول.",
+                evidence)
             return
         }
-        handler.removeCallbacksAndMessages(null)
+        clearScheduledAutomationCallbacks()
         handler.postDelayed({ inspectCurrentPage() }, 1600)
     }
 
@@ -1823,7 +1876,7 @@ class FlowAutomationService : AccessibilityService() {
                 "وصل الهاتف إلى Google Flow، لكن لم يظهر حقل إدخال قابل للوصول خلال 60 ثانية. تم إيقاف المهمة دون الضغط على توليد.")
             return
         }
-        handler.removeCallbacksAndMessages(null)
+        clearScheduledAutomationCallbacks()
         handler.postDelayed({ inspectCurrentPage() }, 1200)
     }
 
@@ -1855,7 +1908,7 @@ class FlowAutomationService : AccessibilityService() {
                 "تم لصق وصف المشهد في Google Flow، لكن لم يظهر زر إرسال/توليد واضح وفريد خلال 45 ثانية؛ لم يضغط التطبيق أي زر غير مؤكد.")
             return
         }
-        handler.removeCallbacksAndMessages(null)
+        clearScheduledAutomationCallbacks()
         handler.postDelayed({ inspectCurrentPage() }, 1200)
     }
 
@@ -2171,6 +2224,12 @@ class FlowAutomationService : AccessibilityService() {
                     prefs.getString("flow_selected_account", "") ?: "").trim())
                 .put("save_only", payload.optBoolean("save_only", true))
             prefs.edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+            DeviceNotifications.show(
+                context,
+                if (diagnostic) "بدأ فحص التحكم في Google Flow" else "بدأ تنفيذ مشهد Google Flow",
+                if (diagnostic) "يفتح ZOZ التطبيق الأصلي ويفحص إمكانية الوصول إلى المحرر دون بدء توليد أو استهلاك رصيد."
+                else "يفتح ZOZ تطبيق Flow الأصلي ويجهز وضع الفيديو والوصف. لن يبدأ التوليد قبل التحقق من إدخال النص وزر Generate."
+            )
             val runningService = activeService
             if (runningService != null && runningService.isFlowInForeground()) {
                 runningService.handler.postDelayed({ runningService.inspectCurrentPage() }, 250)
