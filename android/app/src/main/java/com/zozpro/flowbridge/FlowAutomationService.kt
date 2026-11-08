@@ -1020,12 +1020,48 @@ class FlowAutomationService : AccessibilityService() {
                 ))
                 if (videoMode != null && videoMode.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
                     task.put("video_mode_selected", true)
-                    task.put("video_mode_selected_at_ms", System.currentTimeMillis())
-                    updatePhase(task, "waiting_editor")
+                    task.put("video_option_index", 0)
+                    updatePhase(task, "configuring_video_options")
                     lastActionAt = System.currentTimeMillis()
-                    handler.postDelayed({ inspectCurrentPage() }, 1100)
+                    handler.postDelayed({ inspectCurrentPage() }, 900)
                 } else {
                     retryVideoModeScan(task)
+                }
+            }
+            "configuring_video_options" -> {
+                val step = task.optInt("video_option_index", 0)
+                if (step >= 4) {
+                    task.put("video_preferences_verified", true)
+                    updatePhase(task, "waiting_editor")
+                    handler.postDelayed({ inspectCurrentPage() }, 800)
+                } else {
+                    val control = findUniqueClickableContaining(root, flowVideoOptionControls(step))
+                    if (control != null && control.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                        task.put("video_option_opened", step)
+                        updatePhase(task, "selecting_video_option_value")
+                        lastActionAt = System.currentTimeMillis()
+                        handler.postDelayed({ inspectCurrentPage() }, 650)
+                    } else {
+                        retryVideoOptionScan(task, step)
+                    }
+                }
+            }
+            "selecting_video_option_value" -> {
+                val step = task.optInt("video_option_opened", -1)
+                if (step !in 0..3) {
+                    finishTask(task, false, "flow_video_option_state_invalid",
+                        "حالة إعدادات الفيديو غير صالحة؛ أوقف الهاتف التوليد بأمان.")
+                    return
+                }
+                val option = findUniqueClickableContaining(root, flowVideoOptionValues(step))
+                if (option != null && option.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    task.put("video_option_verified_$step", true)
+                    task.put("video_option_index", step + 1)
+                    updatePhase(task, "configuring_video_options")
+                    lastActionAt = System.currentTimeMillis()
+                    handler.postDelayed({ inspectCurrentPage() }, 700)
+                } else {
+                    retryVideoOptionScan(task, step)
                 }
             }
             "waiting_send" -> {
@@ -1202,6 +1238,65 @@ class FlowAutomationService : AccessibilityService() {
             }
         }
         return candidates.singleOrNull()
+    }
+
+    /**
+     * Official Flow Android creation order: Orientation, output count, model, duration.
+     * This bridge uses one portrait clip per request and Gemini Omni Flash 720p.
+     */
+    private fun flowVideoOptionControls(step: Int): Set<String> = when (step) {
+        0 -> setOf("orientation", "portrait", "landscape", "9:16", "16:9")
+        1 -> setOf("number of outputs", "outputs", "output count", "1 output", "2 outputs")
+        2 -> setOf("model", "gemini omni flash (720p)", "gemini omni flash 720p", "veo 3.1 fast")
+        3 -> setOf("generation length", "video length", "duration", "8 seconds", "8s")
+        else -> emptySet()
+    }
+
+    private fun flowVideoOptionValues(step: Int): Set<String> = when (step) {
+        0 -> setOf("portrait", "portrait 9:16", "9:16")
+        1 -> setOf("1 output", "1 video", "one output", "1")
+        2 -> setOf("gemini omni flash (720p)", "gemini omni flash 720p")
+        3 -> setOf("8s", "8 s", "8 seconds", "8 sec")
+        else -> emptySet()
+    }
+
+    private fun findUniqueClickableContaining(
+        root: AccessibilityNodeInfo,
+        acceptedFragments: Set<String>
+    ): AccessibilityNodeInfo? {
+        val candidates = mutableListOf<AccessibilityNodeInfo>()
+        walk(root) { node ->
+            if (!node.isVisibleToUser || !node.isEnabled) return@walk
+            val label = accessibleLabel(node).lowercase()
+                .replace('_', ' ')
+                .replace(Regex("\\s+"), " ")
+                .trim()
+            if (acceptedFragments.none { label == it || label.contains(it) }) return@walk
+            val target = when {
+                node.isClickable -> node
+                node.parent?.isClickable == true -> node.parent
+                else -> null
+            } ?: return@walk
+            val bounds = android.graphics.Rect().also(target::getBoundsInScreen)
+            if (candidates.none { android.graphics.Rect().also(it::getBoundsInScreen) == bounds }) {
+                candidates.add(target)
+            }
+        }
+        return candidates.singleOrNull()
+    }
+
+    private fun retryVideoOptionScan(task: JSONObject, step: Int) {
+        val started = task.optLong("phase_started_at_ms", System.currentTimeMillis())
+        val attempts = task.optInt("video_option_attempts_$step", 0) + 1
+        task.put("video_option_attempts_$step", attempts)
+        prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+        if (System.currentTimeMillis() - started > 30000L || attempts > 24) {
+            val names = listOf("الاتجاه الرأسي 9:16", "مخرج واحد", "Gemini Omni Flash بدقة 720p", "مدة 8 ثوانٍ")
+            finishTask(task, false, "flow_video_option_not_verified",
+                "تعذر التحقق من إعداد الفيديو (" + names.getOrElse(step) { "إعداد غير معروف" } + ") في تطبيق Flow. لم يضغط الهاتف زر التوليد.")
+            return
+        }
+        handler.postDelayed({ inspectCurrentPage() }, 900)
     }
 
     private fun findGeneratedPromptAsset(root: AccessibilityNodeInfo, prompt: String): AccessibilityNodeInfo? {
