@@ -994,6 +994,18 @@ class FlowAutomationService : AccessibilityService() {
                         } else {
                             retryEditorScan(task)
                         }
+                    } else if (!task.optBoolean("video_mode_selected", false)) {
+                        val imageMode = findUniqueExactClickable(root, setOf(
+                            "image", "image mode", "image generation", "صورة", "وضع الصورة"
+                        ))
+                        if (imageMode != null && imageMode.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                            task.put("video_mode_menu_opened", true)
+                            updatePhase(task, "selecting_video_mode")
+                            lastActionAt = System.currentTimeMillis()
+                            handler.postDelayed({ inspectCurrentPage() }, 900)
+                        } else {
+                            retryVideoModeScan(task)
+                        }
                     } else {
                         retryEditorScan(task)
                     }
