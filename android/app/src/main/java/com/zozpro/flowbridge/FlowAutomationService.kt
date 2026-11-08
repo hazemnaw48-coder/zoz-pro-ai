@@ -99,6 +99,7 @@ class FlowAutomationService : AccessibilityService() {
     private var controlInspectionScheduled = false
     private var agentPollScheduled = false
     @Volatile private var activeLocalUploadJobId: String? = null
+    @Volatile private var sceneReconciliationRunning = false
     private val networkExecutor = Executors.newSingleThreadExecutor()
 
     /**
@@ -137,8 +138,9 @@ class FlowAutomationService : AccessibilityService() {
             ContextCompat.registerReceiver(this, downloadReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
             receiverRegistered = true
         }
-        // Preserve in-flight Flow state across accessibility-service restarts.
-        if (activeTask() != null) handler.postDelayed({ inspectCurrentPage() }, 900)
+        // Reconcile persisted Flow work against the server before resuming it.
+        // Server-cancelled jobs must never leave a stale local lock blocking the next scene.
+        if (activeTask() != null) reconcileActiveSceneWithServer()
         if (activeControlTask() != null) scheduleControlInspection(900)
         scheduleAgentPoll(1800)
     }
@@ -188,6 +190,45 @@ class FlowAutomationService : AccessibilityService() {
     private fun activeControlTask(): JSONObject? = runCatching {
         prefs().getString(KEY_ACTIVE_CONTROL_TASK, null)?.let(::JSONObject)
     }.getOrNull()
+
+    /**
+     * Ask production whether the locally persisted scene is still running.
+     * This clears only terminal/missing server jobs; a live generation is resumed.
+     */
+    private fun reconcileActiveSceneWithServer() {
+        val task = activeTask() ?: return
+        val jobId = task.optString("job_id", "")
+        if (jobId.isBlank() || sceneReconciliationRunning) return
+        val deviceToken = DeviceTokenVault.read(this) ?: return
+        sceneReconciliationRunning = true
+        networkExecutor.execute {
+            val response = runCatching {
+                apiPostWithToken("job_status", JSONObject().put("job_id", jobId), deviceToken)
+            }.getOrNull()
+            sceneReconciliationRunning = false
+            handler.post {
+                val current = activeTask()
+                if (current?.optString("job_id") != jobId) return@post
+                val found = response?.optBoolean("found", false) == true
+                val status = response?.optString("status", "").orEmpty()
+                if (found && status == "running") {
+                    handler.postDelayed({ inspectCurrentPage() }, 700)
+                } else if (response != null && (!found || status in setOf(
+                        "queued", "cancelled", "failed", "succeeded", "awaiting_owner_approval"
+                    ))) {
+                    prefs().edit().remove(KEY_ACTIVE_TASK).apply()
+                    DeviceNotifications.show(
+                        this,
+                        "تم تحرير قفل مشهد قديم",
+                        "أكد خادم ZOZ أن المهمة السابقة لم تعد قيد التنفيذ؛ أصبح الهاتف جاهزًا للمشهد التالي."
+                    )
+                    scheduleAgentPoll(1200)
+                } else {
+                    scheduleAgentPoll(10000)
+                }
+            }
+        }
+    }
 
     private fun scheduleControlInspection(delayMs: Long = 350L) {
         if (controlInspectionScheduled) return
@@ -393,8 +434,13 @@ class FlowAutomationService : AccessibilityService() {
     }
 
     private fun pollAgentQueue() {
-        if (!isEnabled(this) || activeControlTask() != null || activeTask() != null || hasActiveVoiceoverJob()) {
+        if (!isEnabled(this) || activeControlTask() != null || hasActiveVoiceoverJob()) {
             scheduleAgentPoll(5000L)
+            return
+        }
+        if (activeTask() != null) {
+            reconcileActiveSceneWithServer()
+            scheduleAgentPoll(12000L)
             return
         }
         val deviceToken = DeviceTokenVault.read(this)
