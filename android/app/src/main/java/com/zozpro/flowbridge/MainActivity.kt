@@ -472,24 +472,38 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0, resumeRevis
                     Button(enabled = !busy, onClick = { runAsync {
                         val token = DeviceTokenVault.read(context)
                             ?: throw IllegalStateException("الجهاز غير مقرون.")
+                        val flowAccount = selectedFlowAccount.trim()
+                        if (flowAccount.isBlank()) {
+                            throw IllegalStateException("اختر حساب Google Flow أولًا قبل اختبار التحكم.")
+                        }
                         apiPostWithToken("device_health", JSONObject().put("app_version", BuildConfig.VERSION_NAME), token)
-                        var processed = 0
-                        var flowResult = false
-                        for (index in 0 until 6) {
-                            val job = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job") ?: break
-                            val capability = job.optString("capability_id")
-                            executeJob(context, job)
-                            processed++
-                            if (capability == "flow.generate_scene" || capability == "device.ui_control") {
-                                flowResult = true
-                                break
+                        val queued = apiPostWithToken(
+                            "request_flow_control_diagnostic",
+                            JSONObject().put("flow_account_email", flowAccount),
+                            token
+                        )
+                        val queuedId = queued.optString("job_id")
+                        if (queuedId.isBlank()) {
+                            throw IllegalStateException("لم يُرجع الخادم معرّف اختبار Flow.")
+                        }
+                        val poll = apiPostWithToken(
+                            "poll_jobs",
+                            JSONObject().put("job_id", queuedId),
+                            token
+                        )
+                        val claimed = poll.optJSONObject("job") ?: run {
+                            val blocked = poll.optString("blocked")
+                            val reason = when (blocked) {
+                                "capability_not_granted" -> "صلاحية flow.generate_scene غير مفعّلة لهذا الجهاز."
+                                else -> "الخادم أبقى اختبار Flow في قائمة الانتظار؛ الهاتف لم يستلمه بعد."
                             }
+                            throw IllegalStateException(reason)
                         }
-                        when {
-                            flowResult -> "تم استلام مهمة تحكم Flow وتنفيذها. افحص نتيجة المهمة في مركز ZOZ."
-                            processed > 0 -> "تم استلام وتنفيذ $processed مهمة من الوكيل. لا توجد مهمة Flow ضمن المهام المستلمة."
-                            else -> "اتصال الوكيل ناجح، لكن لا توجد مهام جاهزة في الطابور."
+                        if (claimed.optString("id") != queuedId) {
+                            throw IllegalStateException("معرّف المهمة المستلمة لا يطابق اختبار Flow المطلوب؛ أوقفت التنفيذ بأمان.")
                         }
+                        val execution = executeJob(context, claimed)
+                        "$execution\nتم استلام اختبار Flow الآمن للحساب المحدد. لم يتم الضغط على Generate ولم يبدأ توليد أو استهلاك رصيد."
                     } }, modifier = Modifier.fillMaxWidth()) { Text("اتصال وفحص المهام") }
                     OutlinedButton(onClick = {
                         DeviceTokenVault.clear(context)
