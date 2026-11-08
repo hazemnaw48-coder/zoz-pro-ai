@@ -82,7 +82,12 @@ private const val PREF_PENDING_PROMPTS = "pending_agent_prompts"
 private const val PREF_FLOW_ACCOUNTS = "flow_account_profiles"
 private const val PREF_FLOW_SELECTED_ACCOUNT = "flow_selected_account"
 private const val FLOW_APP_PACKAGE = "com.google.android.apps.labs.whisk"
-private fun loadFlowAccounts(prefs: android.content.SharedPreferences): List<String> = runCatching {\n    val values = JSONArray(prefs.getString(PREF_FLOW_ACCOUNTS, "[]") ?: "[]")\n    (0 until values.length()).mapNotNull { values.optString(it).trim().lowercase().takeIf(String::isNotBlank) }.distinct()\n}.getOrDefault(emptyList())
+private fun loadFlowAccounts(prefs: android.content.SharedPreferences): List<String> = runCatching {
+    val values = JSONArray(prefs.getString(PREF_FLOW_ACCOUNTS, "[]") ?: "[]")
+    (0 until values.length())
+        .mapNotNull { index -> values.optString(index).trim().lowercase().takeIf { it.isNotBlank() } }
+        .distinct()
+}.getOrDefault(emptyList())
 private const val API = "https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-device-agent"
 private const val INTAKE_API = "https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-youtube-analytics"
 private const val VOICEOVER_API = "https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-voiceover"
@@ -117,6 +122,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0, resumeRevision: Int = 0) {
     val context = LocalContext.current
+    val flowPrefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
+    var flowAccountDraft by remember { mutableStateOf("") }
+    var flowAccounts by remember { mutableStateOf(loadFlowAccounts(flowPrefs)) }
+    var selectedFlowAccount by remember { mutableStateOf(flowPrefs.getString(PREF_FLOW_SELECTED_ACCOUNT, "") ?: "") }
     val scrollState = rememberScrollState()
     var voiceoverCardTop by remember { mutableIntStateOf(-1) }
     val scope = rememberCoroutineScope()
@@ -125,6 +134,12 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0, resumeRevis
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf(if (paired) "الجهاز مرتبط بوكيل ZOZ Pro." else "اربط التطبيق بمركز ZOZ Pro.") }
     var downloadsAccessGranted by remember { mutableStateOf(Build.VERSION.SDK_INT < 30 || Environment.isExternalStorageManager()) }
+    LaunchedEffect(flowAccounts) {
+        flowPrefs.edit().putString(PREF_FLOW_ACCOUNTS, JSONArray(flowAccounts).toString()).apply()
+    }
+    LaunchedEffect(selectedFlowAccount) {
+        flowPrefs.edit().putString(PREF_FLOW_SELECTED_ACCOUNT, selectedFlowAccount).apply()
+    }
     LaunchedEffect(voiceoverDeepLinkRequest, paired, voiceoverCardTop) {
         if (voiceoverDeepLinkRequest > 0 && paired && voiceoverCardTop >= 0) {
             withFrameNanos { }
@@ -266,7 +281,7 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0, resumeRevis
                                 flowAccounts = (flowAccounts + email).distinct()
                                 selectedFlowAccount = email
                                 flowAccountDraft = ""
-                                lastAction = "أُضيف الحساب إلى قائمة Flow واختير للحساب المستهدف."
+                                status = "أُضيف الحساب إلى قائمة Flow واختير للحساب المستهدف."
                             }, modifier = Modifier.fillMaxWidth()) { Text("إضافة الحساب واختياره") }
                         if (flowAccounts.isEmpty()) {
                             Text("لم تُضف حسابات بعد.")
@@ -275,7 +290,7 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0, resumeRevis
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     OutlinedButton(enabled = !busy, onClick = {
                                         selectedFlowAccount = email
-                                        lastAction = "الحساب المستهدف الآن: $email"
+                                        status = "الحساب المستهدف الآن: $email"
                                     }, modifier = Modifier.weight(1f)) {
                                         Text(if (selectedFlowAccount.equals(email, true)) "✓ $email" else email)
                                     }
@@ -287,12 +302,29 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0, resumeRevis
                             }
                         }
                         Text("الحساب المختار: ${selectedFlowAccount.ifBlank { "لم يتم الاختيار" }}")
+                        OutlinedButton(enabled = !busy, onClick = {
+                            val launch = context.packageManager.getLaunchIntentForPackage(FLOW_APP_PACKAGE)
+                            if (launch == null) {
+                                status = "تطبيق Google Flow الأصلي غير متاح في قائمة التطبيقات؛ لم يتم فتح Chrome بديلًا عنه."
+                            } else {
+                                context.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                                status = "تم فتح تطبيق Google Flow الأصلي على الهاتف."
+                            }
+                        }, modifier = Modifier.fillMaxWidth()) { Text("فتح تطبيق Google Flow الأصلي") }
                         Button(enabled = !busy && paired && FlowAutomationService.isEnabled(context), onClick = { runAsync {
-                            val token = DeviceTokenVault.read(context) ?: throw IllegalStateException("الجهاز غير مقرون.")
-                            val result = apiPostWithToken("request_flow_control_diagnostic",
+                            val token = DeviceTokenVault.read(context)
+                                ?: throw IllegalStateException("الجهاز غير مقرون.")
+                            val queued = apiPostWithToken("request_flow_control_diagnostic",
                                 JSONObject().put("flow_account_email", selectedFlowAccount), token)
-                            "أُرسلت مهمة اختبار التحكم إلى الهاتف: ${result.optString("job_id")}. الاختبار لا يكتب مطالبة ولا يضغط Generate ولا يستهلك رصيدًا."
-                        } }, modifier = Modifier.fillMaxWidth()) { Text("اختبار التحكم الفعلي في Flow") }
+                            val queuedId = queued.optString("job_id")
+                            if (queuedId.isBlank()) throw IllegalStateException("لم يُرجع الخادم معرّف اختبار.")
+                            val claimed = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job")
+                                ?: throw IllegalStateException("وصل طلب الاختبار إلى الخادم، لكن الهاتف لم يستلم المهمة بعد.")
+                            if (claimed.optString("id") != queuedId) {
+                                throw IllegalStateException("استلم الهاتف مهمة أخرى؛ أوقف اختبار Flow لتجنب تنفيذ مهمة غير مقصودة.")
+                            }
+                            withContext(Dispatchers.Main) { executeJob(context, claimed) }
+                        } }, modifier = Modifier.fillMaxWidth()) { Text("فتح Flow واختبار التحكم الفعلي") }
                     }
                 }
 
