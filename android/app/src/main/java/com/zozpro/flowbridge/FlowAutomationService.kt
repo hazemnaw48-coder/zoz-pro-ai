@@ -101,6 +101,12 @@ class FlowAutomationService : AccessibilityService() {
     private var lastAccessibilityEventPackage = ""
     private var lastAccessibilityEventType = -1
     private var lastAccessibilityEventAtMs = 0L
+    // Some WebView-backed Flow surfaces emit useful accessibility events even when
+    // Android does not expose the app window through getWindows()/rootInActiveWindow.
+    private var lastFlowEventSource: AccessibilityNodeInfo? = null
+    private var lastFlowEventSourceAtMs = 0L
+    private var lastFlowEventSourceClass = ""
+    private var lastFlowEventSourceViewId = ""
     @Volatile private var activeLocalUploadJobId: String? = null
     @Volatile private var sceneReconciliationRunning = false
     private val networkExecutor = Executors.newSingleThreadExecutor()
@@ -112,6 +118,24 @@ class FlowAutomationService : AccessibilityService() {
     private fun isVerifiedFlowPage(root: AccessibilityNodeInfo): Boolean =
         root.packageName?.toString() == FLOW_APP_PACKAGE
 
+    private fun flowEventRootFallback(): AccessibilityNodeInfo? {
+        val source = lastFlowEventSource ?: return null
+        if (System.currentTimeMillis() - lastFlowEventSourceAtMs > 6000L) return null
+        if (!isVerifiedFlowPage(source)) return null
+
+        // Walk only through parents that still belong to the official Flow package.
+        // This never crosses into Chrome, System UI, or another app.
+        var current: AccessibilityNodeInfo = source
+        var depth = 0
+        while (depth < 24) {
+            val parent = runCatching { current.parent }.getOrNull() ?: break
+            if (!isVerifiedFlowPage(parent)) break
+            current = parent
+            depth++
+        }
+        return current
+    }
+
     private fun flowWindowRoot(): AccessibilityNodeInfo? {
         val appWindowRoot = runCatching {
             windows.firstNotNullOfOrNull { window ->
@@ -119,7 +143,9 @@ class FlowAutomationService : AccessibilityService() {
                 if (candidate != null && isVerifiedFlowPage(candidate)) candidate else null
             }
         }.getOrNull()
-        return appWindowRoot ?: rootInActiveWindow?.takeIf(::isVerifiedFlowPage)
+        return appWindowRoot
+            ?: rootInActiveWindow?.takeIf(::isVerifiedFlowPage)
+            ?: flowEventRootFallback()
     }
 
     private fun isFlowInForeground(): Boolean = flowWindowRoot() != null
@@ -154,6 +180,15 @@ class FlowAutomationService : AccessibilityService() {
             lastAccessibilityEventPackage = pkg
             lastAccessibilityEventType = event?.eventType ?: -1
             lastAccessibilityEventAtMs = System.currentTimeMillis()
+        }
+        if (pkg == FLOW_APP_PACKAGE) {
+            val source = runCatching { event?.source }.getOrNull()
+            lastFlowEventSource = source?.let {
+                runCatching { AccessibilityNodeInfo.obtain(it) }.getOrNull()
+            }
+            lastFlowEventSourceAtMs = if (source != null) System.currentTimeMillis() else 0L
+            lastFlowEventSourceClass = source?.className?.toString().orEmpty()
+            lastFlowEventSourceViewId = runCatching { source?.viewIdResourceName.orEmpty() }.getOrDefault("")
         }
         if (event?.eventType !in listOf(
                 AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
@@ -1855,6 +1890,14 @@ class FlowAutomationService : AccessibilityService() {
                 .put("last_accessibility_event_package", lastAccessibilityEventPackage)
                 .put("last_accessibility_event_type", lastAccessibilityEventType)
                 .put("last_accessibility_event_age_ms", if (lastAccessibilityEventAtMs > 0L) now - lastAccessibilityEventAtMs else -1L)
+                .put("last_flow_event_source_available", lastFlowEventSource != null &&
+                    lastFlowEventSourceAtMs > 0L && now - lastFlowEventSourceAtMs <= 6000L)
+                .put("last_flow_event_source_class", lastFlowEventSourceClass)
+                .put("last_flow_event_source_view_id", lastFlowEventSourceViewId)
+                .put("last_flow_event_source_age_ms", if (lastFlowEventSourceAtMs > 0L) now - lastFlowEventSourceAtMs else -1L)
+                .put("screen_locked", runCatching {
+                    (getSystemService(android.content.Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager)?.isKeyguardLocked == true
+                }.getOrDefault(false))
                 .put("window_root_packages", windowRootPackages)
             finishTask(task, false, "manual_intervention_required",
                 "تطبيق Google Flow الرسمي موجود، لكن خدمة إمكانية الوصول لم تتمكن من قراءة شجرة نافذته خلال 60 ثانية. لم يتم إدخال النص أو الضغط على Generate. سُجلت بيانات النوافذ لتحديد سبب تعذر الوصول.",
