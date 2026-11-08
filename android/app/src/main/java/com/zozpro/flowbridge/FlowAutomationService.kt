@@ -1136,15 +1136,20 @@ class FlowAutomationService : AccessibilityService() {
                 }
             }
             "flow_asset_selected" -> {
-                val more = findUniqueExactClickable(root, setOf(
-                    "more", "more options", "more actions", "options", "المزيد", "خيارات إضافية", "خيارات"
-                ))
-                if (more != null && more.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                    updatePhase(task, "flow_asset_menu_open")
-                    lastActionAt = System.currentTimeMillis()
-                    handler.postDelayed({ inspectCurrentPage() }, 700)
+                val download = findButton(root, setOf("download", "download video", "download asset", "تنزيل", "تحميل الفيديو"))
+                if (download != null && download.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    markFlowDownloadStarted(task)
                 } else {
-                    retryAssetMenuScan(task)
+                    val more = findUniqueExactClickable(root, setOf(
+                        "more", "more options", "more actions", "options", "المزيد", "خيارات إضافية", "خيارات"
+                    ))
+                    if (more != null && more.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                        updatePhase(task, "flow_asset_menu_open")
+                        lastActionAt = System.currentTimeMillis()
+                        handler.postDelayed({ inspectCurrentPage() }, 700)
+                    } else {
+                        retryAssetMenuScan(task)
+                    }
                 }
             }
             "flow_asset_menu_open" -> {
@@ -1574,6 +1579,17 @@ class FlowAutomationService : AccessibilityService() {
             }
             val uri = manager.getUriForDownloadedFile(downloadId) ?: run {
                 finishTask(task, false, "download_uri_missing", "Download completed but Android did not expose a readable file URI.")
+                return
+            }
+            val validMp4 = runCatching {
+                contentResolver.openInputStream(uri)?.use { input ->
+                    val header = ByteArray(12)
+                    val count = input.read(header)
+                    count >= 8 && String(header, 4, 4, Charsets.US_ASCII) == "ftyp"
+                } ?: false
+            }.getOrDefault(false)
+            if (!validMp4) {
+                finishTask(task, false, "flow_download_not_mp4", "الملف الذي أعاده تنزيل Flow ليس ملف MP4 صالحًا؛ لم يتم تسجيل نجاح المهمة.")
                 return
             }
             val name = cursor.getString(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TITLE)) ?: "flow-scene-${task.optInt("scene_index", 1)}.mp4"
