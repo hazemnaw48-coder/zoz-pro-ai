@@ -326,10 +326,10 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0, resumeRevis
                                             JSONObject().put("flow_account_email", selectedFlowAccount), token)
                                         val queuedId = queued.optString("job_id")
                                         if (queuedId.isBlank()) throw IllegalStateException("لم يُرجع الخادم معرّف اختبار.")
-                                        val claimed = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job")
-                                            ?: throw IllegalStateException("تم فتح Flow، لكن الهاتف لم يستلم مهمة اختبار الكتابة بعد.")
+                                        val claimed = apiPostWithToken("poll_jobs", JSONObject().put("job_id", queuedId), token).optJSONObject("job")
+                                            ?: throw IllegalStateException("تم تجهيز اختبار Flow، لكن لم يستطع الهاتف استلام مهمة الاختبار المحددة.")
                                         if (claimed.optString("id") != queuedId) {
-                                            throw IllegalStateException("تم فتح Flow، لكن استلم الهاتف مهمة أخرى؛ أوقفت الاختبار لتجنب تنفيذ مهمة غير مقصودة.")
+                                            throw IllegalStateException("معرّف المهمة المستلمة لا يطابق اختبار Flow المطلوب؛ أوقفت التنفيذ بأمان.")
                                         }
                                         withContext(Dispatchers.Main) { executeJob(context, claimed) }
                                     }
