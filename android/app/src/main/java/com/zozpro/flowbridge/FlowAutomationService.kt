@@ -145,9 +145,9 @@ class FlowAutomationService : AccessibilityService() {
                 AccessibilityEvent.TYPE_VIEW_FOCUSED
             )) return
         if (activeTask() != null) {
-            // Browser events are considered only during an active Flow scene; inspectCurrentPage
-            // independently verifies the labs.google origin before entering text or clicking.
-            if (pkg !in setOf("com.android.chrome", "com.google.android.googlequicksearchbox")) return
+            // Only the official native Google Flow app may advance a Flow generation task.
+            // Browser and unrelated app events are ignored.
+            if (pkg != FLOW_APP_PACKAGE) return
             handler.postDelayed({ inspectCurrentPage() }, 300)
             return
         }
@@ -918,18 +918,21 @@ class FlowAutomationService : AccessibilityService() {
     private fun inspectCurrentPage() {
         val task = activeTask() ?: return
         val phase = task.optString("phase", "waiting_editor")
-        val root = rootInActiveWindow
-        if (root == null) {
-            if (phase == "waiting_editor") retryEditorScan(task)
+
+        // Download verification runs independently of the foreground app because Flow
+        // may send the download to Android MediaStore and finish after its UI is backgrounded.
+        if (phase == "download_started") {
+            if (!task.optBoolean("downloads_folder_watch_started", false)) {
+                task.put("downloads_folder_watch_started", true)
+                prefs().edit().putString(KEY_ACTIVE_TASK, task.toString()).apply()
+                handler.postDelayed({ pollFlowDownloadsFolder(task) }, 1200)
+            }
             return
         }
-        if (phase == "waiting_editor" || phase == "waiting_send") {
-            if (!isVerifiedFlowPage(root)) {
-                retryFlowOriginScan(task)
-                return
-            }
-        } else if (phase == "waiting_download" && !isVerifiedFlowPage(root)) {
-            handler.postDelayed({ inspectCurrentPage() }, 4000)
+
+        val root = rootInActiveWindow
+        if (root == null || !isVerifiedFlowPage(root)) {
+            retryFlowOriginScan(task)
             return
         }
 
@@ -1072,6 +1075,7 @@ class FlowAutomationService : AccessibilityService() {
                         task.put("generate_button_clicked", true)
                         task.put("send_clicked", true)
                         task.put("generate_clicked_at_ms", System.currentTimeMillis())
+                        task.put("generation_started_at_ms", System.currentTimeMillis())
                         updatePhase(task, "waiting_download")
                         lastActionAt = System.currentTimeMillis()
                         handler.postDelayed({ inspectCurrentPage() }, 5000)
@@ -1390,9 +1394,12 @@ class FlowAutomationService : AccessibilityService() {
         handler.postDelayed({ inspectCurrentPage() }, 1200)
     }
 
-    private fun accessibleLabel(node: AccessibilityNodeInfo): String =
-        ((node.text?.toString() ?: "") + " " +
-            (node.contentDescription?.toString() ?: "")).trim().replace(Regex("\\s+"), " ")
+    private fun accessibleLabel(node: AccessibilityNodeInfo): String {
+        val text = node.text?.toString()?.trim().orEmpty()
+        val description = node.contentDescription?.toString()?.trim().orEmpty()
+        val parts = listOf(text, description).filter { it.isNotBlank() }.distinct()
+        return parts.joinToString(" ").replace(Regex("\\s+"), " ").trim()
+    }
 
     private fun findGenerateButton(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
         val acceptedLabels = setOf(
@@ -1424,16 +1431,22 @@ class FlowAutomationService : AccessibilityService() {
     }
 
     private fun findButton(root: AccessibilityNodeInfo, labels: Set<String>): AccessibilityNodeInfo? {
-        var found: AccessibilityNodeInfo? = null
+        val matches = mutableListOf<AccessibilityNodeInfo>()
         walk(root) { node ->
-            if (found != null) return@walk
+            if (!node.isVisibleToUser || !node.isEnabled) return@walk
             val label = accessibleLabel(node).lowercase()
-            val clickable = node.isClickable || node.parent?.isClickable == true
-            if (clickable && labels.any { label == it || (it.length >= 8 && label.contains(it)) }) {
-                found = if (node.isClickable) node else node.parent
+            val target = when {
+                node.isClickable -> node
+                node.parent?.isClickable == true -> node.parent
+                else -> null
+            } ?: return@walk
+            if (labels.any { label == it || (it.length >= 5 && label.contains(it)) }) {
+                val bounds = android.graphics.Rect().also(target::getBoundsInScreen)
+                if (matches.none { android.graphics.Rect().also(it::getBoundsInScreen) == bounds }) matches.add(target)
             }
         }
-        return found
+        // Never guess between several Download actions, e.g. a list of previous assets.
+        return matches.singleOrNull()
     }
 
     private fun walk(node: AccessibilityNodeInfo, visit: (AccessibilityNodeInfo) -> Unit) {
