@@ -207,6 +207,21 @@ Deno.serve(async(req:Request)=>{
    if(sourceId)await db("zoz_pro_video_intake_sources?id=eq."+encodeURIComponent(sourceId)+"&owner_id=eq."+encodeURIComponent(u.id),{method:"PATCH",headers:{prefer:"return=minimal"},body:JSON.stringify({is_active:false,revoked_at:new Date().toISOString()})});
    await log(u.id,id,null,"device_revoked",{});return json({ok:true,device_id:id,status:"revoked"});
   }
+  if(action==="request_flow_control_diagnostic"){
+   const d=await device(req);if(!d)return fail("الجهاز غير مقرون أو تم إلغاء صلاحياته.",401);
+   if(!(d.device.capabilities||[]).includes("flow.generate_scene"))return fail("Flow automation is not enabled for this device.",403);
+   const desired=clean(body?.flow_account_email,254).toLowerCase();
+   if(desired&&!/^[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$/i.test(desired))return fail("Flow account email is invalid.",400);
+   const jobRows=await db("zoz_pro_device_jobs",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({
+    owner_id:d.owner_id,device_id:d.device_id,capability_id:"flow.generate_scene",
+    payload:{task_type:"flow_control_diagnostic",flow_account_email:desired,save_only:true},
+    status:"queued",approval_required:false,approval_status:"not_required",priority:5,
+    idempotency_key:"flow-diagnostic-"+crypto.randomUUID()
+   })});
+   const job=jobRows?.[0];if(!job)throw new Error("Could not create Flow control diagnostic.");
+   await log(d.owner_id,d.device_id,job.id,"flow_control_diagnostic_queued",{flow_account_selected:Boolean(desired)});
+   return json({ok:true,job_id:job.id,status:job.status,task_type:"flow_control_diagnostic"});
+  }
   if(action==="job_enqueue"){
    const cap=clean(body?.capability_id,80);if(!CAPABILITIES.has(cap))return fail("Capability is not allow-listed.",400);
    const deviceId=clean(body?.device_id,40);const dev=await db("zoz_pro_device_registry?id=eq."+encodeURIComponent(deviceId)+"&owner_id=eq."+encodeURIComponent(u.id)+"&device_status=eq.active&select=id,capabilities&limit=1");
