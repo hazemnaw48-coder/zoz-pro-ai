@@ -469,6 +469,28 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0, resumeRevis
                             }
                         }
                     }
+                    Button(enabled = !busy, onClick = { runAsync {
+                        val token = DeviceTokenVault.read(context)
+                            ?: throw IllegalStateException("الجهاز غير مقرون.")
+                        apiPostWithToken("device_health", JSONObject().put("app_version", BuildConfig.VERSION_NAME), token)
+                        var processed = 0
+                        var flowResult = false
+                        for (index in 0 until 6) {
+                            val job = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job") ?: break
+                            val capability = job.optString("capability_id")
+                            executeJob(context, job)
+                            processed++
+                            if (capability == "flow.generate_scene" || capability == "device.ui_control") {
+                                flowResult = true
+                                break
+                            }
+                        }
+                        when {
+                            flowResult -> "تم استلام مهمة تحكم Flow وتنفيذها. افحص نتيجة المهمة في مركز ZOZ."
+                            processed > 0 -> "تم استلام وتنفيذ $processed مهمة من الوكيل. لا توجد مهمة Flow ضمن المهام المستلمة."
+                            else -> "اتصال الوكيل ناجح، لكن لا توجد مهام جاهزة في الطابور."
+                        }
+                    } }, modifier = Modifier.fillMaxWidth()) { Text("اتصال وفحص المهام") }
                     OutlinedButton(onClick = {
                         DeviceTokenVault.clear(context)
                         paired = false
