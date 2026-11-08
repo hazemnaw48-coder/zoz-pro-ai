@@ -11,8 +11,8 @@ android {
         applicationId = "com.zozpro.flowbridge.auto2"
         minSdk = 26
         targetSdk = 35
-        versionCode = 42
-        versionName = "0.9.2"
+        versionCode = 43
+        versionName = "0.9.3"
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
