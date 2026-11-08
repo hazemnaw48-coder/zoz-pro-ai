@@ -79,6 +79,10 @@ private const val PREF_CLIPS = "saved_clips"
 private const val PREF_PROMPT = "scene_prompt"
 private const val PREF_PENDING_PROMPT = "pending_agent_prompt"
 private const val PREF_PENDING_PROMPTS = "pending_agent_prompts"
+private const val PREF_FLOW_ACCOUNTS = "flow_account_profiles"
+private const val PREF_FLOW_SELECTED_ACCOUNT = "flow_selected_account"
+private const val FLOW_APP_PACKAGE = "com.google.android.apps.labs.whisk"
+private fun loadFlowAccounts(prefs: android.content.SharedPreferences): List<String> = runCatching {\n    val values = JSONArray(prefs.getString(PREF_FLOW_ACCOUNTS, "[]") ?: "[]")\n    (0 until values.length()).mapNotNull { values.optString(it).trim().lowercase().takeIf(String::isNotBlank) }.distinct()\n}.getOrDefault(emptyList())
 private const val API = "https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-device-agent"
 private const val INTAKE_API = "https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-youtube-analytics"
 private const val VOICEOVER_API = "https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-pro-voiceover"
@@ -245,6 +249,53 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0, resumeRevis
                         }
                     }
                 }
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Text("حسابات Google Flow", fontWeight = FontWeight.Bold)
+                        Text("احفظ عناوين الحسابات المستخدمة على الهاتف واختر الحساب المطلوب لكل جلسة. يجري النظام التحقق من الحساب الظاهر داخل Flow ومحاولة اختياره من قائمة الحسابات المتاحة. لا يحفظ التطبيق كلمات مرور أو رموز تحقق. إذا طلب Flow تسجيل دخول أو تحقق إضافي، أكمل ذلك داخل Flow يدويًا.")
+                        OutlinedTextField(
+                            value = flowAccountDraft,
+                            onValueChange = { flowAccountDraft = it.take(254) },
+                            label = { Text("البريد الإلكتروني لحساب Google") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Button(enabled = !busy && flowAccountDraft.trim().matches(Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")),
+                            onClick = {
+                                val email = flowAccountDraft.trim().lowercase()
+                                flowAccounts = (flowAccounts + email).distinct()
+                                selectedFlowAccount = email
+                                flowAccountDraft = ""
+                                lastAction = "أُضيف الحساب إلى قائمة Flow واختير للحساب المستهدف."
+                            }, modifier = Modifier.fillMaxWidth()) { Text("إضافة الحساب واختياره") }
+                        if (flowAccounts.isEmpty()) {
+                            Text("لم تُضف حسابات بعد.")
+                        } else {
+                            flowAccounts.forEach { email ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(enabled = !busy, onClick = {
+                                        selectedFlowAccount = email
+                                        lastAction = "الحساب المستهدف الآن: $email"
+                                    }, modifier = Modifier.weight(1f)) {
+                                        Text(if (selectedFlowAccount.equals(email, true)) "✓ $email" else email)
+                                    }
+                                    OutlinedButton(enabled = !busy, onClick = {
+                                        flowAccounts = flowAccounts.filterNot { it.equals(email, true) }
+                                        if (selectedFlowAccount.equals(email, true)) selectedFlowAccount = flowAccounts.firstOrNull().orEmpty()
+                                    }) { Text("إزالة") }
+                                }
+                            }
+                        }
+                        Text("الحساب المختار: ${selectedFlowAccount.ifBlank { "لم يتم الاختيار" }}")
+                        Button(enabled = !busy && paired && FlowAutomationService.isEnabled(context), onClick = { runAsync {
+                            val token = DeviceTokenVault.read(context) ?: throw IllegalStateException("الجهاز غير مقرون.")
+                            val result = apiPostWithToken("request_flow_control_diagnostic",
+                                JSONObject().put("flow_account_email", selectedFlowAccount), token)
+                            "أُرسلت مهمة اختبار التحكم إلى الهاتف: ${result.optString("job_id")}. الاختبار لا يكتب مطالبة ولا يضغط Generate ولا يستهلك رصيدًا."
+                        } }, modifier = Modifier.fillMaxWidth()) { Text("اختبار التحكم الفعلي في Flow") }
+                    }
+                }
+
                 if (!paired) {
                     OutlinedTextField(
                         value = pairingCode,
@@ -406,6 +457,9 @@ private fun FlowBridgeScreen() {
     var finalVideoUri by remember { mutableStateOf(prefs.getString("final_video_uri", null)?.let { Uri.parse(it) }) }
     var syntheticMedia by remember { mutableStateOf(true) }
     var madeForKids by remember { mutableStateOf(false) }
+    var flowAccountDraft by remember { mutableStateOf("") }
+    var flowAccounts by remember { mutableStateOf(loadFlowAccounts(prefs)) }
+    var selectedFlowAccount by remember { mutableStateOf(prefs.getString(PREF_FLOW_SELECTED_ACCOUNT, "") ?: "") }
     var showCleanupConfirm by remember { mutableStateOf(false) }
 
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -425,6 +479,8 @@ private fun FlowBridgeScreen() {
         }
     }
     LaunchedEffect(clips) { saveClips(context, clips) }
+    LaunchedEffect(flowAccounts) { prefs.edit().putString(PREF_FLOW_ACCOUNTS, JSONArray(flowAccounts).toString()).apply() }
+    LaunchedEffect(selectedFlowAccount) { prefs.edit().putString(PREF_FLOW_SELECTED_ACCOUNT, selectedFlowAccount).apply() }
 
     fun runAsync(block: suspend () -> String) {
         if (busy) return
@@ -497,7 +553,8 @@ private fun FlowBridgeScreen() {
                             val response = apiPost(context, "pair_exchange", JSONObject()
                                 .put("pairing_code", pairingCode)
                                 .put("device_name", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL)
-                                .put("app_version", BuildConfig.VERSION_NAME))
+                                .put("app_version", BuildConfig.VERSION_NAME)
+                                .put("app_package", BuildConfig.APPLICATION_ID))
                             val token = response.getString("device_token")
                             DeviceTokenVault.write(context, token, response.getString("intake_token"))
                             paired = true
@@ -510,7 +567,8 @@ private fun FlowBridgeScreen() {
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(enabled = !busy, onClick = { runAsync {
-                            apiPost(context, "device_health", JSONObject().put("app_version", BuildConfig.VERSION_NAME))
+                            apiPost(context, "device_health", JSONObject().put("app_version", BuildConfig.VERSION_NAME)
+                                .put("app_package", BuildConfig.APPLICATION_ID))
                             var processed = 0
                             for (index in 0 until 6) {
                                 val job = apiPost(context, "poll_jobs", JSONObject()).optJSONObject("job") ?: break
@@ -556,9 +614,14 @@ private fun FlowBridgeScreen() {
                 Button(
                     onClick = {
                         try {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://labs.google/fx/tools/flow")))
-                            lastAction = "تم فتح Google Flow. سجّل الدخول بحساب Flow المصرح به على الهاتف."
-                        } catch (_: Exception) { lastAction = "تعذر فتح Google Flow." }
+                            val launch = context.packageManager.getLaunchIntentForPackage(FLOW_APP_PACKAGE)
+                            if (launch == null) {
+                                lastAction = "تطبيق Google Flow الأصلي غير ظاهر على الهاتف؛ لم نفتح Chrome كبديل."
+                            } else {
+                                context.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                                lastAction = "تم فتح تطبيق Google Flow الأصلي على الهاتف."
+                            }
+                        } catch (_: Exception) { lastAction = "تعذر فتح تطبيق Google Flow الأصلي." }
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("فتح Google Flow") }
