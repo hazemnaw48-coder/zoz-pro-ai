@@ -311,20 +311,33 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0, resumeRevis
                                 status = "تم فتح تطبيق Google Flow الأصلي على الهاتف."
                             }
                         }, modifier = Modifier.fillMaxWidth()) { Text("فتح تطبيق Google Flow الأصلي") }
-                        Button(enabled = !busy && paired && FlowAutomationService.isEnabled(context), onClick = { runAsync {
-                            val token = DeviceTokenVault.read(context)
-                                ?: throw IllegalStateException("الجهاز غير مقرون.")
-                            val queued = apiPostWithToken("request_flow_control_diagnostic",
-                                JSONObject().put("flow_account_email", selectedFlowAccount), token)
-                            val queuedId = queued.optString("job_id")
-                            if (queuedId.isBlank()) throw IllegalStateException("لم يُرجع الخادم معرّف اختبار.")
-                            val claimed = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job")
-                                ?: throw IllegalStateException("وصل طلب الاختبار إلى الخادم، لكن الهاتف لم يستلم المهمة بعد.")
-                            if (claimed.optString("id") != queuedId) {
-                                throw IllegalStateException("استلم الهاتف مهمة أخرى؛ أوقف اختبار Flow لتجنب تنفيذ مهمة غير مقصودة.")
+                        Button(enabled = !busy && paired && FlowAutomationService.isEnabled(context), onClick = {
+                            val launch = context.packageManager.getLaunchIntentForPackage(FLOW_APP_PACKAGE)
+                            if (launch == null) {
+                                status = "تعذر العثور على تطبيق Google Flow الأصلي في قائمة تطبيقات Android؛ لم يتم فتح Chrome بديلًا عنه."
+                            } else {
+                                try {
+                                    context.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                                    status = "تم طلب فتح تطبيق Google Flow الأصلي؛ يجري الآن تجهيز اختبار الكتابة الآمن."
+                                    runAsync {
+                                        val token = DeviceTokenVault.read(context)
+                                            ?: throw IllegalStateException("الجهاز غير مقرون.")
+                                        val queued = apiPostWithToken("request_flow_control_diagnostic",
+                                            JSONObject().put("flow_account_email", selectedFlowAccount), token)
+                                        val queuedId = queued.optString("job_id")
+                                        if (queuedId.isBlank()) throw IllegalStateException("لم يُرجع الخادم معرّف اختبار.")
+                                        val claimed = apiPostWithToken("poll_jobs", JSONObject(), token).optJSONObject("job")
+                                            ?: throw IllegalStateException("تم فتح Flow، لكن الهاتف لم يستلم مهمة اختبار الكتابة بعد.")
+                                        if (claimed.optString("id") != queuedId) {
+                                            throw IllegalStateException("تم فتح Flow، لكن استلم الهاتف مهمة أخرى؛ أوقفت الاختبار لتجنب تنفيذ مهمة غير مقصودة.")
+                                        }
+                                        withContext(Dispatchers.Main) { executeJob(context, claimed) }
+                                    }
+                                } catch (e: Exception) {
+                                    status = "تعذر فتح تطبيق Google Flow: ${e.message ?: "خطأ Android غير معروف"}"
+                                }
                             }
-                            withContext(Dispatchers.Main) { executeJob(context, claimed) }
-                        } }, modifier = Modifier.fillMaxWidth()) { Text("فتح Flow واختبار التحكم الفعلي") }
+                        }, modifier = Modifier.fillMaxWidth()) { Text("فتح Flow واختبار التحكم الفعلي") }
                     }
                 }
 
