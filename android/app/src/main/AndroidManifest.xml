@@ -12,7 +12,7 @@
     </queries>
     <application
         android:allowBackup="false"
-        android:label="ZOZ Pro Flow Operator 0.9.4"
+        android:label="ZOZ Pro Flow Operator 0.9.5"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
