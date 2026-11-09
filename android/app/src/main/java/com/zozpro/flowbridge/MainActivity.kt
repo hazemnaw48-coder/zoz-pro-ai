@@ -1473,6 +1473,9 @@ private fun documentMimeType(context: Context, uri: Uri, filename: String): Stri
         "png" -> "image/png"
         "jpg", "jpeg" -> "image/jpeg"
         "webp" -> "image/webp"
+        "mp4" -> "video/mp4"
+        "webm" -> "video/webm"
+        "mov" -> "video/quicktime"
         else -> ""
     }
     val detected = runCatching { context.contentResolver.getType(uri) }.getOrNull()?.lowercase(Locale.ROOT).orEmpty()
@@ -1495,7 +1498,8 @@ fun findLocalDownloadForAgent(payload: JSONObject): File {
     val allowed = if (kind == "video") {
         setOf("mp4", "mov", "webm", "mkv")
     } else if (kind == "document") {
-        setOf("csv", "xlsx", "xls", "pdf", "txt", "docx", "png", "jpg", "jpeg", "webp")
+        val documents = setOf("csv", "xlsx", "xls", "pdf", "txt", "docx", "png", "jpg", "jpeg", "webp")
+        if (payload.optString("purpose", "document") == "ad_asset") documents + setOf("mp4", "webm", "mov") else documents
     } else {
         throw IllegalArgumentException("نوع الملف المطلوب غير مدعوم.")
     }
@@ -1549,7 +1553,13 @@ fun sha256LocalFile(file: File): String {
     return digest.digest().joinToString("") { "%02x".format(it) }
 }
 
-fun uploadDocumentToIntake(context: Context, uri: Uri, appVersion: String): String {
+fun uploadDocumentToIntake(
+    context: Context,
+    uri: Uri,
+    appVersion: String,
+    purpose: String = "document",
+    creativeId: String = ""
+): String {
     val deviceToken = DeviceTokenVault.read(context)?.takeIf { it.length >= 40 }
         ?: throw IllegalStateException("الجهاز غير مرتبط بالوكيل.")
     val filename = queryName(context, uri)?.take(180)?.takeIf { it.isNotBlank() }
@@ -1557,16 +1567,28 @@ fun uploadDocumentToIntake(context: Context, uri: Uri, appVersion: String): Stri
     val size = querySize(context, uri)
     if (size <= 0L || size > 25L * 1024L * 1024L) throw IllegalStateException("حجم الملف غير صالح أو يتجاوز 25 ميجابايت.")
     val mime = documentMimeType(context, uri, filename)
-    val allowed = setOf("text/csv", "application/csv", "text/plain", "application/pdf",
+    val baseAllowed = setOf("text/csv", "application/csv", "text/plain", "application/pdf",
         "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "image/png", "image/jpeg", "image/webp")
-    if (mime !in allowed) throw IllegalStateException("صيغة الملف غير مدعومة. استخدم CSV أو Excel أو PDF أو TXT أو DOCX أو PNG/JPG/WebP.")
-    val prepared = apiPostWithToken("document_intake_create", JSONObject()
+    val adMediaAllowed = setOf("video/mp4", "video/webm", "video/quicktime")
+    if (purpose !in setOf("document", "ad_asset")) throw IllegalArgumentException("intake_purpose_not_allowed")
+    val allowed = if (purpose == "ad_asset") baseAllowed + adMediaAllowed else baseAllowed
+    if (mime !in allowed) throw IllegalStateException(
+        if (purpose == "ad_asset") "صيغة الملف غير مدعومة. استخدم PNG أو JPG أو WebP أو MP4 أو WebM أو MOV."
+        else "صيغة الملف غير مدعومة. استخدم CSV أو Excel أو PDF أو TXT أو DOCX أو PNG/JPG/WebP."
+    )
+    if (purpose == "ad_asset" && !creativeId.matches(Regex("^[0-9a-fA-F-]{36}$"))) {
+        throw IllegalArgumentException("creative_id_required_for_ad_asset")
+    }
+    val createBody = JSONObject()
         .put("filename", filename)
         .put("mime_type", mime)
         .put("file_size", size)
-        .put("app_version", appVersion), deviceToken)
+        .put("app_version", appVersion)
+        .put("purpose", purpose)
+    if (purpose == "ad_asset") createBody.put("creative_id", creativeId)
+    val prepared = apiPostWithToken("document_intake_create", createBody, deviceToken)
     val assetId = prepared.optString("asset_id")
     val uploadUrl = prepared.optString("upload_url")
     if (assetId.length < 30 || !uploadUrl.startsWith("https://oxyzxbkwhafzaztraowc.supabase.co/storage/v1/object/upload/sign/"))
@@ -1599,7 +1621,11 @@ fun uploadDocumentToIntake(context: Context, uri: Uri, appVersion: String): Stri
     val finalized = apiPostWithToken("document_intake_finalize",
         JSONObject().put("asset_id", assetId).put("checksum_sha256", checksum), deviceToken)
     if (finalized.optString("status") != "ready") throw IllegalStateException("تم نقل الملف لكن الخادم لم يؤكد اكتمال الاستقبال.")
-    return "تم استيراد الملف بنجاح إلى ذاكرة ZOZ Pro.\nالملف: $filename\nالحجم: $sent بايت\nبصمة SHA-256: $checksum\nالحالة: محفوظ بأمان وينتظر تحليل الوكيل."
+    return if (purpose == "ad_asset") {
+        "تم استقبال مادة الإعلان بنجاح في مساحة ZOZ الخاصة.\\nالملف: $filename\\nالحجم: $sent بايت\\nبصمة SHA-256: $checksum\\nالمرجع الإعلاني: $creativeId\\nالحالة: محفوظة للاستخدام داخل مسودة الإعلان فقط."
+    } else {
+        "تم استيراد الملف بنجاح إلى ذاكرة ZOZ Pro.\\nالملف: $filename\\nالحجم: $sent بايت\\nبصمة SHA-256: $checksum\\nالحالة: محفوظ بأمان وينتظر تحليل الوكيل."
+    }
 }
 
 private fun apiPost(context: Context, action: String, body: JSONObject): JSONObject {
