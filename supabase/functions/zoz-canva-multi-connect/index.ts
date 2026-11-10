@@ -26,6 +26,7 @@ Deno.serve(async(req:Request)=>{
    if(!account)return reply({ok:false,error:"Choose one of the three configured Canva account slots."},400);
    const c=await rpc("zoz_canva_get_account_client_credentials",{p_owner_id:OWNER,p_account_key:account});
    if(!c?.client_id||!c?.client_secret)return reply({ok:false,error:"Canva Developer Client ID/Secret are not configured. Save credentials for this account or the shared app first."},409);
+   if(!String(c.client_secret).startsWith("cnvca"))return reply({ok:false,error:"Stored Canva Client Secret is invalid: it does not have Canva secret format (cnvca...). Replace the shared Client Secret in ZOZ Pro with the Client Secret copied from Canva Developer > Outside Canva > Configuration > Credentials. Do not use the redirect URL or Client ID."},409);
    const verifier=random(48),state=random(32),challenge=await sha(verifier);
    await rpc("zoz_canva_store_account_oauth_state",{p_owner_id:OWNER,p_account_key:account,p_state_hash:await sha(state),p_code_verifier:verifier,p_redirect_uri:REDIRECT,p_expires_at:new Date(Date.now()+10*60*1000).toISOString()});
    const scopes="design:meta:read design:content:write asset:write profile:read";
@@ -41,11 +42,12 @@ Deno.serve(async(req:Request)=>{
    if(!row?.owner_id||row.owner_id!==OWNER||!account||row.redirect_uri!==REDIRECT)return reply({ok:false,error:"Invalid, expired, or already used OAuth state"},400);
    const c=await rpc("zoz_canva_get_account_client_credentials",{p_owner_id:OWNER,p_account_key:account});
    if(!c?.client_id||!c?.client_secret)return reply({ok:false,error:"Canva application credentials missing for this account"},409);
+   if(!String(c.client_secret).startsWith("cnvca"))return html("بيانات Canva غير صحيحة","الـ Client Secret المحفوظ في ZOZ Pro ليس بصيغة Canva الصحيحة. استبدله بالسر الذي يبدأ بـ cnvca من Canva Developer ثم أعد الربط.");
    const basic=btoa(c.client_id+":"+c.client_secret);
    const body=new URLSearchParams({grant_type:"authorization_code",code,code_verifier:row.code_verifier,redirect_uri:REDIRECT});
    const tr=await fetch("https://api.canva.com/rest/v1/oauth/token",{method:"POST",headers:{authorization:"Basic "+basic,"content-type":"application/x-www-form-urlencoded",accept:"application/json"},body});
    const td=await tr.json().catch(()=>({}));
-   if(!tr.ok||!td.access_token||!td.refresh_token)return reply({ok:false,error:"Canva token exchange failed: "+String(td.message||td.code||tr.status)},502);
+   if(!tr.ok||!td.access_token||!td.refresh_token)return html("تعذر إكمال تفويض Canva","رفض Canva تبادل رمز التفويض (HTTP "+tr.status+"). رمز الخطأ: "+String(td.code||"غير متاح").replace(/[<>&"]/g,"")+" · "+String(td.message||"لا توجد رسالة إضافية").replace(/[<>&"]/g,""));
    const tokenBundle={access_token:td.access_token,refresh_token:td.refresh_token,expires_at:new Date(Date.now()+Number(td.expires_in||14400)*1000).toISOString(),scope:td.scope||"design:meta:read design:content:write asset:write profile:read",account_key:account,updated_at:new Date().toISOString()};
    await rpc("zoz_canva_store_account_oauth_tokens",{p_owner_id:OWNER,p_account_key:account,p_secret:JSON.stringify(tokenBundle)});
    return html("تم حفظ تفويض Canva بنجاح","تم ربط حساب "+LABELS[account]+" وتخزين رموزه بصورة مستقلة. ارجع إلى لوحة الربط واختبر الحساب.");
