@@ -100,7 +100,7 @@ async function publishCreative(t:any,input:any,k:string){
 Deno.serve(async(req:Request)=>{if(req.method==="OPTIONS")return new Response("ok",{headers:cors});if(req.method!=="POST")return json({ok:false,error:"POST required"},405);if(!await who(req))return json({ok:false,error:"Owner authentication required"},401);
 try{
  const body=await req.json().catch(()=>({})),action=String(body.action||"test_connection"),requested=String(body.account_key||"");
- if(!["test_connection","list_designs","publish_creative","account_status"].includes(action))return json({ok:false,error:"Action not allowlisted"},403);
+ if(!["test_connection","list_designs","publish_creative","account_status","image_generation_capabilities","generate_image","get_image_generation_job"].includes(action))return json({ok:false,error:"Action not allowlisted"},403);
  if(action==="image_generation_capabilities"){
   const k=ACCOUNTS.includes(requested)?requested:null;
   if(!k)return json({ok:false,error:"account_key must be one of the three configured accounts"},400);
