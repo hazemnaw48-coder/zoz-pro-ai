@@ -8,7 +8,7 @@ const OWNER_EMAIL="hazemnaw48@gmail.com";
 const SESSION_KEY="zoz_canva_owner_session_v2";
 const $=id=>document.getElementById(id);
 const accounts=[["zoz_hazem","ZOZ Hazem"],["hazem_now","Hazem Now"],["zoz_manager","ZOZ Manager"]];
-let busy=false;
+let busy=false;let accountStates={};
 function say(id,message,kind=""){const el=$(id);if(!el)return;el.textContent=message;el.className=(id==="loginmsg"?"status ":"")+(kind||"");}
 function showLogin(){ $("app").classList.add("hidden");$("login").classList.remove("hidden"); }
 function parseResponse(response){return response.text().then(raw=>{let d={};try{d=raw?JSON.parse(raw):{}}catch(_){d={message:raw.slice(0,500)}}if(!response.ok)throw new Error(d.msg||d.message||d.error_description||d.error||("HTTP "+response.status));return d;});}
@@ -56,7 +56,22 @@ async function handleMagicCallback(){
  return true;
 }
 function renderAccounts(){
- $("accounts").innerHTML=accounts.map(([k,label])=>'<section class="card" data-account="'+k+'"><h2>'+label+'</h2><p class="muted">اتصال مستقل لهذا الحساب. اترك بيانات التطبيق فارغة عند استخدام تطبيق Canva مشترك سبق حفظه.</p><label for="'+k+'_id">Client ID بديل لهذا الحساب فقط (اختياري)</label><input id="'+k+'_id" autocomplete="off" placeholder="اتركه فارغًا لاستخدام التطبيق المشترك"><label for="'+k+'_secret">Client Secret البديل لهذا الحساب (اختياري)</label><input id="'+k+'_secret" type="password" autocomplete="new-password" placeholder="اتركه فارغًا لاستخدام التطبيق المشترك"><button type="button" data-action="save" data-key="'+k+'">حفظ بيانات تطبيق بديلة لهذا الحساب</button><button type="button" data-action="auth" data-key="'+k+'">ربط حساب Canva</button><button type="button" data-action="test" data-key="'+k+'">اختبار الاتصال</button><button type="button" data-action="list" data-key="'+k+'">قراءة التصاميم</button><p id="'+k+'_msg" class="muted status" role="status" aria-live="polite">بانتظار الفحص</p></section>').join("");
+ $("accounts").innerHTML=accounts.map(([k,label])=>'<section class="card" data-account="'+k+'"><h2>'+label+'</h2><p class="muted">اتصال مستقل لهذا الحساب. اترك بيانات التطبيق فارغة عند استخدام تطبيق Canva مشترك سبق حفظه.</p><label for="'+k+'_id">Client ID بديل لهذا الحساب فقط (اختياري)</label><input id="'+k+'_id" autocomplete="off" placeholder="اتركه فارغًا لاستخدام التطبيق المشترك"><label for="'+k+'_secret">Client Secret البديل لهذا الحساب (اختياري)</label><input id="'+k+'_secret" type="password" autocomplete="new-password" placeholder="اتركه فارغًا لاستخدام التطبيق المشترك"><button type="button" data-action="save" data-key="'+k+'">حفظ بيانات تطبيق بديلة لهذا الحساب</button><button type="button" data-action="auth" data-key="'+k+'" disabled>ربط حساب Canva</button><button type="button" data-action="test" data-key="'+k+'" disabled>اختبار الاتصال</button><button type="button" data-action="list" data-key="'+k+'" disabled>قراءة التصاميم</button><p id="'+k+'_msg" class="muted status" role="status" aria-live="polite">بانتظار الفحص</p></section>').join("");
+}
+function updateAccountControls(rows){
+ accountStates={};for(const a of rows||[])accountStates[a.account_key]=a;
+ for(const [k] of accounts){
+  const a=accountStates[k]||{},card=$('accounts').querySelector('[data-account="'+k+'"]');if(!card)continue;
+  const auth=card.querySelector('[data-action="auth"]'),test=card.querySelector('[data-action="test"]'),list=card.querySelector('[data-action="list"]');
+  auth.disabled=!a.client_credentials_configured;
+  test.disabled=!a.oauth_connected;
+  list.disabled=!a.oauth_connected;
+  const msg=$(k+"_msg");
+  if(!a.client_credentials_configured)msg.textContent="الخطوة 1: احفظ تطبيق Canva المشترك بالأعلى أو بيانات تطبيق بديلة لهذا الحساب.";
+  else if(!a.oauth_connected)msg.textContent="الخطوة 2: اضغط ربط حساب Canva ووافق على الصلاحيات.";
+  else if(a.token_expired)msg.textContent="رمز OAuth منتهي؛ سيتم تجديده تلقائيًا عند الاختبار.";
+  else msg.textContent="جاهز للاختبار وقراءة التصاميم.";
+ }
 }
 $("shared_save").addEventListener("click",async()=>{
  const b=$("shared_save");if(busy)return;busy=true;b.disabled=true;
@@ -73,7 +88,7 @@ $("shared_save").addEventListener("click",async()=>{
  finally{busy=false;b.disabled=false;}
 });
 async function checkAccounts(){
- try{const d=await invoke("zoz-canva-multi-adapter",{action:"account_status"});$("status").textContent=(d.accounts||[]).map(a=>a.account_label+": "+(a.client_credentials_configured?"بيانات التطبيق محفوظة":"بيانات التطبيق غير محفوظة")+" · "+(a.oauth_connected?"OAuth مربوط":"OAuth غير مربوط")+(a.token_expired?" · الرمز منتهي":"")).join("\n")||"لم يرجع الخادم حالة الحسابات.";}
+ try{const d=await invoke("zoz-canva-multi-adapter",{action:"account_status"});updateAccountControls(d.accounts||[]);$("status").textContent=(d.accounts||[]).map(a=>a.account_label+": "+(a.client_credentials_configured?"بيانات التطبيق محفوظة":"بيانات التطبيق غير محفوظة")+" · "+(a.oauth_connected?"OAuth مربوط":"OAuth غير مربوط")+(a.token_expired?" · الرمز منتهي":"")).join("\n")||"لم يرجع الخادم حالة الحسابات.";}
  catch(e){$("status").textContent="فشل فحص الحسابات: "+e.message;}
 }
 async function showApp(){renderAccounts();$("login").classList.add("hidden");$("app").classList.remove("hidden");await checkAccounts();}
@@ -100,7 +115,10 @@ $("signin").addEventListener("click",async()=>{
 $("accounts").addEventListener("click",async ev=>{
  const b=ev.target.closest("button[data-action]");if(!b)return;
  const k=b.dataset.key,a=b.dataset.action,pair=accounts.find(x=>x[0]===k),label=pair?pair[1]:k;
- const msg=$(k+"_msg");b.disabled=true;msg.textContent="جارٍ التنفيذ…";
+ const msg=$(k+"_msg");
+ if(a==="auth"&&!accountStates[k]?.client_credentials_configured){msg.textContent="احفظ بيانات تطبيق Canva أولًا؛ لا يمكن بدء OAuth قبل ذلك.";return;}
+ if((a==="test"||a==="list")&&!accountStates[k]?.oauth_connected){msg.textContent="هذا ليس خطأ كلمة مرور. اربط حساب Canva ووافق على OAuth أولًا؛ بعدها يتاح الاختبار وقراءة التصاميم.";return;}
+ b.disabled=true;msg.textContent="جارٍ التنفيذ…";
  try{
   if(a==="save"){
    const id=$(k+"_id").value.trim(),secret=$(k+"_secret").value.trim();
