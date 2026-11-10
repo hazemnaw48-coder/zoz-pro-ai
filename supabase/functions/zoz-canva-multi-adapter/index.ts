@@ -105,7 +105,7 @@ try{
   const k=ACCOUNTS.includes(requested)?requested:null;
   if(!k)return json({ok:false,error:"account_key must be one of the three configured accounts"},400);
   const {token}=await resolveCanvaAccount(k);
-  if(!String(token.scope||"").split(/\\s+/).includes("profile:read"))return json({ok:false,error:"يحتاج فحص إمكانات Canva إلى صلاحية profile:read. أعد تفويض هذا الحساب من لوحة ربط Canva بعد تحديث الصلاحيات.",reauthorization_required:true,required_scope:"profile:read"},409);
+  if(!String(token.scope||"").split(/\s+/).includes("profile:read"))return json({ok:false,error:"يحتاج فحص إمكانات Canva إلى صلاحية profile:read. أعد تفويض هذا الحساب من لوحة ربط Canva بعد تحديث الصلاحيات.",reauthorization_required:true,required_scope:"profile:read"},409);
   try{
    const result=await getImageCapabilities(token);
    return json({ok:true,account_key:k,account_label:LABELS[k],...result,scope_ready:true,generation_cost_notice:"إنشاء الصورة يستهلك رصيد Canva AI للحساب المختار؛ فحص الإمكانية لا يستهلك رصيدًا."});
