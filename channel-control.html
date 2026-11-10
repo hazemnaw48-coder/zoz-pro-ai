@@ -2710,11 +2710,11 @@ async function adCanvaConnect(){
  const b=adEl('ad-canva-connect');if(b)b.disabled=true;
  try{
   const session=await ownerSession();
-  const endpoint=SUPABASE_URL+'/functions/v1/zoz-canva-connect';
+  const endpoint=SUPABASE_URL+'/functions/v1/zoz-canva-multi-connect';
   let response,data,lastError;
   for(let attempt=0;attempt<2;attempt++){
    try{
-    response=await fetch(endpoint,{method:'POST',mode:'cors',cache:'no-store',headers:{'content-type':'application/json','apikey':SUPABASE_PUBLISHABLE_KEY,'authorization':'Bearer '+session.access_token},body:JSON.stringify({action:'authorize'}),signal:AbortSignal.timeout(30000)});
+    response=await fetch(endpoint,{method:'POST',mode:'cors',cache:'no-store',headers:{'content-type':'application/json','apikey':SUPABASE_PUBLISHABLE_KEY,'authorization':'Bearer '+session.access_token},body:JSON.stringify({account_key:adVal('ad-canva-account')||'hazem_now'}),signal:AbortSignal.timeout(30000)});
     data=await response.json().catch(()=>({}));
     if(response.ok&&data?.authorization_url)break;
     throw new Error(data?.error||('خدمة Canva أعادت HTTP '+response.status));
