@@ -582,7 +582,28 @@ body.upload-mode .footer{font-size:11px}
     <label for="ad-logo">شعار علامتك التجارية (اختياري)</label><input id="ad-logo" type="file" accept="image/png,image/jpeg,image/webp">
     <label for="ad-image-starches">صورة حقيقية لأطباق قسم النشويات (اختياري)</label><input id="ad-image-starches" type="file" accept="image/png,image/jpeg,image/webp">
     <label for="ad-image-butcher">صورة حقيقية لقطع اللحوم أو قسم الجزارة (اختياري)</label><input id="ad-image-butcher" type="file" accept="image/png,image/jpeg,image/webp">
-    <p class="small">المحرك لا ينشئ صورًا بالذكاء الاصطناعي: يستخدم الصورة الأصلية التي ترفعها، ويصمم حولها العناوين والخطوط والألوان والأشكال والشرائط والعناصر المتجهة. عند عدم وجود صورة، يظهر رسم توضيحي متجهي واضح وليس صورة فوتوغرافية مزيفة.</p>
+    <section class="notice" style="margin-top:12px">
+     <strong>توليد الصور بالذكاء الاصطناعي — Canva</strong>
+     <p class="small">اختر حساب Canva، واربط الصورة بتصميم محفوظ، ثم اكتب وصف الصورة. التوليد يستهلك رصيد AI الخاص بحساب Canva؛ لا يبدأ إلا بعد تأكيدك في كل مرة. بعد اكتماله تحفظ الصورة في مساحة ZOZ الخاصة وتظهر في معاينة التصميم.</p>
+     <div class="grid-2">
+      <div><label for="ad-canva-account">حساب Canva المستخدم</label><select id="ad-canva-account"><option value="zoz_hazem">ZOZ Hazem</option><option value="hazem_now" selected>Hazem Now</option><option value="zoz_manager">ZOZ Manager</option></select></div>
+      <div><label for="ad-canva-target">التصميم الذي ستُربط به الصورة</label><select id="ad-canva-target"><option value="">تحميل التصميمات…</option></select></div>
+     </div>
+     <label for="ad-canva-prompt">وصف الصورة المطلوب توليدها</label><textarea id="ad-canva-prompt" rows="3" placeholder="مثال: صورة إعلانية واقعية لطبق مكرونة... بدون كتابة أو شعارات، إضاءة احترافية وتكوين مناسب للإعلان."></textarea>
+     <div class="grid-2">
+      <div><label for="ad-canva-ratio">مقاس الصورة</label><select id="ad-canva-ratio"><option value="portrait_4_5">منشور 4:5</option><option value="portrait">عمودي 9:16</option><option value="square">مربع 1:1</option><option value="landscape">أفقي 16:9</option><option value="portrait_3_4">عمودي 3:4</option></select></div>
+      <div><label for="ad-canva-model">محرك الصورة</label><select id="ad-canva-model"><option value="auto">اختيار تلقائي (موصى به)</option><option value="craft_v1_2k">CRAFT 2K</option><option value="z_image_turbo">Z Image Turbo</option><option value="lucid_origin">Lucid Origin</option></select></div>
+     </div>
+     <label><input id="ad-canva-credit-confirm" type="checkbox"> أؤكد أن بدء التوليد قد يستهلك رصيد AI في حساب Canva المختار.</label>
+     <div class="actions">
+      <button id="ad-canva-check" class="secondary" type="button">فحص إمكانات الحساب</button>
+      <button id="ad-canva-generate" type="button">✦ توليد الصورة وربطها بالتصميم</button>
+      <button id="ad-canva-poll" class="secondary" type="button" disabled>تحديث حالة التوليد</button>
+      <a href="https://hazemnaw48-coder.github.io/zoz-pro-ai/canva-connect.html" target="_blank" rel="noopener">إدارة وربط حسابات Canva الثلاثة</a>
+     </div>
+     <div id="ad-canva-status" class="small" role="status" aria-live="polite">لم يبدأ أي توليد. يمكنك متابعة التصميم اليدوي والرفع من الهاتف دون Canva.</div>
+    </section>
+    <p class="small">يدعم المركز مسارين متكاملين: توليد الصورة عبر Canva بعد ربط الحساب وتأكيد الرصيد، أو رفع صورة/شعار يدويًا. ثم يبني ZOZ التصميم بطبقاته القابلة للتعديل ويصدر PNG بأربعة مقاسات.</p>
     <div class="actions"><button id="ad-preset-starches" class="secondary">تهيئة إعلان النشويات</button><button id="ad-preset-butcher" class="secondary">تهيئة إعلان الجزارة واللحوم</button><button id="ad-create-pair">✦ إنشاء الإعلانين وحفظ 8 مقاسات</button></div>
     <div class="actions"><button id="ad-generate-complete">✦ بناء التصميم من الطبقات الحالية</button><button id="ad-auto-production">⚙ تصميم وحفظ المقاسات الأربع للقسم الحالي</button><button id="ad-generate-copy" class="secondary">اقتراح نصوص إعلانية بالذكاء الاصطناعي (اختياري)</button><button id="ad-render" class="secondary">تحديث المعاينة وفحص الجودة</button></div>
     <div id="ad-status" class="notice">أدخل موجز النشاط ثم أنشئ الإعلان كاملاً. يمكنك تعديل كل النصوص قبل الحفظ.</div>
@@ -683,7 +704,7 @@ function showPage(pageKey, scrollTop=true){
  if(indicator)indicator.textContent='القسم الحالي: '+label+' · '+step+' من '+tabs.length;
  if(scrollTop)window.scrollTo(0,0);
 }
-function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage(uploadMode?'intake':(requestedPage==='tiktok'?'tiktok':(requestedPage==='ads'?'ads':(requestedPage==='books'?'books':'connection'))),false);notice('intake-msg',uploadMode?'الجلسة متصلة. اختر ملف الفيديو ثم اضغط «رفع الفيديو للمراجعة والنشر».':'جلسة المالك متصلة بمشروع الإنتاج.','good');if(!uploadMode){if(requestedPage==='tiktok')loadTikTokAccounts();else{loadManagedChannels();loadHFProviderStatus();}if(requestedPage==='ads'){adRender();adQualityCheck();adCheckHealth();adLoadSaved();}if(requestedPage==='books'){loadBooksDashboard();kdpDocRefresh();}setTimeout(()=>processPendingKdpReportsOnLogin(),900);if(automaticAmazonExcelRequest&&!automaticAmazonExcelStarted){automaticAmazonExcelStarted=true;setTimeout(()=>queueLatestAmazonExcelFromPhone(true),250);}}}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
+function setSigned(on){$('workspace').classList.toggle('hidden',!on);$('logout').classList.toggle('hidden',!on);$('login').classList.toggle('hidden',on);$('password').classList.toggle('hidden',on);$('login-pill').textContent=on?'جلسة المالك متصلة':'غير متصل';if(on){showPage(uploadMode?'intake':(requestedPage==='tiktok'?'tiktok':(requestedPage==='ads'?'ads':(requestedPage==='books'?'books':'connection'))),false);notice('intake-msg',uploadMode?'الجلسة متصلة. اختر ملف الفيديو ثم اضغط «رفع الفيديو للمراجعة والنشر».':'جلسة المالك متصلة بمشروع الإنتاج.','good');if(!uploadMode){if(requestedPage==='tiktok')loadTikTokAccounts();else{loadManagedChannels();loadHFProviderStatus();}if(requestedPage==='ads'){adRender();adQualityCheck();adCheckHealth();adLoadSaved();adCanvaLoadTargets();}if(requestedPage==='books'){loadBooksDashboard();kdpDocRefresh();}setTimeout(()=>processPendingKdpReportsOnLogin(),900);if(automaticAmazonExcelRequest&&!automaticAmazonExcelStarted){automaticAmazonExcelStarted=true;setTimeout(()=>queueLatestAmazonExcelFromPhone(true),250);}}}else{notice('intake-msg','سجّل الدخول بحساب مالك ZOZ Pro لعرض ملفات الاستقبال.','warn');}}
 async function ownerSession(){
  const {data,error}=await getSessionSafely();if(error)throw error;const session=data&&data.session;
  if(!session||!session.access_token)throw new Error('لا توجد جلسة مالك محفوظة. سجّل الدخول بحساب مالك ZOZ Pro.');
@@ -2197,6 +2218,7 @@ checkZozAgentHealth();
 const AD_API=SUPABASE_URL+'/functions/v1/zoz-ad-studio';
 const AD_BUCKET='zoz-pro-ad-studio';
 let adImage=null, adLogo=null, adCopyPackage={}, adCurrentId=null;
+let adCanvaGeneration={jobId:null,creativeId:null,accountKey:null,idempotencyKey:null};
 const adEl=id=>document.getElementById(id);
 const adVal=id=>String(adEl(id)?.value||'').trim();
 const adThemes={
@@ -2595,6 +2617,75 @@ async function adRunFullProduction(){
  }catch(e){notice('ad-status','توقفت دورة الإنتاج بأمان: '+(e.message||String(e)),'warn');return false}
  finally{if(b)b.disabled=false}
 }
+function adCanvaStatus(message,kind='notice'){
+ const el=adEl('ad-canva-status');if(el){el.textContent=message;el.className='small '+kind}
+}
+async function adCanvaInvoke(body){
+ const session=await ownerSession();
+ const response=await fetch(SUPABASE_URL+'/functions/v1/zoz-canva-multi-adapter',{
+  method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,authorization:'Bearer '+session.access_token,'content-type':'application/json'},
+  body:JSON.stringify(body),signal:AbortSignal.timeout(65000)
+ });
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok||!data.ok)throw new Error(data.error||('Canva adapter HTTP '+response.status));
+ return data;
+}
+async function adCanvaLoadTargets(){
+ const select=adEl('ad-canva-target');if(!select)return;
+ select.innerHTML='<option value="">جارٍ تحميل التصميمات…</option>';
+ try{
+  const {data:{user},error:userError}=await sb.auth.getUser();if(userError||!user?.id)throw userError||new Error('جلسة المالك غير جاهزة.');
+  const {data,error}=await sb.from('zoz_pro_ad_creatives').select('id,title,format_key,created_at').eq('owner_id',user.id).order('updated_at',{ascending:false}).limit(50);
+  if(error)throw error;
+  select.innerHTML='';
+  (data||[]).forEach(row=>{const option=document.createElement('option');option.value=row.id;option.textContent=row.title+' · '+row.format_key+' · '+new Date(row.created_at).toLocaleDateString('ar-EG');select.appendChild(option)});
+  if(!select.options.length)select.innerHTML='<option value="">احفظ تصميمًا أولًا</option>';
+ }catch(e){select.innerHTML='<option value="">تعذر تحميل التصميمات</option>';adCanvaStatus('تعذر تحميل قائمة التصميمات: '+(e.message||String(e)),'bad')}
+}
+async function adCanvaCheckCapabilities(){
+ const button=adEl('ad-canva-check');if(button)button.disabled=true;
+ try{
+  const account=adVal('ad-canva-account');
+  const data=await adCanvaInvoke({action:'image_generation_capabilities',account_key:account});
+  const has=!!data.image_generation;
+  adCanvaStatus(has?'الحساب '+data.account_label+' مؤهل لتوليد الصور. لا يستهلك هذا الفحص رصيدًا.':'الحساب متصل لكن لا يملك صلاحية image_generation حاليًا.',''+(has?'good':'warn'));
+  return has;
+ }catch(e){adCanvaStatus((e.message||String(e))+' إذا طُلبت صلاحية profile:read، أعد تفويض الحساب من لوحة Canva.','bad');return false}
+ finally{if(button)button.disabled=false}
+}
+async function adCanvaGenerateImage(){
+ const button=adEl('ad-canva-generate');if(button)button.disabled=true;
+ try{
+  const account=adVal('ad-canva-account'),creativeId=adVal('ad-canva-target'),prompt=adVal('ad-canva-prompt');
+  if(!creativeId)throw new Error('اختر تصميمًا محفوظًا أولًا حتى تُربط الصورة بسجل صحيح.');
+  if(!prompt)throw new Error('اكتب وصف الصورة قبل التوليد.');
+  if(!adEl('ad-canva-credit-confirm')?.checked)throw new Error('أكد استهلاك رصيد Canva AI قبل بدء التوليد.');
+  if(!adCanvaGeneration.idempotencyKey)adCanvaGeneration.idempotencyKey=crypto.randomUUID();
+  adCanvaStatus('جارٍ إرسال طلب التوليد إلى Canva. لن يبدأ طلب ثانٍ تلقائيًا…','warn');
+  const data=await adCanvaInvoke({action:'generate_image',account_key:account,creative_id:creativeId,prompt,aspect_ratio:adVal('ad-canva-ratio'),model:adVal('ad-canva-model'),idempotency_key:adCanvaGeneration.idempotencyKey,owner_confirmed_ai_credits:true});
+  adCanvaGeneration={jobId:data.job_id,creativeId,accountKey:account,idempotencyKey:adCanvaGeneration.idempotencyKey};
+  adEl('ad-canva-poll').disabled=false;
+  adCanvaStatus('بدأ التوليد. رقم المهمة: '+data.job_id+' · الحالة: '+data.status+' · قد استُخدم رصيد Canva AI. اضغط تحديث الحالة عند اكتمال التوليد.','warn');
+ }catch(e){adCanvaStatus('لم يبدأ التوليد أو تعذر تأكيده: '+(e.message||String(e)),'bad')}
+ finally{if(button)button.disabled=false}
+}
+async function adCanvaPollImage(){
+ const button=adEl('ad-canva-poll');if(button)button.disabled=true;
+ try{
+  const j=adCanvaGeneration;if(!j.jobId||!j.creativeId||!j.accountKey)throw new Error('لا توجد مهمة توليد محفوظة في هذه الجلسة.');
+  const data=await adCanvaInvoke({action:'get_image_generation_job',account_key:j.accountKey,creative_id:j.creativeId,job_id:j.jobId});
+  if(data.status==='in_progress'){adCanvaStatus('الصورة ما زالت قيد التوليد. لم ننشئ طلبًا جديدًا.','warn');return}
+  if(data.status==='failed'){adCanvaStatus('فشل التوليد: '+(data.error||data.error_code||'خطأ غير معروف')+'. يمكنك تعديل الوصف ثم بدء محاولة جديدة.','bad');adCanvaGeneration.idempotencyKey=null;return}
+  const path=data.generated_image?.storage_path;if(!path)throw new Error('اكتملت المهمة لكن لم يُرجع النظام مسار الصورة المحفوظة.');
+  const {data:blob,error}=await sb.storage.from(AD_BUCKET).download(path);if(error||!blob)throw error||new Error('تعذر تحميل الصورة المحفوظة من مساحة ZOZ.');
+  adImage=await adLoadImage(blob);
+  const section=adVal('ad-sector-template')||'generic';adLoadedAssetPaths[section]=path;adCurrentId=j.creativeId;
+  await adRender();adQualityCheck();
+  adCanvaStatus('اكتمل توليد الصورة وحُفظت في مساحة ZOZ الخاصة وربطت بالتصميم. المعاينة محدثة؛ احفظ حزمة المقاسات الأربع لإنشاء الإعلان النهائي.','good');
+  adCanvaGeneration.idempotencyKey=null;await adLoadSaved();await adCanvaLoadTargets();
+ }catch(e){adCanvaStatus('تعذر تحديث حالة الصورة: '+(e.message||String(e)),'bad')}
+ finally{if(button)button.disabled=!adCanvaGeneration.jobId}
+}
 async function adCanvaConnect(){
  const b=adEl('ad-canva-connect');if(b)b.disabled=true;
  try{
@@ -2718,6 +2809,10 @@ adEl('ad-preset-starches')?.addEventListener('click',async()=>{try{adApplyRestau
 adEl('ad-preset-butcher')?.addEventListener('click',async()=>{try{adApplyRestaurantPreset('butcher');await adLoadSectionImage();await adRender();adQualityCheck();notice('ad-status','تم تجهيز إعلان قسم الجزارة واللحوم للمراجعة والتعديل.','good')}catch(e){notice('ad-status',e.message||String(e),'bad')}});
 adEl('ad-create-pair')?.addEventListener('click',adCreateRestaurantPair);
 adEl('ad-canva-connect')?.addEventListener('click',adCanvaConnect);
+adEl('ad-canva-check')?.addEventListener('click',adCanvaCheckCapabilities);
+adEl('ad-canva-generate')?.addEventListener('click',adCanvaGenerateImage);
+adEl('ad-canva-poll')?.addEventListener('click',adCanvaPollImage);
+adEl('ad-canva-account')?.addEventListener('change',()=>{adCanvaGeneration={jobId:null,creativeId:null,accountKey:null,idempotencyKey:null};adEl('ad-canva-poll').disabled=true;adCanvaStatus('تم تغيير الحساب. افحص الصلاحيات قبل التوليد.','warn')});
 adEl('ad-canva-publish')?.addEventListener('click',adPublishLatestPack);
 adEl('ad-save')?.addEventListener('click',adSave);
 adEl('ad-refresh')?.addEventListener('click',adLoadSaved);
@@ -2737,7 +2832,7 @@ adEl('ad-logo')?.addEventListener('change',async e=>{const f=e.target.files?.[0]
 ['ad-image-starches','ad-image-butcher'].forEach(id=>adEl(id)?.addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{if(!/^image\/(png|jpeg|webp)$/.test(file.type))throw new Error('اختر PNG أو JPG أو WebP.');if(file.size>25*1024*1024)throw new Error('الصورة تتجاوز حد 25MB.');if(id===adCurrentImageInputId())adImage=await adLoadImage(file);await adRender();notice('ad-status','تم تحميل الصورة الأصلية للقسم. لن تُستخدم بدل صورة القسم الآخر.','good')}catch(err){notice('ad-status',err.message||'تعذر تحميل الصورة.','bad')}}));
 adEl('ad-copy-variants')?.addEventListener('click',e=>{const b=e.target.closest('[data-ad-variant]');if(!b)return;const v=adCopyPackage?.variants?.[Number(b.dataset.adVariant)];if(!v)return;adEl('ad-headline').value=v.headline||'';adEl('ad-body').value=v.primary_text||'';adEl('ad-cta').value=v.call_to_action||'';adRender()});
 adEl('ad-saved-list')?.addEventListener('click',e=>{const edit=e.target.closest('[data-ad-edit]');if(edit){adEditSaved(edit.dataset.adEdit);return}const download=e.target.closest('[data-ad-download]');if(download)adDownloadSaved(download.dataset.adDownload)});
-adEl('section-nav')?.addEventListener('click',e=>{if(e.target.closest('[data-page-target="ads"]')){adRender();adQualityCheck();adCheckHealth();adLoadSaved()}if(e.target.closest('[data-page-target="books"]')){loadBooksDashboard();kdpDocRefresh()}});
+adEl('section-nav')?.addEventListener('click',e=>{if(e.target.closest('[data-page-target="ads"]')){adRender();adQualityCheck();adCheckHealth();adLoadSaved();adCanvaLoadTargets()}if(e.target.closest('[data-page-target="books"]')){loadBooksDashboard();kdpDocRefresh()}});
 
 // Owner-selected KDP report intake directly from the phone's browser file picker.
 const KDP_DOC_BUCKET='zoz-pro-documents';
