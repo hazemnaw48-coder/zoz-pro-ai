@@ -4,7 +4,7 @@ const ACCOUNTS=["zoz_hazem","hazem_now","zoz_manager"];
 const LABELS:any={zoz_hazem:"ZOZ Hazem",hazem_now:"Hazem Now",zoz_manager:"ZOZ Manager"};
 const cors={"access-control-allow-origin":"*","access-control-allow-headers":"authorization, apikey, content-type","access-control-allow-methods":"POST, OPTIONS"};
 const json=(d:any,s=200)=>new Response(JSON.stringify(d),{status:s,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store",...cors}});
-async function who(req:Request){const a=req.headers.get("authorization")||"";if(!a.startsWith("Bearer "))return null;const r=await fetch(URL+"/auth/v1/user",{headers:{apikey:ANON,authorization:a}});if(!r.ok)return null;const u=await r.json();return u.id===OWNER&&String(u.email||"").toLowerCase()==="hazemnaw48@gmail.com"?u:null;}
+async function who(req:Request){const a=req.headers.get("authorization")||"";if(!a.startsWith("Bearer "))return null;const r=await fetch(URL+"/auth/v1/user",{headers:{apikey:ANON,authorization:a}});if(!r.ok)return null;const u=await r.json();return u.id===OWNER&&String(u.email||"").toLowerCase()==="hazemnaw48@gmail.com"&&!!u.email_confirmed_at?u:null;}
 async function rpc(name:string,args:any){const r=await fetch(URL+"/rest/v1/rpc/"+name,{method:"POST",headers:{apikey:SERVICE,authorization:"Bearer "+SERVICE,"content-type":"application/json"},body:JSON.stringify(args)});const t=await r.text();if(!r.ok)throw new Error("Canva secure storage RPC failed ("+r.status+")");return t?JSON.parse(t):null;}
 async function credentials(k:string){return await rpc("zoz_canva_get_account_client_credentials",{p_owner_id:OWNER,p_account_key:k});}
 async function getTokens(k:string){return await rpc("zoz_canva_get_account_oauth_tokens",{p_owner_id:OWNER,p_account_key:k});}
