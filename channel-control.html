@@ -2722,8 +2722,8 @@ async function adPublishLatestPack(){
   for(const row of pack){
    if(row.design_json?.canva?.design_id){results.push({row,existing:true,canva:row.design_json.canva});continue}
    const {data:blob,error:downloadError}=await sb.storage.from(AD_BUCKET).download(row.export_path);if(downloadError||!blob)throw downloadError||new Error('تعذر قراءة ملف '+row.format_key);
-   const payload={action:'publish_creative',title:row.title,width:Number(row.design_json?.width),height:Number(row.design_json?.height),format:'png',image_base64:await adBlobBase64(blob)};
-   const {data,error:invokeError}=await sb.functions.invoke('zoz-canva-adapter',{body:payload});if(invokeError)throw invokeError;if(!data?.ok||!data?.result?.design_id)throw new Error(data?.error||'Canva لم يؤكد إنشاء '+row.format_key);
+   const payload={action:'publish_creative',account_key:adVal('ad-canva-account')||'hazem_now',title:row.title,width:Number(row.design_json?.width),height:Number(row.design_json?.height),format:'png',image_base64:await adBlobBase64(blob)};
+   const {data,error:invokeError}=await sb.functions.invoke('zoz-canva-multi-adapter',{body:payload});if(invokeError)throw invokeError;if(!data?.ok||!data?.result?.design_id)throw new Error(data?.error||'Canva لم يؤكد إنشاء '+row.format_key);
    const canva={...data.result,stored_at:new Date().toISOString()};
    const nextDesign={...(row.design_json||{}),canva};
    const {error:updateError}=await sb.from('zoz_pro_ad_creatives').update({design_json:nextDesign}).eq('id',row.id).eq('owner_id',user.id);if(updateError)throw updateError;
