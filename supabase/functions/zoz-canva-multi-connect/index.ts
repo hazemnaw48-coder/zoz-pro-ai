@@ -46,7 +46,7 @@ Deno.serve(async(req:Request)=>{
    const tr=await fetch("https://api.canva.com/rest/v1/oauth/token",{method:"POST",headers:{authorization:"Basic "+basic,"content-type":"application/x-www-form-urlencoded",accept:"application/json"},body});
    const td=await tr.json().catch(()=>({}));
    if(!tr.ok||!td.access_token||!td.refresh_token)return reply({ok:false,error:"Canva token exchange failed: "+String(td.message||td.code||tr.status)},502);
-   const tokenBundle={access_token:td.access_token,refresh_token:td.refresh_token,expires_at:new Date(Date.now()+Number(td.expires_in||14400)*1000).toISOString(),scope:td.scope||"design:meta:read design:content:write asset:write",account_key:account,updated_at:new Date().toISOString()};
+   const tokenBundle={access_token:td.access_token,refresh_token:td.refresh_token,expires_at:new Date(Date.now()+Number(td.expires_in||14400)*1000).toISOString(),scope:td.scope||"design:meta:read design:content:write asset:write profile:read",account_key:account,updated_at:new Date().toISOString()};
    await rpc("zoz_canva_store_account_oauth_tokens",{p_owner_id:OWNER,p_account_key:account,p_secret:JSON.stringify(tokenBundle)});
    return html("تم حفظ تفويض Canva بنجاح","تم ربط حساب "+LABELS[account]+" وتخزين رموزه بصورة مستقلة. ارجع إلى لوحة الربط واختبر الحساب.");
   }
