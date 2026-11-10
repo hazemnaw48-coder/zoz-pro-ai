@@ -32,6 +32,10 @@ async function writeCreativeImageJob(creative:any,generated:any){
  if(!rows?.[0])throw new Error("تعذر حفظ حالة توليد الصورة في التصميم.");
  return rows[0];
 }
+async function db(path:string,init:RequestInit={}){
+ const r=await fetch(URL+"/rest/v1/"+path,{...init,headers:{apikey:SERVICE,authorization:"Bearer "+SERVICE,"content-type":"application/json",...(init.headers||{})},signal:AbortSignal.timeout(25000)});
+ const text=await r.text();if(!r.ok)throw new Error("Database request failed ("+r.status+"): "+text.slice(0,220));return text?JSON.parse(text):null;
+}
 async function getImageCapabilities(t:any){
  const data=await canva(t,"users/me/capabilities");
  const caps=Array.isArray(data.capabilities)?data.capabilities:[];
@@ -101,9 +105,10 @@ try{
   const k=ACCOUNTS.includes(requested)?requested:null;
   if(!k)return json({ok:false,error:"account_key must be one of the three configured accounts"},400);
   const {token}=await resolveCanvaAccount(k);
+  if(!String(token.scope||"").split(/\\s+/).includes("profile:read"))return json({ok:false,error:"يحتاج فحص إمكانات Canva إلى صلاحية profile:read. أعد تفويض هذا الحساب من لوحة ربط Canva بعد تحديث الصلاحيات.",reauthorization_required:true,required_scope:"profile:read"},409);
   try{
    const result=await getImageCapabilities(token);
-   return json({ok:true,account_key:k,account_label:LABELS[k],...result,scope_ready:String(token.scope||"").split(/\\s+/).includes("profile:read"),generation_cost_notice:"إنشاء الصورة يستهلك رصيد Canva AI للحساب المختار؛ فحص الإمكانية لا يستهلك رصيدًا."});
+   return json({ok:true,account_key:k,account_label:LABELS[k],...result,scope_ready:true,generation_cost_notice:"إنشاء الصورة يستهلك رصيد Canva AI للحساب المختار؛ فحص الإمكانية لا يستهلك رصيدًا."});
   }catch(e){
    return json({ok:false,error:String(e instanceof Error?e.message:e).slice(0,350),reauthorization_required:true,required_scope:"profile:read"},409);
   }
@@ -124,12 +129,14 @@ try{
   let caps;
   try{caps=await getImageCapabilities(token)}catch(e){return json({ok:false,error:String(e instanceof Error?e.message:e).slice(0,320),reauthorization_required:true,required_scope:"profile:read"},409);}
   if(!caps.image_generation)return json({ok:false,error:"حساب Canva لا يملك صلاحية image_generation. راجع أهلية Canva AI/Magic Media للحساب ثم أعد الفحص.",capability_missing:true},403);
-  const requestBody:any={prompt,aspect_ratio:aspect,idempotency_key:crypto.randomUUID(),asset_upload:{type:"upload",asset_name:String(creative.title||"ZOZ Ad Image").slice(0,255)}};
+  const idempotencyKey=String(body.idempotency_key||"");
+  if(!validUuid(idempotencyKey))return json({ok:false,error:"مفتاح منع التكرار غير صالح."},400);
+  const requestBody:any={prompt,aspect_ratio:aspect,idempotency_key:idempotencyKey,asset_upload:{type:"upload",asset_name:String(creative.title||"ZOZ Ad Image").slice(0,255)}};
   if(model!=="auto")requestBody.model=model;
   const generated=await canva(token,"image-generations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(requestBody)});
   const job=generated.job||{};
   if(!job.id)throw new Error("Canva لم يرجع رقم مهمة توليد صالحًا.");
-  const metadata={provider:"canva",account_key:k,account_label:LABELS[k],job_id:job.id,status:job.status||"in_progress",prompt,aspect_ratio:aspect,model,requested_at:new Date().toISOString(),ai_credits_consumed:true};
+  const metadata={provider:"canva",account_key:k,account_label:LABELS[k],job_id:job.id,idempotency_key:idempotencyKey,status:job.status||"in_progress",prompt,aspect_ratio:aspect,model,requested_at:new Date().toISOString(),ai_credits_consumed:true};
   await writeCreativeImageJob(creative,metadata);
   return json({ok:true,action,creative_id:creative.id,account_key:k,account_label:LABELS[k],job_id:job.id,status:job.status||"in_progress",ai_credits_consumed:true,message:"بدأ توليد الصورة عبر Canva؛ ستظهر في التصميم بعد اكتمال المهمة وحفظها في المساحة الخاصة."});
  }
