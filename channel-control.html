@@ -2219,6 +2219,7 @@ const AD_API=SUPABASE_URL+'/functions/v1/zoz-ad-studio';
 const AD_BUCKET='zoz-pro-ad-studio';
 let adImage=null, adLogo=null, adCopyPackage={}, adCurrentId=null;
 let adCanvaGeneration={jobId:null,creativeId:null,accountKey:null,idempotencyKey:null};
+let adCanvaTargets={};
 const adEl=id=>document.getElementById(id);
 const adVal=id=>String(adEl(id)?.value||'').trim();
 const adThemes={
@@ -2635,12 +2636,31 @@ async function adCanvaLoadTargets(){
  select.innerHTML='<option value="">جارٍ تحميل التصميمات…</option>';
  try{
   const {data:{user},error:userError}=await sb.auth.getUser();if(userError||!user?.id)throw userError||new Error('جلسة المالك غير جاهزة.');
-  const {data,error}=await sb.from('zoz_pro_ad_creatives').select('id,title,format_key,created_at').eq('owner_id',user.id).order('updated_at',{ascending:false}).limit(50);
+  const {data,error}=await sb.from('zoz_pro_ad_creatives').select('id,title,format_key,created_at,design_json').eq('owner_id',user.id).order('updated_at',{ascending:false}).limit(50);
   if(error)throw error;
-  select.innerHTML='';
-  (data||[]).forEach(row=>{const option=document.createElement('option');option.value=row.id;option.textContent=row.title+' · '+row.format_key+' · '+new Date(row.created_at).toLocaleDateString('ar-EG');select.appendChild(option)});
+  select.innerHTML='';adCanvaTargets={};
+  (data||[]).forEach(row=>{adCanvaTargets[row.id]=row;const option=document.createElement('option');option.value=row.id;option.textContent=row.title+' · '+row.format_key+' · '+new Date(row.created_at).toLocaleDateString('ar-EG');select.appendChild(option)});
   if(!select.options.length)select.innerHTML='<option value="">احفظ تصميمًا أولًا</option>';
+  adCanvaRestoreSelectedTarget();
  }catch(e){select.innerHTML='<option value="">تعذر تحميل التصميمات</option>';adCanvaStatus('تعذر تحميل قائمة التصميمات: '+(e.message||String(e)),'bad')}
+}
+async function adCanvaRestoreSelectedTarget(){
+ const id=adVal('ad-canva-target'),row=adCanvaTargets[id],generated=row?.design_json?.generated_image;
+ const poll=adEl('ad-canva-poll');if(!generated){adCanvaGeneration={jobId:null,creativeId:null,accountKey:null,idempotencyKey:null};if(poll)poll.disabled=true;return}
+ if(generated.status==='in_progress'&&generated.job_id&&generated.account_key){
+  adCanvaGeneration={jobId:generated.job_id,creativeId:id,accountKey:generated.account_key,idempotencyKey:generated.idempotency_key||null};
+  if(adEl('ad-canva-account'))adEl('ad-canva-account').value=generated.account_key;
+  if(poll)poll.disabled=false;
+  adCanvaStatus('تم استعادة مهمة التوليد المحفوظة. يمكنك متابعة حالتها دون إنشاء طلب جديد.','warn');
+  return;
+ }
+ if(generated.status==='ready'&&generated.storage_path){
+  try{
+   const {data:blob,error}=await sb.storage.from(AD_BUCKET).download(generated.storage_path);if(error||!blob)throw error||new Error('تعذر تحميل الصورة المحفوظة.');
+   adImage=await adLoadImage(blob);adLoadedAssetPaths[adVal('ad-sector-template')||'generic']=generated.storage_path;adCurrentId=id;await adRender();adQualityCheck();
+   adCanvaStatus('الصورة المولدة لهذا التصميم محفوظة وجاهزة لإعادة الاستخدام.','good');
+  }catch(e){adCanvaStatus('الصورة محفوظة لكن تعذر عرضها: '+(e.message||String(e)),'bad')}
+ }
 }
 async function adCanvaCheckCapabilities(){
  const button=adEl('ad-canva-check');if(button)button.disabled=true;
@@ -2810,6 +2830,7 @@ adEl('ad-preset-butcher')?.addEventListener('click',async()=>{try{adApplyRestaur
 adEl('ad-create-pair')?.addEventListener('click',adCreateRestaurantPair);
 adEl('ad-canva-connect')?.addEventListener('click',adCanvaConnect);
 adEl('ad-canva-check')?.addEventListener('click',adCanvaCheckCapabilities);
+adEl('ad-canva-target')?.addEventListener('change',adCanvaRestoreSelectedTarget);
 adEl('ad-canva-generate')?.addEventListener('click',adCanvaGenerateImage);
 adEl('ad-canva-poll')?.addEventListener('click',adCanvaPollImage);
 adEl('ad-canva-account')?.addEventListener('change',()=>{adCanvaGeneration={jobId:null,creativeId:null,accountKey:null,idempotencyKey:null};adEl('ad-canva-poll').disabled=true;adCanvaStatus('تم تغيير الحساب. افحص الصلاحيات قبل التوليد.','warn')});
