@@ -1,0 +1,119 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ZOZ Pro · إدارة حسابات Canva · إصدار جديد</title><style>body{margin:0;padding:18px;max-width:900px;margin:auto;background:#0b1220;color:#e5edf7;font:16px system-ui}.card{background:#142238;border:1px solid #30465f;border-radius:16px;padding:18px;margin:14px 0}input,button{box-sizing:border-box;width:100%;padding:12px;margin:6px 0;border-radius:10px;border:1px solid #49617b;background:#081525;color:white}button{background:#087eb7;border:0;font-weight:700;cursor:pointer}button:disabled{opacity:.5}.muted{color:#9fb2c8;font-size:13px}.ok{color:#86efac}.bad{color:#fca5a5}.hidden{display:none!important}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style></head><body><h1>ZOZ Pro · إدارة ثلاثة حسابات Canva</h1><p class="muted">كل حساب له تفويض OAuth ورموز مستقلة. يمكن استخدام تطبيق Canva Developer واحد مشترك أو بيانات تطبيق مختلفة لكل حساب. لا تُرسل كلمات المرور أو المفاتيح إلى المحادثة.</p><section id="login" class="card"><h3>دخول المالك</h3><input id="email" type="email" value="hazemnaw48@gmail.com"><input id="password" type="password" autocomplete="current-password" placeholder="كلمة المرور"><button id="signin">دخول بكلمة المرور</button><button id="magic" type="button">إرسال رابط دخول آمن إلى بريد المالك</button><p class="muted">الرابط لمرة واحدة ولا ينشئ حسابًا جديدًا. يتم التحقق من هوية المالك قبل فتح لوحة التحكم.</p><p id="loginmsg" role="status" aria-live="polite"></p></section><section id="app" class="hidden"><div class="card"><b>حالة الاتصالات</b><button id="refresh">فحص الحسابات الثلاثة</button><pre id="status">لم يتم الفحص بعد</pre></div><div id="accounts"></div><div class="card"><button id="logout">تسجيل الخروج</button><p id="msg"></p><pre id="result"></pre></div></section><script>
+"use strict";
+(()=>{
+const API="https://oxyzxbkwhafzaztraowc.supabase.co";
+const KEY="sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm";
+const OWNER_ID="3361f235-cf85-4678-b7ab-87068f06c207";
+const OWNER_EMAIL="hazemnaw48@gmail.com";
+const SESSION_KEY="zoz_canva_owner_session_v2";
+const $=id=>document.getElementById(id);
+const accounts=[["zoz_hazem","ZOZ Hazem"],["hazem_now","Hazem Now"],["zoz_manager","ZOZ Manager"]];
+let busy=false;
+function say(id,message,kind=""){const el=$(id);if(!el)return;el.textContent=message;el.className=(id==="loginmsg"?"status ":"")+(kind||"");}
+function showLogin(){ $("app").classList.add("hidden");$("login").classList.remove("hidden"); }
+function parseResponse(response){return response.text().then(raw=>{let d={};try{d=raw?JSON.parse(raw):{}}catch(_){d={message:raw.slice(0,500)}}if(!response.ok)throw new Error(d.msg||d.message||d.error_description||d.error||("HTTP "+response.status));return d;});}
+function readSession(){try{return JSON.parse(sessionStorage.getItem(SESSION_KEY)||"null")}catch(_){return null}}
+function saveSession(s){sessionStorage.setItem(SESSION_KEY,JSON.stringify(s))}
+function clearSession(){sessionStorage.removeItem(SESSION_KEY)}
+async function authFetch(path,body){const r=await fetch(API+path,{method:"POST",headers:{"apikey":KEY,"content-type":"application/json"},body:JSON.stringify(body)});return await parseResponse(r)}
+async function checkOwnerToken(token){const r=await fetch(API+"/auth/v1/user",{headers:{"apikey":KEY,"authorization":"Bearer "+token}});const u=await parseResponse(r);if(u.id!==OWNER_ID||String(u.email||"").toLowerCase()!==OWNER_EMAIL)throw new Error("رفض أمني: الجلسة ليست لحساب مالك ZOZ Pro.");return u}
+async function currentSession(){
+ let s=readSession();
+ if(!s||!s.access_token)throw new Error("لا توجد جلسة مالك. سجّل الدخول أولاً.");
+ if(!s.expires_at||Date.now()>Number(s.expires_at)-60000){
+  const d=await authFetch("/auth/v1/token?grant_type=refresh_token",{refresh_token:s.refresh_token});
+  if(!d.access_token||!d.refresh_token)throw new Error("انتهت الجلسة وتعذر تجديدها.");
+  s={access_token:d.access_token,refresh_token:d.refresh_token,expires_at:Date.now()+Number(d.expires_in||3600)*1000};
+  saveSession(s);
+ }
+ return s;
+}
+async function invoke(slug,body){
+ const s=await currentSession();
+ const r=await fetch(API+"/functions/v1/"+slug,{method:"POST",headers:{"apikey":KEY,"authorization":"Bearer "+s.access_token,"content-type":"application/json"},body:JSON.stringify(body)});
+ const d=await parseResponse(r);if(d.ok!==true)throw new Error(d.error||"تعذر تنفيذ الطلب");return d;
+}
+async function rpc(name,args){
+ const s=await currentSession();
+ const r=await fetch(API+"/rest/v1/rpc/"+name,{method:"POST",headers:{"apikey":KEY,"authorization":"Bearer "+s.access_token,"content-type":"application/json"},body:JSON.stringify(args)});
+ return await parseResponse(r);
+}
+async function acceptSession(access,refresh,expiresIn){
+ const user=await checkOwnerToken(access);
+ saveSession({access_token:access,refresh_token:refresh,expires_at:Date.now()+Number(expiresIn||3600)*1000});
+ history.replaceState(null,"",location.pathname+location.search);
+ say("loginmsg","تم التحقق من هوية المالك. جارٍ تحميل لوحة Canva…","ok");
+ await showApp();
+}
+async function handleMagicCallback(){
+ const p=new URLSearchParams(location.hash.replace(/^#/,""));
+ const access=p.get("access_token"),refresh=p.get("refresh_token"),type=p.get("type");
+ if(p.get("error")||p.get("error_description"))throw new Error(p.get("error_description")||p.get("error"));
+ if(!access&&!refresh)return false;
+ if(!access||!refresh)throw new Error("رابط الدخول غير مكتمل. اطلب رابطًا جديدًا.");
+ if(type&&type!=="magiclink"&&type!=="email")throw new Error("نوع رابط الدخول غير صالح.");
+ await acceptSession(access,refresh,p.get("expires_in")||3600);
+ return true;
+}
+function renderAccounts(){
+ $("accounts").innerHTML=accounts.map(([k,label])=>'<section class="card" data-account="'+k+'"><h2>'+label+'</h2><p class="muted">اتصال مستقل لهذا الحساب. اترك بيانات التطبيق فارغة عند استخدام تطبيق Canva مشترك سبق حفظه.</p><label for="'+k+'_id">Canva Client ID (اختياري للتطبيق المشترك)</label><input id="'+k+'_id" autocomplete="off" placeholder="Canva Client ID"><label for="'+k+'_secret">Canva Client Secret</label><input id="'+k+'_secret" type="password" autocomplete="new-password" placeholder="Canva Client Secret"><button type="button" data-action="save" data-key="'+k+'">حفظ بيانات التطبيق</button><button type="button" data-action="auth" data-key="'+k+'">ربط حساب Canva</button><button type="button" data-action="test" data-key="'+k+'">اختبار الاتصال</button><button type="button" data-action="list" data-key="'+k+'">قراءة التصاميم</button><p id="'+k+'_msg" class="muted status" role="status" aria-live="polite">بانتظار الفحص</p></section>').join("");
+}
+async function checkAccounts(){
+ try{const d=await invoke("zoz-canva-multi-adapter",{action:"account_status"});$("status").textContent=(d.accounts||[]).map(a=>a.account_label+": "+(a.client_credentials_configured?"بيانات التطبيق محفوظة":"بيانات التطبيق غير محفوظة")+" · "+(a.oauth_connected?"OAuth مربوط":"OAuth غير مربوط")+(a.token_expired?" · الرمز منتهي":"")).join("\n")||"لم يرجع الخادم حالة الحسابات.";}
+ catch(e){$("status").textContent="فشل فحص الحسابات: "+e.message;}
+}
+async function showApp(){renderAccounts();$("login").classList.add("hidden");$("app").classList.remove("hidden");await checkAccounts();}
+$("magic").addEventListener("click",async()=>{
+ if(busy)return;busy=true;const b=$("magic");b.disabled=true;say("loginmsg","جارٍ إرسال طلب الدخول الآمن…");
+ try{
+  const redirect=location.origin+location.pathname;
+  await authFetch("/auth/v1/otp?redirect_to="+encodeURIComponent(redirect),{email:OWNER_EMAIL,create_user:false});
+  say("loginmsg","قُبل طلب الدخول. افحص بريد المالك. إذا لم تصل الرسالة فقد تكون إعدادات SMTP أو قائمة عناوين إعادة التوجيه تمنع الإرسال.","ok");
+ }catch(e){say("loginmsg","تعذر طلب رابط الدخول: "+e.message,"bad");}
+ finally{busy=false;b.disabled=false;}
+});
+$("signin").addEventListener("click",async()=>{
+ if(busy)return;busy=true;const b=$("signin");b.disabled=true;say("loginmsg","جارٍ التحقق من دخول المالك…");
+ try{
+  const email=$("email").value.trim().toLowerCase(),password=$("password").value;
+  if(email!==OWNER_EMAIL)throw new Error("استخدم بريد مالك ZOZ Pro المسجل.");
+  const d=await authFetch("/auth/v1/token?grant_type=password",{email,password});
+  if(!d.access_token||!d.refresh_token)throw new Error("لم تُرجع خدمة الدخول جلسة صالحة.");
+  await acceptSession(d.access_token,d.refresh_token,d.expires_in||3600);$("password").value="";
+ }catch(e){say("loginmsg","تعذر تسجيل الدخول: "+e.message,"bad");}
+ finally{busy=false;b.disabled=false;}
+});
+$("accounts").addEventListener("click",async ev=>{
+ const b=ev.target.closest("button[data-action]");if(!b)return;
+ const k=b.dataset.key,a=b.dataset.action,pair=accounts.find(x=>x[0]===k),label=pair?pair[1]:k;
+ const msg=$(k+"_msg");b.disabled=true;msg.textContent="جارٍ التنفيذ…";
+ try{
+  if(a==="save"){
+   const id=$(k+"_id").value.trim(),secret=$(k+"_secret").value.trim();
+   if(!id||!secret)throw new Error("أدخل Client ID وClient Secret لهذا الحساب، أو استخدم تطبيقًا مشتركًا محفوظًا.");
+   const s=await currentSession();const d=await rpc("zoz_canva_store_account_client_credentials",{p_owner_id:OWNER_ID,p_account_key:k,p_client_id:id,p_client_secret:secret});
+   if(!d||d.ok!==true)throw new Error("لم يؤكد الخادم حفظ بيانات التطبيق.");
+   $(k+"_id").value="";$(k+"_secret").value="";msg.textContent="تم حفظ بيانات التطبيق لهذا الحساب في الخزنة الآمنة.";
+  }else if(a==="auth"){
+   const d=await invoke("zoz-canva-multi-connect",{account_key:k});
+   if(!d.authorization_url)throw new Error("لم يرجع الخادم رابط تفويض Canva.");
+   location.assign(d.authorization_url);return;
+  }else{
+   const d=await invoke("zoz-canva-multi-adapter",{action:a==="test"?"test_connection":"list_designs",account_key:k});
+   $("result").textContent=JSON.stringify(d.result,null,2);
+   msg.textContent=a==="test"?"نجح اتصال Canva للحساب "+label:"تم استرجاع التصاميم للحساب "+label;
+  }
+ }catch(e){msg.textContent="تعذر التنفيذ: "+e.message;}
+ finally{b.disabled=false;}
+});
+$("refresh").addEventListener("click",checkAccounts);
+$("logout").addEventListener("click",()=>{clearSession();$("password").value="";showLogin();say("loginmsg","تم تسجيل الخروج.");});
+window.addEventListener("error",ev=>say("loginmsg","تعطل JavaScript في الصفحة: "+(ev.message||"خطأ غير معروف"),"bad"));
+(async()=>{
+ try{
+  const completed=await handleMagicCallback();if(completed)return;
+  const s=readSession();if(s&&s.access_token){await checkOwnerToken(s.access_token);await showApp();}else showLogin();
+ }catch(e){clearSession();showLogin();say("loginmsg","تعذر فتح جلسة المالك: "+e.message,"bad");}
+})();
+})();
+</script></body></html>
