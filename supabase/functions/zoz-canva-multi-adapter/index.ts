@@ -67,7 +67,7 @@ async function storeGeneratedImage(t:any,k:string,creative:any,job:any){
  const next={...(creative.design_json&&typeof creative.design_json==="object"?creative.design_json:{}),generated_image:generated};
  const updated=await db("zoz_pro_ad_creatives?id=eq."+encodeURIComponent(creative.id)+"&owner_id=eq."+encodeURIComponent(OWNER),{
   method:"PATCH",headers:{prefer:"return=representation"},
-  body:JSON.stringify({design_json:next,asset_path:path,updated_at:new Date().toISOString()})
+  body:JSON.stringify({design_json:next,updated_at:new Date().toISOString()})
  });
  if(!updated?.[0])throw new Error("تم رفع الصورة لكن تعذر ربطها بسجل التصميم.");
  return generated;
