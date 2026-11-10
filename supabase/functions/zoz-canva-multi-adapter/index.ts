@@ -55,7 +55,7 @@ async function storeGeneratedImage(t:any,k:string,creative:any,job:any){
  const path=OWNER+"/"+creative.id+"/generated-"+String(job.id).replace(/[^a-zA-Z0-9_-]/g,"").slice(0,70)+"."+ext;
  const upload=await fetch(URL+"/storage/v1/object/zoz-pro-ad-studio/"+path.split("/").map(encodeURIComponent).join("/"),{
   method:"POST",
-  headers:{apikey:SERVICE,authorization:"Bearer "+SERVICE,"content-type":mime,"x-upsert":"false","cache-control":"3600"},
+  headers:{apikey:SERVICE,authorization:"Bearer "+SERVICE,"content-type":mime,"x-upsert":"true","cache-control":"3600"},
   body:bytes,
   signal:AbortSignal.timeout(60000)
  });
