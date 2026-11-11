@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.zoz-pro-youtube-analytics]
 verify_jwt = false
+
+[functions.zoz-tiktok-ads]
+verify_jwt = false
