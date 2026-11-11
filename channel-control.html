@@ -476,6 +476,30 @@ body.upload-mode .footer{font-size:11px}
    <div class="actions"><button type="button" id="tiktok-save-credentials">حفظ بيانات التطبيق بأمان</button></div>
    <div id="tiktok-credentials-status" class="notice">لن تظهر قيم المفاتيح بعد الحفظ.</div>
   </section>
+  <section class="card" id="tiktok-marketing-api">
+   <h3>إعلانات TikTok Ads — تحكم مستقل عن الحسابات العضوية</h3>
+   <p class="small">هذا الربط يخص حسابات الإعلانات وAds Manager فقط. أدخل بيانات Developer App والرابط الذي أنشأه TikTok من My Apps؛ لا تستخدم Client Key الخاص بتحليلات TikTok العضوية.</p>
+   <label for="tiktok-ads-app-id">TikTok Marketing API · App ID</label>
+   <input id="tiktok-ads-app-id" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="App ID من TikTok for Business Developer Portal">
+   <label for="tiktok-ads-app-secret">App Secret</label>
+   <input id="tiktok-ads-app-secret" type="password" autocomplete="new-password" placeholder="App Secret">
+   <label for="tiktok-ads-auth-url">Advertiser authorization URL</label>
+   <input id="tiktok-ads-auth-url" type="url" inputmode="url" autocomplete="off" placeholder="الصق الرابط الذي أنشأه TikTok داخل My Apps">
+   <p class="small">Callback URL الذي يجب إضافته في إعدادات التطبيق قبل التفويض:</p>
+   <code id="tiktok-ads-callback-url" dir="ltr">https://oxyzxbkwhafzaztraowc.supabase.co/functions/v1/zoz-tiktok-ads</code>
+   <div class="actions">
+    <button type="button" id="tiktok-ads-save">حفظ بيانات Marketing API بأمان</button>
+    <button type="button" id="tiktok-ads-connect" class="secondary">بدء تفويض حساب المعلن</button>
+    <button type="button" id="tiktok-ads-refresh" class="secondary">تحديث حسابات الإعلانات</button>
+   </div>
+   <div id="tiktok-ads-setup-status" class="notice">لم يتم ربط حساب إعلاني بعد. بيانات التطبيق تحفظ في Supabase Vault ولا تظهر مرة أخرى.</div>
+   <div class="row">
+    <div><label for="tiktok-ads-report-start">من تاريخ</label><input id="tiktok-ads-report-start" type="date"></div>
+    <div><label for="tiktok-ads-report-end">إلى تاريخ</label><input id="tiktok-ads-report-end" type="date"></div>
+   </div>
+   <div id="tiktok-ads-advertisers" class="stack"></div>
+   <div id="tiktok-ads-report-output" class="notice">تقارير Ads Manager ستظهر هنا بعد تفويض حساب المعلن.</div>
+  </section>
   <div class="actions">
    <button type="button" id="tiktok-analyze-all">حلّل حسابَي TikTok معًا</button>
   </div>
@@ -2000,6 +2024,8 @@ $('zoz-agent-video-test-btn')?.addEventListener('click',async()=>{
 });
 
 const TIKTOK_API=SUPABASE_URL+'/functions/v1/zoz-pro-tiktok';
+const TIKTOK_ADS_API=SUPABASE_URL+'/functions/v1/zoz-tiktok-ads';
+const TIKTOK_ADS_CALLBACK=SUPABASE_URL+'/functions/v1/zoz-tiktok-ads';
 let tiktokAccounts=[];
 let tiktokAssets=[];
 async function tiktokCall(action,body){
@@ -2010,6 +2036,74 @@ async function tiktokCall(action,body){
  return data;
 }
 function tiktokLabel(slot){return slot==='tiktok_1'?'Hazem Now':'Fekra';}
+
+async function tiktokAdsCall(action,body){
+ const session=await ownerSession();
+ const response=await fetch(TIKTOK_ADS_API,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action},body||{})),cache:'no-store'});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok||data.ok===false)throw new Error(data.error||('TikTok Ads HTTP '+response.status));
+ return data;
+}
+function tiktokAdsStatus(message,kind){
+ const el=$('tiktok-ads-setup-status');if(!el)return;
+ el.className='notice'+(kind?' '+kind:'');el.textContent=message;
+}
+function renderTikTokAdvertisers(rows){
+ const host=$('tiktok-ads-advertisers');if(!host)return;host.replaceChildren();
+ if(!Array.isArray(rows)||!rows.length){const p=document.createElement('p');p.className='small';p.textContent='لا توجد حسابات إعلانية مفوضة حتى الآن.';host.appendChild(p);return;}
+ for(const row of rows){
+  const card=document.createElement('article');card.className='video-card';
+  const title=document.createElement('h3');title.textContent=(row.advertiser_name||'حساب إعلاني')+' · '+row.advertiser_id;card.appendChild(title);
+  const meta=document.createElement('p');meta.className='small';meta.textContent='الحالة: '+(row.account_status||'غير معروفة')+' · العملة: '+(row.currency||'—')+' · آخر تحقق: '+(row.last_verified_at||'لم يتم بعد');card.appendChild(meta);
+  const actions=document.createElement('div');actions.className='actions';
+  const sync=document.createElement('button');sync.type='button';sync.textContent='مزامنة الحساب والحملات';
+  sync.addEventListener('click',async()=>{sync.disabled=true;try{const result=await tiktokAdsCall('sync',{advertiser_id:row.advertiser_id});tiktokAdsStatus('تمت قراءة الحساب بنجاح. عدد الحملات المسترجعة: '+((result.campaigns||[]).length)+'. لم يتم تغيير أي حملة أو ميزانية.','good');}catch(e){tiktokAdsStatus('تعذر مزامنة الحساب: '+(e.message||e),'bad');}finally{sync.disabled=false;}});
+  const report=document.createElement('button');report.type='button';report.className='secondary';report.textContent='جلب تقرير الأداء';
+  report.addEventListener('click',async()=>{report.disabled=true;try{const start=$('tiktok-ads-report-start').value,end=$('tiktok-ads-report-end').value;if(!start||!end)throw new Error('حدد تاريخ بداية ونهاية التقرير.');const result=await tiktokAdsCall('report',{advertiser_id:row.advertiser_id,start_date:start,end_date:end});$('tiktok-ads-report-output').textContent=JSON.stringify(result.report,null,2);tiktokAdsStatus('تم جلب تقرير TikTok Ads من '+start+' إلى '+end+'.','good');}catch(e){tiktokAdsStatus('تعذر جلب التقرير: '+(e.message||e),'bad');}finally{report.disabled=false;}});
+  actions.append(sync,report);card.appendChild(actions);host.appendChild(card);
+ }
+}
+async function refreshTikTokAds(){
+ const result=await tiktokAdsCall('status');
+ renderTikTokAdvertisers(result.advertisers||[]);
+ tiktokAdsStatus(result.connected?'تم العثور على '+result.advertisers.length+' حسابات إعلانية مفوضة.':'لا يوجد حساب معلن مفوض بعد.','');
+ return result;
+}
+$('tiktok-ads-save')?.addEventListener('click',async()=>{
+ const b=$('tiktok-ads-save'),appId=$('tiktok-ads-app-id'),secret=$('tiktok-ads-app-secret'),auth=$('tiktok-ads-auth-url');
+ const values={app_id:String(appId.value||'').trim(),app_secret:String(secret.value||'').trim(),authorization_url:String(auth.value||'').trim()};
+ if(values.app_id.length<5||values.app_secret.length<12||!values.authorization_url){tiktokAdsStatus('أدخل App ID وApp Secret ورابط Advertiser authorization URL من My Apps.','warn');return;}
+ b.disabled=true;tiktokAdsStatus('جارٍ حفظ بيانات Developer App في Supabase Vault…','');
+ try{
+  const result=await tiktokAdsCall('save_app_credentials',values);
+  appId.value='';secret.value='';auth.value='';
+  $('tiktok-ads-callback-url').textContent=result.callback_url||TIKTOK_ADS_CALLBACK;
+  tiktokAdsStatus('تم حفظ بيانات Marketing API في Vault بنجاح. أضف Callback URL الظاهر أعلاه في TikTok Developer App ثم ابدأ التفويض.','good');
+ }catch(e){appId.value='';secret.value='';auth.value='';tiktokAdsStatus('تعذر حفظ بيانات التطبيق: '+(e.message||e),'bad');}
+ finally{b.disabled=false;}
+});
+$('tiktok-ads-connect')?.addEventListener('click',async()=>{
+ const tab=window.open('about:blank','_blank');
+ const b=$('tiktok-ads-connect');b.disabled=true;tiktokAdsStatus('جارٍ إنشاء رابط تفويض آمن لحساب المعلن…','');
+ try{
+  const result=await tiktokAdsCall('connect_start');
+  if(tab)tab.location.href=result.authorization_url;else window.location.href=result.authorization_url;
+  tiktokAdsStatus('تم إنشاء رابط التفويض. أكمل موافقة حساب المعلن داخل TikTok، ثم ارجع إلى المركز لتحديث الحسابات.','good');
+ }catch(e){if(tab)tab.close();tiktokAdsStatus('تعذر بدء التفويض: '+(e.message||e),'bad');}
+ finally{b.disabled=false;}
+});
+$('tiktok-ads-refresh')?.addEventListener('click',async()=>{
+ const b=$('tiktok-ads-refresh');b.disabled=true;
+ try{await refreshTikTokAds();}catch(e){tiktokAdsStatus('تعذر تحديث حالة Ads Manager: '+(e.message||e),'bad');}
+ finally{b.disabled=false;}
+});
+(function initTikTokAdsDates(){
+ const end=$('tiktok-ads-report-end'),start=$('tiktok-ads-report-start');if(!end||!start)return;
+ const today=new Date(),from=new Date(today);from.setDate(today.getDate()-7);
+ const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+ end.value=iso(today);start.value=iso(from);
+})();
+
 
 $('tiktok-save-credentials')?.addEventListener('click',async()=>{
  const b=$('tiktok-save-credentials'),key=$('tiktok-client-key'),secret=$('tiktok-client-secret');
