@@ -208,6 +208,35 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0, resumeRevis
         }
     }
 
+    fun requestAdsManager() {
+        if (!paired) { status = "اربط تطبيق ZOZ Pro بمركز الشركة أولًا."; return }
+        if (!FlowAutomationService.isEnabled(context)) {
+            serviceEnabled = false
+            status = "فعّل خدمة ZOZ App Access من إعدادات Android أولًا."
+            return
+        }
+        val launchIntent = context.packageManager.getLaunchIntentForPackage("com.android.chrome")
+        if (launchIntent == null) { status = "Google Chrome غير مثبت على الهاتف."; return }
+        runAsync {
+            val token = DeviceTokenVault.read(context)
+                ?: throw IllegalStateException("رمز الجهاز غير موجود.")
+            apiPostWithToken("enable_phone_control", JSONObject().put("app_version", BuildConfig.VERSION_NAME), token)
+            val response = apiPostWithToken(
+                "request_app_control",
+                JSONObject()
+                    .put("target_package", "com.android.chrome")
+                    .put("section", "ads")
+                    .put("url", "https://ads.tiktok.com/i18n/login"),
+                token
+            )
+            withContext(Dispatchers.Main) {
+                context.startActivity(launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+            scheduleDeviceWorker(context)
+            "فتح Chrome على TikTok Ads Manager وإنشاء مهمة قراءة محدودة. أكمل تسجيل الدخول بنفسك داخل الصفحة؛ لن يقرأ التطبيق كلمات المرور أو رموز التحقق."
+        }
+    }
+
     fun requestApp(packageName: String, displayName: String, analytics: Boolean = false) {
         if (!paired) {
             status = "اربط التطبيق بمركز ZOZ Pro أولًا."
@@ -261,6 +290,16 @@ private fun AppScopeControlScreen(voiceoverDeepLinkRequest: Int = 0, resumeRevis
                             context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                         }, modifier = Modifier.fillMaxWidth()) {
                             Text(if (serviceEnabled) "إعدادات خدمة التطبيقات" else "تفعيل خدمة التطبيقات عند الحاجة")
+                        }
+                    }
+                }
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Text("BeyondMedia · TikTok Ads Manager", fontWeight = FontWeight.Bold)
+                        Text("قسم الإعلانات المدفوعة مستقل عن قنوات المحتوى العضوي. يفتح ZOZ لوحة Ads Manager في Chrome لقراءة حالة الحساب. تسجيل الدخول أو رمز التحقق تنفذه أنت يدويًا داخل TikTok.")
+                        Text("الوكلاء يمكنهم إعداد التقارير والمسودات عبر التكامل الرسمي بعد تفويض حساب المعلن. لن يُشغّل إعلان أو تُصرف أموال أو تُقبل اتفاقية دون موافقتك.")
+                        Button(enabled = !busy && paired && serviceEnabled, onClick = { requestAdsManager() }, modifier = Modifier.fillMaxWidth()) {
+                            Text("فتح TikTok Ads Manager ومزامنة الشاشة")
                         }
                     }
                 }
