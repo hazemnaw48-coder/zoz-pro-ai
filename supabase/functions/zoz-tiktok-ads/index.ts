@@ -104,7 +104,7 @@ async function callback(req: Request) {
   const state = clean(url.searchParams.get("state"), 180);
   const authCode = clean(url.searchParams.get("auth_code") || url.searchParams.get("code"), 2000);
   const providerError = clean(url.searchParams.get("error_description") || url.searchParams.get("error"), 300);
-  if (providerError) return html("لم يكتمل تفويض TikTok: " + providerError, 400);
+  if (providerError) return html("لم يكتمل تفويض TikTok. ارجع إلى مركز ZOZ Pro وراجع إعدادات تطبيق المطور، ثم أعد المحاولة.", 400);
   if (!state || !authCode) return html("بيانات عودة TikTok غير مكتملة.", 400);
   const stateHash = await digest(state);
   const rows = await db("zoz_tiktok_ads_oauth_states?state_hash=eq." + encodeURIComponent(stateHash) + "&consumed_at=is.null&expires_at=gt." + encodeURIComponent(new Date().toISOString()) + "&select=id,owner_id&limit=1");
