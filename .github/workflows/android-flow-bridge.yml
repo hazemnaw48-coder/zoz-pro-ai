@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/zoz-android-flow-bridge
+      - feature/beyondmedia-ads-android-v2
     paths:
       - "android/**"
       - ".github/workflows/android-flow-bridge.yml"
