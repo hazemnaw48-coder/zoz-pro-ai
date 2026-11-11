@@ -4,7 +4,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const ANON = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const API_BASE = "https://business-api.tiktok.com/open_api/v1.3";
-const PORTAL_AUTH = "https://business-api.tiktok.com/portal/auth";
+
 
 const headers = {
   "content-type": "application/json; charset=utf-8",
@@ -73,8 +73,14 @@ async function audit(ownerId: string, action: string, result: string, advertiser
 async function appCredentials() {
   const appId = await vaultGet("zoz_tiktok_ads_app_id");
   const appSecret = await vaultGet("zoz_tiktok_ads_app_secret");
-  if (!appId || !appSecret) throw new Error("tiktok_developer_app_credentials_missing");
-  return { appId, appSecret };
+  const authorizationUrl = await vaultGet("zoz_tiktok_ads_authorization_url");
+  if (!appId || !appSecret || !authorizationUrl) throw new Error("tiktok_developer_app_setup_incomplete");
+  let parsed: URL;
+  try { parsed = new URL(authorizationUrl); } catch { throw new Error("tiktok_advertiser_authorization_url_invalid"); }
+  if (parsed.protocol !== "https:" || !["business-api.tiktok.com", "ads.tiktok.com"].includes(parsed.hostname) || !parsed.pathname.includes("/portal/auth")) {
+    throw new Error("tiktok_advertiser_authorization_url_invalid");
+  }
+  return { appId, appSecret, authorizationUrl: parsed.toString() };
 }
 async function tiktok(path: string, accessToken: string, params: Record<string, string> = {}) {
   const url = new URL(API_BASE + path);
@@ -121,7 +127,14 @@ async function callback(req: Request) {
   const data = tokenData?.data || {};
   const accessToken = clean(data.access_token, 6000);
   const refreshToken = clean(data.refresh_token, 6000);
-  const advertiserIds = Array.isArray(data.advertiser_ids) ? data.advertiser_ids.map((x: unknown) => clean(x, 80)).filter(Boolean) : [];
+  let advertiserIds = Array.isArray(data.advertiser_ids) ? data.advertiser_ids.map((x: unknown) => clean(x, 80)).filter(Boolean) : [];
+  if (advertiserIds.length === 0) {
+    try {
+      const authorized = await fetch(API_BASE + "/oauth2/advertiser/get/?app_id=" + encodeURIComponent(appId) + "&secret=" + encodeURIComponent(appSecret) + "&access_token=" + encodeURIComponent(accessToken), { signal: AbortSignal.timeout(20000) });
+      const authorizedData = await authorized.json().catch(() => ({}));
+      if (authorized.ok && authorizedData?.code === 0) advertiserIds = (authorizedData?.data?.list || authorizedData?.data?.advertiser_ids || []).map((x: any) => clean(typeof x === "object" ? x.advertiser_id : x, 80)).filter(Boolean);
+    } catch { /* the user can reauthorize after the provider grants advertiser access */ }
+  }
   if (!accessToken || advertiserIds.length === 0) return html("تمت العودة من TikTok لكن لم تُمنح صلاحية لأي حساب إعلاني.", 422);
   let saved = 0;
   for (const advertiserId of advertiserIds.slice(0, 50)) {
@@ -161,24 +174,55 @@ async function callback(req: Request) {
 async function start(req: Request) {
   const user = await owner(req);
   if (!user) return json({ ok: false, error: "owner_auth_required" }, 401);
-  const { appId } = await appCredentials();
+  const { authorizationUrl } = await appCredentials();
   const state = randomState();
   await db("zoz_tiktok_ads_oauth_states", {
     method: "POST", headers: { prefer: "return=minimal" },
     body: JSON.stringify({ owner_id: user.id, state_hash: await digest(state), expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString() }),
   });
-  const authorizationUrl = new URL(PORTAL_AUTH);
-  authorizationUrl.searchParams.set("app_id", appId);
-  authorizationUrl.searchParams.set("state", state);
+  const authorization = new URL(authorizationUrl);
+  authorization.searchParams.set("state", state);
   const callbackUrl = SUPABASE_URL + "/functions/v1/zoz-tiktok-ads";
   await audit(user.id, "oauth_start", "created");
-  return json({ ok: true, authorization_url: authorizationUrl.toString(), callback_url: callbackUrl, expires_in_seconds: 900, note: "Add callback_url exactly to the TikTok developer app before authorization." });
+  return json({ ok: true, authorization_url: authorization.toString(), callback_url: callbackUrl, expires_in_seconds: 900, note: "Add callback_url exactly to the TikTok developer app before authorization." });
 }
 async function status(req: Request) {
   const user = await owner(req);
   if (!user) return json({ ok: false, error: "owner_auth_required" }, 401);
   const rows = await db("zoz_tiktok_ads_connections?owner_id=eq." + encodeURIComponent(user.id) + "&select=advertiser_id,advertiser_name,business_center_id,currency,timezone,account_status,scopes,account_snapshot,last_verified_at,last_synced_at,last_error&order=created_at.desc");
   return json({ ok: true, connected: rows?.length > 0, advertisers: rows || [] });
+}
+async function report(req: Request) {
+  const user = await owner(req);
+  if (!user) return json({ ok: false, error: "owner_auth_required" }, 401);
+  const body = await req.json().catch(() => ({}));
+  const advertiserId = clean(body?.advertiser_id, 80);
+  const startDate = clean(body?.start_date, 10);
+  const endDate = clean(body?.end_date, 10);
+  if (!advertiserId || !/^\\d{4}-\\d{2}-\\d{2}$/.test(startDate) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(endDate) || startDate > endDate) {
+    return json({ ok: false, error: "valid_advertiser_and_date_range_required" }, 400);
+  }
+  const rows = await db("zoz_tiktok_ads_connections?owner_id=eq." + encodeURIComponent(user.id) + "&advertiser_id=eq." + encodeURIComponent(advertiserId) + "&select=advertiser_id,token_secret_name&limit=1");
+  const connection = rows?.[0];
+  if (!connection) return json({ ok: false, error: "advertiser_not_connected" }, 404);
+  const tokenValue = await vaultGet(connection.token_secret_name);
+  let stored: any = {};
+  try { stored = JSON.parse(tokenValue); } catch { return json({ ok: false, error: "stored_token_invalid" }, 500); }
+  const accessToken = clean(stored.access_token, 6000);
+  const params = {
+    report_type: "BASIC",
+    advertiser_id: advertiserId,
+    data_level: "AUCTION_ADVERTISER",
+    dimensions: JSON.stringify(["stat_time_day"]),
+    metrics: JSON.stringify(["spend", "impressions", "clicks", "ctr", "cpc", "cpm", "conversion"]),
+    start_date: startDate,
+    end_date: endDate,
+    page: "1",
+    page_size: "100",
+  };
+  const result = await tiktok("/report/integrated/get/", accessToken, params);
+  await audit(user.id, "read_integrated_advertiser_report", "succeeded", advertiserId, { start_date: startDate, end_date: endDate });
+  return json({ ok: true, advertiser_id: advertiserId, start_date: startDate, end_date: endDate, report: result?.data || {}, actions_performed: ["read_integrated_advertiser_report"] });
 }
 async function sync(req: Request) {
   const user = await owner(req);
@@ -192,22 +236,7 @@ async function sync(req: Request) {
   const tokenValue = await vaultGet(connection.token_secret_name);
   let stored: any = {};
   try { stored = JSON.parse(tokenValue); } catch { return json({ ok: false, error: "stored_token_invalid" }, 500); }
-  let accessToken = clean(stored.access_token, 6000);
-  const expiresIn = Number(stored.access_token_expires_in || 0);
-  const storedAt = Date.parse(stored.stored_at || "");
-  if (stored.refresh_token && expiresIn > 0 && Number.isFinite(storedAt) && Date.now() > storedAt + Math.max(0, expiresIn - 300) * 1000) {
-    const { appId, appSecret } = await appCredentials();
-    const refreshed = await fetch(API_BASE + "/oauth2/refresh_token/", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ app_id: appId, secret: appSecret, refresh_token: stored.refresh_token, grant_type: "refresh_token" }),
-      signal: AbortSignal.timeout(20000),
-    });
-    const refreshData = await refreshed.json().catch(() => ({}));
-    if (!refreshed.ok || refreshData?.code !== 0) throw new Error("tiktok_token_refresh_failed");
-    stored = { ...stored, ...refreshData.data, access_token: refreshData.data.access_token || stored.access_token, refresh_token: refreshData.data.refresh_token || stored.refresh_token, stored_at: new Date().toISOString() };
-    await vaultSet(connection.token_secret_name, JSON.stringify(stored));
-    accessToken = clean(stored.access_token, 6000);
-  }
+  const accessToken = clean(stored.access_token, 6000);
   const [info, campaigns] = await Promise.all([
     tiktok("/advertiser/info/", accessToken, { advertiser_ids: JSON.stringify([advertiserId]) }),
     tiktok("/campaign/get/", accessToken, { advertiser_id: advertiserId, page: "1", page_size: "50" }),
@@ -238,11 +267,12 @@ Deno.serve(async (req: Request) => {
       case "connect_start": return await start(req);
       case "status": return await status(req);
       case "sync": return await sync(req);
+      case "report": return await report(req);
       default: return json({ ok: false, error: "unsupported_action" }, 400);
     }
   } catch (error) {
     const message = clean(error instanceof Error ? error.message : error, 300);
-    const status = message === "tiktok_developer_app_credentials_missing" ? 503 : 500;
+    const status = message.startsWith("tiktok_developer_app_") || message === "tiktok_advertiser_authorization_url_invalid" ? 503 : 500;
     return json({ ok: false, error: message }, status);
   }
 });
