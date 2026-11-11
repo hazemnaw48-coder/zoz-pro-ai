@@ -31,14 +31,16 @@ private const val TIKTOK_STUDIO_PACKAGE = "com.ss.android.tt.creator"
 private const val YOUTUBE_STUDIO_PACKAGE = "com.google.android.apps.youtube.creator"
 private const val TIKTOK_PACKAGE = "com.zhiliaoapp.musically"
 private const val YOUTUBE_PACKAGE = "com.google.android.youtube"
+private const val CHROME_PACKAGE = "com.android.chrome"
 private const val FLOW_APP_PACKAGE = "com.google.android.apps.labs.whisk"
 private const val VOICEOVER_CHANNEL_ID = "UCIael48cvwPG3gKj--c7HKw"
 private const val VOICEOVER_SOURCE_PREFIX = "/storage/v1/object/sign/zoz-pro-intake/voiceover-source/"
 private const val VOICEOVER_MAX_SOURCE_BYTES = 100L * 1024L * 1024L
 
-private val ZOZ_CONTROL_PACKAGES = setOf(TIKTOK_STUDIO_PACKAGE, YOUTUBE_STUDIO_PACKAGE, TIKTOK_PACKAGE, YOUTUBE_PACKAGE)
+private val ZOZ_CONTROL_PACKAGES = setOf(TIKTOK_STUDIO_PACKAGE, YOUTUBE_STUDIO_PACKAGE, TIKTOK_PACKAGE, YOUTUBE_PACKAGE, CHROME_PACKAGE)
 private val ZOZ_STUDIO_PACKAGES = setOf(TIKTOK_STUDIO_PACKAGE, YOUTUBE_STUDIO_PACKAGE)
-private val ZOZ_REGULAR_SOCIAL_PACKAGES = setOf(TIKTOK_PACKAGE, YOUTUBE_PACKAGE)
+private val ZOZ_REGULAR_SOCIAL_PACKAGES = setOf(TIKTOK_PACKAGE, YOUTUBE_PACKAGE, CHROME_PACKAGE)
+private val ADS_MANAGER_TEXT_PURPOSES = setOf("ads_campaign_name", "ads_ad_text", "ads_ad_description", "ads_destination_url")
 
 private val STUDIO_NAV_LABELS = listOf(
     "analytics", "overview", "insights", "dashboard", "content", "posts", "videos", "audience", "engagement",
@@ -65,13 +67,19 @@ private val ZOZ_CONTROL_WEB_HOSTS = setOf(
     "kdp.amazon.com", "amazon.com", "draft2digital.com", "notion.so", "canva.com", "tiktok.com"
 )
 
-private val ZOZ_TEXT_PURPOSES = setOf("title", "description", "prompt", "tags", "comment", "business_copy", "search_query")
+private val ZOZ_TEXT_PURPOSES = setOf("title", "description", "prompt", "tags", "comment", "business_copy", "search_query") + ADS_MANAGER_TEXT_PURPOSES
 
 private fun isAllowedZozWebUrl(raw: String): Boolean {
     val uri = runCatching { Uri.parse(raw) }.getOrNull() ?: return false
     if (uri.scheme != "https" || uri.userInfo != null || uri.port !in setOf(-1, 443)) return false
     val host = uri.host?.lowercase()?.trimEnd('.') ?: return false
     return ZOZ_CONTROL_WEB_HOSTS.any { host == it || host.endsWith(".$it") }
+}
+
+private fun isAllowedTikTokAdsUrl(raw: String): Boolean {
+    val uri = runCatching { Uri.parse(raw) }.getOrNull() ?: return false
+    return uri.scheme == "https" && uri.host?.lowercase() == "ads.tiktok.com" &&
+        uri.userInfo == null && uri.port in setOf(-1, 443) && uri.path.orEmpty().startsWith("/i18n/")
 }
 
 private fun containsSensitiveWorkValue(raw: String): Boolean {
@@ -754,7 +762,7 @@ class FlowAutomationService : AccessibilityService() {
                 }
                 "open_url" -> {
                     val rawUrl = step.optString("url", "")
-                    if (targetPackage != "com.android.chrome" || !isAllowedZozWebUrl(rawUrl)) {
+                    if (targetPackage != CHROME_PACKAGE || !isAllowedTikTokAdsUrl(rawUrl)) {
                         throw IllegalStateException("business_url_not_allowlisted")
                     }
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(rawUrl))
@@ -814,6 +822,11 @@ class FlowAutomationService : AccessibilityService() {
             if (safe.isNotBlank()) texts.add(safe)
         }
         val combined = texts.joinToString(" ").lowercase()
+        if (currentPackage == CHROME_PACKAGE &&
+            !texts.any { it.contains("ads.tiktok.com", ignoreCase = true) } &&
+            !combined.contains("tiktok ads") && !combined.contains("ads manager")) {
+            throw IllegalStateException("ads_manager_domain_not_verified")
+        }
         val analyticsTerms = listOf(
             "analytics", "overview", "views", "video views", "followers", "subscribers", "likes", "comments",
             "engagement", "audience", "content performance", "profile views", "watch time", "reach",
@@ -839,6 +852,7 @@ class FlowAutomationService : AccessibilityService() {
                 YOUTUBE_STUDIO_PACKAGE -> "youtube_studio_$sectionKey"
                 TIKTOK_PACKAGE -> "tiktok_app"
                 YOUTUBE_PACKAGE -> "youtube_app"
+                CHROME_PACKAGE -> "tiktok_ads_manager"
                 else -> "unknown"
             })
             .put("captured_at_ms", System.currentTimeMillis())
@@ -867,7 +881,8 @@ class FlowAutomationService : AccessibilityService() {
     private fun isIrreversibleLabel(value: String): Boolean {
         val v = value.lowercase()
         return listOf("publish", "post", "send", "share", "delete", "remove", "buy", "purchase", "pay", "transfer",
-            "confirm", "submit", "نشر", "إرسال", "ارسال", "مشاركة", "حذف", "شراء", "دفع", "تحويل", "تأكيد", "تاكيد").any(v::contains)
+            "confirm", "submit", "launch", "activate", "start campaign", "publish now", "payment", "budget",
+            "نشر", "إرسال", "ارسال", "مشاركة", "حذف", "شراء", "دفع", "تحويل", "تأكيد", "تاكيد", "تشغيل", "تفعيل", "الميزانية").any(v::contains)
     }
 
     private fun findControlNode(root: AccessibilityNodeInfo, selector: JSONObject, requireEditable: Boolean): AccessibilityNodeInfo? {
@@ -2178,7 +2193,7 @@ class FlowAutomationService : AccessibilityService() {
             if (target !in ZOZ_CONTROL_PACKAGES) throw IllegalArgumentException("target_package_not_allowed")
             val steps = payload.optJSONArray("steps") ?: throw IllegalArgumentException("control_steps_missing")
             if (steps.length() !in 1..30) throw IllegalArgumentException("control_steps_limit")
-            val allowed = setOf("inspect", "read_screen", "tap", "type_text", "scroll", "wait", "back")
+            val allowed = setOf("inspect", "read_screen", "tap", "type_text", "scroll", "wait", "back", "open_url")
             for (i in 0 until steps.length()) {
                 val step = steps.optJSONObject(i) ?: throw IllegalArgumentException("control_step_invalid")
                 val action = step.optString("action")
@@ -2186,6 +2201,7 @@ class FlowAutomationService : AccessibilityService() {
                 if (step.optString("text").length > 3000) throw IllegalArgumentException("ui_text_invalid")
                 if (action == "type_text" &&
                     (target !in ZOZ_REGULAR_SOCIAL_PACKAGES && target !in ZOZ_STUDIO_PACKAGES ||
+                     (target == CHROME_PACKAGE && step.optString("input_purpose").lowercase() !in ADS_MANAGER_TEXT_PURPOSES) ||
                      step.optString("input_purpose").lowercase() !in ZOZ_TEXT_PURPOSES ||
                      step.optString("text").isBlank() ||
                      containsSensitiveWorkValue(step.optString("text")))) {
