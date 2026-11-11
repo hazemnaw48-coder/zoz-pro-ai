@@ -3,6 +3,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const ANON = Deno.env.get("SUPABASE_ANON_KEY") || "";
+const OWNER_EMAIL = "hazemnaw48@gmail.com";
 const API_BASE = "https://business-api.tiktok.com/open_api/v1.3";
 
 
@@ -43,7 +44,7 @@ async function owner(req: Request) {
   });
   if (!response.ok) return null;
   const user = await response.json().catch(() => null);
-  return user?.id && user?.email_confirmed_at ? user : null;
+  return user?.id && user?.email_confirmed_at && clean(user?.email, 254).toLowerCase() === OWNER_EMAIL ? user : null;
 }
 async function digest(value: string) {
   const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
@@ -171,6 +172,27 @@ async function callback(req: Request) {
   await audit(pending.owner_id, "oauth_exchange", "succeeded", null, { advertisers_saved: saved });
   return html("تم ربط TikTok Ads بنجاح. أُضيفت " + saved + " حسابات إعلانية إلى مركز ZOZ Pro. لن يتم إنشاء حملات أو إنفاق أموال دون موافقتك.");
 }
+async function saveAppCredentials(req: Request) {
+  const user = await owner(req);
+  if (!user) return json({ ok: false, error: "owner_auth_required" }, 401);
+  const body = await req.json().catch(() => ({}));
+  const appId = clean(body?.app_id, 180);
+  const appSecret = clean(body?.app_secret, 4000);
+  const authorizationUrl = clean(body?.authorization_url, 4000);
+  if (appId.length < 5 || appSecret.length < 12 || !authorizationUrl) {
+    return json({ ok: false, error: "app_id_secret_and_authorization_url_required" }, 400);
+  }
+  let parsed: URL;
+  try { parsed = new URL(authorizationUrl); } catch { return json({ ok: false, error: "tiktok_advertiser_authorization_url_invalid" }, 400); }
+  if (parsed.protocol !== "https:" || !["business-api.tiktok.com", "ads.tiktok.com"].includes(parsed.hostname) || !parsed.pathname.includes("/portal/auth")) {
+    return json({ ok: false, error: "tiktok_advertiser_authorization_url_invalid" }, 400);
+  }
+  await vaultSet("zoz_tiktok_ads_app_id", appId);
+  await vaultSet("zoz_tiktok_ads_app_secret", appSecret);
+  await vaultSet("zoz_tiktok_ads_authorization_url", parsed.toString());
+  await audit(user.id, "save_developer_app_credentials", "succeeded");
+  return json({ ok: true, saved: true, secret_stored: true, callback_url: SUPABASE_URL + "/functions/v1/zoz-tiktok-ads" });
+}
 async function start(req: Request) {
   const user = await owner(req);
   if (!user) return json({ ok: false, error: "owner_auth_required" }, 401);
@@ -264,6 +286,7 @@ Deno.serve(async (req: Request) => {
     if (req.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405);
     const body = await req.clone().json().catch(() => ({}));
     switch (clean(body?.action, 40)) {
+      case "save_app_credentials": return await saveAppCredentials(req);
       case "connect_start": return await start(req);
       case "status": return await status(req);
       case "sync": return await sync(req);
