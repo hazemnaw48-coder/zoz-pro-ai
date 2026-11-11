@@ -65,6 +65,34 @@ async function vaultGet(name: string): Promise<string> {
   });
   return typeof value === "string" ? value : "";
 }
+async function markMarketingToolConnected(ownerId: string, advertiserIds: string[]) {
+  const tools = await db("zoz_pro_tool_catalog?tool_key=eq.tiktok_marketing_api&select=id&limit=1");
+  const toolId = tools?.[0]?.id;
+  if (!toolId) return;
+  const now = new Date().toISOString();
+  const existing = await db("zoz_pro_tool_connections?owner_id=eq." + encodeURIComponent(ownerId) + "&tool_id=eq." + encodeURIComponent(toolId) + "&select=id&limit=1");
+  const payload = {
+    owner_id: ownerId, tool_id: toolId, connection_status: "connected",
+    connection_method: "supabase_edge_function_oauth",
+    account_label: "TikTok Ads · " + advertiserIds.length + " authorized advertiser(s)",
+    capabilities_enabled: ["advertiser_account_read", "campaign_read", "report_read"],
+    last_checked_at: now, last_error: null,
+    setup_notes: "TikTok Marketing API advertiser OAuth verified. Read-only advertiser, campaign, and integrated report actions are available. Campaign activation and budget changes remain disabled."
+  };
+  if (existing?.[0]?.id) {
+    await db("zoz_pro_tool_connections?id=eq." + encodeURIComponent(existing[0].id), {
+      method: "PATCH", headers: { prefer: "return=minimal" }, body: JSON.stringify(payload),
+    });
+  } else {
+    await db("zoz_pro_tool_connections", {
+      method: "POST", headers: { prefer: "return=minimal" }, body: JSON.stringify(payload),
+    });
+  }
+  await db("zoz_pro_tool_catalog?id=eq." + encodeURIComponent(toolId), {
+    method: "PATCH", headers: { prefer: "return=minimal" },
+    body: JSON.stringify({ integration_status: "connected" }),
+  });
+}
 async function audit(ownerId: string, action: string, result: string, advertiserId: string | null = null, details: unknown = {}) {
   await db("zoz_tiktok_ads_audit", {
     method: "POST", headers: { prefer: "return=minimal" },
@@ -169,6 +197,7 @@ async function callback(req: Request) {
     });
     saved++;
   }
+  if (saved > 0) await markMarketingToolConnected(pending.owner_id, advertiserIds.slice(0, 50));
   await audit(pending.owner_id, "oauth_exchange", "succeeded", null, { advertisers_saved: saved });
   return html("تم ربط TikTok Ads بنجاح. أُضيفت " + saved + " حسابات إعلانية إلى مركز ZOZ Pro. لن يتم إنشاء حملات أو إنفاق أموال دون موافقتك.");
 }
