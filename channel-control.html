@@ -2024,7 +2024,7 @@ $('zoz-agent-video-test-btn')?.addEventListener('click',async()=>{
 });
 
 const TIKTOK_API=SUPABASE_URL+'/functions/v1/zoz-pro-tiktok';
-const TIKTOK_ADS_API=SUPABASE_URL+'/functions/v1/zoz-tiktok-ads';
+const TIKTOK_ADS_API=SUPABASE_URL+'/functions/v1/zoz-tool-gateway';
 const TIKTOK_ADS_CALLBACK=SUPABASE_URL+'/functions/v1/zoz-tiktok-ads';
 let tiktokAccounts=[];
 let tiktokAssets=[];
@@ -2039,10 +2039,12 @@ function tiktokLabel(slot){return slot==='tiktok_1'?'Hazem Now':'Fekra';}
 
 async function tiktokAdsCall(action,body){
  const session=await ownerSession();
- const response=await fetch(TIKTOK_ADS_API,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action},body||{})),cache:'no-store'});
- const data=await response.json().catch(()=>({}));
- if(!response.ok||data.ok===false)throw new Error(data.error||('TikTok Ads HTTP '+response.status));
- return data;
+ const actions={save_app_credentials:'tiktok_ads_save_credentials',connect_start:'tiktok_ads_connect_start',status:'tiktok_ads_status',sync:'tiktok_ads_sync',report:'tiktok_ads_report'};
+ const gatewayAction=actions[action];if(!gatewayAction)throw new Error('عملية TikTok Ads غير مدعومة.');
+ const response=await fetch(TIKTOK_ADS_API,{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:gatewayAction},body||{})),cache:'no-store'});
+ const envelope=await response.json().catch(()=>({}));
+ if(!response.ok||envelope.ok===false)throw new Error(envelope.error||('TikTok Ads HTTP '+response.status));
+ return envelope.result||envelope;
 }
 function tiktokAdsStatus(message,kind){
  const el=$('tiktok-ads-setup-status');if(!el)return;
