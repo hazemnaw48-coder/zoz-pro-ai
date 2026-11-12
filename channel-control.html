@@ -500,6 +500,34 @@ body.upload-mode .footer{font-size:11px}
    <div id="tiktok-ads-advertisers" class="stack"></div>
    <div id="tiktok-ads-report-output" class="notice">تقارير Ads Manager ستظهر هنا بعد تفويض حساب المعلن.</div>
   </section>
+  <section class="card" id="zoz-ads-campaign-workbench">
+   <h3>مساحة عمل الحملات — مسودات المالك</h3>
+   <p class="small">إنشاء وحفظ مسودات محلية داخل ZOZ Pro فقط. لا تُرسل إلى TikTok ولا تنشئ إعلانًا أو إنفاقًا. الإطلاق يتطلب ربط الحساب وموافقة مستقلة.</p>
+   <label for="zoz-ads-draft-name">اسم الحملة</label>
+   <input id="zoz-ads-draft-name" maxlength="120" value="ZOZ Pro — جذب عملاء خدمات الفيديو القصير">
+   <label for="zoz-ads-draft-offer">العرض الذي سنسوّقه</label>
+   <input id="zoz-ads-draft-offer" maxlength="240" value="إنتاج فيديوهات قصيرة وإعلانات رقمية للشركات والمتاجر في مصر">
+   <label for="zoz-ads-draft-objective">هدف الحملة</label>
+   <select id="zoz-ads-draft-objective">
+    <option value="LEAD_GENERATION" selected>جمع عملاء محتملين</option>
+    <option value="TRAFFIC">زيارات</option><option value="VIDEO_VIEWS">مشاهدات فيديو</option>
+    <option value="REACH">انتشار</option><option value="ENGAGEMENT">تفاعل</option><option value="SALES">مبيعات</option>
+   </select>
+   <label for="zoz-ads-draft-audience">الجمهور المستهدف</label>
+   <textarea id="zoz-ads-draft-audience" rows="3">أصحاب المطاعم والمتاجر والمشروعات الصغيرة في مصر، والمسؤولون عن التسويق وصناعة المحتوى.</textarea>
+   <label for="zoz-ads-draft-destination">وجهة المهتم</label>
+   <select id="zoz-ads-draft-destination"><option value="INSTANT_FORM" selected>نموذج عملاء داخل TikTok</option><option value="WEBSITE">موقع إلكتروني</option><option value="TIKTOK_PROFILE">ملف TikTok</option></select>
+   <label for="zoz-ads-draft-url">رابط الموقع (اختياري للموقع فقط)</label>
+   <input id="zoz-ads-draft-url" type="url" placeholder="https://...">
+   <label for="zoz-ads-draft-creative">موجز الفيديو الإعلاني</label>
+   <textarea id="zoz-ads-draft-creative" rows="4">فيديو عمودي 9:16 مدته 15–25 ثانية: عرض مشكلة أصحاب الأعمال في جذب العملاء، ثم إظهار نموذج فيديو قصير احترافي من إنتاج ZOZ Pro، مع دعوة واضحة لطلب استشارة وتسعير. لا نعد بنتائج مضمونة.</textarea>
+   <label for="zoz-ads-draft-cta">دعوة الإجراء</label>
+   <input id="zoz-ads-draft-cta" maxlength="80" value="اطلب استشارة">
+   <div class="actions"><button type="button" id="zoz-ads-save-draft">حفظ المسودة في ZOZ Pro</button><button type="button" class="secondary" id="zoz-ads-load-drafts">عرض المسودات المحفوظة</button></div>
+   <div id="zoz-ads-draft-status" class="notice">لم يتم حفظ أي مسودة في هذه الجلسة بعد.</div>
+   <div id="zoz-ads-draft-list" class="stack"></div>
+  </section>
+
   <div class="actions">
    <button type="button" id="tiktok-analyze-all">حلّل حسابَي TikTok معًا</button>
   </div>
@@ -2099,6 +2127,40 @@ $('tiktok-ads-refresh')?.addEventListener('click',async()=>{
  try{await refreshTikTokAds();}catch(e){tiktokAdsStatus('تعذر تحديث حالة Ads Manager: '+(e.message||e),'bad');}
  finally{b.disabled=false;}
 });
+
+async function loadZozTikTokAdDrafts(){
+ const status=$('zoz-ads-draft-status'),host=$('zoz-ads-draft-list');
+ try{
+  const session=await ownerSession();
+  const {data,error}=await sb.from('zoz_tiktok_ads_campaign_drafts').select('id,campaign_name,promoted_offer,objective,target_audience,destination_type,creative_brief,call_to_action,status,created_at').eq('owner_id',session.user.id).order('created_at',{ascending:false}).limit(30);
+  if(error)throw error;
+  host.replaceChildren();
+  if(!data||!data.length){status.textContent='لا توجد مسودات محفوظة بعد.';return;}
+  for(const item of data){
+   const card=document.createElement('article');card.className='video-card';
+   const h=document.createElement('h4');h.textContent=item.campaign_name;card.appendChild(h);
+   const p=document.createElement('p');p.textContent=item.promoted_offer+' · الهدف: '+item.objective+' · الوجهة: '+item.destination_type+' · الحالة: '+item.status;card.appendChild(p);
+   const detail=document.createElement('p');detail.className='small';detail.textContent='الجمهور: '+item.target_audience+' · الإجراء: '+item.call_to_action;card.appendChild(detail);
+   host.appendChild(card);
+  }
+  status.textContent='تم تحميل '+data.length+' مسودات من قاعدة بيانات الإنتاج. لم يتم إرسالها إلى TikTok.';
+ }catch(e){status.textContent='تعذر تحميل المسودات: '+(e.message||e);}
+}
+$('zoz-ads-save-draft')?.addEventListener('click',async()=>{
+ const button=$('zoz-ads-save-draft'),status=$('zoz-ads-draft-status');button.disabled=true;
+ try{
+  const session=await ownerSession();
+  const objective=$('zoz-ads-draft-objective').value,destination=$('zoz-ads-draft-destination').value,url=String($('zoz-ads-draft-url').value||'').trim();
+  if(destination==='WEBSITE'&&(!url||!/^https:\/\//i.test(url)))throw new Error('أدخل رابط HTTPS صالحًا لوجهة الموقع.');
+  const payload={owner_id:session.user.id,campaign_name:$('zoz-ads-draft-name').value.trim(),promoted_offer:$('zoz-ads-draft-offer').value.trim(),objective,target_audience:$('zoz-ads-draft-audience').value.trim(),country_code:'EG',destination_type:destination,destination_url:destination==='WEBSITE'?url:null,creative_brief:$('zoz-ads-draft-creative').value.trim(),call_to_action:$('zoz-ads-draft-cta').value.trim(),status:'draft'};
+  const {data,error}=await sb.from('zoz_tiktok_ads_campaign_drafts').insert(payload).select('id').single();
+  if(error)throw error;
+  status.textContent='تم حفظ المسودة في Supabase بنجاح. رقمها: '+data.id+'. لم تُرسل إلى TikTok ولم يتم إنفاق أي أموال.';
+  await loadZozTikTokAdDrafts();
+ }catch(e){status.textContent='تعذر حفظ المسودة: '+(e.message||e);}
+ finally{button.disabled=false;}
+});
+$('zoz-ads-load-drafts')?.addEventListener('click',loadZozTikTokAdDrafts);
 (function initTikTokAdsDates(){
  const end=$('tiktok-ads-report-end'),start=$('tiktok-ads-report-start');if(!end||!start)return;
  const today=new Date(),from=new Date(today);from.setDate(today.getDate()-7);
