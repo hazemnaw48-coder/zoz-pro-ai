@@ -250,7 +250,7 @@ async function report(req: Request) {
   const advertiserId = clean(body?.advertiser_id, 80);
   const startDate = clean(body?.start_date, 10);
   const endDate = clean(body?.end_date, 10);
-  if (!advertiserId || !/^\\d{4}-\\d{2}-\\d{2}$/.test(startDate) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(endDate) || startDate > endDate) {
+  if (!advertiserId || !/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) {
     return json({ ok: false, error: "valid_advertiser_and_date_range_required" }, 400);
   }
   const rows = await db("zoz_tiktok_ads_connections?owner_id=eq." + encodeURIComponent(user.id) + "&advertiser_id=eq." + encodeURIComponent(advertiserId) + "&select=advertiser_id,token_secret_name&limit=1");
