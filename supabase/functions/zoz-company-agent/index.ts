@@ -675,34 +675,80 @@ async function executeCompanyDepartmentAction(owner:string,agent:any,task:any,ct
     if(!auth)return {requested:true,status:"blocked",error:"owner_session_required"};
     headers.authorization=auth;headers.apikey=req.headers.get("apikey")||ANON;
   }
-  const requestId=crypto.randomUUID(),startedAt=new Date().toISOString();
+  const taskId=clean(task.id,40),startedAt=new Date().toISOString();
+  const priorScripts=await rest("zoz_pro_content_scripts?owner_id=eq."+encodeURIComponent(owner)+
+    "&channel_id=eq."+encodeURIComponent(channelId)+"&evidence->>company_task_id=eq."+encodeURIComponent(taskId)+
+    "&select=id,channel_id,title,status,generation_method,production_package,evidence,created_at&order=created_at.desc&limit=1");
+  const priorScript=Array.isArray(priorScripts)?priorScripts[0]:null;
+  if(priorScript) {
+    if(priorScript.status!=="draft"||priorScript.channel_id!==channelId)
+      return {requested:true,status:"blocked",error:"idempotency_artifact_exists_but_state_requires_reconciliation"};
+    return {requested:true,status:"succeeded",reused:true,operation:"create_content_script",tool_key:"zoz_content_studio",
+      request_id:clean(priorScript.evidence?.company_execution_request_id,80)||"recovered",
+      artifact:{type:"zoz_pro_content_scripts",id:priorScript.id,channel_id:priorScript.channel_id,
+        channel_name:clean(channels[0].display_name,120),title:clean(priorScript.title,160),status:priorScript.status,
+        generation_method:clean(priorScript.generation_method||"unknown",80),
+        duration_seconds:Number(priorScript.production_package?.duration_seconds||duration),
+        verified_at:new Date().toISOString()}};
+  }
+
+  const priorAudit=await rest("zoz_pro_tool_gateway_audit?owner_id=eq."+encodeURIComponent(owner)+
+    "&tool_key=eq.zoz_content_studio&capability=eq.content_script.create_draft"+
+    "&details->>company_task_id=eq."+encodeURIComponent(taskId)+
+    "&select=id,status,request_id,details,created_at&order=created_at.desc&limit=1");
+  if(Array.isArray(priorAudit)&&priorAudit.length) {
+    const audit=priorAudit[0];
+    return {requested:true,status:"blocked",error:"idempotency_guard_prior_attempt_requires_reconciliation",
+      prior_status:clean(audit.status,30),prior_request_id:clean(audit.request_id,80)};
+  }
+
+  const requestId=crypto.randomUUID();
+  let auditId="";
   try {
+    const auditRows=await rest("zoz_pro_tool_gateway_audit",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({
+      owner_id:owner,agent_id:agent.id||null,tool_id:tool.tool_id||null,tool_key:"zoz_content_studio",
+      capability:"content_script.create_draft",status:"running",request_id:requestId,
+      details:{company_task_id:taskId,channel_id:channelId,topic,mode,duration_seconds:duration,started_at:startedAt}
+    })});
+    auditId=clean(Array.isArray(auditRows)?auditRows[0]?.id:"",40);
+    if(!auditId)throw new Error("execution_audit_start_record_missing");
+
     const response=await fetch(URL+"/functions/v1/zoz-pro-youtube-analytics?action=studio_generate",{
       method:"POST",headers,body:JSON.stringify({channel_id:channelId,topic,mode,duration_seconds:duration}),signal:AbortSignal.timeout(45000)
     });
     const data=await response.json().catch(()=>({}));
     if(!response.ok||data?.ok!==true||!data?.script?.id)throw new Error(clean(data?.error||"content_studio_did_not_confirm_saved_script",240));
     const scriptId=clean(data.script.id,40);
-    const rows=await rest("zoz_pro_content_scripts?id=eq."+encodeURIComponent(scriptId)+"&owner_id=eq."+encodeURIComponent(owner)+"&channel_id=eq."+encodeURIComponent(channelId)+"&select=id,channel_id,title,status,generation_method,production_package,created_at&limit=1");
+    const rows=await rest("zoz_pro_content_scripts?id=eq."+encodeURIComponent(scriptId)+
+      "&owner_id=eq."+encodeURIComponent(owner)+"&channel_id=eq."+encodeURIComponent(channelId)+
+      "&select=id,channel_id,title,status,generation_method,production_package,evidence,created_at&limit=1");
     const script=Array.isArray(rows)?rows[0]:null;
     if(!script||script.status!=="draft"||script.channel_id!==channelId)throw new Error("content_script_readback_verification_failed");
-    const result={requested:true,status:"succeeded",operation:"create_content_script",tool_key:"zoz_content_studio",request_id:requestId,
-      artifact:{type:"zoz_pro_content_scripts",id:script.id,channel_id:script.channel_id,channel_name:clean(channels[0].display_name,120),
-        title:clean(script.title,160),status:script.status,generation_method:clean(script.generation_method||"unknown",80),
-        duration_seconds:Number(script.production_package?.duration_seconds||duration),verified_at:new Date().toISOString()}};
-    await rest("zoz_pro_tool_gateway_audit",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({
-      owner_id:owner,agent_id:agent.id||null,tool_id:tool.tool_id||null,tool_key:"zoz_content_studio",
-      capability:"content_script.create_draft",status:"succeeded",request_id:requestId,
-      details:{task_id:task.id,channel_id:channelId,script_id:script.id,verified_readback:true,started_at:startedAt}
-    })}).catch(()=>null);
-    return result;
+
+    const evidence={...(script.evidence&&typeof script.evidence==="object"?script.evidence:{}),
+      company_task_id:taskId,company_execution_request_id:requestId,company_tool_verified_at:new Date().toISOString()};
+    await rest("zoz_pro_content_scripts?id=eq."+encodeURIComponent(scriptId)+
+      "&owner_id=eq."+encodeURIComponent(owner)+"&channel_id=eq."+encodeURIComponent(channelId),
+      {method:"PATCH",body:JSON.stringify({evidence,updated_at:new Date().toISOString()})});
+    const verifiedRows=await rest("zoz_pro_content_scripts?id=eq."+encodeURIComponent(scriptId)+
+      "&owner_id=eq."+encodeURIComponent(owner)+"&channel_id=eq."+encodeURIComponent(channelId)+
+      "&select=id,channel_id,title,status,generation_method,production_package,evidence&limit=1");
+    const verified=Array.isArray(verifiedRows)?verifiedRows[0]:null;
+    if(!verified||verified.evidence?.company_task_id!==taskId||verified.status!=="draft")
+      throw new Error("content_script_idempotency_marker_readback_failed");
+
+    await rest("zoz_pro_tool_gateway_audit?id=eq."+encodeURIComponent(auditId)+"&owner_id=eq."+encodeURIComponent(owner),
+      {method:"PATCH",body:JSON.stringify({status:"succeeded",details:{company_task_id:taskId,channel_id:channelId,
+        script_id:scriptId,verified_readback:true,started_at:startedAt,finished_at:new Date().toISOString()}})});
+    return {requested:true,status:"succeeded",operation:"create_content_script",tool_key:"zoz_content_studio",request_id:requestId,
+      artifact:{type:"zoz_pro_content_scripts",id:verified.id,channel_id:verified.channel_id,channel_name:clean(channels[0].display_name,120),
+        title:clean(verified.title,160),status:verified.status,generation_method:clean(verified.generation_method||"unknown",80),
+        duration_seconds:Number(verified.production_package?.duration_seconds||duration),verified_at:new Date().toISOString()}};
   } catch(error) {
     const message=clean(error instanceof Error?error.message:"content_script_execution_failed",260);
-    await rest("zoz_pro_tool_gateway_audit",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({
-      owner_id:owner,agent_id:agent.id||null,tool_id:tool.tool_id||null,tool_key:"zoz_content_studio",
-      capability:"content_script.create_draft",status:"failed",request_id:requestId,
-      details:{task_id:task.id,channel_id:channelId,error:message,started_at:startedAt}
-    })}).catch(()=>null);
+    if(auditId)await rest("zoz_pro_tool_gateway_audit?id=eq."+encodeURIComponent(auditId)+"&owner_id=eq."+encodeURIComponent(owner),
+      {method:"PATCH",body:JSON.stringify({status:"failed",details:{company_task_id:taskId,channel_id:channelId,
+        request_id:requestId,error:message,started_at:startedAt,finished_at:new Date().toISOString()}})}).catch(()=>null);
     return {requested:true,status:"failed",operation:"create_content_script",tool_key:"zoz_content_studio",request_id:requestId,error:message};
   }
 }
