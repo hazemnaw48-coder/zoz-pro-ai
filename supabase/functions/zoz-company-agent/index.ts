@@ -501,6 +501,26 @@ async function seedAcceptedCompanyHandoffs(owner: string) {
   const agents = await rest("zoz_pro_company_agents?status=eq.active&select=id,agent_key,department_id");
   const deptIdByKey = new Map((Array.isArray(departments) ? departments : []).map((x:any) => [String(x.department_key), x.id]));
   const agentIdByDept = new Map((Array.isArray(agents) ? agents : []).map((x:any) => [String(x.department_id), x.id]));
+  const normalizeHandoffTopic = (value: unknown) =>
+    String(value || "").trim().toLocaleLowerCase("ar")
+      .replace(/[؟?!.,،؛:]+/g, "").replace(/\\s+/g, " ");
+  const existingTaskRows = await rest(
+    "zoz_pro_company_tasks?owner_id=eq." + encodeURIComponent(owner) +
+    "&status=in.(queued,running,awaiting_owner,completed)&select=id,status,input&order=created_at.desc&limit=500"
+  );
+  const existingContentTaskKeys = new Set((Array.isArray(existingTaskRows) ? existingTaskRows : [])
+    .map((row:any) => {
+      const execution = row?.input?.execution;
+      if (execution?.operation !== "create_content_script") return "";
+      return clean(execution.channel_id, 40) + "|" + normalizeHandoffTopic(execution.topic);
+    }).filter(Boolean));
+  const existingScriptRows = await rest(
+    "zoz_pro_content_scripts?owner_id=eq." + encodeURIComponent(owner) +
+    "&select=channel_id,topic&order=created_at.desc&limit=500"
+  );
+  const existingContentScriptKeys = new Set((Array.isArray(existingScriptRows) ? existingScriptRows : [])
+    .map((row:any) => clean(row.channel_id, 40) + "|" + normalizeHandoffTopic(row.topic))
+    .filter((key:string) => key !== "|"));
   const aliases: Record<string,string> = {
     "development_and_architecture":"software",
     "software_engineer":"software",
@@ -558,6 +578,16 @@ async function seedAcceptedCompanyHandoffs(owner: string) {
       const reason = clean(h.reason || "", 1800);
       if (!departmentId || !assignedAgentId || title.length < 5 || !reason) { skipped++; continue; }
       const handoffKey = String(parent.id) + ":" + String(index + 1);
+      const requestedExecution = h.execution && typeof h.execution === "object" &&
+        clean(h.execution.operation, 80) === "create_content_script" && deptKey === "content"
+        ? h.execution : null;
+      const contentWorkKey = requestedExecution
+        ? clean(requestedExecution.channel_id, 40) + "|" + normalizeHandoffTopic(requestedExecution.topic || title)
+        : "";
+      if (contentWorkKey && (existingContentTaskKeys.has(contentWorkKey) || existingContentScriptKeys.has(contentWorkKey))) {
+        existing++;
+        continue;
+      }
       const prior = await rest(
         "zoz_pro_company_tasks?owner_id=eq." + encodeURIComponent(owner) +
         "&input->>handoff_key=eq." + encodeURIComponent(handoffKey) +
@@ -616,6 +646,7 @@ async function seedAcceptedCompanyHandoffs(owner: string) {
       const row = Array.isArray(inserted) ? inserted[0] : inserted;
       if (row?.id) {
         created++;
+        if (contentWorkKey) existingContentTaskKeys.add(contentWorkKey);
         createdTasks.push({ id: row.id, title: row.title, department: deptKey, parent_task_id: parent.id });
       } else {
         skipped++;
