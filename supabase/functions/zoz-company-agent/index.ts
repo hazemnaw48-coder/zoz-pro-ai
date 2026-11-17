@@ -1,3 +1,4 @@
+// Reconciled deployed source snapshot: zoz-company-agent v36 (2026-11-17).
 // Reconciled production source snapshot: zoz-company-agent deployment v35 (2026-11-17).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
