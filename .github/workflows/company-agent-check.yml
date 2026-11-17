@@ -1,0 +1,29 @@
+name: ZOZ Company Agent Validation
+
+on:
+  pull_request:
+    paths:
+      - "supabase/functions/zoz-company-agent/**"
+      - ".github/workflows/company-agent-check.yml"
+  push:
+    branches:
+      - "feat/zoz-company-operating-runtime"
+    paths:
+      - "supabase/functions/zoz-company-agent/**"
+      - ".github/workflows/company-agent-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deno-check:
+    name: Type-check production company agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check Edge Function
+        run: deno check --config supabase/functions/zoz-company-agent/deno.json supabase/functions/zoz-company-agent/index.ts
