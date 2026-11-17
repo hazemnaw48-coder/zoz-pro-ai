@@ -1216,7 +1216,7 @@ Deno.serve(async (req: Request) => {
     if (scheduled && action !== "run_next") return reply({ ok: false, error: "Scheduled access is limited to safe queued-task execution." }, 403);
 
     if (action === "status") {
-      const [departments, agents, tools, connections, access, tasks, runs, models, channels, socialChannels, books, productionCycles, devices] = await Promise.all([
+      const [departments, agents, tools, connections, access, tasks, runs, models, channels, socialChannels, books, productionCycles, devices, companyMemory] = await Promise.all([
         rest("zoz_pro_company_departments?select=id,department_key,name_ar,name_en,mission,status,priority&order=priority.asc"),
         rest("zoz_pro_company_agents?select=id,agent_key,name_ar,role_title,mission,status,autonomy_level,runtime_type,runtime_ref,department_id,budget_monthly,currency&order=created_at.asc"),
         rest("zoz_pro_tool_catalog?is_visible=eq.true&select=id,tool_key,name,provider,category,description,capabilities,pricing_model,access_mode,install_required,api_key_required,integration_status,setup_url,notes,is_visible&order=category.asc,name.asc"),
@@ -1229,7 +1229,10 @@ Deno.serve(async (req: Request) => {
         rest("zoz_pro_social_channels?owner_id=eq." + owner + "&platform=eq.tiktok&select=slot_key,platform,connection_status"),
         rest("zoz_pro_books?owner_id=eq." + owner + "&select=id,title,kdp_status,last_verified_at"),
         rest("zoz_pro_automation_runs?workflow=eq.zoz_pro_agent_autonomous_worker&details->>owner_id=eq." + owner + "&select=status,started_at,finished_at,details&order=started_at.desc&limit=1"),
-        rest("zoz_pro_device_registry?owner_id=eq." + owner + "&select=device_name,device_status,app_version,last_heartbeat_at,capabilities&order=last_heartbeat_at.desc.nullslast&limit=10")
+        rest("zoz_pro_device_registry?owner_id=eq." + owner + "&select=device_name,device_status,app_version,last_heartbeat_at,capabilities&order=last_heartbeat_at.desc.nullslast&limit=10"),
+        rest("zoz_pro_agent_memory?owner_id=eq." + encodeURIComponent(owner) +
+          "&memory_key=in.(company_operating_assistant,project_zoz_operating_assistant)&status=eq.active" +
+          "&select=memory_key,title,project,content,updated_at,notion_sync_status&order=updated_at.desc&limit=2")
       ]);
       const connectionMap = new Map((Array.isArray(connections) ? connections : []).map((x:any) => [x.tool_id, x]));
       const accessRows = Array.isArray(access) ? access : [];
@@ -1264,7 +1267,13 @@ Deno.serve(async (req: Request) => {
         } : null,
         limits: { direct_kdp_connection: false, unattended_flow_generation: false, public_publication_requires_owner_approval: true }
       };
-      return reply({ ok: true, departments, agents: agentsWithAccess, tools: toolsWithConnections, tasks, runs, models, operations, runtime: { gemini_keys_available: GEMINI_KEYS.length > 0, claude_enabled: false, make_required: false, paid_services_required: false, execution_mode: "direct_supabase_edge", agent_work_modes: ["department_drafts_and_peer_qa", "youtube_tiktok_book_monitoring_via_zoz_pro_agent"], free_tier_only: true, active_agents: activeAgents, registered_agents: agentsWithAccess.length, owner_approval_required_for_external_actions: true } });
+      return reply({ ok: true, departments, agents: agentsWithAccess, tools: toolsWithConnections, tasks, runs, models, operations,
+        memory: Array.isArray(companyMemory) ? companyMemory.map((row:any) => ({
+          memory_key: clean(row.memory_key, 100), title: clean(row.title, 180), project: clean(row.project, 100),
+          updated_at: row.updated_at || null, notion_sync_status: clean(row.notion_sync_status, 40),
+          content: row.content && typeof row.content === "object" ? row.content : {}
+        })) : [],
+        runtime: { gemini_keys_available: GEMINI_KEYS.length > 0, claude_enabled: false, make_required: false, paid_services_required: false, execution_mode: "direct_supabase_edge", agent_work_modes: ["department_drafts_and_peer_qa", "youtube_tiktok_book_monitoring_via_zoz_pro_agent"], free_tier_only: true, active_agents: activeAgents, registered_agents: agentsWithAccess.length, owner_approval_required_for_external_actions: true } });
     }
 
     if (action === "enqueue_task") {
