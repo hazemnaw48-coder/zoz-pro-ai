@@ -41,6 +41,10 @@
   <div id="operations" class="ops-grid"><div class="empty">تحميل حالة القنوات والإنتاج والكتب والهاتف...</div></div>
   <div id="operations-note" class="notice warn">القراءة من الإنتاج مباشرة. أي اتصال غير مهيأ سيظهر بوضوح، ولن يُعرض كتنفيذ ناجح.</div>
  </section>
+ <section class="panel">
+  <div class="section-head"><h2>مساعد التشغيل والذاكرة الدائمة</h2><span id="memory-status" class="pill">جارٍ تحميل الذاكرة</span></div>
+  <div id="operating-memory"><div class="empty">تحميل آخر نقطة استئناف وحالة المشروع...</div></div>
+ </section>
  <div class="grid">
   <section class="panel"><h2>محركات الذكاء الاصطناعي</h2><div id="models"></div></section>
   <section class="panel"><h2>الأقسام</h2><div id="departments"></div></section>
@@ -108,9 +112,32 @@ function renderOperations(d){
  $('cycle-status').className='pill '+(cycle?.status==='succeeded'?'good':'warn');
  $('operations-note').textContent='البيانات تُقرأ مباشرة من الإنتاج. تحليل ومزامنة القنوات والكتب والذاكرة يعملان على الجدولة؛ KDP المباشر وتوليد Flow التلقائي غير مهيأين بعد، والنشر العام يظل بموافقة المالك.';
 }
+function renderMemory(rows){
+ const list=Array.isArray(rows)?rows:[];
+ const company=list.find(x=>x.memory_key==='company_operating_assistant');
+ const project=list.find(x=>x.memory_key==='project_zoz_operating_assistant');
+ const cc=company?.content||{},pc=project?.content||{},last=cc.last_task||{},truth=cc.truth||{};
+ const escList=(items)=>Array.isArray(items)&&items.length?'<ul>'+items.slice(0,6).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'<div class="small">لا توجد عناصر مسجلة.</div>';
+ const date=v=>{if(!v)return 'غير متاح';const n=new Date(v);return Number.isNaN(n.getTime())?String(v):n.toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'});};
+ if(!company&&!project){
+  $('memory-status').textContent='لا توجد ذاكرة تشغيل نشطة';
+  $('memory-status').className='pill warn';
+  $('operating-memory').innerHTML='<div class="empty">لم تُرجع خدمة الإنتاج ذاكرة التشغيل بعد.</div>';
+  return;
+ }
+ const artifact=truth.content_script_id||last.artifact?.id||'لا يوجد أصل مسجل في آخر نقطة';
+ const qa=last.qa_score??truth.overall_qa_score??'—';
+ const cards=[];
+ if(company)cards.push('<article class="ops-card"><h3>ذاكرة الشركة</h3><div class="ops-muted">آخر تحديث: '+esc(date(company.updated_at||cc.updated_at))+' · مزامنة Notion: '+pill(company.notion_sync_status||'غير معروفة')+'</div><p>'+esc(cc.objective||'مساعد تشغيل دائم للشركة')+'</p><strong>آخر عمل موثق</strong><p>'+esc(last.summary||'لم يُسجل ملخص بعد')+'</p><div class="ops-muted">المهمة: '+esc(last.task_id||'—')+' · الوكيل: '+esc(last.agent_key||'—')+' · QA: '+esc(qa)+'/100</div><div class="ops-muted">آخر أصل معروف: '+esc(artifact)+'</div><strong>الخطوات التالية</strong>'+escList(last.next_actions)+'</article>');
+ if(project)cards.push('<article class="ops-card"><h3>ذاكرة المشروع</h3><div class="ops-muted">'+esc(pc.project_name||project.title||'مشروع ZOZ Pro')+' · آخر تحديث: '+esc(date(project.updated_at))+'</div><p>'+esc(pc.current_state||'لا توجد حالة حالية محفوظة.')+'</p><strong>المواصفات المعتمدة</strong>'+escList(pc.accepted_specs)+'<strong>ما اكتمل</strong>'+escList(pc.completed_work)+'<strong>العوائق المفتوحة</strong>'+escList(pc.open_blockers)+'<strong>الخطوة الدقيقة التالية</strong><p>'+esc(pc.next_exact_action||'غير محددة')+'</p></article>');
+ $('operating-memory').innerHTML='<div class="ops-grid">'+cards.join('')+'</div>';
+ $('memory-status').textContent='ذاكرة Supabase محفوظة';
+ $('memory-status').className='pill good';
+}
 function render(d){
  lastData=d;$('dashboard').classList.remove('hidden');$('login-card').classList.add('hidden');
  renderOperations(d);
+ renderMemory(d.memory);
  const active=d.agents.filter(x=>x.status==='active').length;
  const connected=d.tools.filter(x=>x.connection?.connection_status==='connected'||x.integration_status==='available_now').length;
  const queued=d.tasks.filter(x=>x.status==='queued').length;
