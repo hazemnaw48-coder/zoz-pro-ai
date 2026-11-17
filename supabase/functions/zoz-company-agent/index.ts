@@ -235,9 +235,23 @@ async function reviewNextPendingTask(owner: string) {
       const priorCollaboration = priorResult.collaboration && typeof priorResult.collaboration === "object" ? priorResult.collaboration : {};
       const priorQa = priorCollaboration.independent_quality_review && typeof priorCollaboration.independent_quality_review === "object" ? priorCollaboration.independent_quality_review : {};
       const taskInput = task.input && typeof task.input === "object" ? task.input : {};
-      // The database approval flag is authoritative for internal work. A model-generated
-      // requires_owner_approval field must never block safe internal auto-review or revision.
-      const policyAllowsAutoAccept = task.approval_required === false && taskInput.external_actions_authorized !== true;
+      // Recover/verify the durable checkpoint before the peer reviewer can auto-accept this task.
+      let checkpointVerified = false;
+      try {
+        const sourceRows = await rest("zoz_pro_company_agents?id=eq." + encodeURIComponent(String(task.assigned_agent_id || "")) +
+          "&select=id,agent_key&limit=1");
+        const sourceAgent = Array.isArray(sourceRows) ? sourceRows[0] : null;
+        if (sourceAgent) {
+          const recovery = await saveCompanyOperatingCheckpoints(owner, sourceAgent, task, priorResult, priorQa,
+            priorResult.execution_trace?.department_action || { status: "not_requested" });
+          checkpointVerified = recovery.saved === true;
+        }
+      } catch (_checkpointError) {
+        checkpointVerified = false;
+      }
+      // The database approval flag is authoritative for internal work; durable memory is also mandatory.
+      const policyAllowsAutoAccept = task.approval_required === false &&
+        taskInput.external_actions_authorized !== true && checkpointVerified;
       const priorQaPassed = priorQa.status === "passed" && Number(priorQa.score || 0) >= 80 &&
         (!Array.isArray(priorQa.required_fixes) || priorQa.required_fixes.length === 0);
       if (policyAllowsAutoAccept && priorQaPassed && task.status === "awaiting_owner") {
@@ -1302,7 +1316,7 @@ Deno.serve(async (req: Request) => {
       const requestedProjectKey = companyProjectMemoryKey(task.input?.project_key || task.input?.execution?.project_key);
       let projectMemory: any = null;
       if (requestedProjectKey) projectMemory = await readCompanyMemory(owner, requestedProjectKey);
-      const departmentExecution = await executeCompanyDepartmentAction(owner, agent, task, executorContext, req, scheduledToken);
+      let departmentExecution: any = { requested: false, status: "not_requested" };
 
       // Shared company memory: previous department outputs are passed forward as explicitly unapproved drafts.
       const sharedRows = await rest(
@@ -1403,6 +1417,10 @@ Deno.serve(async (req: Request) => {
         if (!output || typeof output !== "object" || !clean(output.summary, 1200)) {
           throw new Error("Agent returned an incomplete deliverable.");
         }
+
+        // Execute the allow-listed internal action only after the agent has produced a valid deliverable.
+        departmentExecution = await executeCompanyDepartmentAction(owner, agent, task, executorContext, req, scheduledToken);
+        output.execution_trace = { department_action: departmentExecution };
 
         const mainFinished = new Date().toISOString();
         // Persist the primary work before the peer review, so a reviewer timeout cannot lose the deliverable.
