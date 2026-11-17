@@ -1001,7 +1001,7 @@ async function loadDepartmentToolContext(owner: string, agent: any, task: any) {
   }
 
   return {
-    runtime: "zoz-company-agent-v27",
+    runtime: "zoz-company-agent-v37",
     agent_key: agentKey,
     task_id: task?.id || null,
     collected_at: new Date().toISOString(),
@@ -1306,7 +1306,7 @@ Deno.serve(async (req: Request) => {
         return reply({ ok: false, ran: false, error: "Task was already claimed by another worker; retry safely." }, 409);
       }
 
-      let executorContext: any = { runtime: "zoz-company-agent-v27", agent_key: agent.agent_key, available_tools: [], unavailable_tools: [], evidence: [], data: {}, safety: { external_actions_performed: false } };
+      let executorContext: any = { runtime: "zoz-company-agent-v37", agent_key: agent.agent_key, available_tools: [], unavailable_tools: [], evidence: [], data: {}, safety: { external_actions_performed: false } };
       try {
         executorContext = await loadDepartmentToolContext(owner, agent, task);
       } catch (toolError) {
@@ -1525,7 +1525,7 @@ Deno.serve(async (req: Request) => {
         }
 
         output.execution_trace = {
-          runtime: "zoz-company-agent-v27",
+          runtime: "zoz-company-agent-v37",
           server_tool_evidence: executorContext.evidence || [],
           available_tools: executorContext.available_tools || [],
           unavailable_tools: executorContext.unavailable_tools || [],
