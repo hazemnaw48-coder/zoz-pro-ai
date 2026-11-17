@@ -504,7 +504,6 @@ async function seedAcceptedCompanyHandoffs(owner: string) {
     "qa_and_testing":"operations",
     "qa":"operations",
     "quality_assurance":"operations",
-    "operations_qa":"operations",
     "marketing_and_funnel":"sales_marketing",
     "marketing":"sales_marketing",
     "sales":"sales_marketing",
@@ -982,7 +981,7 @@ async function probeExternalToolConnections(owner: string) {
     try {
       const token = await loadExternalCredential(owner, key);
       if (!token) throw new Error("Missing server credential in Vault.");
-      const result = key === "github" ? await githubServerProbe(token) : await notionServerProbe(token);
+      const result: any = key === "github" ? await githubServerProbe(token) : await notionServerProbe(token);
       await persistExternalConnection(owner, key, tool.id, result);
       report[key] = key === "github"
         ? { status: "connected", account: result.login, repository: result.repository, recent_commits: result.recent_commits?.length || 0, checked_at: result.verified_at }
@@ -1500,7 +1499,7 @@ Deno.serve(async (req: Request) => {
             status: autoAccepted ? "completed" : (!executionOkay ? "blocked" : "awaiting_owner"),
             result: output,
             ...(autoAccepted ? { completed_at: finalSavedAt, error_message: null } :
-              (!executionOkay ? { error_message: clean(departmentExecution.error || "department_action_blocked", 300) } :
+              (!executionOkay ? { error_message: clean((departmentExecution as any).error || "department_action_blocked", 300) } :
                 (!durableMemoryResult.saved ? { error_message: "Durable operating memory was not verified; task remains awaiting review." } : {}))),
             updated_at: finalSavedAt
           })
