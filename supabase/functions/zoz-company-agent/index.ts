@@ -580,7 +580,14 @@ async function seedAcceptedCompanyHandoffs(owner: string) {
             handoff_reason: reason,
             handoff_depth: depth + 1,
             owner_authorized_internal_work: true,
-            external_actions_authorized: false
+            external_actions_authorized: false,
+            ...(companyProjectMemoryKey(h.project_key) ? { project_key: clean(h.project_key, 80) } : {}),
+            ...(h.execution && typeof h.execution === "object" && clean(h.execution.operation, 80) === "create_content_script" && deptKey === "content"
+              ? { execution: { operation: "create_content_script", channel_id: clean(h.execution.channel_id, 40),
+                  topic: clean(h.execution.topic || title, 240), mode: h.execution.mode === "long" ? "long" : "short",
+                  duration_seconds: Math.max(20, Math.min(180, Number(h.execution.duration_seconds) || 45)),
+                  ...(companyProjectMemoryKey(h.execution.project_key || h.project_key) ? { project_key: clean(h.execution.project_key || h.project_key, 80) } : {})
+                } } : {})
           },
           expected_output: "مخرج عملي داخلي قابل للفحص مع أدلة التنفيذ واختبارات القبول والاعتماديات.",
           priority: Math.max(1, Math.min(1000, Number(parent.priority || 100) + index + 1)),
@@ -604,7 +611,7 @@ async function seedAcceptedCompanyHandoffs(owner: string) {
 
 
 const DEPARTMENT_TOOL_BINDINGS: Record<string, string[]> = {
-  ceo: ["zoz_company_runtime","supabase","zoz_tool_gateway","youtube_data_api","tiktok_display_api","zoz_production_center","amazon_kdp","github","notion"],
+  ceo: ["zoz_company_runtime","supabase","zoz_tool_gateway","youtube_data_api","tiktok_display_api","zoz_production_center","zoz_content_studio","amazon_kdp","github","notion"],
   research_lead: ["gemini","youtube_data_api","tiktok_display_api","supabase"],
   content_producer: ["gemini","youtube_data_api","tiktok_display_api","zoz_content_studio","zoz_production_center"],
   digital_product_manager: ["gemini","amazon_kdp","supabase"],
@@ -622,6 +629,120 @@ const DEPARTMENT_TOOL_BINDINGS: Record<string, string[]> = {
 
 function summarizeRows(value: any, max = 12) {
   return (Array.isArray(value) ? value : []).slice(0, max);
+}
+
+function companyProjectMemoryKey(value: unknown): string {
+  const slug=clean(value,80).toLowerCase().replace(/[^a-z0-9_-]/g,"_").replace(/_+/g,"_").replace(/^_+|_+$/g,"");
+  return /^[a-z0-9][a-z0-9_-]{2,50}$/.test(slug) ? "project_"+slug : "";
+}
+function memoryStrings(value: unknown, limit=12, size=400): string[] {
+  return Array.isArray(value) ? [...new Set(value.map((x:unknown)=>clean(x,size)).filter(Boolean))].slice(0,limit) : [];
+}
+async function readCompanyMemory(owner:string,key:string) {
+  const rows=await rest("zoz_pro_agent_memory?owner_id=eq."+encodeURIComponent(owner)+"&memory_key=eq."+encodeURIComponent(key)+"&status=eq.active&select=id,memory_key,project,title,content,updated_at&order=updated_at.desc&limit=1");
+  return Array.isArray(rows)?rows[0]||null:null;
+}
+async function writeCompanyMemory(owner:string,key:string,title:string,content:Record<string,unknown>,taskId:string) {
+  const existing=await readCompanyMemory(owner,key);
+  const payload={owner_id:owner,memory_key:key,project:"ZOZ Pro",title,content,status:"active",updated_at:new Date().toISOString()};
+  if(existing?.id) await rest("zoz_pro_agent_memory?id=eq."+encodeURIComponent(String(existing.id))+"&owner_id=eq."+encodeURIComponent(owner),{method:"PATCH",body:JSON.stringify(payload)});
+  else await rest("zoz_pro_agent_memory",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify(payload)});
+  const check=await readCompanyMemory(owner,key);
+  if(!check?.id||clean(check.content?.last_task?.task_id,40)!==taskId) throw new Error("company_memory_readback_failed:"+key);
+  await rest("zoz_pro_agent_memory_events",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({
+    owner_id:owner,memory_key:key,event_type:key==="company_operating_assistant"?"company_operating_checkpoint_saved":"company_project_checkpoint_saved",
+    payload:{task_id:taskId,verified_at:check.updated_at}
+  })}).catch(()=>null);
+  return {memory_key:key,verified_at:check.updated_at};
+}
+async function executeCompanyDepartmentAction(owner:string,agent:any,task:any,ctx:any,req:Request,scheduledToken:string) {
+  const input=task?.input&&typeof task.input==="object"?task.input:{};
+  const e=input.execution&&typeof input.execution==="object"?input.execution:null;
+  if(!e)return {requested:false,status:"not_requested"};
+  if(clean(e.operation,80)!=="create_content_script")return {requested:true,status:"blocked",error:"operation_not_allowlisted"};
+  if(agent?.agent_key!=="content_producer")return {requested:true,status:"blocked",error:"operation_requires_content_producer"};
+  if(task?.approval_required!==false||input.external_actions_authorized===true)return {requested:true,status:"blocked",error:"internal_draft_requires_non_external_task"};
+  const tool=(Array.isArray(ctx?.available_tools)?ctx.available_tools:[]).find((x:any)=>x.tool_key==="zoz_content_studio");
+  if(!tool||!["draft","write","execute_approved"].includes(String(tool.access_level||"")))return {requested:true,status:"blocked",error:"zoz_content_studio_not_available"};
+  const channelId=clean(e.channel_id,40),topic=clean(e.topic||task.title,240),mode=e.mode==="long"?"long":"short",duration=Number(e.duration_seconds);
+  if(!/^UC[A-Za-z0-9_-]{22}$/.test(channelId)||topic.length<8||!Number.isInteger(duration)||duration<20||duration>180)
+    return {requested:true,status:"blocked",error:"invalid_content_script_parameters"};
+  const channels=await rest("zoz_pro_managed_channels?owner_id=eq."+encodeURIComponent(owner)+"&channel_id=eq."+encodeURIComponent(channelId)+"&is_active=eq.true&select=channel_id,display_name&limit=1");
+  if(!Array.isArray(channels)||!channels[0])return {requested:true,status:"blocked",error:"target_channel_not_active"};
+  const headers:Record<string,string>={"content-type":"application/json"};
+  if(scheduledToken)headers["x-zoz-autopilot-token"]=scheduledToken;
+  else {
+    const auth=req.headers.get("authorization")||"";
+    if(!auth)return {requested:true,status:"blocked",error:"owner_session_required"};
+    headers.authorization=auth;headers.apikey=req.headers.get("apikey")||ANON;
+  }
+  const requestId=crypto.randomUUID(),startedAt=new Date().toISOString();
+  try {
+    const response=await fetch(URL+"/functions/v1/zoz-pro-youtube-analytics?action=studio_generate",{
+      method:"POST",headers,body:JSON.stringify({channel_id:channelId,topic,mode,duration_seconds:duration}),signal:AbortSignal.timeout(45000)
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||data?.ok!==true||!data?.script?.id)throw new Error(clean(data?.error||"content_studio_did_not_confirm_saved_script",240));
+    const scriptId=clean(data.script.id,40);
+    const rows=await rest("zoz_pro_content_scripts?id=eq."+encodeURIComponent(scriptId)+"&owner_id=eq."+encodeURIComponent(owner)+"&channel_id=eq."+encodeURIComponent(channelId)+"&select=id,channel_id,title,status,generation_method,production_package,created_at&limit=1");
+    const script=Array.isArray(rows)?rows[0]:null;
+    if(!script||script.status!=="draft"||script.channel_id!==channelId)throw new Error("content_script_readback_verification_failed");
+    const result={requested:true,status:"succeeded",operation:"create_content_script",tool_key:"zoz_content_studio",request_id:requestId,
+      artifact:{type:"zoz_pro_content_scripts",id:script.id,channel_id:script.channel_id,channel_name:clean(channels[0].display_name,120),
+        title:clean(script.title,160),status:script.status,generation_method:clean(script.generation_method||"unknown",80),
+        duration_seconds:Number(script.production_package?.duration_seconds||duration),verified_at:new Date().toISOString()}};
+    await rest("zoz_pro_tool_gateway_audit",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({
+      owner_id:owner,agent_id:agent.id||null,tool_id:tool.tool_id||null,tool_key:"zoz_content_studio",
+      capability:"content_script.create_draft",status:"succeeded",request_id:requestId,
+      details:{task_id:task.id,channel_id:channelId,script_id:script.id,verified_readback:true,started_at:startedAt}
+    })}).catch(()=>null);
+    return result;
+  } catch(error) {
+    const message=clean(error instanceof Error?error.message:"content_script_execution_failed",260);
+    await rest("zoz_pro_tool_gateway_audit",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({
+      owner_id:owner,agent_id:agent.id||null,tool_id:tool.tool_id||null,tool_key:"zoz_content_studio",
+      capability:"content_script.create_draft",status:"failed",request_id:requestId,
+      details:{task_id:task.id,channel_id:channelId,error:message,started_at:startedAt}
+    })}).catch(()=>null);
+    return {requested:true,status:"failed",operation:"create_content_script",tool_key:"zoz_content_studio",request_id:requestId,error:message};
+  }
+}
+async function saveCompanyOperatingCheckpoints(owner:string,agent:any,task:any,output:any,qa:any,execution:any) {
+  const now=new Date().toISOString(),taskId=clean(task?.id,40),input=task?.input&&typeof task.input==="object"?task.input:{};
+  const oldGlobal=await readCompanyMemory(owner,"company_operating_assistant");
+  const gc=oldGlobal?.content&&typeof oldGlobal.content==="object"?oldGlobal.content:{};
+  const activity={
+    task_id:taskId,task_title:clean(task?.title,180),agent_key:clean(agent?.agent_key,60),
+    qa_status:clean(qa?.status,40),qa_score:Number(qa?.score||0),execution_status:clean(execution?.status||"not_requested",40),
+    artifact:execution?.artifact||null,summary:clean(output?.summary,900),
+    blockers:[...memoryStrings(output?.risks,5,220),...((execution?.status==="failed"||execution?.status==="blocked")?[clean(execution.error,220)]:[]),...memoryStrings(qa?.required_fixes,5,220)].slice(0,10),
+    next_actions:memoryStrings(output?.next_steps,6,250),recorded_at:now
+  };
+  const recent=[...(Array.isArray(gc.recent_work)?gc.recent_work:[]).filter((x:any)=>clean(x?.task_id,40)!==taskId),activity].slice(-20);
+  const globalContent={
+    memory_type:"company_operating_assistant",version:1,
+    objective:"Persistent ZOZ Pro operating assistant: resume projects, delegate work, execute verified server tools and record artifacts.",
+    operating_contract:{primary_source_of_truth:"Supabase Production",no_false_completion:true,no_duplicate_external_actions:true,
+      external_publication_requires_asset_specific_owner_approval:true,google_flow_is_owner_operated:true,video_specs_must_be_loaded_before_production:true},
+    last_task:activity,recent_work:recent,updated_at:now
+  };
+  const writes=[await writeCompanyMemory(owner,"company_operating_assistant","ZOZ Pro — ذاكرة مساعد التشغيل الدائمة",globalContent,taskId)];
+  const projectKey=companyProjectMemoryKey(input.project_key||input.execution?.project_key);
+  if(projectKey) {
+    const prev=await readCompanyMemory(owner,projectKey),old=prev?.content&&typeof prev.content==="object"?prev.content:{};
+    const cp=output?.project_checkpoint&&typeof output.project_checkpoint==="object"?output.project_checkpoint:{};
+    const blockers=[...memoryStrings(old.open_blockers,10,300),...memoryStrings(output?.risks,8,300),
+      ...(qa?.status==="revision_needed"?memoryStrings(qa?.required_fixes,8,300):[]),
+      ...((execution?.status==="failed"||execution?.status==="blocked")?[clean(execution.error,300)]:[])];
+    const projectContent={...old,project_key:clean(input.project_key||input.execution?.project_key,80),
+      project_name:clean(input.project_name||task.title,180),current_state:clean(cp.current_state||output.summary,1400),
+      accepted_specs:memoryStrings(cp.accepted_specs||old.accepted_specs,16,400),
+      completed_work:memoryStrings([...memoryStrings(old.completed_work,12,350),...memoryStrings(cp.completed_work,8,350),activity.summary],16,350),
+      open_blockers:[...new Set(blockers)].slice(-12),next_exact_action:clean(cp.next_exact_action||output?.next_steps?.[0]||"",450),
+      last_task:activity,updated_at:now};
+    writes.push(await writeCompanyMemory(owner,projectKey,"ZOZ Pro — ذاكرة المشروع: "+clean(input.project_name||task.title,140),projectContent,taskId));
+  }
+  return {saved:true,writes,verified_at:now};
 }
 
 async function loadDepartmentToolContext(owner: string, agent: any, task: any) {
@@ -1133,6 +1254,11 @@ Deno.serve(async (req: Request) => {
         };
       }
 
+      const requestedProjectKey = companyProjectMemoryKey(task.input?.project_key || task.input?.execution?.project_key);
+      let projectMemory: any = null;
+      if (requestedProjectKey) projectMemory = await readCompanyMemory(owner, requestedProjectKey);
+      const departmentExecution = await executeCompanyDepartmentAction(owner, agent, task, executorContext, req, scheduledToken);
+
       // Shared company memory: previous department outputs are passed forward as explicitly unapproved drafts.
       const sharedRows = await rest(
         "zoz_pro_company_tasks?owner_id=eq." + owner +
@@ -1167,7 +1293,7 @@ Deno.serve(async (req: Request) => {
       }));
 
       const roleInstructions: Record<string, string> = {
-        executive: "Act as the chief executive. Convert company goals into prioritized measurable work, coordinate departments, identify dependencies and weekly KPIs. Integrate the research, product, publishing, services, software, sales, finance and operations outputs. Never authorize spending or external commitments.",
+        executive: "Act as the chief executive and accountable operations manager. Convert company goals into prioritized measurable work, coordinate departments, identify dependencies and weekly KPIs. For substantive daily strategy tasks, delegate at least two distinct specialist work packages when supported by evidence (normally research_lead for evidence/opportunity validation and content_producer for a channel-specific draft). The content handoff must name an exact active channel_id and exact topic from the supplied content calendar; when justified, include execution {operation:create_content_script,channel_id,topic,mode,duration_seconds,project_key}. Do not create vague QA-only handoffs. This content action saves an internal draft only; never publish. Integrate all department outputs. Never authorize spending or external commitments.",
         research_lead: "Act as research and intelligence lead. Separate verified facts from assumptions, provide source/evidence requirements, compare competitors and market opportunities, and state confidence. Never fabricate citations or pretend to browse if no evidence is supplied.",
         content_producer: "Act as media production lead for the user's Arabic YouTube brands. Respect each channel's distinct niche and visual identity. Produce scripts, scene plans, titles, descriptions, thumbnails briefs and analytics experiments. For every YouTube publication, enforce the company-wide youtube_production_publishing SOP: exact channel ID routing; final file from Android Downloads through the Flow Bridge to the matching Production Center intake; SHA-256 duplicate rejection; one upload only; YouTube Private first; wait for processingStatus=succeeded and processed uploadStatus; asset-specific owner approval for the exact asset/channel/video; publish only through Production Center; re-read YouTube API and verify same video ID, channelId, and privacyStatus=public before reporting success. Never ask for chat re-upload if file already exists on device. Never treat database status as proof.",
         digital_product_manager: "Act as digital product manager. Design useful sellable digital products, customer profile, problem-solution fit, contents, pricing hypotheses, production plan and validation experiment. Reconcile your offer with supplied market research and the company's cost limits. Do not claim sales or validated demand without evidence.",
@@ -1193,10 +1319,12 @@ Deno.serve(async (req: Request) => {
         "requires_owner_approval must be false for completed internal analysis, planning, drafts and reversible database work. Set it true only when a consequential external action (public publishing, customer contact, purchase, payment, account/permission change or destructive action) is actually being requested. External actions remain blocked in this worker even when requested.",
         "An internal handoff may be proposed for another department after your own task is complete. Do not ask the owner to approve ordinary internal work; the independent QA reviewer is the gate for internal completion.",
         "ACTUAL SERVER TOOL OUTPUTS (these are live Supabase-backed adapter reads, with an audit record for each): " + JSON.stringify(executorContext),
+         "ACTUAL EXECUTED DEPARTMENT ACTION (only a successful status with a verified artifact id may be described as executed): " + JSON.stringify(departmentExecution),
+         "PROJECT-SPECIFIC DURABLE MEMORY (resume from it and do not repeat accepted or completed work): " + JSON.stringify(projectMemory?.content || null),
         "No paid services and no Make dependency. External integrations are not implicitly callable from this worker.",
         "All public, financial, account, destructive and customer-facing actions require explicit owner approval. Do all reversible analysis, planning, calculations, drafting and internal QA autonomously.",
         "Self-check the deliverable for completeness, internal consistency, evidence versus assumptions, feasibility without recurring cost, and measurable acceptance criteria.",
-        "Return JSON with keys: summary, deliverable_markdown, evidence_needed, next_steps (array), risks (array), requires_owner_approval (boolean), success_metrics (array), handoffs (array of {department_key,task_title,reason}), quality_check ({completeness,consistency,evidence,feasibility}).",
+        "Return JSON with keys: summary, deliverable_markdown, evidence_needed, next_steps (array), risks (array), requires_owner_approval (boolean), success_metrics (array), handoffs (array of {department_key,task_title,reason,project_key?,execution?:{operation,channel_id,topic,mode,duration_seconds}}), project_checkpoint? ({current_state,accepted_specs,completed_work,open_blockers,next_exact_action}), quality_check ({completeness,consistency,evidence,feasibility}). For content_producer handoffs, set execution only to create_content_script with an exact active channel and topic from supplied data.",
         "Task title: " + task.title,
         "Task description: " + task.objective,
         "Task input: " + JSON.stringify(task.input || {}),
@@ -1342,8 +1470,17 @@ Deno.serve(async (req: Request) => {
         const internalQaPassed = qualityReview.status === "passed" &&
           Number(qualityReview.score || 0) >= 80 &&
           (!Array.isArray(qualityReview.required_fixes) || qualityReview.required_fixes.length === 0);
-        const autoAccepted = internalQaPassed && !ownerRequired;
         const finalSavedAt = new Date().toISOString();
+        output.execution_trace.department_action = departmentExecution;
+        let durableMemoryResult: any = { saved: false, error: "not_attempted" };
+        try {
+          durableMemoryResult = await saveCompanyOperatingCheckpoints(owner, agent, task, output, qualityReview, departmentExecution);
+        } catch (memoryError) {
+          durableMemoryResult = { saved: false, error: clean(memoryError instanceof Error ? memoryError.message : "durable_company_memory_failed", 260) };
+        }
+        output.durable_memory_checkpoint = durableMemoryResult;
+        const executionOkay = departmentExecution.status !== "failed" && departmentExecution.status !== "blocked";
+        const autoAccepted = internalQaPassed && !ownerRequired && executionOkay && durableMemoryResult.saved === true;
         output.collaboration = {
           mode: "shared_department_memory",
           prior_department_task_ids: sharedContext.map((x:any) => x.task_id),
@@ -1359,9 +1496,11 @@ Deno.serve(async (req: Request) => {
         await rest("zoz_pro_company_tasks?id=eq." + task.id + "&owner_id=eq." + owner, {
           method: "PATCH",
           body: JSON.stringify({
-            status: autoAccepted ? "completed" : "awaiting_owner",
+            status: autoAccepted ? "completed" : (!executionOkay ? "blocked" : "awaiting_owner"),
             result: output,
-            ...(autoAccepted ? { completed_at: finalSavedAt, error_message: null } : {}),
+            ...(autoAccepted ? { completed_at: finalSavedAt, error_message: null } :
+              (!executionOkay ? { error_message: clean(departmentExecution.error || "department_action_blocked", 300) } :
+                (!durableMemoryResult.saved ? { error_message: "Durable operating memory was not verified; task remains awaiting review." } : {}))),
             updated_at: finalSavedAt
           })
         });
@@ -1376,6 +1515,8 @@ Deno.serve(async (req: Request) => {
           shared_department_outputs: sharedContext.length,
           tool_evidence_count: Array.isArray(executorContext.evidence) ? executorContext.evidence.length : 0,
           independent_quality_review: qualityReview.status,
+          department_action: departmentExecution,
+          durable_memory_checkpoint: durableMemoryResult,
           handoff_dispatch: handoffDispatch,
           output
         });
