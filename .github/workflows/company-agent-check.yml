@@ -4,10 +4,12 @@ on:
   pull_request:
     paths:
       - "supabase/functions/zoz-company-agent/**"
+      - "supabase/functions/zoz-pro-agent/**"
       - ".github/workflows/company-agent-check.yml"
   push:
     branches:
       - "feat/zoz-company-operating-runtime"
+      - "fix/zoz-agent-calendar-idempotency"
     paths:
       - "supabase/functions/zoz-company-agent/**"
       - ".github/workflows/company-agent-check.yml"
@@ -25,5 +27,7 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - name: Type-check Edge Function
+      - name: Type-check company orchestration Edge Function
         run: deno check --config supabase/functions/zoz-company-agent/deno.json supabase/functions/zoz-company-agent/index.ts
+      - name: Type-check autonomous production agent
+        run: deno check --config supabase/functions/zoz-pro-agent/deno.json supabase/functions/zoz-pro-agent/index.ts
