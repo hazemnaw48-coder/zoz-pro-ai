@@ -503,7 +503,7 @@ async function seedAcceptedCompanyHandoffs(owner: string) {
   const agentIdByDept = new Map((Array.isArray(agents) ? agents : []).map((x:any) => [String(x.department_id), x.id]));
   const normalizeHandoffTopic = (value: unknown) =>
     String(value || "").trim().toLocaleLowerCase("ar")
-      .replace(/[؟?!.,،؛:]+/g, "").replace(/\\s+/g, " ");
+      .replace(/[؟?!.,،؛:]+/g, "").replace(/\s+/g, " ");
   const existingTaskRows = await rest(
     "zoz_pro_company_tasks?owner_id=eq." + encodeURIComponent(owner) +
     "&status=in.(queued,running,awaiting_owner,completed)&select=id,status,input&order=created_at.desc&limit=500"
