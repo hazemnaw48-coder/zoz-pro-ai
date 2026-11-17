@@ -1,3 +1,4 @@
+// Reconciled deployed source snapshot: zoz-company-agent v38 (2026-11-17).
 // Reconciled deployed source snapshot: zoz-company-agent v37 (2026-11-17).
 // Reconciled deployed source snapshot: zoz-company-agent v36 (2026-11-17).
 // Reconciled production source snapshot: zoz-company-agent deployment v35 (2026-11-17).
