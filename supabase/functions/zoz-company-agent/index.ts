@@ -638,7 +638,7 @@ function memoryStrings(value: unknown, limit=12, size=400): string[] {
   return Array.isArray(value) ? [...new Set(value.map((x:unknown)=>clean(x,size)).filter(Boolean))].slice(0,limit) : [];
 }
 async function readCompanyMemory(owner:string,key:string) {
-  const rows=await rest("zoz_pro_agent_memory?owner_id=eq."+encodeURIComponent(owner)+"&memory_key=eq."+encodeURIComponent(key)+"&status=eq.active&select=id,memory_key,project,title,content,updated_at&order=updated_at.desc&limit=1");
+  const rows=await rest("zoz_pro_agent_memory?owner_id=eq."+encodeURIComponent(owner)+"&memory_key=eq."+encodeURIComponent(key)+"&select=id,memory_key,project,title,content,status,updated_at&order=updated_at.desc&limit=1");
   return Array.isArray(rows)?rows[0]||null:null;
 }
 async function writeCompanyMemory(owner:string,key:string,title:string,content:Record<string,unknown>,taskId:string) {
