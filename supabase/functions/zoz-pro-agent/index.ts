@@ -1,3 +1,4 @@
+// Reconciled deployed source snapshot: zoz-pro-agent v61 (2026-11-17).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -15,7 +16,7 @@ const PUBLISHABLE_KEY =
   Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ||
   defaultKey("SUPABASE_PUBLISHABLE_KEYS") ||
   Deno.env.get("SUPABASE_ANON_KEY") || "";
-const OWNER_EMAIL = Deno.env.get("ZOZ_OWNER_EMAIL") || "";
+const OWNER_EMAIL = (Deno.env.get("ZOZ_OWNER_EMAIL") || "").trim().toLowerCase();
 const TARGET_CHANNEL_ID = "UCIael48cvwPG3gKj--c7HKw";
 const SELF = SUPABASE_URL + "/functions/v1/zoz-pro-youtube-analytics";
 const GEMINI_KEYS = [
@@ -283,6 +284,42 @@ async function inspectData(userId: string, channel: any) {
     workflow: clean(a.workflow, 80), status: clean(a.status, 40), started_at: a.started_at,
     finished_at: a.finished_at, summary: clean(a.details?.summary || a.details?.message || "", 220)
   }));
+  let linkedTikTok: any = null;
+  try {
+    const linkedRows = await db(
+      "zoz_pro_social_channels?owner_id=eq." + encodeURIComponent(userId) +
+      "&platform=eq.tiktok&connection_status=eq.connected" +
+      "&metadata->>youtube_channel_id=eq." + encodeURIComponent(cid) +
+      "&select=slot_key,display_name,handle,last_synced_at&limit=1"
+    );
+    const linked = Array.isArray(linkedRows) ? linkedRows[0] : null;
+    if (linked) {
+      const tiktokRows = await db(
+        "zoz_pro_tiktok_analytics_snapshots?owner_id=eq." + encodeURIComponent(userId) +
+        "&slot_key=eq." + encodeURIComponent(String(linked.slot_key)) +
+        "&select=profile,videos,captured_at,source&order=captured_at.desc&limit=1"
+      );
+      const latestTikTok = Array.isArray(tiktokRows) ? tiktokRows[0] : null;
+      if (latestTikTok) {
+        const tv = Array.isArray(latestTikTok.videos) ? latestTikTok.videos : [];
+        linkedTikTok = {
+          account: clean(linked.display_name, 100),
+          handle: clean(linked.handle, 100),
+          captured_at: latestTikTok.captured_at,
+          source: clean(latestTikTok.source, 60),
+          profile: latestTikTok.profile || {},
+          video_count_in_snapshot: tv.length,
+          top_videos: tv.slice().sort((a: any, b: any) => Number(b.view_count || 0) - Number(a.view_count || 0))
+            .slice(0, 8).map((v: any) => ({
+              title: clean(v.title, 180), views: Number(v.view_count || 0),
+              likes: Number(v.like_count || 0), comments: Number(v.comment_count || 0),
+              shares: Number(v.share_count || 0), duration: Number(v.duration || 0),
+              share_url: clean(v.share_url, 300)
+            }))
+        };
+      }
+    }
+  } catch (_) { linkedTikTok = null; }
   return {
     channel: {
       channel_id: cid,
@@ -348,7 +385,8 @@ async function inspectData(userId: string, channel: any) {
         last_error: clean(a.last_error, 180) || null, updated_at: a.updated_at
       }))
     },
-    recent_automation_runs: recentRuns
+    recent_automation_runs: recentRuns,
+    cross_platform: linkedTikTok ? { tiktok: linkedTikTok } : null
   };
 }
 function heuristicAnalysis(state: any) {
@@ -387,7 +425,7 @@ async function modelAnalysis(state: any, memoryContext: any = null) {
     "اكتب بالعربية. أعط 3 إلى 5 خطوات تشغيلية محددة للأقسام الموجودة في البيانات. فرّق بين المشاهدات الكلية ومشاهدات الفترة. لا تنشر ولا تغير خصوصية أي فيديو. لا تطلب مفاتيح أو كلمات مرور. إذا كانت البيانات ناقصة فقل ذلك.",
     JSON.stringify({
       channel: state.channel, live_status: state.live_status, analytics: state.analytics,
-      content: state.content, video_intake: state.video_intake,
+      content: state.content, video_intake: state.video_intake, cross_platform: state.cross_platform || null,
       durable_memory_context: memoryContext ? { last_run_id: memoryContext.last_run_id, last_run_status: memoryContext.last_run_status, next_resume_hint: memoryContext.next_resume_hint, channels_checked: memoryContext.channels_checked, channels_failed: memoryContext.channels_failed, failures: Array.isArray(memoryContext.failures) ? memoryContext.failures.slice(0, 8) : [] } : null
     })
   ].join("\n");
@@ -490,7 +528,6 @@ async function syncChannelLive(req: Request, user: any, channelId: string) {
 async function evaluateLatestVideo(req: Request, user: any, body: any) {
   const channelId = safeUrlId(body?.channel_id || TARGET_CHANNEL_ID);
   if (!channelId) return fail("اختر قناة مسجلة في مركز الإنتاج.", 400);
-  if (channelId !== TARGET_CHANNEL_ID) return fail("اختبار الأداء متاح حاليًا لقناة Hazem Ahmed المحددة فقط.", 403);
   const channel = await getChannel(user.id, channelId);
   const startedAt = new Date().toISOString();
   try {
@@ -536,9 +573,7 @@ async function evaluateLatestVideo(req: Request, user: any, body: any) {
     const related = publicVideos.filter((v: any) => {
       if (String(v.video_id) === String(latest.video_id)) return false;
       const p = parseDate(v.published_at);
-      const title = String(v.title || "");
-      return p !== null && p < publishedMs && Date.now() - p <= 45 * 86400000 &&
-        /فن|رسم|العين|جسم|الملك|نب آمون|عمارنة|ألوان/.test(title);
+      return p !== null && p < publishedMs && Date.now() - p <= 45 * 86400000;
     }).slice(0, 5).map((v: any) => {
       const p = parseDate(v.published_at) as number;
       const hours = Math.max(1, (Date.now() - p) / 3600000);
@@ -723,6 +758,7 @@ async function runManagementCycle(req: Request, user: any, body: any) {
   const channelId = safeUrlId(body?.channel_id || TARGET_CHANNEL_ID);
   if (!channelId) return fail("اختر قناة مسجلة في مركز الإنتاج.", 400);
   const channel = await getChannel(user.id, channelId);
+  if(String(channel.niche||"").includes("وجهة القناة قيد التحقق"))return fail("القناة معلقة حتى تأكيد وجهتها من المالك.",403);
   const startedAt = new Date().toISOString();
   try {
     const liveSync = await syncChannelLive(req, user, channelId);
@@ -927,8 +963,8 @@ async function createDraft(req: Request, user: any, body: any) {
   const channel = await getChannel(user.id, channelId);
   const topic = clean(body?.topic, 240);
   if (topic.length < 8) return fail("اكتب موضوعًا محددًا لا يقل عن 8 أحرف.", 400);
-  if (channelId === "UC-FimUUFXRd0MOSoikzczcQ") {
-    return fail("القناة المسجلة بهذا المعرّف تظهر في YouTube باسم «فكره كيدز»؛ أوقفنا إنشاء المسودات عليها حتى لا نخلط محتوى الأطفال مع القناة السياسية أو مصر القديمة. استخدم قناة Hazem Ahmed أو فكره حاليًا.", 409);
+  if (String(channel.niche || "").includes("وجهة القناة قيد التحقق")) {
+    return fail("وجهة القناة ما زالت قيد التحقق؛ لم يتم إنشاء محتوى حتى يؤكد المالك تصنيفها.", 409);
   }
   const authorization = req.headers.get("authorization") || "";
   const startedAt = new Date().toISOString();
@@ -969,7 +1005,7 @@ async function createDraft(req: Request, user: any, body: any) {
 
 async function chooseProductionChannel(userId:string,requestedId:string,topic:string) {
   const rows=await db("zoz_pro_managed_channels?owner_id=eq."+encodeURIComponent(userId)+"&is_active=eq.true&select=channel_id,display_name,channel_title,niche,connection_status,last_synced_at&order=last_synced_at.desc.nullslast");
-  const channels=(Array.isArray(rows)?rows:[]).filter((x:any)=>safeUrlId(x.channel_id)&&x.channel_id!=="UC-FimUUFXRd0MOSoikzczcQ"&&!String(x.niche||"").includes("قيد التحقق"));
+  const channels=(Array.isArray(rows)?rows:[]).filter((x:any)=>safeUrlId(x.channel_id)&&!String(x.niche||"").includes("وجهة القناة قيد التحقق"));
   if(requestedId){const exact=channels.find((x:any)=>x.channel_id===requestedId);if(!exact)throw new Error("القناة المطلوبة غير مسجلة أو قيد التحقق؛ لم يتم تحويل المحتوى إلى قناة أخرى.");return exact;}
   if(!channels.length)throw new Error("لا توجد قناة موثقة صالحة للإنتاج.");
   const t=topic.toLowerCase();
@@ -1029,7 +1065,7 @@ async function approveProductionProposal(user:any,body:any) {
   const jobs:any[]=[];
   for(const scene of scenes){
     const index=Number(scene.scene_index);
-    const payload={proposal_id:id,campaign_id:id,total_scenes:scenes.length,script_id:spec.script_id||null,channel_id:spec.channel_id,title:spec.title,scene_index:index,scene_count:scenes.length,duration_seconds:8,aspect_ratio:"9:16",orientation:"portrait",output_count:1,video_model:"Gemini Omni Flash (720p)",prompt:clean(scene.prompt,12000),narration:clean(scene.narration,240)};
+    const payload={proposal_id:id,campaign_id:id,total_scenes:scenes.length,script_id:spec.script_id||null,channel_id:spec.channel_id,title:spec.title,scene_index:index,scene_count:scenes.length,duration_seconds:8,aspect_ratio:"9:16",prompt:clean(scene.prompt,12000),narration:clean(scene.narration,240)};
     const created=await db("zoz_pro_device_jobs",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({owner_id:user.id,device_id:device.id,capability_id:"flow.generate_scene",payload,status:"queued",approval_required:false,approval_status:"not_required",idempotency_key:"flow-proposal-"+id+"-scene-"+index,priority:2})});
     const job=created?.[0];if(!job)throw new Error("تعذر إنشاء مهمة المشهد "+index+". راجع الطابور قبل إعادة المحاولة.");
     jobs.push({job_id:job.id,scene_index:index,status:job.status});
@@ -1041,6 +1077,11 @@ async function approveProductionProposal(user:any,body:any) {
 async function dispatchFlowPrompt(user:any,body:any) {
   const deviceId=clean(body?.device_id,40);
   const prompt=clean(body?.prompt,12000);
+  const channelId=safeUrlId(body?.channel_id||TARGET_CHANNEL_ID);
+  if(!channelId)return fail("اختر قناة مسجلة في مركز الإنتاج.",400);
+  let channel:any;
+  try{channel=await getChannel(user.id,channelId);}catch(e){return fail(clean(e instanceof Error?e.message:"القناة غير متاحة.",240),403);}
+  if(String(channel.niche||"").includes("وجهة القناة قيد التحقق"))return fail("تم تعليق إرسال مشاهد Flow لهذه القناة حتى يؤكد المالك وجهتها ومحتواها.",403);
   if(!/^[0-9a-f-]{36}$/i.test(deviceId))return fail("اختر هاتفًا مقرونًا صالحًا.",400);
   if(prompt.length<8)return fail("مطالبة المشهد قصيرة أو فارغة.",400);
   const devices=await db("zoz_pro_device_registry?id=eq."+encodeURIComponent(deviceId)+
@@ -1050,7 +1091,7 @@ async function dispatchFlowPrompt(user:any,body:any) {
   const idempotencyKey=clean(body?.idempotency_key||("agent-flow-"+crypto.randomUUID()),100);
   const rows=await db("zoz_pro_device_jobs",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({
     owner_id:user.id,device_id:deviceId,capability_id:"flow.copy_prompt",
-    payload:{prompt,source:"zoz-pro-agent",channel_id:TARGET_CHANNEL_ID},
+    payload:{prompt,source:"zoz-pro-agent",channel_id:channelId},
     status:"queued",approval_required:false,approval_status:"not_required",
     idempotency_key:idempotencyKey,priority:2
   })});
@@ -1058,14 +1099,17 @@ async function dispatchFlowPrompt(user:any,body:any) {
   if(!job)throw new Error("تعذر إنشاء مهمة الهاتف.");
   await db("zoz_pro_device_job_events",{method:"POST",headers:{prefer:"return=minimal"},body:JSON.stringify({
     owner_id:user.id,device_id:deviceId,job_id:job.id,event_type:"agent_dispatched_flow_prompt",
-    details:{source:"zoz-pro-agent",channel_id:TARGET_CHANNEL_ID,prompt_length:prompt.length}
+    details:{source:"zoz-pro-agent",channel_id:channelId,prompt_length:prompt.length}
   })});
-  return json({ok:true,action:"dispatch_flow_prompt",job_id:job.id,device_id:deviceId,device_name:device.device_name,status:"queued",note:"أُرسلت المطالبة إلى طابور الهاتف. ينسخها التطبيق إلى الحافظة ويطلب فتح Flow بلمسة ظاهرة؛ لا يبدأ التوليد تلقائيًا."});
+  return json({ok:true,action:"dispatch_flow_prompt",job_id:job.id,device_id:deviceId,device_name:device.device_name,channel_id:channelId,channel_name:clean(channel.display_name,140),status:"queued",note:"أُرسلت المطالبة إلى طابور الهاتف. ينسخها التطبيق إلى الحافظة ويطلب فتح Flow بلمسة ظاهرة؛ لا يبدأ التوليد تلقائيًا."});
 }
 
 async function dispatchLatestDraftPrompt(userId:string,channelId:string) {
-  if(channelId!==TARGET_CHANNEL_ID)return {status:"skipped_non_primary_channel"};
-  const recentSince=new Date(Date.now()-7*24*3600000).toISOString();
+  // Only explicitly unverified channels are held from unattended draft dispatch.
+  const verifiedRows=await db("zoz_pro_managed_channels?owner_id=eq."+encodeURIComponent(userId)+"&channel_id=eq."+encodeURIComponent(channelId)+"&select=niche&limit=1");
+  const verifiedChannel=Array.isArray(verifiedRows)?verifiedRows[0]:null;
+  if(!verifiedChannel||String(verifiedChannel.niche||"").includes("وجهة القناة قيد التحقق"))return {status:"skipped_channel_unverified"};
+  const recentSince=new Date(Date.now()-14*24*3600000).toISOString();
   const scripts=await db("zoz_pro_content_scripts?owner_id=eq."+encodeURIComponent(userId)+
     "&channel_id=eq."+encodeURIComponent(channelId)+
     "&created_at=gte."+encodeURIComponent(recentSince)+
@@ -1073,50 +1117,70 @@ async function dispatchLatestDraftPrompt(userId:string,channelId:string) {
   const script=scripts?.[0];
   if(!script)return {status:"skipped_no_recent_script"};
   const devices=await db("zoz_pro_device_registry?owner_id=eq."+encodeURIComponent(userId)+
-    "&device_status=eq.active&select=id,device_name,capabilities,last_heartbeat_at&order=last_heartbeat_at.desc.nullslast&limit=10");
-  const device=(Array.isArray(devices)?devices:[]).find((x:any)=>Array.isArray(x.capabilities)&&x.capabilities.includes("flow.copy_prompt"));
-  if(!device)return {status:"waiting_for_paired_android_device"};
+    "&device_status=eq.active&select=id,device_name,app_version,capabilities,last_heartbeat_at&order=last_heartbeat_at.desc.nullslast&limit=10");
+  const device=(Array.isArray(devices)?devices:[]).find((x:any)=>
+    x.app_version==="0.4.3" &&
+    Date.parse(String(x.last_heartbeat_at||""))>Date.now()-45*60*1000 &&
+    Array.isArray(x.capabilities)&&x.capabilities.includes("flow.generate_scene"));
+  if(!device)return {status:"waiting_for_current_paired_android_device"};
   const pkg=script.production_package&&typeof script.production_package==="object"?script.production_package:{};
   const shots=Array.isArray(pkg.shot_plan)?pkg.shot_plan:(Array.isArray(script.shot_plan)?script.shot_plan:[]);
   const narration=Array.isArray(pkg.narration)?pkg.narration:(Array.isArray(script.narration)?script.narration:[]);
   const sceneCount=Math.max(1,Math.min(6,shots.length||narration.length||1));
   const title=clean(script.title||pkg.title||"موضوع الحلقة",180);
-  const jobs:any[]=[];
-  for(let index=0;index<sceneCount;index++){
-    const shotRaw=shots[index]??"المشهد "+(index+1)+" المرتبط بموضوع الحلقة";
-    const shot=typeof shotRaw==="string"?clean(shotRaw,500):clean(shotRaw?.visual||shotRaw?.description||shotRaw?.scene||JSON.stringify(shotRaw),500);
-    const narrationRaw=narration[index];
-    const narrationText=typeof narrationRaw==="string"?clean(narrationRaw,600):clean(narrationRaw?.text||narrationRaw?.narration||"",600);
-    const prompt=[
-      "Create ONE 8-second vertical 9:16 cinematic video clip for a YouTube Short.",
-      "This is scene "+(index+1)+" of a coherent multi-clip episode. Subject: "+title+".",
-      "Shot direction: "+shot+".",
-      narrationText?"Narrative context: "+narrationText+".":"",
-      "Use historically grounded ancient Egyptian material culture, architecture, clothing, tools and landscape. Realistic cinematic reconstruction, coherent motion, natural light, detailed textures, documentary visual quality.",
-      "No visible text, captions, subtitles, labels, logos, watermarks, or added music. Preserve a clean visual-only clip. Avoid modern objects and anachronisms."
-    ].filter(Boolean).join("\n");
-    const idem="auto-flow-"+String(script.id)+"-"+String(device.id)+"-scene-"+(index+1);
-    try{
-      const rows=await db("zoz_pro_device_jobs",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({
-        owner_id:userId,device_id:device.id,capability_id:"flow.copy_prompt",
-        payload:{prompt,source:"zoz-pro-agent-autonomous-worker",script_id:script.id,script_title:title,scene_index:index+1,scene_count:sceneCount},
-        status:"queued",approval_required:false,approval_status:"not_required",
-        idempotency_key:idem,priority:2
-      })});
-      const job=rows?.[0];
-      if(job){
-        await db("zoz_pro_device_job_events",{method:"POST",headers:{prefer:"return=minimal"},body:JSON.stringify({
-          owner_id:userId,device_id:device.id,job_id:job.id,event_type:"autonomous_flow_prompt_dispatched",
-          details:{script_id:script.id,channel_id:channelId,scene_index:index+1,scene_count:sceneCount}
-        })});
-        jobs.push({job_id:job.id,scene_index:index+1,status:"queued"});
-      }
-    }catch(_){
-      const existing=await db("zoz_pro_device_jobs?owner_id=eq."+encodeURIComponent(userId)+"&idempotency_key=eq."+encodeURIComponent(idem)+"&select=id,status&limit=1");
-      if(existing?.[0])jobs.push({job_id:existing[0].id,scene_index:index+1,status:"already_exists",job_status:existing[0].status});
-    }
+  const campaignId="zoz-auto-"+String(script.id);
+  const existing=await db("zoz_pro_device_jobs?owner_id=eq."+encodeURIComponent(userId)+
+    "&device_id=eq."+encodeURIComponent(device.id)+
+    "&payload->>script_id=eq."+encodeURIComponent(String(script.id))+
+    "&select=id,status,payload,result&order=created_at.asc&limit=30");
+  const prior=Array.isArray(existing)?existing:[];
+  if(prior.some((x:any)=>["queued","running"].includes(String(x.status))))
+    return {status:"waiting_for_current_scene",script_id:script.id,device_id:device.id,existing_jobs:prior.filter((x:any)=>["queued","running"].includes(String(x.status))).map((x:any)=>({id:x.id,status:x.status}))};
+  const completed=new Set<number>();
+  for(const x of prior){
+    const index=Number(x?.payload?.scene_index||0);
+    const result=x?.result&&typeof x.result==="object"?x.result:{};
+    const downloaded=result.downloaded===true || Number(result.size_bytes||0)>0 || Boolean(result.file_uri||result.download_uri);
+    if(x.status==="succeeded" && index>0 && downloaded)completed.add(index);
+    if(x.status==="failed" || x.status==="cancelled")
+      return {status:"paused_after_scene_failure",script_id:script.id,scene_index:index,job_id:x.id,error:clean(x.error_message||x.error_code||"scene_failed",180)};
   }
-  return {status:jobs.length?"queued":"already_dispatched",jobs_queued:jobs.filter((x:any)=>x.status==="queued").length,scene_count:sceneCount,device_id:device.id,device_name:device.device_name,script_id:script.id,jobs,note:"Scene prompts are queued to the phone. The owner still generates each clip visibly in Google Flow; no quota or UI restrictions are bypassed."};
+  let nextIndex=1;
+  while(completed.has(nextIndex))nextIndex++;
+  if(nextIndex>sceneCount)return {status:"all_scenes_downloaded",script_id:script.id,scene_count:sceneCount,completed_scenes:[...completed]};
+  const shotRaw=shots[nextIndex-1]??"المشهد "+nextIndex+" المرتبط بموضوع الحلقة";
+  const shot=typeof shotRaw==="string"?clean(shotRaw,700):clean(shotRaw?.visual||shotRaw?.description||shotRaw?.scene||shotRaw?.action||JSON.stringify(shotRaw),700);
+  const narrationRaw=narration[nextIndex-1];
+  const narrationText=typeof narrationRaw==="string"?clean(narrationRaw,700):clean(narrationRaw?.text||narrationRaw?.narration||"",700);
+  const isFekra=channelId==="UC9fr5B0SZZkmVAApfCqEO3w";
+  const style=isFekra
+    ?"أسلوب سبورة بيضاء كرتوني ثنائي الأبعاد، مقدم مصري ودود بشعر داكن قصير وقميص تركوازي، يد ترسم بقلم أسود، خلفية بيضاء، ألوان محدودة تركوازية وأزرق فاتح وأصفر ومرجاني وأخضر فاتح، حركة رسم تدريجية متصلة، ثبات تصميم الشخصية."
+    :"إعادة بناء وثائقية سينمائية واقعية ومنضبطة تاريخيًا، ملابس وعمارة وأدوات وبيئة مصرية قديمة موثقة، إضاءة طبيعية وتفاصيل دقيقة، دون عناصر حديثة أو تخمينات أثرية.";
+  const prompt=[
+    "أنشئ مقطع فيديو واحدًا مستقلًا مدته 8 ثوانٍ بالضبط، عمودي 9:16، لقطة متصلة بلا انتقالات.",
+    "عنوان الحلقة: "+title+". المشهد "+nextIndex+" من "+sceneCount+".",
+    "التوجيه البصري: "+shot+".",
+    "الهوية البصرية الثابتة: "+style,
+    narrationText?"التعليق الصوتي العربي المصري لهذا المشهد، انطقه كما هو دون إضافة: «"+narrationText+"»":"",
+    "حافظ على وضوح الحركة وتناسق الشخصية والمشهد. لا نصوص أو ترجمة أو حروف أو شعارات أو علامات مائية أو موسيقى خلفية. لا تضف معلومات أو تفاصيل غير موجودة في التوجيه."
+  ].filter(Boolean).join("\n\n");
+  const idem=campaignId+"-"+String(device.id)+"-scene-"+nextIndex;
+  const rows=await db("zoz_pro_device_jobs",{method:"POST",headers:{prefer:"return=representation"},body:JSON.stringify({
+    owner_id:userId,device_id:device.id,capability_id:"flow.generate_scene",
+    payload:{prompt,source:"zoz-pro-agent-autonomous-worker",script_id:script.id,script_title:title,campaign_id:campaignId,total_scenes:sceneCount,scene_index:nextIndex,scene_count:sceneCount,duration_seconds:8,aspect_ratio:"9:16",language:"ar-EG",channel_id:channelId,narration:narrationText},
+    status:"queued",approval_required:false,approval_status:"not_required",idempotency_key:idem,priority:1
+  })});
+  const job=rows?.[0];
+  if(!job){
+    const found=await db("zoz_pro_device_jobs?owner_id=eq."+encodeURIComponent(userId)+"&idempotency_key=eq."+encodeURIComponent(idem)+"&select=id,status&limit=1");
+    if(found?.[0])return {status:"already_dispatched",job_id:found[0].id,job_status:found[0].status,scene_index:nextIndex};
+    throw new Error("تعذر إنشاء مهمة توليد المشهد في طابور الهاتف.");
+  }
+  await db("zoz_pro_device_job_events",{method:"POST",headers:{prefer:"return=minimal"},body:JSON.stringify({
+    owner_id:userId,device_id:device.id,job_id:job.id,event_type:"autonomous_flow_scene_dispatched",
+    details:{script_id:script.id,campaign_id:campaignId,channel_id:channelId,scene_index:nextIndex,scene_count:sceneCount,capability_id:"flow.generate_scene"}
+  })});
+  return {status:"queued_for_real_flow_generation",job_id:job.id,device_id:device.id,device_name:device.device_name,app_version:device.app_version,script_id:script.id,campaign_id:campaignId,channel_id:channelId,scene_index:nextIndex,scene_count:sceneCount,capability_id:"flow.generate_scene"};
 }
 
 async function queuePublicPublishApprovals(userId:string) {
@@ -1208,6 +1272,10 @@ async function executeApprovedAgentTasks(user: any, token: string) {
       if (operation === "books_monitor") {
         output = await monitorBooks(user.id);
         if (!output?.ok) throw new Error(clean(output?.error || "تعذر تحليل الكتب وأمازون.", 300));
+      } else if (operation === "vidiq_research") {
+        if (!channelId || topic.length < 8) throw new Error("مهمة بحث vidIQ تحتاج قناة مسجلة وموضوعًا صالحًا.");
+        output = await callAnalyticsTool(token, "vidiq_research", { channel_id: channelId, topic, mode: spec.mode === "titles" ? "titles" : "keyword" });
+        if (!output?.ok) throw new Error(clean(output?.error || "تعذر بحث vidIQ.", 300));
       } else if (operation === "sync_channel") {
         if (!channelId) throw new Error("المهمة تحتاج channel_id صالحًا.");
         const endDate = utcDay(-1);
@@ -1424,7 +1492,7 @@ function summarizeToolOutput(operation: string, output: any) {
  * choose tools from an explicit allow-list; all task arguments are grounded
  * in existing channels, calendars, scripts, and intake rows.
  */
-async function planAutonomousTasks(user: any, memoryContext: any = null) {
+async function planAutonomousTasks(user: any, memoryContext: any = null, vidiqCreditsRemaining = 0) {
   const now = Date.now();
   const nowIso = new Date(now).toISOString();
   const today = nowIso.slice(0, 10);
@@ -1469,8 +1537,7 @@ async function planAutonomousTasks(user: any, memoryContext: any = null) {
 
     for (const ch of channels) {
       const cid = String(ch.channel_id);
-      const unverifiedKids = cid === "UC-FimUUFXRd0MOSoikzczcQ" ||
-        String(ch.niche || "").includes("قيد التحقق");
+      const unverifiedKids = String(ch.niche || "").includes("وجهة القناة قيد التحقق");
       const [liveRows, intakeRows, recentScriptRows] = await Promise.all([
         db("zoz_pro_managed_channel_live_status?owner_id=eq." + encodeURIComponent(ownerId) +
           "&channel_id=eq." + encodeURIComponent(cid) +
@@ -1578,6 +1645,17 @@ async function planAutonomousTasks(user: any, memoryContext: any = null) {
           }
         });
       }
+      if (Number(vidiqCreditsRemaining) >= 5 && upcoming.length) {
+        const researchTopic = clean(upcoming[0].working_title, 240);
+        if (researchTopic.length >= 8) addCandidate({
+          operation: "vidiq_research", kind: "research", priority: 4,
+          title: "بحث vidIQ للموضوع القادم — " + researchTopic.slice(0, 100),
+          objective: "استخدام رصيد vidIQ المتاح لتحليل كلمة مفتاحية واحدة من موضوع التقويم، مع حفظ النتيجة في سجل القناة.",
+          expected_outcome: "أدلة بحث محفوظة لتحسين اختيار الموضوع؛ لا تعديل أو نشر على YouTube.",
+          reason: "vidiq_credits_available_and_topic_in_calendar",
+          spec: { operation: "vidiq_research", channel_id: cid, topic: researchTopic, mode: "keyword" }
+        });
+      }
     }
 
     const bookCandidate = {
@@ -1612,7 +1690,8 @@ async function planAutonomousTasks(user: any, memoryContext: any = null) {
       inspect_intake: 30 * 60000,
       system_diagnostics: 6 * 3600000,
       books_monitor: 24 * 3600000,
-      upload_private_video: 15 * 60000
+      upload_private_video: 15 * 60000,
+      vidiq_research: 24 * 3600000
     };
     const activeStatuses = new Set(["draft", "awaiting_owner_approval", "approved", "in_progress"]);
     const eligible: any[] = [];
@@ -1672,7 +1751,7 @@ async function planAutonomousTasks(user: any, memoryContext: any = null) {
           "اختر حتى 5 مهام مناسبة فقط من القائمة المعطاة. لا تخترع IDs أو عمليات أو معاملات.",
           "رتب حسب ما يساعد استمرار النظام والإنتاج. لا تطلب نشرًا عامًا أو تغيير خصوصية أو تعديل metadata أو حذفًا.",
           "أعد JSON فقط بالشكل: {\"selected_task_ids\":[\"id\"],\"rationale\":\"سبب مختصر بالعربية\"}.",
-          JSON.stringify({ allowed_operations: ["sync_channel","check_video_processing","generate_calendar","create_draft","inspect_intake","system_diagnostics","books_monitor"], durable_memory_context: memoryContext ? { last_run_id: memoryContext.last_run_id, last_run_status: memoryContext.last_run_status, next_resume_hint: memoryContext.next_resume_hint, channels_checked: memoryContext.channels_checked, channels_failed: memoryContext.channels_failed, failures: Array.isArray(memoryContext.failures) ? memoryContext.failures.slice(0, 8) : [] } : null, candidates: allowed })
+          JSON.stringify({ allowed_operations: ["sync_channel","check_video_processing","generate_calendar","create_draft","inspect_intake","system_diagnostics","books_monitor","vidiq_research"], durable_memory_context: memoryContext ? { last_run_id: memoryContext.last_run_id, last_run_status: memoryContext.last_run_status, next_resume_hint: memoryContext.next_resume_hint, channels_checked: memoryContext.channels_checked, channels_failed: memoryContext.channels_failed, failures: Array.isArray(memoryContext.failures) ? memoryContext.failures.slice(0, 8) : [] } : null, candidates: allowed })
         ].join("\n");
         for (const key of [...new Set(GEMINI_KEYS)]) {
           try {
@@ -1807,6 +1886,472 @@ async function advanceApprovedYouTubeUpload(token: string, ownerId: string, requ
  * as tools, stores an audit record, and never publishes, changes privacy/metadata,
  * deletes temporary files, or performs arbitrary SQL/code supplied by a task.
  */
+
+async function syncTikTokAnalyticsForAgent(ownerId: string, onlySlot?: string) {
+  const rows = await db(
+    "zoz_pro_social_channels?owner_id=eq." + encodeURIComponent(ownerId) +
+    "&platform=eq.tiktok&connection_status=eq.connected" +
+    (onlySlot ? "&slot_key=eq." + encodeURIComponent(onlySlot) : "") +
+    "&select=slot_key,display_name,handle,platform_user_id,scopes,token_expires_at,metadata,capabilities&order=slot_key.asc"
+  );
+  const accounts = Array.isArray(rows) ? rows : [];
+  const results: any[] = [];
+  for (const ch of accounts) {
+    const slot = String(ch.slot_key || "");
+    try {
+      let creds = await db("rpc/zoz_pro_tiktok_get_credentials", {
+        method: "POST",
+        body: JSON.stringify({ p_owner_id: ownerId, p_slot_key: slot })
+      });
+      if (!creds?.access_token) throw new Error("رمز TikTok غير متاح لهذا الحساب في Vault.");
+
+      const expiresAt = Date.parse(String(ch.token_expires_at || ""));
+      if (!Number.isFinite(expiresAt) || expiresAt <= Date.now() + 120000) {
+        const app = await db("rpc/zoz_pro_tiktok_get_app_credentials", {
+          method: "POST",
+          body: JSON.stringify({ p_owner_id: ownerId })
+        });
+        if (!app?.client_key || !app?.client_secret) throw new Error("بيانات تطبيق TikTok غير متاحة لتجديد الرمز.");
+        if (!creds.refresh_token) throw new Error("انتهت صلاحية TikTok ولا يوجد refresh token؛ أعد التفويض.");
+
+        const refreshResponse = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_key: app.client_key,
+            client_secret: app.client_secret,
+            grant_type: "refresh_token",
+            refresh_token: creds.refresh_token
+          }),
+          signal: AbortSignal.timeout(20000)
+        });
+        const refreshData = await refreshResponse.json().catch(() => ({}));
+        const tokenData = refreshData.data || refreshData;
+        if (!refreshResponse.ok || refreshData.error || !tokenData.access_token) {
+          throw new Error("تعذر تجديد تفويض TikTok (HTTP " + refreshResponse.status + ").");
+        }
+
+        const nextRefresh = tokenData.refresh_token || creds.refresh_token;
+        const scopes = String(tokenData.scope || (Array.isArray(ch.scopes) ? ch.scopes.join(",") : ""))
+          .split(/[ ,]+/).filter(Boolean);
+        const meta = ch.metadata || {};
+        const storedProfile = {
+          ...(meta.profile && typeof meta.profile === "object" ? meta.profile : {}),
+          open_id: ch.platform_user_id || creds.open_id || "",
+          display_name: meta.display_name || "",
+          username: meta.username || "",
+          avatar_url: meta.avatar_url || ""
+        };
+        const payload = {
+          ...creds,
+          access_token: tokenData.access_token,
+          refresh_token: nextRefresh,
+          open_id: storedProfile.open_id,
+          token_type: tokenData.token_type || creds.token_type
+        };
+        const refreshExpiresAt = tokenData.refresh_expires_in
+          ? new Date(Date.now() + Number(tokenData.refresh_expires_in) * 1000).toISOString()
+          : (meta.refresh_expires_at || null);
+        await db("rpc/zoz_pro_tiktok_store_credentials", {
+          method: "POST",
+          body: JSON.stringify({
+            p_owner_id: ownerId,
+            p_slot_key: slot,
+            p_payload: payload,
+            p_profile: storedProfile,
+            p_scopes: scopes,
+            p_token_expires_at: new Date(Date.now() + Number(tokenData.expires_in || 86400) * 1000).toISOString(),
+            p_refresh_expires_at: refreshExpiresAt
+          })
+        });
+        creds = payload;
+      }
+
+      const basicFields = "open_id,display_name,avatar_url";
+      const profileResponse = await fetch(
+        "https://open.tiktokapis.com/v2/user/info/?fields=" + basicFields,
+        { headers: { authorization: "Bearer " + creds.access_token }, signal: AbortSignal.timeout(20000) }
+      );
+      const profileData = await profileResponse.json().catch(() => ({}));
+      if (!profileResponse.ok || profileData.error?.code !== "ok" || !profileData.data?.user) {
+        throw new Error("فشلت قراءة بيانات TikTok الأساسية (HTTP " + profileResponse.status + "، " + clean(profileData.error?.code || "unknown", 80) + ").");
+      }
+      let profile = { ...profileData.data.user } as any;
+      let profileStatsAvailable = false;
+      let profileStatsError: string | null = null;
+      if (Array.isArray(ch.scopes) && ch.scopes.includes("user.info.stats")) {
+        const statsResponse = await fetch(
+          "https://open.tiktokapis.com/v2/user/info/?fields=follower_count,following_count,likes_count,video_count",
+          { headers: { authorization: "Bearer " + creds.access_token }, signal: AbortSignal.timeout(20000) }
+        );
+        const statsData = await statsResponse.json().catch(() => ({}));
+        if (statsResponse.ok && statsData.error?.code === "ok" && statsData.data?.user) {
+          profile = { ...profile, ...statsData.data.user };
+          profileStatsAvailable = true;
+        } else {
+          profileStatsError = "TikTok لم يمنح هذا التفويض قراءة إحصاءات الحساب (HTTP " + statsResponse.status + "، " + clean(statsData.error?.code || "scope_not_authorized", 80) + ").";
+        }
+      } else {
+        profileStatsError = "صلاحية user.info.stats غير موجودة ضمن الصلاحيات المسجلة لهذا التفويض.";
+      }
+
+      let videos: any[] = [];
+      if (Array.isArray(ch.scopes) && ch.scopes.includes("video.list")) {
+        const videoFields = "id,title,video_description,duration,create_time,cover_image_url,share_url,view_count,like_count,comment_count,share_count";
+        const videoResponse = await fetch("https://open.tiktokapis.com/v2/video/list/?fields=" + videoFields, {
+          method: "POST",
+          headers: { authorization: "Bearer " + creds.access_token, "content-type": "application/json" },
+          body: JSON.stringify({ max_count: 20 }),
+          signal: AbortSignal.timeout(30000)
+        });
+        const videoData = await videoResponse.json().catch(() => ({}));
+        if (!videoResponse.ok || videoData.error?.code !== "ok") {
+          throw new Error("فشلت قراءة فيديوهات TikTok (HTTP " + videoResponse.status + "، " + clean(videoData.error?.code || "unknown", 80) + ").");
+        }
+        videos = Array.isArray(videoData.data?.videos) ? videoData.data.videos : [];
+      }
+
+      const capturedAt = new Date().toISOString();
+      await db("zoz_pro_tiktok_analytics_snapshots", {
+        method: "POST",
+        headers: { prefer: "return=minimal" },
+        body: JSON.stringify({
+          owner_id: ownerId,
+          slot_key: slot,
+          platform_user_id: profile.open_id || ch.platform_user_id,
+          profile,
+          profile_stats_available: profileStatsAvailable,
+          profile_stats_error: profileStatsError,
+          videos,
+          captured_at: capturedAt,
+          source: "tiktok-display-api"
+        })
+      });
+      const metadata = {
+        ...(ch.metadata || {}),
+        display_name: profile.display_name || ch.metadata?.display_name || ch.display_name,
+        username: profile.username || ch.metadata?.username || null,
+        avatar_url: profile.avatar_url || ch.metadata?.avatar_url || null,
+        profile,
+        last_analytics_sync: capturedAt,
+        not_connected_yet: false
+      };
+      await db(
+        "zoz_pro_social_channels?owner_id=eq." + encodeURIComponent(ownerId) +
+        "&platform=eq.tiktok&slot_key=eq." + encodeURIComponent(slot),
+        {
+          method: "PATCH",
+          headers: { prefer: "return=minimal" },
+          body: JSON.stringify({ last_synced_at: capturedAt, metadata, updated_at: capturedAt })
+        }
+      );
+      results.push({
+        ok: true,
+        slot_key: slot,
+        account: clean(profile.display_name || ch.display_name, 100),
+        username: clean(profile.username || ch.handle, 100),
+        follower_count: profileStatsAvailable ? Number(profile.follower_count || 0) : null,
+        video_count: profileStatsAvailable ? Number(profile.video_count || 0) : null,
+        profile_stats_available: profileStatsAvailable,
+        profile_stats_error: profileStatsError,
+        videos_read: videos.length,
+        captured_at: capturedAt
+      });
+    } catch (error) {
+      results.push({
+        ok: false,
+        slot_key: slot,
+        account: clean(ch.display_name || slot, 100),
+        error: clean(error instanceof Error ? error.message : "فشل مزامنة TikTok.", 260)
+      });
+    }
+  }
+  return {
+    ok: results.every((x: any) => x.ok),
+    checked: accounts.length,
+    connected: accounts.length,
+    accounts: results,
+    reason: accounts.length ? null : "no_connected_tiktok_accounts"
+  };
+}
+
+
+
+async function analyzeTikTokAccount(ownerId: string, slotKey: string) {
+  if (!["tiktok_1", "tiktok_2"].includes(slotKey)) throw new Error("حساب TikTok غير صالح.");
+  const sync = await syncTikTokAnalyticsForAgent(ownerId, slotKey);
+  const syncedAccount = (Array.isArray(sync.accounts) ? sync.accounts : []).find((x: any) => x.slot_key === slotKey);
+  if (!syncedAccount?.ok) throw new Error(clean(syncedAccount?.error || "تعذرت مزامنة حساب TikTok.", 300));
+
+  const accountRows = await db(
+    "zoz_pro_social_channels?owner_id=eq." + encodeURIComponent(ownerId) +
+    "&platform=eq.tiktok&slot_key=eq." + encodeURIComponent(slotKey) +
+    "&connection_status=eq.connected&select=slot_key,display_name,handle,platform_user_id,scopes,metadata,last_synced_at&limit=1"
+  );
+  const account = Array.isArray(accountRows) ? accountRows[0] : null;
+  if (!account) throw new Error("الحساب غير متصل أو غير مسجل لحساب المالك.");
+
+  const snapshotRows = await db(
+    "zoz_pro_tiktok_analytics_snapshots?owner_id=eq." + encodeURIComponent(ownerId) +
+    "&slot_key=eq." + encodeURIComponent(slotKey) +
+    "&select=id,profile,videos,captured_at,source,profile_stats_available,profile_stats_error&order=captured_at.desc&limit=2"
+  );
+  const latest = Array.isArray(snapshotRows) ? snapshotRows[0] : null;
+  const previous = Array.isArray(snapshotRows) ? snapshotRows[1] : null;
+  if (!latest) throw new Error("تمت مزامنة الحساب لكن لم تُحفظ لقطة تحليلات يمكن قراءتها.");
+
+  const profile = latest.profile && typeof latest.profile === "object" ? latest.profile : {};
+  const videos = Array.isArray(latest.videos) ? latest.videos : [];
+  const profileStatsAvailable = latest.profile_stats_available === true ||
+    (latest.profile_stats_available == null && Number.isFinite(Number(profile.video_count)));
+  const profileStatsError = clean(latest.profile_stats_error || "", 260);
+  const profileVideoCount = profileStatsAvailable ? Math.max(0, Number(profile.video_count || 0)) : null;
+  const noVideoSample = videos.length === 0 && profileStatsAvailable && profileVideoCount === 0;
+  const emptyListWithProfileVideos = videos.length === 0 && profileStatsAvailable && Number(profileVideoCount) > 0;
+  const emptyListStatsUnknown = videos.length === 0 && !profileStatsAvailable;
+  const sum = (key: string) => videos.reduce((n: number, video: any) => n + Math.max(0, Number(video?.[key] || 0)), 0);
+  const views = sum("view_count");
+  const likes = sum("like_count");
+  const comments = sum("comment_count");
+  const shares = sum("share_count");
+  const engagementRate = views > 0 ? Math.round(((likes + comments + shares) / views) * 10000) / 100 : null;
+  const topVideos = videos.slice().sort((a: any, b: any) => Number(b.view_count || 0) - Number(a.view_count || 0))
+    .slice(0, 5).map((v: any) => ({
+      id: clean(v?.id, 80),
+      title: clean(v?.title || v?.video_description || "فيديو TikTok", 180),
+      create_time: Number(v?.create_time || 0),
+      duration: Number(v?.duration || 0),
+      views: Number(v?.view_count || 0),
+      likes: Number(v?.like_count || 0),
+      comments: Number(v?.comment_count || 0),
+      shares: Number(v?.share_count || 0),
+      share_url: clean(v?.share_url, 500)
+    }));
+
+  const linkedYoutubeId = safeUrlId(account.metadata?.youtube_channel_id);
+  let channelContext: any = null;
+  if (linkedYoutubeId) {
+    const channelRows = await db(
+      "zoz_pro_managed_channels?owner_id=eq." + encodeURIComponent(ownerId) +
+      "&channel_id=eq." + encodeURIComponent(linkedYoutubeId) +
+      "&select=channel_id,display_name,channel_title,niche,target_audience,content_tone,content_pillars&limit=1"
+    );
+    channelContext = Array.isArray(channelRows) ? channelRows[0] || null : null;
+  }
+
+  const accountName = clean(profile.display_name || account.display_name || (slotKey === "tiktok_1" ? "Hazem Now" : "Fekra"), 120);
+  const username = clean(profile.username || account.handle || "", 100);
+  const contextNiche = clean(channelContext?.niche || "", 300);
+  const isFekra = slotKey === "tiktok_2" || /fekra|فكره|فِكره/i.test(accountName);
+  let fallback: any;
+  if (noVideoSample) {
+    fallback = {
+      diagnosis: "الحساب متصل ومزامنة TikTok ناجحة، لكن لا توجد فيديوهات منشورة أو متاحة في قائمة الحساب حتى الآن؛ لذلك لا توجد عينة أداء يمكن تقييمها. الأرقام الصفرية هنا تعني غياب المحتوى، لا ضعف أداء الفيديوهات.",
+      strengths: [
+        "التفويض والقراءة الأساسية للحساب يعملان بنجاح.",
+        "صلاحية قراءة قائمة الفيديوهات موجودة؛ يمكن بدء تكوين خط أساس بمجرد نشر أول فيديو."
+      ],
+      risks: [
+        "لا تتوفر عينة فيديوهات لقياس المشاهدات أو التفاعل أو المقارنة بين المنشورات.",
+        ...(contextNiche ? [] : ["هوية المحتوى والجمهور المستهدف لهذا الحساب تحتاج إلى تثبيت قبل اقتراح موضوعات تفصيلية."])
+      ],
+      next_actions: [
+        ...(contextNiche ? ["إعداد أول ثلاثة فيديوهات قصيرة متسقة مع هوية القناة: " + contextNiche + "."] : ["تثبيت مجال الحساب والجمهور المستهدف أولًا حتى لا ننشئ محتوى في اتجاه خاطئ."]),
+        "تجهيز أول فيديو للمراجعة ثم إرساله إلى صندوق TikTok؛ النشر العام يظل بقرار المالك داخل التطبيق.",
+        "إعادة المزامنة بعد أول نشر ثم تسجيل قراءة بعد 24–48 ساعة وقراءة أخرى عند 72 ساعة لبناء خط أساس."
+      ],
+      suggested_first_video: contextNiche
+        ? (isFekra ? "كيف تبني وكيل ذكاء اصطناعي عمليًا من هاتفك وبأدوات مجانية؟" : "أول فيديو تعريفي يشرح فائدة الحساب لجمهوره المستهدف.")
+        : "فيديو تعريفي قصير بعد تثبيت مجال الحساب والجمهور.",
+      content_pillars: contextNiche ? [contextNiche, "تجارب تطبيقية قصيرة", "حلول وأدوات قابلة للتنفيذ"] : [],
+      confidence_notes: ["لا توجد فيديوهات في عينة TikTok الحالية؛ لا يمكن حساب متوسط المشاهدات أو معدل التفاعل."]
+    };
+  } else if (emptyListWithProfileVideos) {
+    fallback = {
+      diagnosis: "ملف الحساب يعلن وجود " + profileVideoCount + " فيديو، لكن طلب قائمة الفيديوهات لم يُرجع عناصر في هذه القراءة؛ يلزم التحقق من نطاق البيانات أو صلاحية العرض قبل إصدار حكم أداء.",
+      strengths: ["بيانات الملف الشخصي تصل من TikTok."],
+      risks: ["قائمة الفيديوهات فارغة رغم أن عداد الملف الشخصي أكبر من صفر؛ لم يتم تجاهل التعارض أو اعتباره ضعف أداء."],
+      next_actions: ["أعد مزامنة قائمة الفيديوهات وافحص صلاحية video.list ومدى إتاحة المنشورات عبر Display API.", "لا تنشئ توصيات أداء أو مقارنة قبل وصول عينة فيديوهات فعلية."],
+      suggested_first_video: null,
+      content_pillars: contextNiche ? [contextNiche] : [],
+      confidence_notes: ["هناك تعارض بين عداد الفيديوهات في الملف الشخصي وقائمة الفيديوهات التي أعادها API."]
+    };
+  } else if (emptyListStatsUnknown) {
+    fallback = {
+      diagnosis: "تمت قراءة بيانات الحساب الأساسية، لكن TikTok رفض صلاحية إحصاءات الملف الشخصي. لم تُرجع قائمة الفيديوهات عناصر في هذه المزامنة، لذلك لا يمكن الجزم بعدد فيديوهات الحساب أو تقييم أدائه.",
+      strengths: ["اتصال الحساب وقراءة بياناته الأساسية يعملان."],
+      risks: ["صلاحية user.info.stats لم تُقبل من TikTok لهذا التفويض؛ أرقام المتابعين والإعجابات وعدد الفيديوهات غير متاحة."],
+      next_actions: ["التحقق من اعتماد user.info.stats في تطبيق TikTok Developer ثم إعادة تفويض الحسابين بهذه الصلاحية.", "إعادة مزامنة قائمة الفيديوهات بعد التأكد من video.list؛ لا تُعامل البيانات غير المتاحة كأصفار."],
+      suggested_first_video: null,
+      content_pillars: contextNiche ? [contextNiche] : [],
+      confidence_notes: [profileStatsError || "بيانات إحصاءات الملف الشخصي غير متاحة في هذه القراءة."]
+    };
+  } else {
+    fallback = {
+      diagnosis: "تتوفر عينة من " + videos.length + " فيديو في قائمة TikTok الحالية، ويمكن بدء المقارنة على أساس هذه العينة فقط؛ الأرقام لا تمثل بالضرورة كل تاريخ الحساب.",
+      strengths: ["توجد منشورات يمكن ترتيبها حسب المشاهدات وقياس تفاعلها."],
+      risks: videos.length < 5 ? ["العينة صغيرة؛ تجنب تعميم النتائج قبل توفر منشورات أكثر."] : [],
+      next_actions: ["قارن أداء الفيديوهات المتقاربة في العمر والموضوع بدل مقارنة منشورات بأعمار مختلفة.", "استخدم الفيديو الأعلى مشاهدة لاستخراج زاوية متابعة جديدة دون تكرار المحتوى.", "استمر في نشر سلسلة متسقة ثم قِس التغير بعد 24–72 ساعة."],
+      suggested_first_video: topVideos[0]?.title || null,
+      content_pillars: contextNiche ? [contextNiche] : [],
+      confidence_notes: ["التحليل مبني على أحدث قائمة فيديو أعادها TikTok، وعددها " + videos.length + "."]
+    };
+  }
+
+  const dataForModel = {
+    account: { slot_key: slotKey, display_name: accountName, username, connection_status: account.connection_status, scopes: account.scopes || [] },
+    channel_context: channelContext ? { display_name: channelContext.display_name, niche: contextNiche, target_audience: clean(channelContext.target_audience, 200) } : null,
+    profile: {
+      follower_count: profileStatsAvailable ? Number(profile.follower_count || 0) : null,
+      following_count: profileStatsAvailable ? Number(profile.following_count || 0) : null,
+      likes_count: profileStatsAvailable ? Number(profile.likes_count || 0) : null,
+      video_count: profileStatsAvailable ? profileVideoCount : null,
+      stats_available: profileStatsAvailable,
+      stats_error: profileStatsError
+    },
+    sample: { videos_returned: videos.length, views, likes, comments, shares, engagement_rate_percent: engagementRate, top_videos: topVideos },
+    no_video_sample: noVideoSample,
+    previous_snapshot_at: previous?.captured_at || null,
+    captured_at: latest.captured_at
+  };
+
+  let analysis = fallback;
+  let model = "tiktok-rule-based";
+  const uniqueKeys = [...new Set(GEMINI_KEYS)];
+  if (uniqueKeys.length) {
+    const prompt = [
+      "أنت محلل أداء وتشغيل لقنوات TikTok. حلل JSON فقط، ولا تخترع أي أرقام أو معلومات غير موجودة.",
+      "أعد JSON بالمفاتيح diagnosis وstrengths وrisks وnext_actions وsuggested_first_video وcontent_pillars وconfidence_notes.",
+      "مهم جدًا: إذا no_video_sample=true فهذه ليست نتيجة أداء ضعيف؛ إنها تعني عدم وجود فيديوهات في عينة الحساب. لا تصف الصفر بأنه فشل أو ضعف أو ركود، ولا تحسب معدل مشاهدة أو تفاعل. وجّه العمل إلى الإطلاق وتثبيت هوية الحساب وبناء أول عينة.",
+      "إذا لم يوجد channel_context للحساب، لا تخمّن تخصصه؛ اذكر أن المجال والجمهور يحتاجان إلى تأكيد. لا تنشر ولا ترفع ولا تغيّر الحساب.",
+      "اكتب بالعربية بخطوات عملية مختصرة. لا تضع أي أرقام إلا ما ورد في المدخلات.",
+      JSON.stringify(dataForModel)
+    ].join("\n");
+    for (const key of uniqueKeys) {
+      try {
+        const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=" + encodeURIComponent(key), {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json", temperature: 0.2, maxOutputTokens: 1200 }
+          }),
+          signal: AbortSignal.timeout(18000)
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) continue;
+        const generated = String(result?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("\n") || "");
+        const start = generated.indexOf("{"), end = generated.lastIndexOf("}");
+        if (start < 0 || end <= start) continue;
+        const parsed = JSON.parse(generated.slice(start, end + 1));
+        const array = (value: any, backup: any[], max = 5) =>
+          (Array.isArray(value) ? value : backup).map((x: any) => clean(x, 320)).filter(Boolean).slice(0, max);
+        analysis = {
+          diagnosis: clean(parsed.diagnosis, 900) || fallback.diagnosis,
+          strengths: array(parsed.strengths, fallback.strengths),
+          risks: array(parsed.risks, fallback.risks),
+          next_actions: array(parsed.next_actions, fallback.next_actions, 6),
+          suggested_first_video: clean(parsed.suggested_first_video, 300) || fallback.suggested_first_video,
+          content_pillars: array(parsed.content_pillars, fallback.content_pillars),
+          confidence_notes: array(parsed.confidence_notes, fallback.confidence_notes)
+        };
+        model = "gemini-3.5-flash-lite";
+        break;
+      } catch (_) { /* Use the deterministic analysis below when Gemini is unavailable. */ }
+    }
+  }
+
+  // The no-video interpretation is a hard data rule, not a model preference.
+  if (noVideoSample) {
+    analysis.diagnosis = "الحساب متصل ومزامنة TikTok ناجحة، لكن لا توجد فيديوهات منشورة أو متاحة في قائمة الحساب حتى الآن؛ لذلك لا توجد عينة أداء يمكن تقييمها. الأرقام الصفرية هنا تعني غياب المحتوى، لا ضعف أداء الفيديوهات.";
+    analysis.confidence_notes = [
+      "لا توجد فيديوهات في عينة TikTok الحالية؛ لا يمكن حساب متوسط المشاهدات أو معدل التفاعل.",
+      ...(Array.isArray(analysis.confidence_notes) ? analysis.confidence_notes.slice(0, 3) : [])
+    ].slice(0, 4);
+    analysis.risks = (Array.isArray(analysis.risks) ? analysis.risks : []).filter((x: string) => !/ضعف الأداء|أداء ضعيف|ركود|فشل القناة/i.test(x)).slice(0, 5);
+  }
+
+  const workTitle = "خطة إطلاق TikTok — " + accountName;
+  const objective = noVideoSample
+    ? "بناء أول عينة محتوى لهذا الحساب المتصل؛ الأرقام الصفرية ناتجة عن عدم وجود فيديوهات منشورة وليست حكمًا على الأداء. تُجهز الخطة للمراجعة قبل التنفيذ."
+    : "تحويل قراءة تحليلات TikTok إلى خطة محتوى قصيرة مبنية على عينة الفيديوهات الحالية، مع بقاء الرفع والنشر تحت موافقة المالك.";
+  const spec = {
+    platform: "tiktok",
+    slot_key: slotKey,
+    account_name: accountName,
+    username,
+    youtube_channel_id: linkedYoutubeId || null,
+    linked_youtube_channel: channelContext ? { display_name: channelContext.display_name, niche: contextNiche } : null,
+    snapshot_id: latest.id,
+    captured_at: latest.captured_at,
+    profile: dataForModel.profile,
+    sample: dataForModel.sample,
+    no_video_sample: noVideoSample,
+    analysis,
+    model,
+    publication_policy: "owner_approval_required; upload_to_inbox_only"
+  };
+
+  const openRows = await db(
+    "zoz_pro_agent_work_items?owner_id=eq." + encodeURIComponent(ownerId) +
+    "&kind=eq.content_project&status=in.(awaiting_owner_approval,approved,in_progress,blocked)" +
+    "&select=id,title,status,spec&order=updated_at.desc&limit=100"
+  );
+  const openItems = Array.isArray(openRows) ? openRows : [];
+  const existing = openItems.find((item: any) => item?.spec?.platform === "tiktok" && item?.spec?.slot_key === slotKey);
+  const now = new Date().toISOString();
+  const workPayload: any = {
+    owner_id: ownerId,
+    kind: "content_project",
+    title: workTitle,
+    objective: objective.slice(0, 3900),
+    priority: noVideoSample ? 2 : 3,
+    agent_decision: noVideoSample
+      ? "اعتبر الأصفار غيابًا لعينة الفيديو؛ جهز مسار إطلاق ومراجعة، ولا تصدر تقييم أداء."
+      : "حلل عينة الفيديوهات الحالية واقترح خطوات تحسين مبنية على المقاييس المتاحة.",
+    expected_outcome: "خطة عمل للحساب ومحتوى أولي قابل للمراجعة، دون نشر عام تلقائي.",
+    spec,
+    next_actions: analysis.next_actions,
+    approval_required: true,
+    source_channel_id: linkedYoutubeId || null,
+    created_by: "zoz-pro-agent",
+    updated_at: now
+  };
+  let workItem: any = null;
+  if (existing?.id) {
+    const updated = await db("zoz_pro_agent_work_items?id=eq." + encodeURIComponent(String(existing.id)) +
+      "&owner_id=eq." + encodeURIComponent(ownerId), {
+        method: "PATCH",
+        headers: { prefer: "return=representation" },
+        body: JSON.stringify({ ...workPayload, status: existing.status })
+      });
+    workItem = Array.isArray(updated) ? updated[0] : null;
+  } else {
+    const inserted = await db("zoz_pro_agent_work_items", {
+      method: "POST",
+      headers: { prefer: "return=representation" },
+      body: JSON.stringify({ ...workPayload, status: "awaiting_owner_approval" })
+    });
+    workItem = Array.isArray(inserted) ? inserted[0] : null;
+  }
+  if (!workItem?.id) throw new Error("تم التحليل لكن لم تؤكد قاعدة البيانات حفظ خطة العمل.");
+
+  return {
+    ok: true,
+    slot_key: slotKey,
+    account: { display_name: accountName, username, connection_status: account.connection_status },
+    sync: syncedAccount,
+    data: dataForModel,
+    no_video_sample: noVideoSample,
+    analysis,
+    model,
+    work_item: { id: workItem.id, title: workItem.title, status: workItem.status },
+    note: noVideoSample
+      ? "لا توجد فيديوهات للتحليل بعد؛ تم تسجيل خطة إطلاق بدل تقييم أداء غير ممكن."
+      : "تم تحليل أحدث عينة فيديو وحفظ خطة العمل للمراجعة."
+  };
+}
+
 async function autonomousRun(req: Request, user: any, body: any) {
   const token = req.headers.get("x-zoz-autopilot-token") || "";
   if (!token) return fail("الطلب الآلي يحتاج تفويض الجدولة الداخلي.", 401);
@@ -1872,8 +2417,16 @@ async function autonomousRun(req: Request, user: any, body: any) {
       previousCheckpoint = { available: false, reason: "previous_run_lookup_failed" };
     }
 
+    // Owner cost policy: do not spend vidIQ credits in unattended cycles.
+    // Research can be run later only through a separately approved, owner-requested action.
+    const backgroundVidiqStatus: any = {
+      ok: true, configured: false, connected: false, credits_remaining: 0,
+      reason: "disabled_by_owner_cost_policy"
+    };
+    const availableVidiqCredits = 0;
+
     // Create grounded, low-risk tasks from live production state, then execute them using the tool allow-list.
-    const toolPlan = await planAutonomousTasks(user, loadedMemory?.content || null);
+    const toolPlan = await planAutonomousTasks(user, loadedMemory?.content || null, availableVidiqCredits);
     const approvedTasks = await executeApprovedAgentTasks(user, token);
     let privateUploadProgress: any = { ok: true, skipped: true, reason: "not_attempted" };
     try {
@@ -1890,6 +2443,18 @@ async function autonomousRun(req: Request, user: any, body: any) {
     );
     const results: any[] = [];
     const failures: any[] = [];
+    let tiktokAnalytics: any = { ok: true, checked: 0, connected: 0, accounts: [], reason: "not_run" };
+    try {
+      tiktokAnalytics = await syncTikTokAnalyticsForAgent(user.id);
+      if (!tiktokAnalytics.ok) {
+        for (const account of (Array.isArray(tiktokAnalytics.accounts) ? tiktokAnalytics.accounts : []).filter((x: any) => !x.ok)) {
+          failures.push({ tool: "tiktok.analytics_sync", slot_key: account.slot_key, error: account.error });
+        }
+      }
+    } catch (error) {
+      tiktokAnalytics = { ok: false, checked: 0, connected: 0, accounts: [], error: clean(error instanceof Error ? error.message : "تعذر مزامنة TikTok.", 260) };
+      failures.push({ tool: "tiktok.analytics_sync", error: tiktokAnalytics.error });
+    }
     if (backgroundBooksMonitorError) failures.push({ tool: "monitorBooks", error: backgroundBooksMonitorError });
     if (!toolPlan?.ok) failures.push({ tool: "planAutonomousTasks", error: clean(toolPlan?.error, 300) });
     let contentDraftCreated = approvedTasks.some((x: any) => x.operation === "create_draft" && x.status === "completed");
@@ -1897,7 +2462,12 @@ async function autonomousRun(req: Request, user: any, body: any) {
     for (const ch of channels.slice(0, 10)) {
       const channelId = safeUrlId(ch.channel_id);
       if (!channelId) continue;
-      const result: any = { channel_id: channelId, channel: clean(ch.display_name || ch.channel_title, 140), tools: [] };
+      const result: any = {
+        channel_id: channelId,
+        channel: clean(ch.display_name || ch.channel_title, 140),
+        connection_status: clean(ch.connection_status || "unknown", 40),
+        tools: []
+      };
       try {
         const liveRows = await db(
           "zoz_pro_managed_channel_live_status?owner_id=eq." + encodeURIComponent(user.id) +
@@ -1909,20 +2479,34 @@ async function autonomousRun(req: Request, user: any, body: any) {
         const liveAgeMinutes = Number.isFinite(liveMs) ? Math.max(0, Math.round((Date.now() - liveMs) / 60000)) : null;
         result.live_age_minutes = liveAgeMinutes;
         if (liveAgeMinutes === null || liveAgeMinutes > 90) {
+          // Try official OAuth refresh even when cached status says needs_reconnect.
+          // The analytics endpoint refreshes valid tokens and persists needs_reconnect when Google rejects them.
           try {
             const endDate = utcDay(-1);
             const startDate = utcDay(-28);
             const synced = await callAnalyticsTool(token, "managed_channel_sync", {
               channel_id: channelId, start_date: startDate, end_date: endDate
             });
-            result.tools.push({ tool: "managed_channel_sync", status: "executed", video_count: Number(synced.video_count || 0) });
+            result.tools.push({
+              tool: "managed_channel_sync", status: "executed",
+              video_count: Number(synced.video_count || 0),
+              connection_status: "connected"
+            });
           } catch (error) {
             const message = clean(error instanceof Error ? error.message : "تعذرت مزامنة القناة.", 300);
-            result.tools.push({ tool: "managed_channel_sync", status: "failed", error: message });
+            result.tools.push({
+              tool: "managed_channel_sync", status: "failed",
+              previous_connection_status: clean(ch.connection_status || "unknown", 40),
+              error: message
+            });
             failures.push({ channel_id: channelId, tool: "managed_channel_sync", error: message });
           }
         } else {
-          result.tools.push({ tool: "managed_channel_sync", status: "skipped_fresh_data" });
+          result.tools.push({
+            tool: "managed_channel_sync", status: "skipped_fresh_data",
+            live_age_minutes: liveAgeMinutes,
+            connection_status: clean(ch.connection_status || "unknown", 40)
+          });
         }
 
         // Reconcile in-progress uploads, but never publish or archive them automatically.
@@ -1945,8 +2529,7 @@ async function autonomousRun(req: Request, user: any, body: any) {
           }
         }
 
-        const isKidsUnverified = channelId === "UC-FimUUFXRd0MOSoikzczcQ" ||
-          String(ch.niche || "").includes("قيد التحقق");
+        const isKidsUnverified = String(ch.niche || "").includes("وجهة القناة قيد التحقق");
         result.content_policy = isKidsUnverified ? "hold_unverified_channel" : "drafts_only";
         if (!isKidsUnverified) {
           const recentSince = new Date(Date.now() - 20 * 3600000).toISOString();
@@ -2033,7 +2616,8 @@ async function autonomousRun(req: Request, user: any, body: any) {
         } else {
           result.draft = { status: "held_until_channel_niche_verified" };
         }
-        result.ok = true;
+        result.ok = !result.tools.some((tool: any) => tool.status === "failed");
+        result.analytics_sync_status = result.tools.find((tool: any) => tool.tool === "managed_channel_sync")?.status || "not_attempted";
       } catch (error) {
         const message = clean(error instanceof Error ? error.message : "تعذر تنفيذ دورة أدوات القناة.", 350);
         result.ok = false;
@@ -2050,13 +2634,13 @@ async function autonomousRun(req: Request, user: any, body: any) {
       failures.push({tool:"youtube.public_publish_approval_queue",error:clean(publishQueueError instanceof Error?publishQueueError.message:"تعذر إنشاء مهام موافقة النشر.",250)});
     }
 
-    let androidDeviceDispatch:any={status:"skipped_no_recent_script_or_paired_device"};
-    try {
-      androidDeviceDispatch=await dispatchLatestDraftPrompt(user.id,TARGET_CHANNEL_ID);
-    } catch(deviceError) {
-      androidDeviceDispatch={status:"failed",error:clean(deviceError instanceof Error?deviceError.message:"تعذر إرسال مطالبة المشهد للهاتف.",250)};
-      failures.push({tool:"android.flow_prompt_dispatch",error:androidDeviceDispatch.error});
-    }
+    // Do not consume external Flow generation quota in unattended runs.
+    // Owner-requested scenes are prepared as drafts and wait for an explicit production action.
+    let androidDeviceDispatch:any={
+      status:"paused_for_owner_requested_generation",
+      channels:[],
+      reason:"owner_cost_policy_no_unattended_flow_generation"
+    };
 
     // Use the language model for strategic analysis at most once every six hours.
     let aiAnalysis: any = { used: false, reason: "throttled_or_not_due" };
@@ -2070,7 +2654,10 @@ async function autonomousRun(req: Request, user: any, body: any) {
         Date.parse(String(x.started_at || "")) > Date.now() - 6 * 3600000
       );
       if (!recentAiRun) {
-        const mainChannel = await getChannel(user.id, TARGET_CHANNEL_ID);
+        const analysisTarget = channels
+          .filter((ch:any)=>!String(ch.niche||"").includes("وجهة القناة قيد التحقق"))
+          .slice().sort((a:any,b:any)=>Date.parse(String(a.last_synced_at||""))-Date.parse(String(b.last_synced_at||"")))[0];
+        const mainChannel = await getChannel(user.id, safeUrlId(analysisTarget?.channel_id)||TARGET_CHANNEL_ID);
         const state = await inspectData(user.id, mainChannel);
         const computed = await modelAnalysis(state, loadedMemory?.content || null);
         aiAnalysis = {
@@ -2095,8 +2682,12 @@ async function autonomousRun(req: Request, user: any, body: any) {
       owner_id: user.id,
       scheduled: Boolean(body?.scheduled),
       channels_checked: results.length,
-      channels_succeeded: results.filter((x: any) => x.ok).length,
-      channels_failed: results.filter((x: any) => !x.ok).length,
+      channels_succeeded: results.filter((x: any) => {
+        const sync = (Array.isArray(x.tools) ? x.tools : []).find((tool: any) => tool.tool === "managed_channel_sync");
+        return sync?.status === "executed" || (sync?.status === "skipped_fresh_data" && x.connection_status === "connected");
+      }).length,
+      channels_failed: results.filter((x: any) => (Array.isArray(x.tools) ? x.tools : []).some((tool: any) => tool.tool === "managed_channel_sync" && tool.status === "failed")).length,
+      channels_operations_succeeded: results.filter((x: any) => x.ok).length,
       content_draft_created: contentDraftCreated,
       tool_plan: toolPlan,
       tool_planner_model_used: Boolean(toolPlan?.model_used),
@@ -2104,9 +2695,11 @@ async function autonomousRun(req: Request, user: any, body: any) {
       durable_memory_used_for_planning: Boolean(loadedMemory?.content),
       prior_durable_memory: loadedMemory ? { updated_at: loadedMemory.updated_at, notion_sync_status: loadedMemory.notion_sync_status, content: loadedMemory.content } : null,
       book_monitoring: backgroundBooksMonitor,
+      tiktok_analytics: tiktokAnalytics,
       approved_tasks_seen: approvedTasks.length,
       approved_tasks: approvedTasks,
       private_upload_progress: privateUploadProgress,
+      vidiq_status: backgroundVidiqStatus,
       android_device_dispatch: androidDeviceDispatch,
       public_publish_approval_queue: publicPublishApprovals,
       channels: results,
@@ -2134,7 +2727,7 @@ async function autonomousRun(req: Request, user: any, body: any) {
         channels_succeeded: results.filter((x: any) => x.ok).length,
         channels_failed: results.filter((x: any) => !x.ok).length,
         content_draft_created: contentDraftCreated, previous_checkpoint: previousCheckpoint,
-        book_monitoring: backgroundBooksMonitor, failures: allFailures,
+        book_monitoring: backgroundBooksMonitor, tiktok_analytics: tiktokAnalytics, failures: allFailures,
         next_resume_hint: "Load this primary_checkpoint and inspect latest automation run before planning new work.",
         notion_sync_status: "not_configured"
       });
@@ -2155,7 +2748,12 @@ async function autonomousRun(req: Request, user: any, body: any) {
       completed_at: new Date().toISOString(),
       status: finalStatus,
       channels_checked: results.length,
-      channels_succeeded: results.filter((x: any) => x.ok).length,
+      channels_succeeded: results.filter((x: any) => {
+        const sync = (Array.isArray(x.tools) ? x.tools : []).find((tool: any) => tool.tool === "managed_channel_sync");
+        return sync?.status === "executed" || (sync?.status === "skipped_fresh_data" && x.connection_status === "connected");
+      }).length,
+      channels_failed: results.filter((x: any) => (Array.isArray(x.tools) ? x.tools : []).some((tool: any) => tool.tool === "managed_channel_sync" && tool.status === "failed")).length,
+      channels_operations_succeeded: results.filter((x: any) => x.ok).length,
       tools_executed: results.reduce((n: number, x: any) => n + (Array.isArray(x.tools) ? x.tools.filter((t: any) => t.status === "executed").length : 0), 0),
       content_draft_created: contentDraftCreated,
       tool_plan: toolPlan,
@@ -2163,6 +2761,7 @@ async function autonomousRun(req: Request, user: any, body: any) {
       previous_checkpoint: previousCheckpoint,
       durable_memory_used_for_planning: Boolean(loadedMemory?.content),
       book_monitoring: backgroundBooksMonitor,
+      tiktok_analytics: tiktokAnalytics,
       durable_memory: durableMemory,
       approved_tasks: approvedTasks,
       private_upload_progress: privateUploadProgress,
@@ -2286,7 +2885,7 @@ Deno.serve(async (req: Request) => {
       ok: true, service: "zoz-pro-agent", environment: "production",
       owner_auth_enabled: Boolean(PUBLISHABLE_KEY && OWNER_EMAIL),
       model_key_count: [...new Set(GEMINI_KEYS)].length,
-      actions: ["analyze", "evaluate_latest_video", "create_draft", "run_management_cycle", "autonomous_run", "books_monitor", "record_book_snapshot", "update_book_record", "dispatch_flow_prompt"], automatic_worker_enabled: true, automatic_worker_schedule: "every 15 minutes via Supabase Cron", available_tools: ["managed_channel_sync","managed_channel_calendar_generate","studio_generate","intake_check_processing","intake_list","intake_review(approve only via owner-approved task)","intake_start_youtube","intake_youtube_part","system_diagnostics","books_monitor","record_book_snapshot","update_book_record","android.flow_prompt_dispatch","android.device_status"], tool_planner_enabled: true, automatic_queue_enabled: true, automatic_execution: "scheduled, allow-listed tools", automatic_publication: false, books_and_amazon_monitoring: true, direct_kdp_connection: false, durable_memory_enabled: true, notion_worker_sync: Boolean(Deno.env.get("NOTION_API_KEY")), notion_data_source_id_configured: Boolean(Deno.env.get("NOTION_ARCHIVE_DATA_SOURCE_ID") || "93d9d04a-dd49-4fb9-8d84-61324cf4cf24")
+      actions: ["analyze", "analyze_tiktok_account", "analyze_tiktok_accounts", "evaluate_latest_video", "create_draft", "run_management_cycle", "autonomous_run", "books_monitor", "record_book_snapshot", "update_book_record", "dispatch_flow_prompt"], automatic_worker_enabled: true, automatic_worker_schedule: "every 15 minutes via Supabase Cron", available_tools: ["managed_channel_sync","tiktok.analytics_sync","managed_channel_calendar_generate","studio_generate","intake_check_processing","intake_list","intake_review(only from owner-approved task)","intake_start_youtube","intake_youtube_part","vidiq_status","vidiq_research(quota-gated, 5-credit minimum, 24h cooldown)","system_diagnostics","books_monitor","record_book_snapshot","update_book_record","android.flow_scene_execute","android.device_status"], tool_planner_enabled: true, automatic_queue_enabled: true, automatic_execution: "scheduled, allow-listed tools", automatic_publication: false, books_and_amazon_monitoring: true, tiktok_analytics_sync: true, direct_kdp_connection: false, durable_memory_enabled: true, notion_worker_sync: Boolean(Deno.env.get("NOTION_API_KEY")), notion_data_source_id_configured: Boolean(Deno.env.get("NOTION_ARCHIVE_DATA_SOURCE_ID") || "93d9d04a-dd49-4fb9-8d84-61324cf4cf24")
     });
   }
   if (req.method !== "POST") return fail("Method not supported.", 405);
@@ -2301,6 +2900,34 @@ Deno.serve(async (req: Request) => {
   if (!user) return fail("يلزم تسجيل الدخول بحساب مالك ZOZ Pro المؤكد في مشروع الإنتاج.", 401);
   try {
     if (action === "analyze") return await analyze(req, user, body);
+    if (action === "analyze_tiktok_account") {
+      const slot = clean(body?.slot_key, 20);
+      return json(await analyzeTikTokAccount(user.id, slot));
+    }
+    if (action === "analyze_tiktok_accounts") {
+      const accountRows = await db(
+        "zoz_pro_social_channels?owner_id=eq." + encodeURIComponent(user.id) +
+        "&platform=eq.tiktok&connection_status=eq.connected&select=slot_key&order=slot_key.asc"
+      );
+      const slots = [...new Set((Array.isArray(accountRows) ? accountRows : [])
+        .map((x: any) => clean(x?.slot_key, 20))
+        .filter((x: string) => ["tiktok_1", "tiktok_2"].includes(x)))];
+      if (!slots.length) return fail("لا توجد حسابات TikTok متصلة بهذا المالك.", 409);
+      const results: any[] = [];
+      for (const slot of slots) {
+        try { results.push(await analyzeTikTokAccount(user.id, slot)); }
+        catch (error) {
+          results.push({ ok: false, slot_key: slot, error: clean(error instanceof Error ? error.message : "تعذر تحليل الحساب.", 300) });
+        }
+      }
+      return json({
+        ok: results.every((x: any) => x.ok),
+        action: "analyze_tiktok_accounts",
+        checked: slots.length,
+        succeeded: results.filter((x: any) => x.ok).length,
+        accounts: results
+      });
+    }
     if (action === "evaluate_latest_video") return await evaluateLatestVideo(req, user, body);
     if (action === "create_draft") return await createDraft(req, user, body);
     if (action === "propose_production") return await proposeProduction(req, user, body);
@@ -2310,7 +2937,7 @@ Deno.serve(async (req: Request) => {
     if (action === "record_book_snapshot") return json(await recordBookSnapshot(user.id, body));
     if (action === "update_book_record") return json(await updateBookRecord(user.id, body));
     if (action === "dispatch_flow_prompt") return await dispatchFlowPrompt(user, body);
-    return fail("إجراء غير مدعوم. استخدم analyze أو evaluate_latest_video أو create_draft أو propose_production أو approve_production_proposal أو run_management_cycle أو books_monitor أو record_book_snapshot أو update_book_record أو dispatch_flow_prompt.", 400);
+    return fail("إجراء غير مدعوم. استخدم analyze أو analyze_tiktok_account أو analyze_tiktok_accounts أو evaluate_latest_video أو create_draft أو propose_production أو approve_production_proposal أو run_management_cycle أو books_monitor أو record_book_snapshot أو update_book_record أو dispatch_flow_prompt.", 400);
   } catch (error) {
     return fail(error instanceof Error ? error.message : "تعذر تنفيذ الوكيل.", 502);
   }
