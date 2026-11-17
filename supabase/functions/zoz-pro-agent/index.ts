@@ -1658,7 +1658,7 @@ async function planAutonomousTasks(user: any, memoryContext: any = null, vidiqCr
       }
     }
 
-    const bookCandidate = {
+    const bookCandidate: any = {
       operation: "books_monitor", kind: "system_improvement", priority: 3,
       channel_id: TARGET_CHANNEL_ID, channel_name: "الكتب وAmazon KDP",
       title: "متابعة الكتب وأمازون — تقرير الأداء وحالة البيانات",
@@ -1669,7 +1669,7 @@ async function planAutonomousTasks(user: any, memoryContext: any = null, vidiqCr
     bookCandidate.id = taskFingerprint(bookCandidate.operation, TARGET_CHANNEL_ID, bookCandidate.spec);
     candidates.push(bookCandidate);
 
-    const diagCandidate = {
+    const diagCandidate: any = {
       operation: "system_diagnostics", kind: "system_improvement", priority: 6,
       channel_id: TARGET_CHANNEL_ID, channel_name: "ZOZ Pro",
       title: "تشخيص تشغيلي دوري لنظام ZOZ Pro",
@@ -1772,7 +1772,7 @@ async function planAutonomousTasks(user: any, memoryContext: any = null, vidiqCr
             const allowedIds = new Set(allowed.map((x: any) => x.id));
             const ids = Array.isArray(plan.selected_task_ids) ? [...new Set(plan.selected_task_ids.filter((x: any) => typeof x === "string" && allowedIds.has(x)))] : [];
             if (ids.length) {
-              selected = ids.slice(0, 5).map((id: string) => eligible.find((x: any) => x.id === id)).filter(Boolean);
+              selected = ids.slice(0, 5).map((id: unknown) => eligible.find((x: any) => x.id === String(id))).filter(Boolean);
               plannerRationale = clean(plan.rationale, 450) || plannerRationale;
               plannerModelUsed = true;
               result.method = "gemini-3.5-flash-lite+policy-validation";
@@ -2679,7 +2679,7 @@ async function autonomousRun(req: Request, user: any, body: any) {
           .slice().sort((a:any,b:any)=>Date.parse(String(a.last_synced_at||""))-Date.parse(String(b.last_synced_at||"")))[0];
         const mainChannel = await getChannel(user.id, safeUrlId(analysisTarget?.channel_id)||TARGET_CHANNEL_ID);
         const state = await inspectData(user.id, mainChannel);
-        const computed = await modelAnalysis(state, loadedMemory?.content || null);
+        const computed: any = await modelAnalysis(state, loadedMemory?.content || null);
         aiAnalysis = {
           used: true, model: computed.model,
           diagnosis: clean(computed.analysis?.diagnosis, 800),
@@ -2697,7 +2697,7 @@ async function autonomousRun(req: Request, user: any, body: any) {
       ...(privateUploadProgress?.ok === false ? [{ tool: "private_upload_progress", error: privateUploadProgress.error }] : []),
       ...approvedTasks.filter((x: any) => x.status === "blocked").map((x: any) => ({ task_id: x.id, tool: x.operation, error: x.error || x.reason || "task_blocked" }))
     ];
-    const details = {
+    const details: any = {
       actor: "zoz-pro-agent",
       owner_id: user.id,
       scheduled: Boolean(body?.scheduled),
@@ -2779,7 +2779,6 @@ async function autonomousRun(req: Request, user: any, body: any) {
       tool_plan: toolPlan,
       durable_memory_used_for_planning: Boolean(loadedMemory?.content),
       previous_checkpoint: previousCheckpoint,
-      durable_memory_used_for_planning: Boolean(loadedMemory?.content),
       book_monitoring: backgroundBooksMonitor,
       tiktok_analytics: tiktokAnalytics,
       durable_memory: durableMemory,
