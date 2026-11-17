@@ -2550,7 +2550,7 @@ async function autonomousRun(req: Request, user: any, body: any) {
                 "zoz_pro_content_calendar?owner_id=eq." + encodeURIComponent(user.id) +
                 "&channel_id=eq." + encodeURIComponent(channelId) +
                 "&status=eq.draft&planned_date=gte." + encodeURIComponent(today) +
-                "&select=id,planned_date,working_title&order=planned_date.asc,sequence_no.asc&limit=1"
+                "&select=id,planned_date,working_title&order=planned_date.asc,sequence_no.asc&limit=40"
               );
               calendarRows = Array.isArray(legacyRows) ? legacyRows : [];
             }
@@ -2559,7 +2559,7 @@ async function autonomousRun(req: Request, user: any, body: any) {
                 "zoz_pro_managed_channel_content_calendar?owner_id=eq." + encodeURIComponent(user.id) +
                 "&channel_id=eq." + encodeURIComponent(channelId) +
                 "&status=eq.draft&planned_date=gte." + encodeURIComponent(today) +
-                "&select=id,planned_date,working_title&order=planned_date.asc,sequence_no.asc&limit=1"
+                "&select=id,planned_date,working_title&order=planned_date.asc,sequence_no.asc&limit=40"
               );
               calendarRows = Array.isArray(managedRows) ? managedRows : [];
             }
@@ -2571,7 +2571,7 @@ async function autonomousRun(req: Request, user: any, body: any) {
                   "zoz_pro_managed_channel_content_calendar?owner_id=eq." + encodeURIComponent(user.id) +
                   "&channel_id=eq." + encodeURIComponent(channelId) +
                   "&status=eq.draft&planned_date=gte." + encodeURIComponent(today) +
-                  "&select=id,planned_date,working_title&order=planned_date.asc,sequence_no.asc&limit=1"
+                  "&select=id,planned_date,working_title&order=planned_date.asc,sequence_no.asc&limit=40"
                 );
                 calendarRows = Array.isArray(managedRows) ? managedRows : [];
               } catch (error) {
@@ -2580,7 +2580,24 @@ async function autonomousRun(req: Request, user: any, body: any) {
                 failures.push({ channel_id: channelId, tool: "managed_channel_calendar_generate", error: message });
               }
             }
-            const candidate = calendarRows[0];
+            const normalizeCalendarTopic = (value: unknown) =>
+              String(value || "").trim().toLocaleLowerCase("ar")
+                .replace(/[؟?!.,،؛:]+/g, "").replace(/\s+/g, " ");
+            const existingScriptRows = await db(
+              "zoz_pro_content_scripts?owner_id=eq." + encodeURIComponent(user.id) +
+              "&channel_id=eq." + encodeURIComponent(channelId) +
+              "&select=id,topic,calendar_id&order=created_at.desc&limit=300"
+            );
+            const existingScripts = Array.isArray(existingScriptRows) ? existingScriptRows : [];
+            const candidate = calendarRows.find((item: any) => {
+              const titleKey = normalizeCalendarTopic(item?.working_title);
+              if (titleKey.length < 8) return false;
+              return !existingScripts.some((script: any) =>
+                (item?.id && script?.calendar_id && String(script.calendar_id) === String(item.id)) ||
+                normalizeCalendarTopic(script?.topic) === titleKey
+              );
+            });
+            const duplicateCalendarItems = calendarRows.length > 0 && !candidate;
             if (candidate && clean(candidate.working_title, 240).length >= 8 && !contentDraftCreated) {
               try {
                 const made = await callAnalyticsTool(token, "studio_generate", {
@@ -2605,6 +2622,9 @@ async function autonomousRun(req: Request, user: any, body: any) {
                 result.draft = { status: "failed", error: message };
                 failures.push({ channel_id: channelId, tool: "studio_generate", error: message });
               }
+            } else if (!candidate && duplicateCalendarItems) {
+              result.draft = { status: "skipped_duplicate_calendar_topics", existing_script_count: existingScripts.length };
+              result.tools.push({ tool: "studio_generate", status: "skipped", reason: "calendar_topic_already_has_a_saved_script" });
             } else if (!candidate) {
               result.draft = { status: "skipped_no_calendar_item" };
             } else {
