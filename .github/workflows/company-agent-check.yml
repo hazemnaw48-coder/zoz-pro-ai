@@ -26,4 +26,4 @@ jobs:
         with:
           deno-version: v2.x
       - name: Type-check Edge Function
-        run: deno check supabase/functions/zoz-company-agent/index.ts
+        run: deno check --config supabase/functions/zoz-company-agent/deno.json supabase/functions/zoz-company-agent/index.ts
