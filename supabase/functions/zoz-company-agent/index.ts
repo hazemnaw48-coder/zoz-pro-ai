@@ -491,7 +491,7 @@ async function reviewNextPendingTask(owner: string) {
 async function seedAcceptedCompanyHandoffs(owner: string) {
   const parents = await rest(
     "zoz_pro_company_tasks?owner_id=eq." + encodeURIComponent(owner) +
-    "&status=eq.completed&select=id,title,objective,department_id,assigned_agent_id,result,input,priority&order=created_at.asc&limit=80"
+    "&status=eq.completed&select=id,title,objective,department_id,assigned_agent_id,result,input,priority&order=created_at.desc&limit=200"
   );
   const parentRows = Array.isArray(parents) ? parents : [];
   const departments = await rest("zoz_pro_company_departments?status=eq.active&select=id,department_key");
