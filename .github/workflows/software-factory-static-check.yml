@@ -50,8 +50,8 @@ jobs:
           python3 - <<'PY'
           import re
           html=open('_site/fieldops/index.html',encoding='utf-8').read()
-          scripts=re.findall(r'<script[^>]*>([\\s\\S]*?)</script>',html,re.I)
-          open('/tmp/fieldops-inline.js','w',encoding='utf-8').write('\\n'.join(scripts))
+          scripts=re.findall(r'<script[^>]*>(.*?)</script>',html,re.I|re.S)
+          open('/tmp/fieldops-inline.js','w',encoding='utf-8').write(''.join(scripts))
           required=['fieldops_customers','fieldops_technicians','fieldops_work_orders','fieldops_expenses','fieldops_payments','signInWithPassword','signUp','company_id']
           missing=[x for x in required if x not in html]
           if missing: raise SystemExit('FieldOps missing markers: '+', '.join(missing))
