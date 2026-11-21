@@ -1,1 +1,1 @@
-window.FIELDOPS_CONFIG = { supabaseUrl: "https://oxyzxbkwhafzaztraowc.supabase.co", supabaseKey: "sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm" };\n
+window.FIELDOPS_CONFIG = { supabaseUrl: "https://oxyzxbkwhafzaztraowc.supabase.co", supabaseKey: "sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm" };
