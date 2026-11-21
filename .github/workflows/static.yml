@@ -70,6 +70,8 @@ jobs:
           test -s _site/fieldops/config.js
           test -s _site/fieldops/manifest.webmanifest
           node -e "JSON.parse(require('fs').readFileSync('_site/fieldops/manifest.webmanifest','utf8'))"
+          node -e "const fs=require('fs');const c=fs.readFileSync('_site/fieldops/config.js','utf8');if(!c.includes('https://oxyzxbkwhafzaztraowc.supabase.co')||!c.includes('sb_publishable_')||c.includes('YOUR_')||/service_role|sb_secret_/i.test(c))throw Error('FieldOps Supabase config is missing, placeholder, or unsafe');const h=fs.readFileSync('_site/fieldops/index.html','utf8');for(const id of ['signup','signin','createCompany','addCustomer','addTech','addOrder','addFin','refresh'])if(!h.includes('id=\\\"'+id+'\\\"'))throw Error('Missing FieldOps control: '+id);const scripts=[...h.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];if(!scripts.length)throw Error('FieldOps inline application script missing');fs.writeFileSync('/tmp/fieldops-inline.js',scripts[scripts.length-1][1]);const sw=fs.readFileSync('_site/fieldops/sw.js','utf8');if(!sw.includes('fieldops-v2'))throw Error('Expected FieldOps cache version missing');"
+          node --check /tmp/fieldops-inline.js
           touch _site/.nojekyll
           mkdir -p _site/production
           cp studio/index.html studio/style.css _site/production/
@@ -85,3 +87,16 @@ jobs:
         uses: actions/deploy-pages@v5
         with:
           artifact_name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Verify live FieldOps deployment
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          base="${PAGE_URL%/}"
+          curl --fail --silent --show-error --retry 8 --retry-delay 10 --retry-all-errors "${base}/fieldops/" -o /tmp/fieldops-live.html
+          grep -q "ZOZ FieldOps" /tmp/fieldops-live.html
+          curl --fail --silent --show-error "${base}/fieldops/config.js" -o /tmp/fieldops-live-config.js
+          grep -q "vjnwojrqduoxhetutxrs.supabase.co" /tmp/fieldops-live-config.js
+          grep -q "sb_publishable_" /tmp/fieldops-live-config.js
+          ! grep -Eiq "service_role|sb_secret_" /tmp/fieldops-live-config.js
+          echo "FieldOps live Pages route and public Supabase config verified."
