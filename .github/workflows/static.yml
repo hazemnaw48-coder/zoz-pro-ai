@@ -82,6 +82,8 @@ jobs:
         with:
           name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: _site
+      - name: Wait for Pages artifact metadata propagation
+        run: sleep 15
       - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@v5
