@@ -87,3 +87,16 @@ jobs:
         uses: actions/deploy-pages@v5
         with:
           artifact_name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Verify live FieldOps deployment
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          base="${PAGE_URL%/}"
+          curl --fail --silent --show-error --retry 8 --retry-delay 10 --retry-all-errors "${base}/fieldops/" -o /tmp/fieldops-live.html
+          grep -q "ZOZ FieldOps" /tmp/fieldops-live.html
+          curl --fail --silent --show-error "${base}/fieldops/config.js" -o /tmp/fieldops-live-config.js
+          grep -q "vjnwojrqduoxhetutxrs.supabase.co" /tmp/fieldops-live-config.js
+          grep -q "sb_publishable_" /tmp/fieldops-live-config.js
+          ! grep -Eiq "service_role|sb_secret_" /tmp/fieldops-live-config.js
+          echo "FieldOps live Pages route and public Supabase config verified."
