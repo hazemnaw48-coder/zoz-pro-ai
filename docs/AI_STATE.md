@@ -242,3 +242,20 @@ The center project `894a0e3a-85c4-43de-b8f7-205db24685b9` still uses browser `lo
 - Flow limitation: Google Flow's normal mobile app is supported in Egypt, but the official Flow Agent is currently web/PC only. The phone app cannot make unattended Flow generations through a documented API. It prepares and delivers prompts; generation still requires a visible owner action in Flow. No credit/region/MFA/CAPTCHA bypass is used.
 - Direct KDP connector and automated KDP submission remain unimplemented.
 - Function source in the repository uses server-only `ZOZ_OWNER_EMAIL` as the owner allowlist setting; configure it in Supabase Edge Function secrets before redeploying source files. Do not commit the real owner email or OAuth/service-role credentials.
+
+
+
+## Software Factory / FieldOps closeout work — 2026-11-22
+
+- Created isolated task branch `feature/fieldops-software-factory-closeout` from `main`; no merge or production deployment performed.
+- Confirmed Preview software-factory tables exist and all four (`zoz_software_products`, `zoz_software_runs`, `zoz_software_quality_gates`, `zoz_software_ledger`) have RLS enabled with authenticated owner-only policies.
+- Confirmed FieldOps production UI and public config are versioned under `_site/fieldops/`; its production Supabase URL uses the public publishable key only.
+- Updated `supabase/functions/zoz-factory-build/index.ts` to support an existing owner-controlled GitHub repository, verify push permission, create a unique isolated development branch, and write generated scaffold files under `factory-products/<slug>/`. It does not write to the base branch. New-repository mode remains available only if the server token has repository-creation permission.
+- Updated `software-factory.html` to pass the selected repository and base branch and explain the required Contents: write permission.
+- Updated `_site/fieldops/index.html` with an authorized-company selector so a user with multiple accessible companies can switch the active company; all operational queries continue to filter by the selected company ID and RLS remains authoritative.
+- Updated `.github/workflows/software-factory-static-check.yml` to type-check the Edge Function with Deno and check the FieldOps company selector markers and inline JavaScript.
+- Updated `docs/SOFTWARE_FACTORY.md` with current adapter behavior and honest release gates.
+- Existing GitHub token previously returned HTTP 403 when creating a new repository. Existing-repository mode has not yet been invoked end-to-end; it still requires the Supabase Edge Function secret `ZOZ_FACTORY_GITHUB_TOKEN` to have Contents: read/write access to the selected private repository.
+- FieldOps Preview product record remains `pilot`. Four quality gates passed (requirements, tenant isolation, tests, staging acceptance); three remain pending (security, backup/restore, owner commercial approval). Supabase Security Advisor currently reports leaked-password protection disabled. Do not mark production-ready or enable paid rollout until these are resolved with evidence.
+- No production database migration, secret update, payment-provider activation, merge, deployment, public release, or destructive change was performed.
+- Next: open PR, inspect CI results, then test the Edge Function with owner-authenticated session and repository-scoped token; test FieldOps company switching with a second authorized company. Keep main unchanged until explicit release approval.
