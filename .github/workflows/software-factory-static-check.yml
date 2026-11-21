@@ -1,0 +1,38 @@
+name: Software Factory static checks
+on:
+  pull_request:
+    paths:
+      - 'software-factory.html'
+      - 'supabase/migrations/*zoz_software_factory*'
+      - '.github/workflows/software-factory-static-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'software-factory.html'
+      - 'supabase/migrations/*zoz_software_factory*'
+      - '.github/workflows/software-factory-static-check.yml'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate embedded JavaScript
+        run: |
+          python3 - <<'PY'
+          import re
+          html = open('software-factory.html', encoding='utf-8').read()
+          scripts = re.findall(r'<script[^>]*>([\\s\\S]*?)</script>', html, re.I)
+          if not scripts:
+              raise SystemExit('No inline JavaScript found')
+          open('/tmp/software-factory-inline.js', 'w', encoding='utf-8').write('\\n'.join(scripts))
+          required = ['zoz_software_products','zoz_software_runs','zoz_software_quality_gates','zoz_software_ledger','signInWithPassword','auth.uid']
+          missing = [item for item in required if item not in html]
+          if missing:
+              raise SystemExit('Missing required factory markers: ' + ', '.join(missing))
+          if 'service_role' in html:
+              raise SystemExit('Service role key must never be shipped to browser')
+          PY
+          node --check /tmp/software-factory-inline.js
