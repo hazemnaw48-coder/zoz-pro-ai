@@ -1,29 +1,54 @@
-# Simple workflow for deploying static content to Pages
+# Deploy ZOZ Pro static site and independent product apps to GitHub Pages
 name: Deploy static content to Pages
-
 on:
-  # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
-    paths-ignore:
+    paths:
+      - "software-factory.html"
+      - "dashboard.html"
+      - "_site/fieldops/**"
+      - ".github/workflows/static.yml"
+      - "analysis-production.html"
       - "channel-control.html"
       - "company-office.html"
       - "qwen-provider-connect.html"
       - "video-provider-connect.html"
-      - ".github/workflows/pages.yml"
-
-  # Allows this workflow to be started manually
+      - "studio/**"
+      - "studio.html"
+      - "production/**"
+      - "production-center.html"
+      - "production-workbench.html"
+      - "production-workbench.js"
+      - "agent-control.html"
+      - "agent-control-preview.html"
+      - "index.html"
+      - "youtube-analytics.html"
+      - "youtube-manager.html"
+      - "proof-studio.html"
+      - "studio.css"
+      - "studio.js"
+      - "visual-production.js"
+      - "production-handoff.js"
+      - "pwa.js"
+      - "sw.js"
+      - "manifest.webmanifest"
+      - "zoz-icon.svg"
+      - "channel-dashboard.html"
+      - "android-app-factory.html"
+      - "tool-credentials.html"
+      - "terms-of-service.html"
+      - "privacy-policy.html"
+      - "canva-connect.html"
+      - "canva-connect-v2.html"
+      - "tiktok1ShjJDl7tDu6DbqXFuOmpvDQgPYBqPcZ.txt"
   workflow_dispatch:
-
 permissions:
   contents: read
   pages: write
   id-token: write
-
 concurrency:
-  group: "github-pages"
+  group: github-pages
   cancel-in-progress: true
-
 jobs:
   deploy:
     environment:
@@ -33,27 +58,27 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Pages
+      - name: Configure Pages
         uses: actions/configure-pages@v5
-      - name: Prepare static site files
+      - name: Prepare static site
         run: |
           mkdir -p _site
-          cp analysis-production.html agent-control.html agent-control-preview.html index.html production-center.html production-workbench.html production-workbench.js channel-control.html company-office.html qwen-provider-connect.html video-provider-connect.html youtube-analytics.html youtube-manager.html studio.html proof-studio.html studio.css studio.js visual-production.js production-handoff.js pwa.js sw.js manifest.webmanifest zoz-icon.svg channel-dashboard.html dashboard.html android-app-factory.html tool-credentials.html terms-of-service.html privacy-policy.html canva-connect.html canva-connect-v2.html tiktok1ShjJDl7tDu6DbqXFuOmpvDQgPYBqPcZ.txt _site/
+          cp analysis-production.html agent-control.html agent-control-preview.html index.html production-center.html production-workbench.html production-workbench.js channel-control.html company-office.html qwen-provider-connect.html video-provider-connect.html youtube-analytics.html youtube-manager.html studio.html proof-studio.html studio.css studio.js visual-production.js production-handoff.js pwa.js sw.js manifest.webmanifest zoz-icon.svg channel-dashboard.html dashboard.html android-app-factory.html tool-credentials.html terms-of-service.html privacy-policy.html canva-connect.html canva-connect-v2.html tiktok1ShjJDl7tDu6DbqXFuOmpvDQgPYBqPcZ.txt software-factory.html _site/
+          test -s _site/software-factory.html
+          test -s _site/dashboard.html
+          test -s _site/fieldops/index.html
+          test -s _site/fieldops/config.js
+          test -s _site/fieldops/manifest.webmanifest
+          node -e "JSON.parse(require('fs').readFileSync('_site/fieldops/manifest.webmanifest','utf8'))"
           touch _site/.nojekyll
-          test -s _site/index.html
-          test -s _site/studio.html
-          test -s _site/tool-credentials.html
-          test -s _site/canva-connect.html
-          test -s _site/canva-connect-v2.html
-          echo "Verified Pages entrypoints:" && ls -l _site/index.html _site/studio.html _site/tool-credentials.html _site/canva-connect.html
           mkdir -p _site/production
           cp studio/index.html studio/style.css _site/production/
           git fetch origin supabase-studio-pages
           git show origin/supabase-studio-pages:studio/app.js > _site/production/app.js
-      - name: Upload artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '_site'
-      - name: Deploy to GitHub Pages
+          path: _site
+      - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@v5

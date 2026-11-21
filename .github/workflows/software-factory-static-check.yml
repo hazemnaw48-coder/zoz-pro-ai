@@ -1,0 +1,65 @@
+name: Software Factory static checks
+on:
+  pull_request:
+    paths:
+      - 'software-factory.html'
+      - 'supabase/migrations/*zoz_software_factory*'
+      - '.github/workflows/software-factory-static-check.yml'
+      - 'dashboard.html'
+      - '_site/fieldops/**'
+  push:
+    branches: [main]
+    paths:
+      - 'software-factory.html'
+      - 'supabase/migrations/*zoz_software_factory*'
+      - '.github/workflows/software-factory-static-check.yml'
+      - 'dashboard.html'
+      - '_site/fieldops/**'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate embedded JavaScript and schema safety
+        run: |
+          python3 - <<'PY'
+          import re
+          html = open('software-factory.html', encoding='utf-8').read()
+          fieldops = open('_site/fieldops/index.html', encoding='utf-8').read()
+          manifest = open('_site/fieldops/manifest.webmanifest', encoding='utf-8').read()
+          migration = open('supabase/migrations/20261121030000_zoz_software_factory_foundation.sql', encoding='utf-8').read()
+          scripts = re.findall(r'<script[^>]*>([\s\S]*?)</script>', html, re.I)
+          if not scripts:
+              raise SystemExit('No inline JavaScript found')
+          open('/tmp/software-factory-inline.js', 'w', encoding='utf-8').write('\n'.join(scripts))
+          required = ['zoz_software_products','zoz_software_runs','zoz_software_quality_gates','zoz_software_ledger','signInWithPassword']
+          missing = [item for item in required if item not in html]
+          if missing:
+              raise SystemExit('Missing required factory markers: ' + ', '.join(missing))
+          for marker in ['auth.uid()', 'enable row level security', 'revoke all']:
+              if marker not in migration.lower():
+                  raise SystemExit('Missing database security marker: ' + marker)
+          if 'service_role' in html.lower():
+              raise SystemExit('Service role key must never be shipped to browser')
+          PY
+          node --check /tmp/software-factory-inline.js
+          node -e "JSON.parse(require('fs').readFileSync('_site/fieldops/manifest.webmanifest','utf8'))"
+          python3 - <<'PY'
+          import re
+          html=open('_site/fieldops/index.html',encoding='utf-8').read()
+          scripts=re.findall(r'<script[^>]*>(.*?)</script>',html,re.I|re.S)
+          open('/tmp/fieldops-inline.js','w',encoding='utf-8').write(''.join(scripts))
+          required=['fieldops_customers','fieldops_technicians','fieldops_work_orders','fieldops_expenses','fieldops_payments','signInWithPassword','signUp','company_id']
+          missing=[x for x in required if x not in html]
+          if missing: raise SystemExit('FieldOps missing markers: '+', '.join(missing))
+          config=open('_site/fieldops/config.js',encoding='utf-8').read()
+          if 'service_role' in config.lower(): raise SystemExit('service_role value found in browser config')
+          if 'sb_publishable_' not in config: raise SystemExit('FieldOps must use a publishable key')
+          PY
+          node --check /tmp/fieldops-inline.js
+          test -s _site/fieldops/config.js
+          grep -q 'sb_publishable_' _site/fieldops/config.js
+          ! grep -qi 'service_role' _site/fieldops/config.js
