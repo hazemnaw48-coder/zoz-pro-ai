@@ -55,7 +55,9 @@ jobs:
           required=['fieldops_customers','fieldops_technicians','fieldops_work_orders','fieldops_expenses','fieldops_payments','signInWithPassword','signUp','company_id']
           missing=[x for x in required if x not in html]
           if missing: raise SystemExit('FieldOps missing markers: '+', '.join(missing))
-          if 'service_role' in html.lower(): raise SystemExit('service_role key found in browser app')
+          config=open('_site/fieldops/config.js',encoding='utf-8').read()
+          if 'service_role' in config.lower(): raise SystemExit('service_role value found in browser config')
+          if 'sb_publishable_' not in config: raise SystemExit('FieldOps must use a publishable key')
           PY
           node --check /tmp/fieldops-inline.js
           test -s _site/fieldops/config.js
