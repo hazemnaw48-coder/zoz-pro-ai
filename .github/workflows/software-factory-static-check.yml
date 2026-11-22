@@ -32,7 +32,7 @@ jobs:
         with:
           deno-version: v2.x
       - name: Type-check factory build function
-        run: deno check supabase/functions/zoz-factory-build/index.ts
+        run: deno check --node-modules-dir=auto supabase/functions/zoz-factory-build/index.ts
       - name: Validate embedded JavaScript and schema safety
         run: |
           python3 - <<'PY'
