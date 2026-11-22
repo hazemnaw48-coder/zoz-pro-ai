@@ -32,7 +32,7 @@ class MainActivity : Activity() {
     private lateinit var progress: ProgressBar
     private lateinit var offline: TextView
     private var fileCallback: android.webkit.ValueCallback<Array<Uri>>? = null
-    private val startUrl = "https://hazemnaw48-coder.github.io/zoz-pro-ai/fieldops/"
+    private val startUrl = "https://hazemnaw48-coder.github.io/zoz-pro-ai/fieldops/?app_version=1.0.1"
     private val allowedHost = "hazemnaw48-coder.github.io"
     private val allowedPrefix = "/zoz-pro-ai/fieldops/"
 
@@ -167,7 +167,7 @@ class MainActivity : Activity() {
         }
         root.addView(offline, FrameLayout.LayoutParams(-1, -1))
         setContentView(root)
-        if (savedInstanceState != null) webView.restoreState(savedInstanceState) else webView.loadUrl(startUrl)
+        webView.loadUrl(startUrl)
     }
 
     private fun isTrusted(url: String): Boolean {
