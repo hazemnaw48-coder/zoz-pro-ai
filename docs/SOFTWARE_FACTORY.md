@@ -27,6 +27,13 @@ Only the Supabase publishable key is used in the browser. No service-role key or
 - Build CI, generated app tests, integration tests and deployment are not claimed complete until the PR checks and adapter execution succeed.
 - FieldOps remains in pilot until security, backup/restore and owner commercial approval gates are evidenced.
 
+## FieldOps current customer capability boundary
+- Available now: one company owner can manage customer and technician records, create and assign work orders, move work through statuses, prepare/print quote drafts, record expenses and collections, view operating/financial summaries, and export company data.
+- Automatic now: company trial creation, subscription/plan expiry and usage-limit enforcement, quote arithmetic, audit event capture, tenant isolation and company-scoped dashboard refresh.
+- Human-operated now: entering customers and work orders, choosing the technician and schedule, changing work status, approving/sending quotes, recording payments/expenses, and exporting/sharing reports.
+- Not shipped yet: staff invitation/onboarding and role administration, technician/customer notifications, automatic dispatch or route optimization, recurring reminders, customer self-service booking, automatic payment collection/renewal, and automatic cloud backup/restore. Do not market these as current features.
+- Multi-user plan caps exist in the database, but employee invitation UI/workflow is not yet available. Treat multi-user access as a gated follow-up until invitation and role testing are complete.
+
 ## FieldOps production gates
 - Requirements, tenant isolation, core CRUD test evidence, staging acceptance and owner commercial approval are recorded as passed. The approved packages are Starter 199 EGP/month or 1,990/year, Growth 399/month or 3,990/year, Business 799/month or 7,990/year, with a 14-day Growth trial. Payment collection remains manual and activation follows admin verification.
 - Security is pending: Supabase Auth leaked-password protection is disabled; production Auth redirect/SMTP readiness and an independent security review still need verification.
