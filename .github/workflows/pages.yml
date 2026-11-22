@@ -10,6 +10,7 @@ on:
       - "qwen-provider-connect.html"
       - "video-provider-connect.html"
       - "_site/fieldops/**"
+      - "fieldops/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
