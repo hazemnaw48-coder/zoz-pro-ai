@@ -28,7 +28,7 @@ Only the Supabase publishable key is used in the browser. No service-role key or
 - FieldOps remains in pilot until security, backup/restore and owner commercial approval gates are evidenced.
 
 ## FieldOps production gates
-- Requirements, tenant isolation, core CRUD test evidence and staging acceptance are recorded as passed.
-- Security is pending: Supabase Auth leaked-password protection is disabled; production SMTP/Auth redirect configuration, staff invitations and independent security review remain open.
+- Requirements, tenant isolation, core CRUD test evidence, staging acceptance and owner commercial approval are recorded as passed. The approved packages are Starter 199 EGP/month or 1,990/year, Growth 399/month or 3,990/year, Business 799/month or 7,990/year, with a 14-day Growth trial. Payment collection remains manual and activation follows admin verification.
+- Security is pending: Supabase Auth leaked-password protection is disabled; production Auth redirect/SMTP readiness and an independent security review still need verification.
 - Backup/restore is pending: no completed isolated restore drill has been recorded.
-- Owner commercial approval is pending: keep FieldOps in pilot until the previously approved pricing/terms are explicitly reconfirmed in the factory record.
+- Current factory record: 5 of 7 gates passed; 2 remain pending (security and backup/restore). Keep FieldOps in pilot until both are evidenced.
