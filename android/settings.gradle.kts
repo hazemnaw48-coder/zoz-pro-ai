@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "ZOZFlowBridge"
-include(":app")
+include(":app", ":fieldops")
