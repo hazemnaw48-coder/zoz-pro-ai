@@ -24,7 +24,7 @@ Deno.serve(async (req: Request) => {
   if (!githubToken) return reply({
     error: "Factory GitHub credential is not configured",
     required_secret: "ZOZ_FACTORY_GITHUB_TOKEN",
-    instructions: "Add a GitHub token with repository creation and contents write access to Supabase Edge Function secrets, then retry.",
+    instructions: "Add a GitHub token with Contents: read/write access to the selected existing repository. Repository-creation permission is only needed when creating a brand-new repository.",
   }, 503);
 
   const db = createClient(supabaseUrl, anonKey, {
@@ -110,7 +110,7 @@ Deno.serve(async (req: Request) => {
     const ownerName = String(repo.owner?.login || "");
     const actualRepoName = String(repo.name || "");
     if (!ownerName || !actualRepoName) throw new Error("استجابة GitHub لا تحتوي بيانات المستودع المطلوبة.");
-    const baseRefResponse = await fetch("https://api.github.com/repos/" + ownerName + "/" + actualRepoName + "/git/ref/heads/" + encodeURIComponent(baseBranch), { headers });
+    const baseRefResponse = await fetch("https://api.github.com/repos/" + ownerName + "/" + actualRepoName + "/git/ref/heads/" + baseBranch, { headers });
     if (!baseRefResponse.ok) throw new Error("تعذر قراءة مرجع فرع الأساس: " + baseBranch);
     const baseRefData = await baseRefResponse.json();
     const targetBranch = "factory/" + slug + "-" + Date.now().toString(36);
