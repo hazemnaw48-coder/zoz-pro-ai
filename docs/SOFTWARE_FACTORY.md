@@ -1,21 +1,41 @@
 # ZOZ Software Factory
 
-Owner-only product lifecycle dashboard backed by ZOZ Pro Supabase Preview.
+Owner-only product lifecycle dashboard backed by the isolated ZOZ Pro Supabase Preview project `vjnwojrqduoxhetutxrs`.
 
 ## Current implementation
 - UI: `software-factory.html`.
 - Tables: `zoz_software_products`, `zoz_software_runs`, `zoz_software_quality_gates`, `zoz_software_ledger`.
-- RLS: authenticated owner-only policies; anonymous table privileges revoked.
-- Initial product to track: ZOZ FieldOps in its separate repository and isolated Supabase Preview schema.
+- All four tables have RLS enabled with authenticated owner-only policies; no anonymous policies are present.
+- Initial tracked product: ZOZ FieldOps, with its source repository and isolated Supabase Preview schema recorded in the product row.
+- Product lifecycle dashboard supports product records, quality gates, run history, repository/branch/preview metadata, and cost/revenue ledger.
 
-## Lifecycle
-Discovery → specification → build → test → staging → pilot → production. Each run records a status and optional evidence. Quality gates cover requirements, security, tests, tenant isolation, backup/restore, staging acceptance and owner approval. The ledger tracks costs, revenue, refunds and assets.
+## Build adapter
+- Edge Function: `zoz-factory-build`, owner-authenticated and using server-only `ZOZ_FACTORY_GITHUB_TOKEN`.
+- Preferred mode: supply an existing owner-controlled GitHub repository and base branch. The function checks repository access and push permission, creates a unique isolated `factory/<slug>-<suffix>` branch, and writes the scaffold under `factory-products/<slug>/`. It does not write to the base branch.
+- New private repository creation remains an optional fallback and requires the GitHub token to have repository-creation permission.
+- The browser only submits product ID and repository metadata; it never receives the GitHub token.
+- A successful adapter response records the branch/workspace URL and build evidence. This is a scaffold build, not proof that domain workflows are production-ready.
+
+## Lifecycle and release gates
+Discovery → specification → build → test → staging → pilot → production. Each run records status and evidence. Quality gates cover requirements, security, tests, tenant isolation, backup/restore, staging acceptance and owner approval. The ledger tracks costs, revenue, refunds and assets.
 
 ## Safety boundary
-Only the Supabase publishable key is used in the browser. No service-role key or third-party credentials are committed. Schema changes were applied to Preview only; production was not changed.
+Only the Supabase publishable key is used in the browser. No service-role key or GitHub credential is committed. Schema changes for the software factory remain in Preview; do not silently move them to production. No automatic public release or paid resource provisioning is enabled.
 
-## Not yet automated
-This release records and tracks product lifecycle work. It does not yet autonomously create repositories, provision cloud environments, run builds, execute integration tests, or deploy products. Those actions require least-privilege server-side adapters, CI verification and owner approval before use.
+## Current blockers
+- The previously configured GitHub token returned HTTP 403 for creating a new repository. Existing-repository mode avoids requiring that permission, but still needs `Contents: read/write` access to the selected repository. The Edge Function has not yet been invoked end-to-end after this code change.
+- Build CI, generated app tests, integration tests and deployment are not claimed complete until the PR checks and adapter execution succeed.
+- FieldOps remains in pilot until security, backup/restore and owner commercial approval gates are evidenced.
 
-## Release gates
-Do not mark FieldOps production-ready until two-tenant isolation, real login, customer/work-order/finance CRUD, backup/restore, security review, mobile PWA acceptance and staging customer acceptance have passed with evidence.
+## FieldOps current customer capability boundary
+- Available now: one company owner can manage customer and technician records, create and assign work orders, move work through statuses, prepare/print quote drafts, record expenses and collections, view operating/financial summaries, and export company data.
+- Automatic now: company trial creation, subscription/plan expiry and usage-limit enforcement, quote arithmetic, audit event capture, tenant isolation and company-scoped dashboard refresh.
+- Human-operated now: entering customers and work orders, choosing the technician and schedule, changing work status, approving/sending quotes, recording payments/expenses, and exporting/sharing reports.
+- Not shipped yet: staff invitation/onboarding and role administration, technician/customer notifications, automatic dispatch or route optimization, recurring reminders, customer self-service booking, automatic payment collection/renewal, and automatic cloud backup/restore. Do not market these as current features.
+- Multi-user plan caps exist in the database, but employee invitation UI/workflow is not yet available. Treat multi-user access as a gated follow-up until invitation and role testing are complete.
+
+## FieldOps production gates
+- Requirements, tenant isolation, core CRUD test evidence, staging acceptance and owner commercial approval are recorded as passed. The approved packages are Starter 199 EGP/month or 1,990/year, Growth 399/month or 3,990/year, Business 799/month or 7,990/year, with a 14-day Growth trial. Payment collection remains manual and activation follows admin verification.
+- Security is pending: Supabase Auth leaked-password protection is disabled; production Auth redirect/SMTP readiness and an independent security review still need verification.
+- Backup/restore is pending: no completed isolated restore drill has been recorded.
+- Current factory record: 5 of 7 gates passed; 2 remain pending (security and backup/restore). Keep FieldOps in pilot until both are evidenced.

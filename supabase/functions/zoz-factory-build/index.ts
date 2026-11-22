@@ -24,7 +24,7 @@ Deno.serve(async (req: Request) => {
   if (!githubToken) return reply({
     error: "Factory GitHub credential is not configured",
     required_secret: "ZOZ_FACTORY_GITHUB_TOKEN",
-    instructions: "Add a GitHub token with repository creation and contents write access to Supabase Edge Function secrets, then retry.",
+    instructions: "Add a GitHub token with Contents: read/write access to the selected existing repository. Repository-creation permission is only needed when creating a brand-new repository.",
   }, 503);
 
   const db = createClient(supabaseUrl, anonKey, {
@@ -37,13 +37,13 @@ Deno.serve(async (req: Request) => {
     return reply({ error: "Only the confirmed factory owner can start builds" }, 403);
   }
 
-  let body: { product_id?: string };
+  let body: { product_id?: string; repository_url?: string; base_branch?: string };
   try { body = await req.json(); } catch { return reply({ error: "Invalid JSON body" }, 400); }
   if (!body.product_id) return reply({ error: "product_id is required" }, 400);
 
   const { data: product, error: productError } = await db
     .from("zoz_software_products")
-    .select("id,name,slug,description,stage")
+    .select("id,name,slug,description,stage,repository_url,repository_branch")
     .eq("id", body.product_id)
     .single();
   if (productError || !product) return reply({ error: "Product not found or not owned by caller" }, 404);
@@ -51,6 +51,8 @@ Deno.serve(async (req: Request) => {
   const slug = String(product.slug ?? "");
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return reply({ error: "Product slug is invalid" }, 422);
   const repoName = `zoz-${slug}`.slice(0, 90);
+  const requestedRepoUrl = typeof body.repository_url === "string" ? body.repository_url.trim() : String(product.repository_url ?? "").trim();
+  const requestedBaseBranch = typeof body.base_branch === "string" ? body.base_branch.trim() : String(product.repository_branch ?? "").trim();
   const headers = {
     Authorization: `Bearer ${githubToken}`,
     Accept: "application/vnd.github+json",
@@ -65,18 +67,60 @@ Deno.serve(async (req: Request) => {
   if (runError) return reply({ error: "Could not create factory run", detail: runError.message }, 500);
 
   try {
-    const createResponse = await fetch("https://api.github.com/user/repos", {
-      method: "POST", headers,
-      body: JSON.stringify({
-        name: repoName, description: String(product.description ?? product.name).slice(0, 350),
-        private: true, auto_init: true, has_issues: true, has_projects: false, has_wiki: false,
-      }),
-    });
     let repo: any;
-    if (createResponse.ok) repo = await createResponse.json();
-    else {
-      const detail = await createResponse.text();
-      throw new Error(`GitHub repository creation failed (${createResponse.status}): ${detail.slice(0, 500)}`);
+    let baseBranch = "";
+    let targetPrefix = "";
+    if (requestedRepoUrl) {
+      let parsed: URL;
+      try { parsed = new URL(requestedRepoUrl); } catch { throw new Error("رابط GitHub غير صالح. أدخل رابط المستودع فقط."); }
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      const repoOwner = parts[0] || "";
+      const repoNameFromUrl = (parts[1] || "").replace(/\.git$/i, "");
+      if (parsed.hostname.toLowerCase() !== "github.com" || !repoOwner || !repoNameFromUrl || !/^[A-Za-z0-9_.-]+$/.test(repoOwner) || !/^[A-Za-z0-9_.-]+$/.test(repoNameFromUrl)) {
+        throw new Error("استخدم رابط مستودع GitHub بصيغة https://github.com/owner/repository");
+      }
+      if (repoOwner.toLowerCase() !== "hazemnaw48-coder") {
+        throw new Error("لأمان المصنع، اختر مستودعًا مملوكًا لحساب hazemnaw48-coder فقط.");
+      }
+      const repoResponse = await fetch("https://api.github.com/repos/" + repoOwner + "/" + repoNameFromUrl, { headers });
+      if (!repoResponse.ok) {
+        const detail = await repoResponse.text();
+        throw new Error("تعذر الوصول إلى المستودع المحدد (" + repoResponse.status + "). تحقق من نطاق GitHub token وإتاحة المستودع.");
+      }
+      repo = await repoResponse.json();
+      if (repo.permissions?.push !== true) throw new Error("التوكن المتصل لا يملك Contents: write على المستودع المحدد. امنحه صلاحية الكتابة لهذا المستودع ثم أعد المحاولة.");
+      baseBranch = requestedBaseBranch || String(repo.default_branch || "main");
+      targetPrefix = "factory-products/" + slug;
+    } else {
+      const createResponse = await fetch("https://api.github.com/user/repos", {
+        method: "POST", headers,
+        body: JSON.stringify({
+          name: repoName, description: String(product.description ?? product.name).slice(0, 350),
+          private: true, auto_init: true, has_issues: true, has_projects: false, has_wiki: false,
+        }),
+      });
+      if (createResponse.ok) repo = await createResponse.json();
+      else {
+        const detail = await createResponse.text();
+        throw new Error("تعذر إنشاء مستودع GitHub جديد (" + createResponse.status + "). استخدم مستودعًا موجودًا مع صلاحية Contents: write، أو حدّث GitHub token ليشمل إنشاء المستودعات. " + detail.slice(0, 250));
+      }
+      baseBranch = String(repo.default_branch || "main");
+    }
+
+    const ownerName = String(repo.owner?.login || "");
+    const actualRepoName = String(repo.name || "");
+    if (!ownerName || !actualRepoName) throw new Error("استجابة GitHub لا تحتوي بيانات المستودع المطلوبة.");
+    const baseRefResponse = await fetch("https://api.github.com/repos/" + ownerName + "/" + actualRepoName + "/git/ref/heads/" + baseBranch, { headers });
+    if (!baseRefResponse.ok) throw new Error("تعذر قراءة مرجع فرع الأساس: " + baseBranch);
+    const baseRefData = await baseRefResponse.json();
+    const targetBranch = "factory/" + slug + "-" + Date.now().toString(36);
+    const createBranchResponse = await fetch("https://api.github.com/repos/" + ownerName + "/" + actualRepoName + "/git/refs", {
+      method: "POST", headers,
+      body: JSON.stringify({ ref: "refs/heads/" + targetBranch, sha: baseRefData.object.sha }),
+    });
+    if (!createBranchResponse.ok) {
+      const detail = await createBranchResponse.text();
+      throw new Error("فشل إنشاء فرع التطوير المعزول (" + createBranchResponse.status + "): " + detail.slice(0, 250));
     }
 
     const files: Record<string, string> = {
@@ -89,26 +133,61 @@ Deno.serve(async (req: Request) => {
       "test/smoke.test.mjs": `import test from "node:test";\nimport assert from "node:assert/strict";\nimport { readFileSync } from "node:fs";\ntest("generated app contains product title and health action",()=>{const html=readFileSync(new URL("../index.html",import.meta.url),"utf8");assert.match(html,/<title>/);assert.match(html,/اختبار التشغيل/);});\n`,
       ".gitignore": "node_modules/\n.env\n.env.*\n!.env.example\n.DS_Store\n",
     };
+    let lastCommitSha = "";
     for (const [path, content] of Object.entries(files)) {
-      const put = await fetch(`https://api.github.com/repos/${repo.owner.login}/${repo.name}/contents/${path}`, {
-        method: "PUT", headers,
-        body: JSON.stringify({ message: `factory: add ${path}`, content: btoa(unescape(encodeURIComponent(content))) }),
-      });
+      const targetPath = targetPrefix ? targetPrefix + "/" + path : path;
+      const contentUrl = "https://api.github.com/repos/" + ownerName + "/" + actualRepoName + "/contents/" + targetPath.split("/").map(encodeURIComponent).join("/");
+      const existingResponse = await fetch(contentUrl + "?ref=" + encodeURIComponent(targetBranch), { headers });
+      let existingSha: string | undefined;
+      if (existingResponse.ok) {
+        const existing = await existingResponse.json();
+        existingSha = typeof existing?.sha === "string" ? existing.sha : undefined;
+      } else if (existingResponse.status !== 404) {
+        const detail = await existingResponse.text();
+        throw new Error("تعذر فحص الملف " + targetPath + " (" + existingResponse.status + "): " + detail.slice(0, 200));
+      }
+      const payload: Record<string, string> = {
+        message: "factory: add " + targetPath,
+        content: btoa(unescape(encodeURIComponent(content))),
+        branch: targetBranch,
+      };
+      if (existingSha) payload.sha = existingSha;
+      const put = await fetch(contentUrl, { method: "PUT", headers, body: JSON.stringify(payload) });
       if (!put.ok) {
         const detail = await put.text();
-        throw new Error(`Writing ${path} failed (${put.status}): ${detail.slice(0, 350)}`);
+        throw new Error("كتابة " + targetPath + " فشلت (" + put.status + "): " + detail.slice(0, 300));
       }
+      const putData = await put.json().catch(() => ({}));
+      lastCommitSha = String(putData?.commit?.sha || lastCommitSha);
     }
 
-    await db.from("zoz_software_products").update({
-      repository_url: repo.html_url, repository_branch: repo.default_branch ?? "main",
-      stage: "building", updated_at: new Date().toISOString(),
+    const repositoryUrl = String(repo.html_url || ("https://github.com/" + ownerName + "/" + actualRepoName));
+    const resultUrl = targetPrefix
+      ? repositoryUrl + "/tree/" + targetBranch + "/" + targetPrefix
+      : repositoryUrl + "/tree/" + targetBranch;
+    const { error: productUpdateError } = await db.from("zoz_software_products").update({
+      repository_url: repositoryUrl,
+      repository_branch: baseBranch,
+      stage: "building",
+      updated_at: new Date().toISOString(),
     }).eq("id", product.id);
-    await db.from("zoz_software_runs").update({
-      status: "passed", summary: "Created isolated private GitHub repository and runnable PWA scaffold; domain implementation and acceptance remain open.",
-      evidence_url: repo.html_url, completed_at: new Date().toISOString(),
+    if (productUpdateError) throw new Error("تم بناء ملفات المشروع لكن تعذر تحديث سجل المنتج: " + productUpdateError.message);
+    const { error: runUpdateError } = await db.from("zoz_software_runs").update({
+      status: "passed",
+      summary: "Created isolated GitHub development branch and executable PWA scaffold. Domain implementation, CI tests and acceptance remain open.",
+      evidence_url: resultUrl,
+      completed_at: new Date().toISOString(),
     }).eq("id", run.id);
-    return reply({ ok: true, repository: repo.html_url, branch: repo.default_branch ?? "main", next: "Implement domain requirements, add database migrations, run acceptance tests, then deploy staging." }, 201);
+    if (runUpdateError) throw new Error("تم حفظ المشروع لكن تعذر إغلاق سجل التشغيل: " + runUpdateError.message);
+    return reply({
+      ok: true,
+      repository: repositoryUrl,
+      branch: targetBranch,
+      path: targetPrefix || "/",
+      commit_sha: lastCommitSha || null,
+      workspace_url: resultUrl,
+      next: "Review the isolated branch, implement product requirements, run CI and acceptance tests, then request owner approval before release.",
+    }, 201);
   } catch (error) {
     await db.from("zoz_software_runs").update({
       status: "failed", summary: String(error).slice(0, 900), completed_at: new Date().toISOString(),

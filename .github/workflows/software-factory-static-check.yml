@@ -6,6 +6,8 @@ on:
       - 'supabase/migrations/*zoz_software_factory*'
       - '.github/workflows/software-factory-static-check.yml'
       - 'dashboard.html'
+      - 'supabase/functions/zoz-factory-build/**'
+      - 'docs/SOFTWARE_FACTORY.md'
       - '_site/fieldops/**'
   push:
     branches: [main]
@@ -14,6 +16,8 @@ on:
       - 'supabase/migrations/*zoz_software_factory*'
       - '.github/workflows/software-factory-static-check.yml'
       - 'dashboard.html'
+      - 'supabase/functions/zoz-factory-build/**'
+      - 'docs/SOFTWARE_FACTORY.md'
       - '_site/fieldops/**'
 jobs:
   validate:
@@ -23,6 +27,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check factory build function
+        run: deno check --node-modules-dir=auto supabase/functions/zoz-factory-build/index.ts
       - name: Validate embedded JavaScript and schema safety
         run: |
           python3 - <<'PY'
@@ -52,7 +62,7 @@ jobs:
           html=open('_site/fieldops/index.html',encoding='utf-8').read()
           scripts=re.findall(r'<script[^>]*>(.*?)</script>',html,re.I|re.S)
           open('/tmp/fieldops-inline.js','w',encoding='utf-8').write(''.join(scripts))
-          required=['fieldops_customers','fieldops_technicians','fieldops_work_orders','fieldops_expenses','fieldops_payments','signInWithPassword','signUp','company_id']
+          required=['fieldops_customers','fieldops_technicians','fieldops_work_orders','fieldops_expenses','fieldops_payments','signInWithPassword','signUp','company_id','companyPicker','applyCompany']
           missing=[x for x in required if x not in html]
           if missing: raise SystemExit('FieldOps missing markers: '+', '.join(missing))
           config=open('_site/fieldops/config.js',encoding='utf-8').read()

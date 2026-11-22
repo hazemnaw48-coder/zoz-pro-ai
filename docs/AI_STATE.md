@@ -242,3 +242,33 @@ The center project `894a0e3a-85c4-43de-b8f7-205db24685b9` still uses browser `lo
 - Flow limitation: Google Flow's normal mobile app is supported in Egypt, but the official Flow Agent is currently web/PC only. The phone app cannot make unattended Flow generations through a documented API. It prepares and delivers prompts; generation still requires a visible owner action in Flow. No credit/region/MFA/CAPTCHA bypass is used.
 - Direct KDP connector and automated KDP submission remain unimplemented.
 - Function source in the repository uses server-only `ZOZ_OWNER_EMAIL` as the owner allowlist setting; configure it in Supabase Edge Function secrets before redeploying source files. Do not commit the real owner email or OAuth/service-role credentials.
+
+
+
+## Software Factory / FieldOps closeout work — 2026-11-22
+
+- Created isolated task branch `feature/fieldops-software-factory-closeout` from `main`; no merge or production deployment performed.
+- Confirmed Preview software-factory tables exist and all four (`zoz_software_products`, `zoz_software_runs`, `zoz_software_quality_gates`, `zoz_software_ledger`) have RLS enabled with authenticated owner-only policies.
+- Confirmed FieldOps production UI and public config are versioned under `_site/fieldops/`; its production Supabase URL uses the public publishable key only.
+- Updated `supabase/functions/zoz-factory-build/index.ts` to support an existing owner-controlled GitHub repository, verify push permission, create a unique isolated development branch, and write generated scaffold files under `factory-products/<slug>/`. It does not write to the base branch. New-repository mode remains available only if the server token has repository-creation permission.
+- Updated `software-factory.html` to pass the selected repository and base branch and explain the required Contents: write permission.
+- Updated `_site/fieldops/index.html` with an authorized-company selector so a user with multiple accessible companies can switch the active company; all operational queries continue to filter by the selected company ID and RLS remains authoritative.
+- Updated `.github/workflows/software-factory-static-check.yml` to type-check the Edge Function with Deno and check the FieldOps company selector markers and inline JavaScript.
+- Updated `docs/SOFTWARE_FACTORY.md` with current adapter behavior and honest release gates.
+- Existing GitHub token previously returned HTTP 403 when creating a new repository. Existing-repository mode has not yet been invoked end-to-end; it still requires the Supabase Edge Function secret `ZOZ_FACTORY_GITHUB_TOKEN` to have Contents: read/write access to the selected private repository.
+- FieldOps Preview product record remains `pilot`. Four quality gates passed (requirements, tenant isolation, tests, staging acceptance); three remain pending (security, backup/restore, owner commercial approval). Supabase Security Advisor currently reports leaked-password protection disabled. Do not mark production-ready or enable paid rollout until these are resolved with evidence.
+- No production database migration, secret update, payment-provider activation, merge, deployment, public release, or destructive change was performed.
+- Next: open PR, inspect CI results, then test the Edge Function with owner-authenticated session and repository-scoped token; test FieldOps company switching with a second authorized company. Keep main unchanged until explicit release approval.
+
+
+## FieldOps / Software Factory follow-up — 2026-11-22 08:xx Cairo
+
+- Production FieldOps audit: verified company onboarding, trial creation trigger (14 days on Growth), plan-limit triggers, CRUD screens, work-order state changes, quote drafts/printing, manual expenses/payments, reports/export, and audit-row trigger. Verified live DB contains sample company/customer/technician/work-order/expense/payment/audit records.
+- Confirmed no FieldOps background scheduler/notification/auto-dispatch routines are present. Assignment, scheduling, technician status updates, expense/payment entry and quote sending remain human-operated. Plan limits and trial dates are database-enforced automatically; audit logging is automatic.
+- Hardened production table grants for `fieldops_company_subscriptions`, `fieldops_subscription_payments`, `fieldops_subscription_plans`, and `fieldops_audit_events`: removed broad anon/authenticated DML; retained only required authenticated reads and pending payment-request inserts, and public read-only plan catalog. Verified privileges after change. RLS remains in force.
+- Reviewed FieldOps security-definer function ACLs: payment-review RPC is not executable by anon/authenticated and remains service-role-only; owner/admin validation occurs inside the function. No direct client approval of payment or subscription activation.
+- Fixed async company-switch race in `_site/fieldops/index.html`: changing companies clears prior-company data immediately, uses a monotonically increasing request sequence, and ignores stale responses from earlier company loads. Refresh button now restores its enabled label after requests settle.
+- Preview Edge Function `zoz-factory-build` is deployed ACTIVE as version 7 with JWT verification. The factory adapter supports an existing owner-controlled GitHub repo and writes into an isolated generated branch/path; its end-to-end call still requires a configured server secret with Contents: read/write.
+- PR #73 remains draft and unmerged; latest Vercel status was successful on the prior commit, but current head CI has not been confirmed. Production GitHub Pages still serves main, so these UI changes are not live yet.
+- Remaining FieldOps launch gates: enable leaked-password protection in Supabase Auth; complete an actual backup-and-restore drill; test second-company switching in an authenticated browser; pass CI and end-to-end factory build. Keep commercial rollout in pilot until then.
+- Product operation statement: FieldOps is currently a human-operated workflow app with automatic guardrails, trial/plan enforcement and audit logging; it is not yet an autonomous dispatch/notification/route-optimization system. Do not market autonomous operation as currently available.

@@ -9,6 +9,7 @@ on:
       - "company-office.html"
       - "qwen-provider-connect.html"
       - "video-provider-connect.html"
+      - "_site/fieldops/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
