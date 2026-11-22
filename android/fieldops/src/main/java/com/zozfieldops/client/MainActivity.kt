@@ -72,13 +72,13 @@ class MainActivity : Activity() {
                 }
 
                 override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
-                    progress.visibility = View.VISIBLE
+                    this@MainActivity.progress.visibility = View.VISIBLE
                     offline.visibility = View.GONE
                     if (!isTrusted(url)) runCatching { view.removeJavascriptInterface("FieldOpsDownloads") }
                 }
 
                 override fun onPageFinished(view: WebView, url: String) {
-                    progress.visibility = View.GONE
+                    this@MainActivity.progress.visibility = View.GONE
                     if (isTrusted(url)) {
                         view.addJavascriptInterface(DownloadBridge(), "FieldOpsDownloads")
                         installBlobDownloadHandler(view)
@@ -91,15 +91,15 @@ class MainActivity : Activity() {
                     error: android.webkit.WebResourceError
                 ) {
                     if (request.isForMainFrame) {
-                        progress.visibility = View.GONE
+                        this@MainActivity.progress.visibility = View.GONE
                         offline.visibility = View.VISIBLE
                     }
                 }
             }
             webChromeClient = object : WebChromeClient() {
                 override fun onProgressChanged(view: WebView, newProgress: Int) {
-                    progress.progress = newProgress
-                    progress.visibility = if (newProgress >= 100) View.GONE else View.VISIBLE
+                    this@MainActivity.progress.progress = newProgress
+                    this@MainActivity.progress.visibility = if (newProgress >= 100) View.GONE else View.VISIBLE
                 }
 
                 override fun onShowFileChooser(
@@ -163,7 +163,7 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(20, 59, 89))
             setPadding(dp(28), dp(20), dp(28), dp(20))
             visibility = View.GONE
-            setOnClickListener { webView.reload(); visibility = View.GONE; progress.visibility = View.VISIBLE }
+            setOnClickListener { webView.reload(); visibility = View.GONE; this@MainActivity.progress.visibility = View.VISIBLE }
         }
         root.addView(offline, FrameLayout.LayoutParams(-1, -1))
         setContentView(root)
