@@ -90,9 +90,6 @@ Deno.serve(async (req: Request) => {
       repo = await repoResponse.json();
       if (repo.permissions?.push !== true) throw new Error("التوكن المتصل لا يملك Contents: write على المستودع المحدد. امنحه صلاحية الكتابة لهذا المستودع ثم أعد المحاولة.");
       baseBranch = requestedBaseBranch || String(repo.default_branch || "main");
-      const branchResponse = await fetch("https://api.github.com/repos/" + repoOwner + "/" + repoNameFromUrl + "/branches/" + encodeURIComponent(baseBranch), { headers });
-      if (!branchResponse.ok) throw new Error("فرع الأساس غير موجود أو لا يمكن قراءته: " + baseBranch);
-      const branchData = await branchResponse.json();
       targetPrefix = "factory-products/" + slug;
     } else {
       const createResponse = await fetch("https://api.github.com/user/repos", {
@@ -170,7 +167,7 @@ Deno.serve(async (req: Request) => {
       : repositoryUrl + "/tree/" + targetBranch;
     const { error: productUpdateError } = await db.from("zoz_software_products").update({
       repository_url: repositoryUrl,
-      repository_branch: targetBranch,
+      repository_branch: baseBranch,
       stage: "building",
       updated_at: new Date().toISOString(),
     }).eq("id", product.id);
