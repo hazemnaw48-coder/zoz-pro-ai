@@ -33,7 +33,23 @@ jobs:
       - name: Run Android unit tests, lint, and assemble
         working-directory: android
         run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --no-daemon --stacktrace
-      - name: Build separate FieldOps Android client\n        working-directory: android\n        run: gradle :fieldops:assembleDebug --no-daemon --stacktrace\n      - name: Verify APK and checksum\n        run: |\n          set -euo pipefail\n          test -s android/fieldops/build/outputs/apk/debug/fieldops-debug.apk\n          sha256sum android/fieldops/build/outputs/apk/debug/fieldops-debug.apk | tee android/fieldops/build/outputs/apk/debug/SHA256SUMS.txt\n      - uses: actions/upload-artifact@v4\n        with:\n          name: zoz-fieldops-android-debug-apk\n          path: |\n            android/fieldops/build/outputs/apk/debug/fieldops-debug.apk\n            android/fieldops/build/outputs/apk/debug/SHA256SUMS.txt\n          if-no-files-found: error\n          retention-days: 14\n      - name: Verify Flow Bridge APK and checksum
+      - name: Build separate FieldOps Android client
+        working-directory: android
+        run: gradle :fieldops:assembleDebug --no-daemon --stacktrace
+      - name: Verify FieldOps APK and checksum
+        run: |
+          set -euo pipefail
+          test -s android/fieldops/build/outputs/apk/debug/fieldops-debug.apk
+          sha256sum android/fieldops/build/outputs/apk/debug/fieldops-debug.apk | tee android/fieldops/build/outputs/apk/debug/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zoz-fieldops-android-debug-apk
+          path: |
+            android/fieldops/build/outputs/apk/debug/fieldops-debug.apk
+            android/fieldops/build/outputs/apk/debug/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Verify Flow Bridge APK and checksum
         run: |
           set -euo pipefail
           test -s android/app/build/outputs/apk/debug/app-debug.apk
