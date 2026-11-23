@@ -2917,6 +2917,26 @@ Deno.serve(async (req: Request) => {
   }
   const user = await owner(req);
   if (!user) return fail("يلزم تسجيل الدخول بحساب مالك ZOZ Pro المؤكد في مشروع الإنتاج.", 401);
+  if (action === "intelligence_solve") {
+    const requestText = clean(body?.request, 5000);
+    const department = clean(body?.department || "operations", 40);
+    const allowedDepartments = new Set(["sales","marketing","operations","engineering","finance","research"]);
+    if (requestText.length < 8 || !allowedDepartments.has(department)) return fail("وصف المشكلة أو القسم غير صالح.", 400);
+    const authorization = req.headers.get("authorization") || "";
+    const apikey = req.headers.get("apikey") || ANON;
+    const response = await fetch(URL0 + "/functions/v1/zoz-intelligence-engine", {
+      method: "POST", headers: { authorization, apikey, "content-type": "application/json" },
+      body: JSON.stringify({ action: "run", run_type: "solve", request: requestText,
+        context: { department, requesting_agent: "zoz-pro-agent", company_workflow: true,
+          objective: "تشخيص المشكلة واقتراح حل قابل للتنفيذ والتحقق" } }),
+      signal: AbortSignal.timeout(125000)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result?.ok !== true) return fail(clean(result?.error || "تعذر إكمال البحث والحل.", 400), response.status >= 400 ? response.status : 502);
+    return out({ ok: true, action: "intelligence_solve", department, research: result.run,
+      proposed_task: result.task, execution_status: "not_executed",
+      note: "تم البحث وإنشاء مهمة حل مقترحة. التنفيذ الفعلي ينتظر محول القسم واعتماد الإجراء المطلوب." });
+  }
   try {
     if (action === "analyze") return await analyze(req, user, body);
     if (action === "analyze_tiktok_account") {
