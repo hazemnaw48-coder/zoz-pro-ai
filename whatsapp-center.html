@@ -14,160 +14,49 @@
 <body>
 <main>
 <header class="row">
- <div><div class="small">ZOZ PRO / BUSINESS COMMUNICATIONS</div><h1>مركز واتساب الشركة</h1><p>صندوق المحادثات • وكيل الردود • القوالب المعتمدة • المتابعة والتدقيق</p></div>
- <span class="pill" id="status">غير متصل</span>
+ <div><div class="small">ZOZ PRO / BUSINESS COMMUNICATIONS</div><h1>واتساب ZOZ Business</h1><p>قناة الشركة الحالية عبر Peach CoPilot — دون إنشاء تطبيق Meta جديد أو طلب أسرار منك</p></div>
+ <span class="pill good">Peach متصل</span>
 </header>
-<section class="card" id="login-card">
- <h2>دخول مالك ZOZ Pro</h2>
- <div class="grid"><div><label>البريد الإلكتروني</label><input id="email" type="email" autocomplete="username" value="hazemnaw48@gmail.com"></div><div><label>كلمة المرور</label><input id="password" type="password" autocomplete="current-password"></div></div>
- <button id="login">دخول آمن</button><div id="login-note" class="notice">يلزم حساب المالك المسجل في مشروع ZOZ Pro.</div>
-</section>
-<div id="app" class="hidden">
- <section class="card">
-  <div class="row"><div><h2>قناة ZOZ Business</h2><div class="muted" id="number">+20 12 22748475</div></div><div class="row"><span class="pill" id="connection">بانتظار ربط Meta API</span><button class="secondary" id="refresh">تحديث</button><button class="secondary" id="logout">خروج</button></div></div>
-  <div class="grid" style="margin-top:10px">
-   <div class="metric"><span class="small">المحادثات</span><strong id="conversation-count">0</strong></div>
-   <div class="metric"><span class="small">مسودات تنتظر المراجعة</span><strong id="draft-count">0</strong></div>
-   <div class="metric"><span class="small">قوالب مستوردة</span><strong id="template-count">0</strong></div>
-   <div class="metric"><span class="small">استهلاك الخدمة هذا الشهر</span><strong id="usage-count">0 / 900</strong></div>
-  </div>
-  <div id="readiness" class="notice warn" style="margin-top:10px">الربط الخارجي غير مكتمل.</div>
- </section>
- <section class="card">
-  <h2>إعداد الربط الرسمي مع Meta</h2>
-  <p>أدخل المعرّفات التي تحصل عليها من مسار WhatsApp Business App Coexistence الرسمي. لا تدخل أي Access Token في هذه الصفحة.</p>
-  <div class="grid"><div><label>Phone Number ID</label><input id="phone-id" inputmode="numeric" placeholder="Meta Phone Number ID"></div><div><label>WhatsApp Business Account ID</label><input id="waba-id" inputmode="numeric" placeholder="WABA ID"></div></div>
-  <button id="save-meta">حفظ المعرّفات</button>
-  <div class="small">الأسرار تحفظ فقط في Supabase Edge Function Secrets: META_WHATSAPP_VERIFY_TOKEN, META_WHATSAPP_APP_SECRET, META_WHATSAPP_ACCESS_TOKEN, META_GRAPH_API_VERSION. لا تضعها في GitHub أو المتصفح.</div>
- </section>
- <section class="card">
-  <div class="row"><h2>سياسة تشغيل الوكيل</h2><span class="pill warn" id="mode-label">مسودات فقط</span></div>
-  <div class="grid">
-   <div><label>وضع الرد</label><select id="mode"><option value="off">إيقاف الرد الآلي</option><option value="draft_only" selected>إنشاء مسودة فقط</option><option value="safe_auto">رد تلقائي آمن داخل نافذة الخدمة</option></select></div>
-   <div><label>حد رسائل الخدمة المجانية الشهري</label><input id="cap" type="number" min="0" max="900" value="900"></div>
-  </div>
-  <div class="checks">
-   <label><input id="enabled" type="checkbox"> تفعيل القناة</label>
-   <label><input id="emergency" type="checkbox" checked> إيقاف طوارئ</label>
-  </div>
-  <p class="small">الوضع الآمن يرد فقط على التحية والتعريف العام، داخل نافذة 24 ساعة، مع استبعاد الموقوفين وجهات الاتصال المستبعدة. السعر والعروض والعقود والشكاوى والمدفوعات لا تُرسل آليًا. لا توجد حملات تسويقية.</p>
-  <button id="save-mode">حفظ سياسة التشغيل</button>
- </section>
- <div class="layout">
-  <section class="card">
-   <div class="row"><h2>المحادثات</h2><span class="small" id="conversation-hint"></span></div>
-   <div id="conversations" class="list"><div class="notice">لا توجد محادثات مستوردة حتى الآن.</div></div>
-  </section>
-  <section class="card">
-   <div class="row"><div><h2 id="chat-title">اختر محادثة</h2><div class="small" id="chat-subtitle"></div></div><span class="pill" id="window-status">—</span></div>
-   <div id="messages" class="messages"><div class="muted">ستظهر الرسائل هنا بعد تفعيل Webhook الرسمي.</div></div>
-   <label>رد أو مسودة للعميل</label><textarea id="reply" rows="3" placeholder="اكتب ردًا لمراجعته..."></textarea>
-   <div class="row"><button id="make-draft">حفظ كمسودة</button><button class="secondary" id="close-chat">إغلاق المحادثة</button></div>
-   <div class="small">الإرسال يتطلب ربط Meta API، نافذة خدمة مفتوحة، وعدم وجود إيقاف طوارئ. لا توجد رسائل تجريبية لعملاء حقيقيين.</div>
-  </section>
+
+<section class="card">
+ <div class="row"><h2>حالة الرقم الحالي</h2><span class="pill good">Connected · Coexistence</span></div>
+ <div class="grid">
+  <div class="metric"><span class="small">رقم الشركة</span><strong>+20 12 22748475</strong></div>
+  <div class="metric"><span class="small">نوع الاتصال</span><strong>WhatsApp Business App + Peach</strong></div>
+  <div class="metric"><span class="small">AI Flow داخل Peach</span><strong>غير مفعّل</strong></div>
+  <div class="metric"><span class="small">آخر فحص للرسائل</span><strong>23 نوفمبر 2026</strong></div>
  </div>
- <section class="card">
-  <div class="row"><h2>صندوق الإرسال والمراجعة</h2><span class="small">المسودات لا ترسل تلقائيًا</span></div>
-  <div class="tablewrap"><table><thead><tr><th>الرد</th><th>التصنيف</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody id="outbox"><tr><td colspan="4">لا توجد مسودات.</td></tr></tbody></table></div>
- </section>
- <section class="card">
-  <div class="row"><h2>مكتبة القوالب</h2><button id="sync-templates" class="secondary">مزامنة القوالب الموجودة</button></div>
-  <p class="small">قراءة فقط: لا ينشئ النظام قوالب مكررة ولا يحذف القوالب المعتمدة.</p>
-  <div class="tablewrap"><table><thead><tr><th>الاسم</th><th>اللغة</th><th>الفئة</th><th>الاعتماد</th></tr></thead><tbody id="templates"><tr><td colspan="4">لم تتم المزامنة بعد.</td></tr></tbody></table></div>
- </section>
- <section class="card">
-  <h2>سياسة جهة الاتصال المحددة</h2>
-  <div id="contact-policy" class="muted">اختر محادثة لإدارة استثناء أو إيقاف الرسائل الآلية.</div>
- </section>
-</div>
+ <div class="notice good" style="margin-top:12px">تأكد اتصال Peach بالرقم نفسه ونمط Coexistence. لم يتم فصل تطبيق WhatsApp Business أو تغيير تسجيل الرقم.</div>
+</section>
+
+<section class="card">
+ <div class="row"><h2>وكيل متابعة واتساب ZOZ</h2><span class="pill good">المراجعة اليومية مفعّلة</span></div>
+ <p>تم إعداد مهمة يومية على اتصال Peach الحالي. تراجع الرسائل الواردة خلال آخر 24 ساعة، وترد فقط عندما يكون الاستفسار واضحًا ويتعلق مباشرة بشركة ZOZ أو أحد منتجاتها، وتكون نافذة خدمة العملاء مفتوحة.</p>
+ <div class="grid">
+  <div class="metric"><span class="small">موعد المراجعة التالية</span><strong>24 نوفمبر 2026 · 08:00 صباحًا</strong><span class="small">بتوقيت القاهرة، والموعد مرن قليلًا</span></div>
+  <div class="metric"><span class="small">نتيجة آخر فحص</span><strong>0 رسائل جديدة</strong><span class="small">منذ 22 نوفمبر 2026</span></div>
+ </div>
+ <div class="notice warn" style="margin-top:12px">حدود الوضع المجاني: هذه مراجعة مجدولة يوميًا وليست وكيلًا متصلًا لحظيًا على مدار الساعة. لا يتم إرسال قوالب أو حملات أو رسائل جماعية.</div>
+</section>
+
+<section class="card">
+ <h2>قواعد الرد الآمن</h2>
+ <ul>
+  <li>الرد النصي فقط عندما يبدأ العميل المحادثة وتكون نافذة الـ24 ساعة مفتوحة.</li>
+  <li>الرد فقط على استفسار تجاري واضح عن ZOZ؛ التحيات المجردة والرسائل الشخصية أو الغامضة تذهب للمراجعة.</li>
+  <li>الأسعار والعروض والخصومات والعقود والضمانات والشكاوى والمدفوعات والوعود ومواعيد التسليم تحتاج موافقة المالك.</li>
+  <li>احترام طلبات إيقاف التواصل، ومنع التسويق الاستباقي أو الجماعي.</li>
+  <li>عدم عرض أو نسخ كلمات المرور أو رموز التحقق أو مفاتيح API أو الروابط المشبوهة في التقارير.</li>
+ </ul>
+</section>
+
+<section class="card">
+ <h2>إدارة الاتصال الحالي</h2>
+ <p>الرسائل تُقرأ وتُرسل عبر صلاحية Peach CoPilot المربوطة بالفعل بحساب ChatGPT. لوحة ZOZ هذه تعرض حالة المسار وسياسة التشغيل؛ لا تملك Peach CoPilot Lite واجهة Webhook/API أو صلاحية صندوق المحادثات الكاملة التي تسمح للوحة Supabase بالتحكم المباشر في الرسائل.</p>
+ <div class="row">
+  <a class="button" href="https://app.trypeach.ai" target="_blank" rel="noopener">فتح Peach</a>
+  <a class="button secondary" href="https://docs.trypeach.ai/use-peach-copilot-with-chatgpt-or-claude" target="_blank" rel="noopener">دليل Peach CoPilot</a>
+ </div>
+</section>
 </main>
-<script>
-const SUPABASE_URL="https://oxyzxbkwhafzaztraowc.supabase.co";
-const SUPABASE_KEY="sb_publishable_16GficzXgQUah0R8FnqUJQ_D-uBVtZm";
-const FN=SUPABASE_URL+"/functions/v1/zoz-whatsapp-control";
-const OWNER="hazemnaw48@gmail.com";
-const $=id=>document.getElementById(id);
-let sb=null,session=null,state=null,selected=null;
-function note(id,msg,kind=""){const el=$(id);el.textContent=msg;el.className="notice "+kind;}
-function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-async function call(action,extra={}) {
- if(!session?.access_token)throw new Error("انتهت جلسة المالك.");
- const r=await fetch(FN,{method:"POST",headers:{"content-type":"application/json","apikey":SUPABASE_KEY,"authorization":"Bearer "+session.access_token},body:JSON.stringify({action,...extra})});
- const d=await r.json().catch(()=>({}));
- if(!r.ok||d.ok===false)throw new Error(d.error||("HTTP "+r.status));
- return d;
-}
-function showApp(on){$("app").classList.toggle("hidden",!on);$("login-card").classList.toggle("hidden",on);$("status").textContent=on?"جلسة المالك متصلة":"غير متصل";}
-async function login(){
- $("login").disabled=true;
- try{
-  const email=$("email").value.trim(),password=$("password").value;
-  if(email.toLowerCase()!==OWNER)throw new Error("استخدم بريد مالك ZOZ Pro.");
-  const {data,error}=await sb.auth.signInWithPassword({email,password});if(error)throw error;
-  session=data.session;if(!session)throw new Error("لم تنشأ جلسة.");
-  $("password").value="";showApp(true);await refresh();
-  note("login-note","تم التحقق من حساب المالك.","good");
- }catch(e){note("login-note",e.message,"bad");}finally{$("login").disabled=false;}
-}
-function render(){
- const c=state.channel||{};
- $("number").textContent=c.business_number_e164||"+20 12 22748475";
- $("connection").textContent=c.connection_status==="connected"?"متصل رسميًا":c.connection_status==="identifiers_saved"?"المعرّفات محفوظة — تحقق Webhook مطلوب":"بانتظار ربط Meta API";
- $("mode").value=c.auto_reply_mode||"draft_only";$("enabled").checked=!!c.is_enabled;$("emergency").checked=c.emergency_stop!==false;$("cap").value=c.free_service_monthly_cap??900;
- $("mode-label").textContent=c.auto_reply_mode==="safe_auto"?"رد آلي آمن":c.auto_reply_mode==="off"?"الرد متوقف":"مسودات فقط";
- $("conversation-count").textContent=(state.conversations||[]).length;
- $("draft-count").textContent=(state.outbox||[]).filter(x=>x.status==="draft").length;
- $("template-count").textContent=(state.templates||[]).length;
- $("usage-count").textContent=(state.usage?.free_service_messages||0)+" / "+(c.free_service_monthly_cap??900);
- $("phone-id").value=c.phone_number_id||"";$("waba-id").value=c.waba_id||"";
- const r=state.readiness||{};
- const missing=Object.entries({VERIFY:r.verify_token,APP_SECRET:r.app_secret,ACCESS:r.access_token,PHONE_ID:r.phone_id,WABA_ID:r.waba_id,GRAPH_VERSION:r.graph_version}).filter(x=>!x[1]).map(x=>x[0]);
- $("readiness").textContent=missing.length?"الربط غير مكتمل. إعدادات الخادم الناقصة: "+missing.join("، ")+". لا يوجد إرسال حقيقي حتى تكتمل المصادقة الرسمية.":"أسرار Meta موجودة. لا يزال يلزم التحقق من Webhook واختبار قناة المالك.";
- $("readiness").className="notice "+(missing.length?"warn":"good");
- $("conversations").innerHTML=(state.conversations||[]).map(x=>{
-  const contact=x.contacts||{},active=selected?.id===x.id;
-  return '<button class="item '+(active?"active":"")+'" data-conv="'+esc(x.id)+'"><b>'+esc(contact.display_name||contact.phone_e164||contact.wa_id||"عميل")+'</b><div class="small">'+esc(x.last_message_preview||"")+'</div><div class="small">'+esc(x.status)+(x.escalated?" • يحتاج متابعة":"")+'</div></button>';
- }).join("")||'<div class="notice">لا توجد محادثات. فعّل Webhook لاستقبال الرسائل.</div>';
- document.querySelectorAll("[data-conv]").forEach(b=>b.addEventListener("click",()=>selectConversation(b.dataset.conv)));
- $("outbox").innerHTML=(state.outbox||[]).map(x=>'<tr><td>'+esc(x.body)+'</td><td>'+esc(x.decision_label)+'</td><td>'+esc(x.status)+'</td><td>'+(x.status==="draft"?'<button data-send="'+esc(x.id)+'">موافقة وإرسال</button>':'—')+'</td></tr>').join("")||'<tr><td colspan="4">لا توجد مسودات.</td></tr>';
- document.querySelectorAll("[data-send]").forEach(b=>b.addEventListener("click",()=>approve(b.dataset.send)));
- $("templates").innerHTML=(state.templates||[]).map(x=>'<tr><td>'+esc(x.template_name)+'</td><td>'+esc(x.language)+'</td><td>'+esc(x.category)+'</td><td>'+esc(x.approval_status)+'</td></tr>').join("")||'<tr><td colspan="4">لم تتم مزامنة القوالب. لا يعني ذلك أنها محذوفة.</td></tr>';
-}
-async function refresh(){
- try{state=await call("bootstrap");render();if(selected)await loadMessages(selected.id);}
- catch(e){note("login-note",e.message,"bad");}
-}
-async function selectConversation(id){
- selected=(state.conversations||[]).find(x=>x.id===id)||null;if(!selected)return;
- render();await loadMessages(id);
- const c=selected.contacts||{};
- $("chat-title").textContent=c.display_name||c.phone_e164||c.wa_id||"محادثة";
- $("chat-subtitle").textContent=c.phone_e164||c.wa_id||"";
- const open=selected.service_window_ends_at&&Date.parse(selected.service_window_ends_at)>Date.now();
- $("window-status").textContent=open?"نافذة 24 ساعة مفتوحة":"نافذة الخدمة مغلقة";
- $("contact-policy").innerHTML='<div class="checks"><label><input type="checkbox" id="excluded" '+(c.is_excluded?"checked":"")+'> استبعاد من الردود الآلية</label><label><input type="checkbox" id="optout" '+(c.opted_out?"checked":"")+'> إيقاف المراسلة</label><label><input type="checkbox" id="autoallow" '+(c.automated_reply_allowed?"checked":"")+'> السماح بالرد الآلي</label></div><button id="save-contact">حفظ سياسة جهة الاتصال</button>';
- $("save-contact").onclick=async()=>{try{await call("contact_policy",{contact_id:c.id,is_excluded:$("excluded").checked,opted_out:$("optout").checked,automated_reply_allowed:$("autoallow").checked});await refresh();}catch(e){alert(e.message);}};
-}
-async function loadMessages(id){
- const d=await call("messages",{conversation_id:id});
- $("messages").innerHTML=(d.messages||[]).map(m=>'<div class="bubble '+(m.direction==="outbound"?"out":"in")+'">'+esc(m.body||"["+m.message_type+"]")+'<div class="meta">'+esc(m.direction==="inbound"?"وارد":"صادر")+" • "+esc(m.delivery_status)+"</div></div>").join("")||'<div class="muted">لا توجد رسائل محفوظة.</div>';
- $("messages").scrollTop=$("messages").scrollHeight;
-}
-async function saveMeta(){try{await call("save_meta_ids",{phone_number_id:$("phone-id").value.trim(),waba_id:$("waba-id").value.trim()});await refresh();alert("تم حفظ المعرّفات. أكمل إعداد أسرار الخادم والتحقق من Meta.");}catch(e){alert(e.message);}}
-async function saveMode(){try{await call("set_mode",{mode:$("mode").value,enabled:$("enabled").checked,emergency_stop:$("emergency").checked,monthly_cap:Number($("cap").value)});await refresh();}catch(e){alert(e.message);}}
-async function draft(){if(!selected)return alert("اختر محادثة أولًا.");try{await call("draft",{conversation_id:selected.id,text:$("reply").value});$("reply").value="";await refresh();}catch(e){alert(e.message);}}
-async function approve(id){if(!confirm("هل راجعت نص الرد وتريد إرساله الآن؟ سيتم منع الإرسال إذا انتهت نافذة الخدمة أو لم يكتمل الربط."))return;try{await call("approve_send",{outbox_id:id});await refresh();}catch(e){alert(e.message);}}
-async function syncTemplates(){try{const r=await call("sync_templates");alert("تمت مزامنة "+r.synced+" قالب موجود.");await refresh();}catch(e){alert(e.message);}}
-async function closeConversation(){if(!selected)return;try{await call("close",{conversation_id:selected.id});selected=null;await refresh();}catch(e){alert(e.message);}}
-async function init(){
- if(!window.supabase?.createClient){note("login-note","تعذر تحميل مكتبة Supabase.","bad");return;}
- if(SUPABASE_KEY.includes("must_be_replaced")){note("login-note","نسخة Preview تحتاج Publishable Key الخاص بمشروع Preview لإكمال تسجيل الدخول. لم يتم وضع أي مفتاح إنتاجي في هذه الصفحة.","warn");$("login").disabled=true;return;}
- sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
- const {data}=await sb.auth.getSession();session=data.session;
- if(session){showApp(true);await refresh();}
-}
-$("login").onclick=login;$("refresh").onclick=refresh;$("logout").onclick=async()=>{await sb.auth.signOut();session=null;showApp(false);};
-$("save-meta").onclick=saveMeta;$("save-mode").onclick=saveMode;$("make-draft").onclick=draft;$("sync-templates").onclick=syncTemplates;$("close-chat").onclick=closeConversation;
-init();
-</script>
 </body></html>
