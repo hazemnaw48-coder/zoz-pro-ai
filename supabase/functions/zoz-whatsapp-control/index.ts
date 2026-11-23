@@ -126,12 +126,13 @@ async function releaseQuota(c:any) {
 }
 async function sendText(c:any,conv:any,contact:any,body:string,actor:string,outboxId:string|null=null) {
   if(!c.is_enabled||c.emergency_stop)throw new Error("channel_paused_or_emergency_stop");
-  if(!ACCESS||!PHONE_ID||!GRAPH_VERSION)throw new Error("meta_cloud_api_not_configured");
+  const activePhoneId=clean(PHONE_ID||c.phone_number_id,80);
+  if(!ACCESS||!activePhoneId||!GRAPH_VERSION)throw new Error("meta_cloud_api_not_configured");
   if(contact.opted_out||contact.is_excluded||!contact.automated_reply_allowed)throw new Error("contact_not_eligible");
   if(!isWithinServiceWindow(conv.last_inbound_at))throw new Error("service_window_closed");
   const reserved=await reserveQuota(c);if(!reserved)throw new Error("free_monthly_cap_reached");
   try{
-    const r=await fetch("https://graph.facebook.com/"+encodeURIComponent(GRAPH_VERSION)+"/"+encodeURIComponent(PHONE_ID)+"/messages",{
+    const r=await fetch("https://graph.facebook.com/"+encodeURIComponent(GRAPH_VERSION)+"/"+encodeURIComponent(activePhoneId)+"/messages",{
       method:"POST",headers:{authorization:"Bearer "+ACCESS,"content-type":"application/json"},
       body:JSON.stringify({messaging_product:"whatsapp",recipient_type:"individual",to:contact.wa_id,type:"text",text:{preview_url:false,body:clean(body,3000)}}),
       signal:AbortSignal.timeout(15000)
