@@ -1,0 +1,21 @@
+name: ZOZ WhatsApp Policy Tests
+on:
+  pull_request:
+    paths:
+      - "supabase/functions/zoz-whatsapp-control/**"
+      - "tests/zoz-whatsapp-policy.test.mjs"
+      - ".github/workflows/whatsapp-policy.yml"
+  push:
+    branches: [main]
+    paths:
+      - "supabase/functions/zoz-whatsapp-control/**"
+      - "tests/zoz-whatsapp-policy.test.mjs"
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/zoz-whatsapp-policy.test.mjs
