@@ -40,10 +40,10 @@ No agent may bypass the research step for substantive current-market, external, 
 Research and internal drafts may run under owner authorization. External customer contact, publishing, ad activation/spend, purchases, financial actions, account/permission changes, and destructive actions require explicit scoped approval and a verified adapter. A proposed handoff is not an executed action. An acknowledged task is not execution. A successful provider response is not necessarily a business outcome. Do not record external work as completed without a destination receipt/read-back or equivalent evidence.
 
 ## Current implementation snapshot
-- Preview Intelligence engine v8 and company worker v3 are active in Supabase project `vjnwojrqduoxhetutxrs`.
+- Preview Intelligence engine v10 and company worker v3 are active in Supabase project `vjnwojrqduoxhetutxrs`.
 - The company worker runs Intelligence preflight before specialist reasoning, then performs a separate QA pass and saves output plus operating memory.
 - Preview seeded company model contains 15 departments, 15 agents, 3 core tools, and 45 permission grants.
-- The integrated Intelligence block is embedded in `channel-control.html` and uses the same owner session against the Preview project. The latest Pages workflow for the final worker button was still in progress at last check; confirm deployment success before assuming it is live.
+- The integrated Intelligence block is embedded in `channel-control.html`, lets the owner select any of the 15 departments, and uses the existing owner session against the Preview project. The latest Pages workflow for the final worker button was still in progress at last check; confirm deployment success before assuming it is live.
 - No Production agent/function/schema was changed. Production autonomous scheduling is not yet wired to the Preview engine.
 - No external domain adapter was run by the new worker; its current verified scope is research, diagnosis, internal solution deliverables, QA, memory, and specialist task handoff.
 
