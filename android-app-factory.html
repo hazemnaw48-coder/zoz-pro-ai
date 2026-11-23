@@ -107,6 +107,27 @@ footer{padding:16px 3px 28px;color:#8295ad;font-size:12px}
 </section>
 
 
+<section class="card hero" id="new-app-request">
+ <div class="row"><h2>طلب تطبيق Android جديد</h2><span class="badge">تسجيل في محفظة الإنتاج</span></div>
+ <p>سجّل فكرة التطبيق ومشكلته والجمهور والوظائف والتصميم والربط المطلوب. يحفظ الطلب في قاعدة الإنتاج تحت حساب المالك. التسجيل لا يعني أن الكود بُني أو أن التطبيق أصبح جاهزًا؛ تبدأ بعده مراجعة المواصفات والمعمارية والأمان وخطة الاختبار.</p>
+ <form id="app-request-form">
+  <div class="row">
+   <div><label for="app-name">اسم التطبيق</label><input id="app-name" required minlength="3" maxlength="100" placeholder="مثال: نظام إدارة العيادات"></div>
+   <div><label for="app-platform">المنصة المطلوبة</label><select id="app-platform"><option value="android">Android</option><option value="android_web">Android + Web</option><option value="android_ios">Android + iOS (بعد مراجعة الجدوى)</option></select></div>
+   <div><label for="app-package">معرّف الحزمة (اختياري)</label><input id="app-package" maxlength="180" placeholder="com.company.product"></div>
+   <div><label for="app-audience">العميل أو المستخدم المستهدف</label><input id="app-audience" maxlength="500" placeholder="من سيستخدم التطبيق؟"></div>
+  </div>
+  <label for="app-purpose">ما المشكلة الفعلية التي سيحلها التطبيق؟</label><textarea id="app-purpose" required minlength="20" maxlength="1200" rows="3" placeholder="اشرح المشكلة والنتيجة المطلوبة بوضوح"></textarea>
+  <label for="app-features">الوظائف الأساسية المطلوبة</label><textarea id="app-features" maxlength="4000" rows="4" placeholder="اكتب الشاشات والعمليات والصلاحيات والتقارير المطلوبة"></textarea>
+  <div class="row">
+   <div><label for="app-design">الرؤية البصرية والتصميم</label><textarea id="app-design" maxlength="1000" rows="3" placeholder="ألوان، طابع، لوحات بيانات، لغة..."></textarea></div>
+   <div><label for="app-integrations">التكاملات المطلوبة</label><textarea id="app-integrations" maxlength="1200" rows="3" placeholder="Supabase، خرائط، دفع، APIs..."></textarea></div>
+  </div>
+  <label for="app-data">البيانات والخصوصية والقيود</label><textarea id="app-data" maxlength="1200" rows="2" placeholder="أنواع البيانات، أدوار المستخدمين، ما الذي يجب حمايته"></textarea>
+  <div class="actions"><button id="app-request-submit" type="submit">تسجيل طلب التطبيق في المصنع</button><span id="app-request-status" class="small" role="status">يتطلب تسجيل دخول المالك إلى ZOZ Pro.</span></div>
+ </form>
+</section>
+
 <section class="card" id="factory-live">
  <div class="row"><h2>حالة المصنع الحية من مشروع الإنتاج</h2><button id="factory-refresh" type="button">تحديث البيانات</button></div>
  <p id="factory-live-status">جارٍ تجهيز الاتصال الآمن بقاعدة الإنتاج…</p>
@@ -224,6 +245,26 @@ async function refresh(){
  }catch(e){text(status,'تعذر تحميل البيانات الحية: '+(e.message||e));}
  finally{btn.disabled=false;}
 }
+el('app-request-form')?.addEventListener('submit',async(event)=>{
+ event.preventDefault();
+ const button=el('app-request-submit'),status=el('app-request-status');
+ button.disabled=true;text(status,'جارٍ التحقق من جلسة المالك وتسجيل الطلب…');
+ try{
+  const {data:{session},error}=await sb.auth.getSession();if(error)throw error;
+  if(!session?.access_token)throw new Error('سجّل الدخول إلى مركز ZOZ Pro أولًا ثم افتح مصنع التطبيقات.');
+  const {data:userData,error:userError}=await sb.auth.getUser(session.access_token);if(userError)throw userError;
+  if(String(userData?.user?.email||'').toLowerCase()!==OWNER)throw new Error('تسجيل الطلبات متاح لحساب مالك ZOZ Pro فقط.');
+  const payload={
+   display_name:el('app-name').value.trim(),platform:el('app-platform').value,package_name:el('app-package').value.trim(),
+   audience:el('app-audience').value.trim(),purpose:el('app-purpose').value.trim(),features:el('app-features').value.trim(),
+   design:el('app-design').value.trim(),integrations:el('app-integrations').value.trim(),data_notes:el('app-data').value.trim()
+  };
+  const res=await fetch(URL+'/functions/v1/zoz-app-factory-intake',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const d=await res.json().catch(()=>({}));if(!res.ok||d.ok!==true)throw new Error(d.error||('HTTP '+res.status));
+  text(status,'تم تسجيل الطلب: '+d.project.display_name+' · الحالة: مواصفات مسجلة، لم يبدأ البناء.');el('app-request-form').reset();await refresh();
+ }catch(e){text(status,'لم يتم التسجيل: '+(e.message||e));}
+ finally{button.disabled=false;}
+});
 el('factory-refresh')?.addEventListener('click',refresh);
 refresh();
 })();
