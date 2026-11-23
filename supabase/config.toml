@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.zoz-tiktok-ads]
 verify_jwt = false
+
+[functions.zoz-whatsapp-control]
+verify_jwt = false
