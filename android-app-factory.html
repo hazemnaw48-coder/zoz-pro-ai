@@ -64,11 +64,11 @@ footer{padding:16px 3px 28px;color:#8295ad;font-size:12px}
 
 <section class="card hero">
  <div class="row"><h2>منهج المصنع</h2><span class="badge good">قسم تطوير مستقل</span></div>
- <p>الوكيل يحدد الحاجة ويكتب المواصفات وينشئ مهام التطوير، ثم تُبنى التطبيقات في CI وتُختبر قبل تثبيتها. لا نعتبر التطبيق جاهزًا لمجرد وجود الكود أو نجاح البناء.</p>
+ <p>يستقبل القسم طلبات تطبيقات Android من المالك ويحفظ المتطلبات في قاعدة الإنتاج، ويتابع المشاريع وعمليات البناء وأدلتها. بناء FieldOps الحالي نجح. أما توليد تطبيق كامل جديد تلقائيًا من أي وصف، فلم يُعتمد بعد كقدرة إنتاجية عامة.</p>
  <div class="kpis">
   <div class="kpi"><strong>5</strong><span>مشاريع تطبيقات مسجلة في الإنتاج</span></div>
-  <div class="kpi"><strong>0</strong><span>تطبيقات ثبت اختبارها نهائيًا في هذا القسم</span></div>
-  <div class="kpi"><strong>7</strong><span>بوابات تحقق قبل الإصدار</span></div>
+  <div class="kpi"><strong>8</strong><span>عمليات بناء مسجلة في الإنتاج</span></div>
+  <div class="kpi"><strong>0</strong><span>إصدارات عامة اجتازت اختبار الهاتف النهائي</span></div>
  </div>
 </section>
 
@@ -166,10 +166,11 @@ footer{padding:16px 3px 28px;color:#8295ad;font-size:12px}
  <div class="tablewrap"><table>
   <thead><tr><th>العملية</th><th>صلاحية الوكيل</th></tr></thead>
   <tbody>
-   <tr><td>تحليل متطلبات التطبيق وكتابة المواصفات</td><td><span class="badge good">تلقائي</span></td></tr>
-   <tr><td>كتابة الكود على فرع تطوير منفصل</td><td><span class="badge good">تلقائي مع سجل تغييرات</span></td></tr>
-   <tr><td>تشغيل الاختبارات وبناء APK تجريبي</td><td><span class="badge good">تلقائي</span></td></tr>
-   <tr><td>تشخيص أخطاء البناء وإعداد إصلاحات</td><td><span class="badge good">تلقائي ضمن النطاق</span></td></tr>
+   <tr><td>تسجيل طلب التطبيق ومواصفاته في قاعدة الإنتاج</td><td><span class="badge good">متاح للمالك</span></td></tr>
+   <tr><td>إعداد المعمارية وخطة التنفيذ التفصيلية لأي تطبيق</td><td><span class="badge warn">مراجعة وتطوير مطلوبة</span></td></tr>
+   <tr><td>توليد كود كامل تلقائيًا لتطبيق جديد على فرع مستقل</td><td><span class="badge warn">غير معتمد إنتاجيًا بعد</span></td></tr>
+   <tr><td>بناء APK آليًا</td><td><span class="badge good">متاح لقالب FieldOps الحالي فقط</span></td></tr>
+   <tr><td>اختبار تطبيق جديد على هاتف فعلي</td><td><span class="badge warn">يتطلب جهازًا واختبار قبول</span></td></tr>
    <tr><td>إضافة صلاحيات حساسة أو الوصول لحساب خارجي</td><td><span class="badge warn">موافقتك</span></td></tr>
    <tr><td>توقيع إصدار نهائي أو نشر التطبيق للعامة</td><td><span class="badge warn">موافقتك</span></td></tr>
    <tr><td>شراء خدمة أو تفعيل فوترة أو حذف بيانات</td><td><span class="badge warn">موافقتك</span></td></tr>
