@@ -25,10 +25,10 @@ The handler authenticates the existing confirmed ZOZ owner, delegates to `zoz-in
 9. If no adapter exists, mark blocked and return the exact missing connector/permission; never pretend execution happened.
 
 ## Current Preview behavior
-- `zoz-intelligence-engine` v3: grounded research, persisted run/events, task proposal, task listing, owner approval record.
-- `zoz-intelligence-ui` v2: serves the HTML document as `text/html` and displays proposed tasks.
-- `zoz-pro-agent` v18: shared `intelligence_solve` action delegates to the engine and returns the task proposal.
-- The task approval endpoint records approval only. It does not enqueue a worker or execute an external action.
+- `zoz-intelligence-engine` v5: grounded research, persisted run/events, task proposal, task listing, owner approval record, department-aware routing, safe readiness endpoint. Health check currently confirms owner auth, database, and search provider configuration are present in Preview.
+- `zoz-intelligence-ui` v2: serves the HTML document as `text/html` and displays proposed tasks. Live fetch verification confirmed Arabic UI HTML is returned rather than source code.
+- `zoz-pro-agent` v20: shared `intelligence_solve` action delegates to the engine and returns the task proposal. Health endpoint confirms owner authentication is configured and advertises `intelligence_solve`.
+- The task approval endpoint records approval only. It does not enqueue a worker or execute an external action. The shared agent-to-engine integration is deployed and health-checked; an authenticated end-to-end owner search still requires a real owner session and has not been run from this tool context.
 - Department adapters, task dispatcher, acknowledgements, cancellation/retry, and verified read-back are still pending.
 
 ## Security and release boundary
