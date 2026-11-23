@@ -66,7 +66,7 @@ footer{padding:16px 3px 28px;color:#8295ad;font-size:12px}
  <div class="row"><h2>منهج المصنع</h2><span class="badge good">قسم تطوير مستقل</span></div>
  <p>الوكيل يحدد الحاجة ويكتب المواصفات وينشئ مهام التطوير، ثم تُبنى التطبيقات في CI وتُختبر قبل تثبيتها. لا نعتبر التطبيق جاهزًا لمجرد وجود الكود أو نجاح البناء.</p>
  <div class="kpis">
-  <div class="kpi"><strong>1</strong><span>مشروع تأسيسي بدأ</span></div>
+  <div class="kpi"><strong>5</strong><span>مشاريع تطبيقات مسجلة في الإنتاج</span></div>
   <div class="kpi"><strong>0</strong><span>تطبيقات ثبت اختبارها نهائيًا في هذا القسم</span></div>
   <div class="kpi"><strong>7</strong><span>بوابات تحقق قبل الإصدار</span></div>
  </div>
@@ -75,6 +75,13 @@ footer{padding:16px 3px 28px;color:#8295ad;font-size:12px}
 <section class="card">
  <div class="row"><h2>محفظة التطبيقات</h2><span class="badge warn">الحالة من سجل التطوير</span></div>
  <div class="grid">
+  <article class="project">
+   <div class="row"><h3>ZOZ FieldOps Android Client</h3><span class="badge good">APK 1.0.1 — بناء وفحص الحزمة والبصمة نجح</span></div>
+   <p>تطبيق عميل مستقل لإدارة شركات الخدمات الميدانية، يفتح واجهة FieldOps المنشورة مباشرة ويعالج مسار الرفع والتنزيل من الهاتف.</p>
+   <div class="meta">الحزمة: com.zozfieldops.client · Android 10 فأحدث · SHA-256: c61993db9211956735466f64b1ad001de32788e16b9e66907869afbc46081a4c</div>
+   <div class="actions"><a href="https://github.com/hazemnaw48-coder/zoz-pro-ai/actions/runs/45013106012">سجل البناء وملف APK</a><a href="https://hazemnaw48-coder.github.io/zoz-pro-ai/fieldops/">فتح تطبيق FieldOps</a></div>
+   <p class="small">البناء وفحص الحزمة والبصمة نجحوا. تثبيت الهاتف الفعلي واختبار تسجيل الدخول ما زالا بوابة اعتماد قبل الإصدار العام.</p>
+  </article>
   <article class="project">
    <div class="row"><h3>ZOZ Device Agent / Flow Bridge</h3><span class="badge good">APK 0.4.0 — البناء والتحقق الآلي نجحا، ينتظر تثبيت الهاتف</span></div>
    <p>تطبيق الهاتف الرئيسي لاستلام مهام الوكيل، تجهيز أوامر Flow، استقبال الملفات، وإدارة المهام المحلية.</p>
@@ -164,12 +171,12 @@ footer{padding:16px 3px 28px;color:#8295ad;font-size:12px}
 
 <section class="card">
  <h2>الحالة التنفيذية الحالية</h2>
- <p>نجح بناء APK 0.3.0. واجهة الاقتران وإدارة الهاتف موجودة في فرع التطوير، وتنتظر الدمج النهائي واختبار الاقتران والرفع على هاتف فعلي.</p>
+ <p>تم إنشاء تطبيق FieldOps مستقل بإصدار 1.0.1، ونجح بناؤه والتحقق من هوية الحزمة وبصمة الملف. واجهة FieldOps منشورة وتعمل عبر HTTPS. ما زال اختبار التثبيت على هاتف فعلي، واختبار دورة تسجيل الدخول والرفع والتنزيل، وموافقة الإصدار النهائي مطلوبة. لا نعرض نسخة debug باعتبارها إصدارًا عامًا نهائيًا.</p>
  <div class="actions">
   <a class="button" href="https://github.com/hazemnaw48-coder/zoz-pro-ai/tree/feature/zoz-android-flow-bridge">فتح فرع العمل</a>
   <a class="button secondary" href="https://github.com/hazemnaw48-coder/zoz-pro-ai/blob/feature/zoz-android-flow-bridge/docs/ANDROID_APP_FACTORY.md">وثيقة قسم المصنع</a>
  </div>
- <p class="small">تم نشر طبقة اقتران الأجهزة وطابور المهام في مشروع الإنتاج. تطبيق Android 0.3.0 يتضمن الاقتران الآمن، استقبال طابور حتى ست مطالبات مشاهد، مشاركة فيديوهات Flow مباشرة إلى التطبيق، تجميع MP4 محليًا دون إعادة ضغط عند توافق الترميزات، رفعًا مقسمًا قابلًا للاستكمال، وتنظيف النسخ الداخلية بموافقة المالك. بناء APK نجح؛ اختبار الهاتف الفعلي ما زال مطلوبًا.</p>
+ <p class="small">تم توثيق مشاريع Android الفعلية وسجلات البناء في قاعدة الإنتاج. لا تزال التطبيقات تمر ببوابة اختبار الجهاز قبل وصفها بأنها جاهزة للإصدار العام.</p>
 </section>
 
 <footer>ZOZ Pro · Android App Factory · إدارة التطوير والاختبارات والإصدارات ضمن صلاحيات المالك</footer>
