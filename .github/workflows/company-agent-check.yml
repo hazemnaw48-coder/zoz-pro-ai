@@ -33,4 +33,4 @@ jobs:
       - name: Type-check autonomous production agent
         run: deno check --config supabase/functions/zoz-pro-agent/deno.json supabase/functions/zoz-pro-agent/index.ts
       - name: Type-check ZOZ Intelligence Engine
-        run: deno check supabase/functions/zoz-intelligence-engine/index.ts
+        run: deno check --config supabase/functions/zoz-intelligence-engine/deno.json supabase/functions/zoz-intelligence-engine/index.ts
