@@ -28,7 +28,6 @@ First-party ZOZ Business inbox for the existing WhatsApp Business number +20 12 
 - `META_WHATSAPP_VERIFY_TOKEN`: random webhook verification secret.
 - `META_WHATSAPP_APP_SECRET`: Meta App Secret, used to validate X-Hub-Signature-256.
 - `META_WHATSAPP_ACCESS_TOKEN`: long-lived system-user token with minimum WhatsApp scopes.
-- `META_WHATSAPP_WABA_ID`: WhatsApp Business Account ID.
 - `META_GRAPH_API_VERSION`: supported Graph API version verified in Meta App Dashboard.
 - Supabase supplies its own URL and service/auth keys; `ZOZ_OWNER_EMAIL` identifies the owner.
 Never paste Meta access tokens into chat, GitHub, or the browser.
