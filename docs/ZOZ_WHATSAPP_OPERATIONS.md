@@ -28,14 +28,13 @@ First-party ZOZ Business inbox for the existing WhatsApp Business number +20 12 
 - `META_WHATSAPP_VERIFY_TOKEN`: random webhook verification secret.
 - `META_WHATSAPP_APP_SECRET`: Meta App Secret, used to validate X-Hub-Signature-256.
 - `META_WHATSAPP_ACCESS_TOKEN`: long-lived system-user token with minimum WhatsApp scopes.
-- `META_WHATSAPP_PHONE_NUMBER_ID`: Cloud API phone-number ID for the same coexistence number.
 - `META_WHATSAPP_WABA_ID`: WhatsApp Business Account ID.
 - `META_GRAPH_API_VERSION`: supported Graph API version verified in Meta App Dashboard.
 - Supabase supplies its own URL and service/auth keys; `ZOZ_OWNER_EMAIL` identifies the owner.
 Never paste Meta access tokens into chat, GitHub, or the browser.
 
 ## Preserve the current WhatsApp Business app
-Complete Meta's official WhatsApp Business App Coexistence flow using the existing number and an eligible Embedded Signup/partner route. Keep the current Peach connection active until Meta confirms the same number can be used by both app and API. Do not scan-link, disconnect, re-register, or migrate the number during development. Save the resulting IDs in the owner page and configure secrets in Supabase Function Secrets. Verify the Meta webhook before enabling the channel.
+Complete Meta's official WhatsApp Business App Coexistence flow using the existing number and an eligible Embedded Signup/partner route. Keep the current Peach connection active until Meta confirms the same number can be used by both app and API. Do not scan-link, disconnect, re-register, or migrate the number during development. Save the resulting Phone Number ID and WABA ID in the owner page; the Phone Number ID is stored in the channel record. Configure the remaining secrets in Supabase Function Secrets. Verify the Meta webhook before enabling the channel.
 
 ## Free operating policy
 - `off`: inbox only.
