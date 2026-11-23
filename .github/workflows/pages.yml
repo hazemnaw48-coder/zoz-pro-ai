@@ -1,47 +1,15 @@
-name: Deploy ZOZ Pro to GitHub Pages
+# Legacy root-folder deployment disabled; static.yml is the canonical GitHub Pages publisher.
+name: Legacy Pages publisher (disabled)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "channel-control.html"
-      - "ad-studio.html"
-      - "company-office.html"
-      - "qwen-provider-connect.html"
-      - "video-provider-connect.html"
-      - "software-factory.html"
-      - "android-app-factory.html"
-      - "dashboard.html"
-      - "_site/fieldops/**"
-      - "fieldops/**"
-      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "github-pages"
-  cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  retired:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-      - name: Upload static site
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: "."
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Explain canonical deployment
+        run: echo "Use .github/workflows/static.yml; this legacy workflow intentionally does not publish."
