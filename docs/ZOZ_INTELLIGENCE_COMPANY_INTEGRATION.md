@@ -5,7 +5,7 @@ Status: Preview integrated pilot, 2026-11-24. This is not a customer-facing mult
 ## Runtime components
 - Supabase Preview project: `vjnwojrqduoxhetutxrs`.
 - `zoz-intelligence-engine` ACTIVE v10: live Google Search grounding through Gemini Interactions API; owner-authenticated requests; evidence/source/query persistence; task proposal; company-task queue handoff; internal task preflight mode.
-- `zoz-company-agent` ACTIVE v3: owner-authenticated company worker; reads a queued department task; invokes the same Intelligence engine before any department reasoning; passes the resulting research and source URLs into the selected agent prompt; runs independent QA; writes the operating-memory checkpoint; records results on the company task and agent run.
+- `zoz-company-agent` ACTIVE v4: owner-authenticated company worker; reads a queued department task; invokes the same Intelligence engine before any department reasoning; passes the resulting research and source URLs into the selected agent prompt; runs independent QA; writes the operating-memory checkpoint; records results on the company task and agent run.
 - `zoz-intelligence-ui` ACTIVE v3: redirects to the real company center section. HTML is hosted as a static Pages page/embedded section, not served from an Edge Function.
 - `channel-control.html` main Pages source now embeds the Arabic Intelligence workspace and invokes the Preview company worker for the exact task returned from the research run.
 
