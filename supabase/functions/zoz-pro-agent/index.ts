@@ -16,7 +16,7 @@ const PUBLISHABLE_KEY =
   Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ||
   defaultKey("SUPABASE_PUBLISHABLE_KEYS") ||
   Deno.env.get("SUPABASE_ANON_KEY") || "";
-const OWNER_EMAIL = (Deno.env.get("ZOZ_OWNER_EMAIL") || "").trim().toLowerCase();
+const OWNER_EMAIL = (Deno.env.get("ZOZ_OWNER_EMAIL") || "hazemnaw48@gmail.com").trim().toLowerCase();
 const TARGET_CHANNEL_ID = "UCIael48cvwPG3gKj--c7HKw";
 const SELF = SUPABASE_URL + "/functions/v1/zoz-pro-youtube-analytics";
 const GEMINI_KEYS = [
@@ -2901,10 +2901,10 @@ Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   if (req.method === "GET" && url.searchParams.get("health") === "1") {
     return json({
-      ok: true, service: "zoz-pro-agent", environment: "production",
+      ok: true, service: "zoz-pro-agent", environment: "preview",
       owner_auth_enabled: Boolean(PUBLISHABLE_KEY && OWNER_EMAIL),
       model_key_count: [...new Set(GEMINI_KEYS)].length,
-      actions: ["analyze", "analyze_tiktok_account", "analyze_tiktok_accounts", "evaluate_latest_video", "create_draft", "run_management_cycle", "autonomous_run", "books_monitor", "record_book_snapshot", "update_book_record", "dispatch_flow_prompt"], automatic_worker_enabled: true, automatic_worker_schedule: "every 15 minutes via Supabase Cron", available_tools: ["managed_channel_sync","tiktok.analytics_sync","managed_channel_calendar_generate","studio_generate","intake_check_processing","intake_list","intake_review(only from owner-approved task)","intake_start_youtube","intake_youtube_part","vidiq_status","vidiq_research(quota-gated, 5-credit minimum, 24h cooldown)","system_diagnostics","books_monitor","record_book_snapshot","update_book_record","android.flow_scene_execute","android.device_status"], tool_planner_enabled: true, automatic_queue_enabled: true, automatic_execution: "scheduled, allow-listed tools", automatic_publication: false, books_and_amazon_monitoring: true, tiktok_analytics_sync: true, direct_kdp_connection: false, durable_memory_enabled: true, notion_worker_sync: Boolean(Deno.env.get("NOTION_API_KEY")), notion_data_source_id_configured: Boolean(Deno.env.get("NOTION_ARCHIVE_DATA_SOURCE_ID") || "93d9d04a-dd49-4fb9-8d84-61324cf4cf24")
+      actions: ["analyze", "analyze_tiktok_account", "analyze_tiktok_accounts", "evaluate_latest_video", "create_draft", "run_management_cycle", "autonomous_run", "books_monitor", "record_book_snapshot", "update_book_record", "dispatch_flow_prompt", "intelligence_solve"], automatic_worker_enabled: true, automatic_worker_schedule: "every 15 minutes via Supabase Cron", available_tools: ["managed_channel_sync","tiktok.analytics_sync","managed_channel_calendar_generate","studio_generate","intake_check_processing","intake_list","intake_review(only from owner-approved task)","intake_start_youtube","intake_youtube_part","vidiq_status","vidiq_research(quota-gated, 5-credit minimum, 24h cooldown)","system_diagnostics","books_monitor","record_book_snapshot","update_book_record","android.flow_scene_execute","android.device_status"], tool_planner_enabled: true, automatic_queue_enabled: true, automatic_execution: "scheduled, allow-listed tools", automatic_publication: false, books_and_amazon_monitoring: true, tiktok_analytics_sync: true, direct_kdp_connection: false, durable_memory_enabled: true, notion_worker_sync: Boolean(Deno.env.get("NOTION_API_KEY")), notion_data_source_id_configured: Boolean(Deno.env.get("NOTION_ARCHIVE_DATA_SOURCE_ID") || "93d9d04a-dd49-4fb9-8d84-61324cf4cf24")
     });
   }
   if (req.method !== "POST") return fail("Method not supported.", 405);
