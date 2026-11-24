@@ -1,124 +1,144 @@
-# MEHWAR — Stitch → AI Studio → GitHub → Production workflow
+# MEHWAR — Continue the existing product through Stitch and Google AI Studio
 
-## Purpose
+## Product identity: do not create a second product
 
-Establish one repeatable pipeline for turning the approved Stitch design into a
-maintainable customer product. GitHub is the source-of-truth for application code.
-Stitch is the visual source-of-truth. Supabase Preview is the integration target
-until the product passes acceptance.
+This work continues the company's **existing مِحور | MEHWAR product**.
+It is not a new product, replacement application, parallel SaaS, or rebrand.
 
-## Verified Google workflow capabilities
+The goal is to modernize the visual design and complete the customer-facing
+screens and interactions **on top of the existing MEHWAR product foundation**,
+while preserving existing business logic, tenant data, Supabase integration,
+authentication model, and company workspaces.
 
-Google documents that Stitch can export designs to AI Studio and Antigravity and
-that Stitch provides an MCP server, SDK and agent skills. Stitch also supports
-a portable `DESIGN.md` design-system handoff.
+The original approved Stitch project is the design source of truth. Open and
+continue that project; do not start a blank Stitch project or generate a
+different substitute design.
 
-Google AI Studio Build mode documents GitHub import and two-way synchronization:
-import a repository from the prompt's Add files (+) menu, or use Settings → GitHub
-to link a repository. The GitHub panel supports pushing AI Studio edits and pulling
-changes made in GitHub.
+### Preserve existing work
 
-These are two connected product capabilities; this is not a claim that Stitch itself
-currently has a native direct GitHub repository sync button.
+- Keep the existing MEHWAR identity, scope and product direction.
+- Keep the existing Preview Supabase project and real tenant schema.
+- Keep the current verified `zoz-tenant-workspace` integration and
+  `createAgentBridge` adapter.
+- Keep the existing customer foundation in `apps/mehwar/` and continue it.
+- Retain all existing repo history, internal services, Android Flow Bridge,
+  and production resources.
+- Add/modernize screens, responsive layout, component quality, navigation,
+  loading/error/empty states and working interactions; do not discard existing
+  integrations to make a mockup.
+- Do not create a competing app, duplicate business database, new tenant model,
+  new Supabase project, or duplicate internal service.
 
-## Safe working rules
+## Primary Google account for this work
 
-- Current integration branch: `feat/mehwar-stitch-ai-studio`.
-- Do not push AI Studio changes to `main` or a production branch.
-- Do not merge to the internal platform or deploy publicly before review.
-- The original Stitch export must be kept intact under `stitch-source/` and treated
-  as the visual acceptance reference.
-- Build React/Vite inside the dedicated MEHWAR app boundary only.
-- Do not modify the root internal Node.js app, Android Flow Bridge, existing ZOZ
-  services, or Supabase Production.
-- Use only the Supabase Preview project for development:
-  `https://vjnwojrqduoxhetutxrs.supabase.co`.
-- Browser code may use only the Preview publishable/anon key. Never expose service-role,
-  secret, database-password, or provider keys.
-- Use the existing tenant API adapter and existing verified database model. Do not
-  invent tables or RPCs.
-- Keep agent mutations disabled until audit logging, owner approval, and tenant-IDOR
-  tests are complete.
+Use the company's **Hazem Now** Google account for Google AI Studio.
+Other already-connected Google accounts are backup accounts only. Do not
+switch accounts or create a second AI Studio workspace under another account
+without the owner's instruction.
 
-## Repeatable design-to-code procedure
+## Verified Stitch workflow
 
-### A. Freeze and export the approved Stitch design
+Google's current Stitch workflow supports bringing an existing codebase and
+design files into its design context, and exporting designs to Google AI Studio
+or Antigravity. Stitch also provides an agent-friendly `DESIGN.md` handoff.
+Therefore use the original Stitch project as the visual reference, and use
+existing MEHWAR source files as implementation context. Do not treat screenshots
+or a newly generated visual as a replacement for editable source.
 
-1. Open the existing approved MEHWAR project in Google Stitch.
-2. Confirm the approved nine-screen flow and the complete connected navigation.
-3. Export the entire project, not only individual screenshots. Preserve every screen's
-   source HTML, screenshots, assets and the original Stitch `DESIGN.md`.
-4. Export the design to Google AI Studio when that option is available. Keep a local
-   archive of the original export as an immutable reference.
-5. Record the project URL/ID, export date, screen names and assets in
-   `STITCH-SOURCE-MANIFEST.md`.
+## GitHub safety constraint — do not attach the whole monorepo blindly
 
-### B. Import into Google AI Studio
+Current repository:
+`hazemnaw48-coder/zoz-pro-ai`
 
-1. Open Google AI Studio Build mode under the product owner's selected Google account.
-2. Use Add files (+) → Import from GitHub to import the designated MEHWAR codebase,
-   or open the Stitch export in AI Studio using Stitch's export action.
-3. Confirm the workspace is operating only on the customer app, not the internal
-   platform source.
-4. Open Settings → GitHub. Connect the designated repository and verify its repository
-   name before any push.
-5. Work on the dedicated feature branch only. If the UI does not let you select that
-   branch, do not commit to the default/production branch; download the app ZIP and
-   reconcile it in the safe feature branch instead.
+Current safe development branch:
+`feat/mehwar-stitch-ai-studio`
 
-### C. Implement without design drift
+Repository default branch:
+`main` (contains the wider internal ZOZ Pro monorepo).
 
-1. Copy the Stitch export to `stitch-source/` unchanged.
-2. Translate the exported screens and reusable components into React + TypeScript + Vite.
-3. Keep the supplied design tokens and assets; do not create substitute screens.
-4. Implement the nine screen routes and navigation using the exact exported screen order.
-5. Add real authentication, tenant bootstrap, organization/workspace selection and
-   task/service reads through the verified adapter.
-6. Add loading, error, empty and success states that use the approved visual language.
-7. Only enable buttons where a working and authorized backend action exists.
+Google AI Studio community guidance has indicated that GitHub sync can bind
+to the repository default branch rather than an arbitrary feature branch.
+Because this repository's default branch is the internal monorepo, do not
+connect AI Studio to the root repository or allow an AI Studio push to `main`
+without a separately verified, non-destructive route.
 
-### D. Verify before closing
+This does **not** mean creating a new MEHWAR product. It means keeping the
+existing MEHWAR customer module under a tightly scoped code boundary for
+design-tool access, or using a workflow that returns reviewed changes into
+the existing feature branch. Do not create a parallel production app, duplicate
+database or independent tenant system.
 
-- TypeScript typecheck passes.
-- Production Vite build passes.
-- All nine screens render in Arabic RTL and match Stitch reference captures.
-- Every navigation link reaches the correct screen and back navigation works.
-- Login/logout/session restore/password reset are tested.
-- Tenant data is read only for the signed-in active organization.
-- A cross-tenant access test proves another organization's records are not visible.
-- PWA install, app icon, launch, update and offline fallback are tested on Android.
-- No service-role or secret key appears in browser bundles.
-- No public deployment, external message, publishing, payment or destructive action
-  occurs without the required owner approval.
-- Export a ZIP from the successful build and record the exact commit, test results,
-  and artifact SHA-256 in the handoff report.
+Do not change the repository default branch, rename the repository, delete
+branches, or modify deployment settings to work around AI Studio limitations.
 
-## AI Studio implementation prompt
+## Design-to-code procedure
 
-Use this prompt after the original Stitch export has been imported:
+### 1. Continue the existing Stitch project
 
-> Continue the existing مِحور | MEHWAR customer product. First inspect the whole imported
-> project, the original Stitch screen HTML, assets and DESIGN.md. Treat these as the
-> visual source of truth. Rebuild the exact approved nine-screen flow as a production-
-> quality React + TypeScript + Vite PWA, Arabic-first and completely RTL. Preserve every
-> visual detail, text, color, font, component, spacing, responsive behavior and navigation
-> pattern from the export. Do not redesign, simplify, invent missing screens, or replace
-> supplied assets. Work only inside the dedicated MEHWAR app directory/repository. Keep
-> the internal ZOZ system and all unrelated files unchanged. Use the existing Supabase
-> Preview project and the verified `zoz-tenant-workspace` adapter for authenticated
-> tenant bootstrap, services and real tasks. Respect existing RLS and server-side
-> membership checks. Do not create database tables/functions, do not expose service-role
-> credentials, and do not enable task mutations, uploads, deliverables, notifications or
-> external integrations unless their secure backend path is already verified. Implement
-> real routes, state, loading/error/empty states, keyboard/accessibility behavior, and
-> responsive Android layouts. Add tests, run typecheck and production build, inspect the
-> rendered screens against Stitch screenshots, and report every incomplete item honestly.
-> Do not deploy or merge to a production branch.
+1. Open the existing approved MEHWAR Stitch project.
+2. Bring the current MEHWAR customer code and existing Stitch source/design
+   files into the design context when the tool supports it.
+3. Inspect the currently approved screens and navigation before changing
+   anything.
+4. Refine the screen layout and interaction design in place. Preserve the
+   product's existing design language and the approved brand.
+5. Export all editable screen/source assets and the actual Stitch `DESIGN.md`.
+6. Keep the exact source export unchanged in the handoff archive and record
+   its Stitch project URL/ID and export date.
 
-## Current branch bootstrap
+### 2. Continue implementation in Google AI Studio
 
-This branch is a safe working branch derived from
-`feat/mehwar-customer-foundation`. It is intended for design import and implementation
-review, not public release. The repository is currently a monorepo; do not give an
-external builder broad write scope to unrelated internal folders. Prefer an isolated
-MEHWAR-only GitHub repository/workspace before granting automated write access.
+1. Use the Hazem Now company Google account.
+2. Continue the existing MEHWAR development context; do not create a separate
+   customer product or replace the backend with a generated demo.
+3. Use only a repository/workspace boundary proven safe for this monorepo.
+4. If AI Studio cannot target the existing feature branch without pushing to
+   the default `main`, stop before linking/pushing. Export code and integrate
+   it through the reviewed feature branch instead.
+5. Before every push, inspect the complete changed-file list. Reject changes
+   outside `apps/mehwar/` or the specifically approved shared design assets.
+
+### 3. Implement the existing app, not a mockup
+
+- Complete the MEHWAR React + TypeScript + Vite customer frontend in the
+  existing MEHWAR scope.
+- Preserve the design from the original Stitch export, not the provisional
+  seed in `.stitch/DESIGN.md`.
+- Preserve current auth, tenant bootstrap and real task/service reads.
+- Respect actual organization/workspace IDs and server-side membership checks.
+- Keep audit-incomplete writes, uploads, deliverables, notifications and
+  external actions disabled until their backend authorization and tests exist.
+- Keep customer UI brand-only: مِحور | MEHWAR. Never show ZOZ Pro or ZOZ Group.
+
+### 4. Acceptance checks before closing
+
+- All approved screens are implemented from the original export.
+- Visual review compares the rendered screens against the Stitch source.
+- RTL, responsive Android layout, keyboard/accessibility and navigation work.
+- Login/session restore and tenant bootstrap work against Preview.
+- The selected tenant's real tasks/services are displayed.
+- Cross-tenant access tests pass.
+- No service-role or secret key is present in browser output.
+- TypeScript check, tests and production build pass.
+- PWA install/update/offline fallback and Android device smoke tests pass.
+- A ZIP is generated from the successful build and its commit/hash is recorded.
+- No Production deployment or database change occurs without a separate release gate.
+
+## Prompt for the existing project
+
+> Continue the existing مِحور | MEHWAR customer product. This is not a request
+> to create a new product, a second app, or a fresh SaaS demo. Inspect the
+> existing customer app foundation, its API adapter, current Supabase Preview
+> integration and the original approved Stitch project. Keep and improve this
+> same product. Use the original Stitch export as the visual source of truth:
+> modernize and complete its existing screens while preserving brand identity,
+> page hierarchy, responsive behavior, RTL and existing working integrations.
+> Do not delete or replace existing business logic, tenant isolation, auth,
+> database schema, or backend functions. Work only in the MEHWAR customer code
+> boundary and only on the reviewed feature branch. Never push changes to the
+> monorepo default branch. Connect the existing Supabase Preview data using the
+> verified tenant adapter. Do not invent demo data, tables, pricing, integrations,
+> or capabilities. Do not expose service-role credentials. Keep unaudited
+> mutations and unverified uploads/notifications disabled. Add real routes and
+> interactions, typecheck, test, build, visually compare with Stitch, and report
+> incomplete work honestly. Do not deploy or merge to Production.
