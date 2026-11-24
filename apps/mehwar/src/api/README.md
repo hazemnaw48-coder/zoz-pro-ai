@@ -19,9 +19,9 @@ Do not send a service-role key from the browser.
 
 ```ts
 import { createAgentBridge } from "./agentBridge";
-import { supabase } from "../lib/supabase";
+import { getSupabaseClient } from "../lib/supabase";
 
-const tenantApi = createAgentBridge(supabase);
+const tenantApi = createAgentBridge(getSupabaseClient());
 const bootstrap = await tenantApi.bootstrap();
 ```
 
