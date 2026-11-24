@@ -75,7 +75,8 @@ jobs:
           test -s _site/intelligence.html
           grep -q "ZOZ Intelligence" _site/intelligence.html
           test -s _site/customer-portal.html
-          grep -q "بوابة الشركات" _site/customer-portal.html
+          grep -q "مِحور | MEHWAR" _site/customer-portal.html
+          ! grep -Eiq "ZOZ Pro|ZOZ Group" _site/customer-portal.html
           node -e "const fs=require('fs');const h=fs.readFileSync('_site/customer-portal.html','utf8');const scripts=[...h.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];if(!scripts.length)throw Error('Customer portal script missing');fs.writeFileSync('/tmp/customer-portal-inline.js',scripts[scripts.length-1][1]);"
           node --check /tmp/customer-portal-inline.js
           node -e "const fs=require('fs');const h=fs.readFileSync('_site/whatsapp-center.html','utf8');if(!h.includes('oxyzxbkwhafzaztraowc.supabase.co')||!h.includes('sb_publishable_')||h.includes('sb_publishable_preview')||!h.includes('zoz-whatsapp-control'))throw Error('WhatsApp center configuration missing or not production');const scripts=[...h.matchAll(/<script>([\s\S]*?)<\/script>/g)];if(!scripts.length)throw Error('WhatsApp center script missing');fs.writeFileSync('/tmp/whatsapp-center-inline.js',scripts[scripts.length-1][1]);"
@@ -118,7 +119,8 @@ jobs:
           ! grep -Eiq "service_role|sb_secret_" /tmp/fieldops-live-config.js
           echo "FieldOps live Pages route and public Supabase config verified."
           curl --fail --silent --show-error "${base}/customer-portal.html" -o /tmp/customer-portal-live.html
-          grep -q "بوابة الشركات" /tmp/customer-portal-live.html
+          grep -q "مِحور | MEHWAR" /tmp/customer-portal-live.html
+          ! grep -Eiq "ZOZ Pro|ZOZ Group" /tmp/customer-portal-live.html
           grep -q "zoz-tenant-workspace" /tmp/customer-portal-live.html
           grep -q "sb_publishable_" /tmp/customer-portal-live.html
           ! grep -Eiq "service_role|sb_secret_" /tmp/customer-portal-live.html
