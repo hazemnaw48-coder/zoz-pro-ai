@@ -17,18 +17,44 @@ It is not another app, product, tenant system or database.
 
 ## Connect Stitch once
 
-1. Open the existing Stitch project with the **Hazem Now company Google account**.
-2. Complete Google's official Stitch MCP setup and obtain either its Stitch API
-   key or an OAuth access token and Google Cloud project ID.
-3. Copy this directory's `.env.example` to `.env.local`.
-4. Put the credentials in `.env.local` only. Never commit it, paste secrets
-   into prompts, or place them in browser code.
-5. Install the pinned SDK:
+**Account split is intentional:** use **ZOZ Hazem** for the existing Stitch
+project. Use **Hazem Now** only for Google AI Studio. Do not switch the Stitch
+project to Hazem Now or create a replacement Stitch project.
 
-   ```bash
-   cd apps/mehwar/stitch
-   npm install
-   ```
+### Official CLI authentication (preferred)
+
+The current official `@google/stitch` CLI supports Google OAuth PKCE and stores
+its refreshed credentials in the local CLI configuration. Version 0.13.0 was
+installed and its command interface checked in the MEHWAR cloud workbench.
+
+```bash
+npm install -g @google/stitch@0.13.0
+stitch login
+stitch status
+stitch find projects --limit 20 --json
+```
+
+**Important for phone continuation:** run the login flow inside the persistent
+MEHWAR cloud workbench, not only in the borrowed computer's local terminal.
+Otherwise OAuth credentials remain on the borrowed computer and the cloud
+workbench cannot use them after it is returned. The browser-based login must
+complete in the same remote workspace whose filesystem stores the CLI
+credentials. Never paste an OAuth token, API key or password into ChatGPT.
+
+### SDK / API-key alternative
+
+If Canvas actions require an API key, copy this directory's `.env.example` to
+`.env.local`, then put `STITCH_API_KEY` or the supported `STITCH_ACCESS_TOKEN`
+there in the cloud workbench only. Keep `.env.local` out of Git. Do not put
+Stitch credentials in browser code, a public Vercel deployment, or an AI Studio
+prompt.
+
+Install the pinned project SDK:
+
+```bash
+cd apps/mehwar/stitch
+npm ci
+```
 
 ## Read the existing Stitch workspace
 
