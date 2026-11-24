@@ -9,14 +9,13 @@ type TasksScreenProps = {
 
 type LoadState = "loading" | "success" | "error";
 
+// These values match the CHECK constraint on public.zoz_tenant_tasks.status.
 const statusLabels: Record<string, string> = {
-  pending: "بانتظار البدء",
   queued: "في قائمة الانتظار",
-  in_progress: "قيد التنفيذ",
-  review: "بانتظار المراجعة",
+  running: "قيد التنفيذ",
   completed: "مكتملة",
+  blocked: "متوقفة لحين استكمال المتطلبات",
   failed: "تعذّر التنفيذ",
-  cancelled: "ملغاة",
 };
 
 function formatDate(value: string): string {
@@ -164,9 +163,7 @@ export default function TasksScreen({
                 <article>
                   <h2>{task.title}</h2>
                   <p>نوع الطلب: {task.task_type}</p>
-                  <p>
-                    الحالة: {statusLabels[task.status] ?? task.status}
-                  </p>
+                  <p>الحالة: {statusLabels[task.status] ?? task.status}</p>
                   <p>تاريخ الإنشاء: {formatDate(task.created_at)}</p>
                   {task.completed_at && (
                     <p>تاريخ الإكمال: {formatDate(task.completed_at)}</p>
