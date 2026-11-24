@@ -74,6 +74,10 @@ jobs:
           test -s _site/whatsapp-center.html
           test -s _site/intelligence.html
           grep -q "ZOZ Intelligence" _site/intelligence.html
+          test -s _site/customer-portal.html
+          grep -q "بوابة الشركات" _site/customer-portal.html
+          node -e "const fs=require('fs');const h=fs.readFileSync('_site/customer-portal.html','utf8');const scripts=[...h.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];if(!scripts.length)throw Error('Customer portal script missing');fs.writeFileSync('/tmp/customer-portal-inline.js',scripts[scripts.length-1][1]);"
+          node --check /tmp/customer-portal-inline.js
           node -e "const fs=require('fs');const h=fs.readFileSync('_site/whatsapp-center.html','utf8');if(!h.includes('oxyzxbkwhafzaztraowc.supabase.co')||!h.includes('sb_publishable_')||h.includes('sb_publishable_preview')||!h.includes('zoz-whatsapp-control'))throw Error('WhatsApp center configuration missing or not production');const scripts=[...h.matchAll(/<script>([\s\S]*?)<\/script>/g)];if(!scripts.length)throw Error('WhatsApp center script missing');fs.writeFileSync('/tmp/whatsapp-center-inline.js',scripts[scripts.length-1][1]);"
           node --check /tmp/whatsapp-center-inline.js
           test -s _site/software-factory.html
