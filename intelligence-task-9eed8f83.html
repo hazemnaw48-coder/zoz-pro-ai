@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101827"><title>ZOZ Pro | إكمال مهمة Intelligence</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{color-scheme:dark;--bg:#0b1422;--p:#122033;--l:#2b405a;--t:#eef4ff;--m:#a9bad0;--b:#80a9ff;--g:#50d5a0;--w:#ffca70;--r:#ff8c8c}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#0b1422,#101c2d);color:var(--t);font:15px/1.7 system-ui,sans-serif}
+main{max-width:900px;margin:auto;padding:18px}.card{background:var(--p);border:1px solid var(--l);border-radius:16px;padding:18px;margin:14px 0}
+.muted,.small{color:var(--m)}.small{font-size:12px}.notice{padding:13px;border:1px solid #314762;border-radius:10px;background:#182a43;white-space:pre-wrap;overflow-wrap:anywhere}
+.good{color:var(--g)}.warn{color:var(--w)}.bad{color:var(--r)}button,.btn{border:0;border-radius:10px;background:#416fe0;color:white;padding:12px 18px;font:inherit;font-weight:750;cursor:pointer;text-decoration:none;display:inline-block}
+button:disabled{opacity:.55;cursor:wait}.secondary{background:#263954}label{display:block;margin:10px 0 5px;font-weight:700}
+input{width:100%;background:#0a1727;color:var(--t);border:1px solid #40536d;border-radius:10px;padding:12px;font:inherit}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}.hidden{display:none!important}.step{padding:10px;border-bottom:1px solid var(--l)}.step:last-child{border:0}
+</style></head>
+<body><main>
+<header style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+<div><h1 style="margin:0">ZOZ Intelligence</h1><div class="muted">استكمال المهمة الأصلية — دون إنشاء مهمة بديلة</div></div>
+<a class="btn secondary" href="./channel-control.html?mode=full&amp;integrated=1">مركز الشركة</a>
+</header>
+<section class="card"><h2>المهمة المحددة</h2>
+<div class="notice">المعرّف: 9eed8f83-7ec6-4998-9073-e07048ad51e1
+القسم: Software
+الوكيل: software_engineer
+البيئة: Preview فقط
+التكلفة المسموح بها: 0
+الإجراءات الخارجية: معطّلة</div>
+<p class="muted">سيُعاد تجهيز أدلة البحث للمهمة نفسها، ثم يعمل الوكيل الفني، ثم يراجع وكيل الجودة النتيجة بصورة مستقلة، وتحفظ الذاكرة مع اختبار القراءة. لن يتم النشر أو إرسال رسائل أو إنفاق أموال أو تعديل Production.</p>
+</section>
+<section id="login-card" class="card"><h2>دخول المالك</h2>
+<label for="email">البريد الإلكتروني</label><input id="email" type="email" value="hazemnaw48@gmail.com" autocomplete="username">
+<label for="password">كلمة المرور</label><input id="password" type="password" autocomplete="current-password">
+<div class="actions"><button id="login">تسجيل الدخول</button></div><div id="auth-msg" class="notice">يلزم حساب مالك ZOZ Pro.</div>
+</section>
+<section id="workspace" class="card hidden"><h2>تشغيل وإغلاق المهمة</h2>
+<div class="notice warn">التشغيل يستخدم مفاتيح Gemini المجانية المتاحة بالتناوب، مع احترام حدود الحصة لكل حساب. تعدد المفاتيح لا يعني تجاوز حدود Google أو ضمان عدم نفاد الحصة.</div>
+<div class="actions"><button id="run">ابدأ إكمال المهمة الأصلية</button><button id="refresh" class="secondary">تحديث حالة الدخول</button></div>
+<div id="status" class="notice" style="margin-top:14px">جاهز. لن يبدأ التنفيذ إلا عند الضغط على الزر.</div>
+<div id="steps" class="card hidden"><div class="step" id="s1">1. تجهيز الأدلة والبحث الموثق</div><div class="step" id="s2">2. تشغيل وكيل القسم الفني</div><div class="step" id="s3">3. مراجعة الجودة المستقلة</div><div class="step" id="s4">4. حفظ الذاكرة والتحقق منها</div><div class="step" id="s5">5. التحقق من حالة المهمة</div></div>
+<pre id="details" class="notice hidden" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+</section>
+</main>
+<script>
+(async()=>{
+const U="https://vjnwojrqduoxhetutxrs.supabase.co";
+const K="sb_publishable_h0eas8ulCa_7zdrt3OvFGA_6aeAuxSw";
+const TASK="9eed8f83-7ec6-4998-9073-e07048ad51e1";
+const sb=window.supabase.createClient(U,K,{auth:{persistSession:true,autoRefreshToken:true}});
+const $=id=>document.getElementById(id);let session=null,busy=false;
+function note(id,msg,kind=""){const e=$(id);e.className="notice "+kind;e.textContent=msg}
+function mark(id,msg,kind=""){const e=$(id);e.textContent=msg;e.className="step "+kind}
+function signed(s){session=s;const ok=!!s?.user&&s.user.email?.toLowerCase()==="hazemnaw48@gmail.com"&&!!s.user.email_confirmed_at;$("workspace").classList.toggle("hidden",!ok);$("login-card").classList.toggle("hidden",ok);if(ok)note("auth-msg","تم التحقق من جلسة المالك.","good")}
+signed((await sb.auth.getSession()).data.session);sb.auth.onAuthStateChange((_e,s)=>signed(s));
+$("login").onclick=async()=>{const {data,error}=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(error)note("auth-msg",error.message,"bad");else signed(data.session)};
+$("refresh").onclick=async()=>{const {data}=await sb.auth.getSession();signed(data.session);note("status",data.session?"جلسة المالك متصلة.":"انتهت الجلسة؛ سجّل الدخول مجددًا.",data.session?"good":"warn")};
+async function call(slug,body){if(!session)throw Error("جلسة المالك غير متصلة");const r=await fetch(U+"/functions/v1/"+slug,{method:"POST",headers:{apikey:K,authorization:"Bearer "+session.access_token,"content-type":"application/json"},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok||d.ok!==true)throw Error(d.error||("فشل الطلب HTTP "+r.status));return d}
+$("run").onclick=async()=>{
+if(busy)return;busy=true;$("run").disabled=true;$("steps").classList.remove("hidden");$("details").classList.add("hidden");$("details").textContent="";
+try{
+note("status","المرحلة 1/2: إعادة البحث الموثق للمهمة الأصلية…","warn");mark("s1","1. جارٍ تجهيز الأدلة عبر Tavily وGemini…");
+const research=await call("zoz-intelligence-engine",{action:"internal_run",task_id:TASK,run_type:"solve",context:{department:"software",agent:"software_engineer",company_workflow:true,expected_outcome:"تشخيص مسار ZOZ Intelligence وإصلاحه، ثم QA مستقل وتحقق الذاكرة."}});
+if(research.task_id!==TASK)throw Error("معرف المهمة الناتج لا يطابق المهمة الأصلية؛ أوقفنا التنفيذ.");
+mark("s1","1. اكتمل البحث: "+(research.evidence_level||"غير محدد")+" · "+((research.sources||[]).length)+" مصدر");
+note("status","المرحلة 2/2: تشغيل الوكيل الفني ومراجع الجودة والذاكرة…","warn");mark("s2","2. جارٍ تشغيل software_engineer…");
+const result=await call("zoz-company-agent",{action:"run_next",task_id:TASK});
+if(result.task_id!==TASK)throw Error("معرف المهمة المنفذة لا يطابق المهمة الأصلية.");
+mark("s2","2. اكتمل تشغيل الوكيل الفني: "+(result.agent||"software_engineer"),"good");
+const qa=result.quality_review||{};mark("s3","3. مراجعة QA: "+(qa.status||"غير متاحة")+" · الدرجة "+(qa.score??"—"),qa.status==="passed"?"good":"warn");
+const mem=result.durable_memory||{};mark("s4","4. الذاكرة: "+(mem.saved&&mem.verified_at?"حُفظت وتم التحقق":"لم يكتمل التحقق"),mem.saved&&mem.verified_at?"good":"warn");
+mark("s5","5. حالة المهمة: "+result.status, result.status==="completed"?"good":"warn");
+$("details").classList.remove("hidden");$("details").textContent=JSON.stringify({task_id:result.task_id,status:result.status,agent:result.agent,intelligence_run_id:result.intelligence_run_id,evidence_level:result.evidence_level,source_count:result.source_count,quality_review:qa,durable_memory:mem,external_actions_performed:result.external_actions_performed,result:result.result},null,2);
+note("status",result.status==="completed"?"اكتملت المهمة وأغلقت بعد اجتياز QA والتحقق من الذاكرة.":"انتهى تشغيل الوكيل، لكن المهمة تحتاج مراجعة مالك أو إصلاحات قبل الإغلاق. لم نضعها مكتملة كذبًا.",result.status==="completed"?"good":"warn");
+}catch(e){note("status","توقف المسار دون إعلان الإغلاق: "+(e.message||String(e)),"bad");}
+finally{busy=false;$("run").disabled=false}
+};
+})();
+</script></body></html>
