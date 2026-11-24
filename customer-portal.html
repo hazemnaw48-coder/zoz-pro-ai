@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1422">
+<title>ZOZ Pro | بوابة الشركات</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{color-scheme:dark;--bg:#0b1422;--panel:#122238;--line:#2b405a;--text:#eef4ff;--muted:#a9bad0;--blue:#416fe0}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(150deg,#0b1422,#12223a);color:var(--text);font:16px/1.7 system-ui,sans-serif}main{max-width:900px;margin:auto;padding:18px}.brand{display:flex;align-items:center;gap:12px;margin:12px 0 22px}.logo{width:46px;height:46px;border-radius:14px;background:linear-gradient(140deg,#416fe0,#1f9eaf);display:grid;place-items:center;font-weight:900;font-size:22px}.muted,small,.tiny{color:var(--muted)}.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;margin:14px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}label{display:block;font-weight:700;margin:10px 0 5px}input,select,textarea{width:100%;padding:12px;border:1px solid #405674;border-radius:11px;background:#0b192b;color:var(--text);font:inherit}textarea{min-height:110px}button{border:0;border-radius:11px;background:var(--blue);color:white;padding:11px 16px;font:inherit;font-weight:750;cursor:pointer}button.secondary{background:#30445f}button:disabled{opacity:.55;cursor:wait}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.hidden{display:none!important}.status{padding:11px;border-radius:10px;background:#172d48;border:1px solid var(--line);white-space:pre-wrap;margin:10px 0}.task{padding:14px;border:1px solid var(--line);border-radius:13px;margin:10px 0;background:#0d1b2e}.pill{display:inline-block;padding:2px 9px;border-radius:20px;background:#203958;color:#cfe0ff;font-size:12px}.result{white-space:pre-wrap;background:#0a1727;padding:12px;border-radius:10px;margin-top:10px}.tiny{font-size:12px}footer{padding:12px 2px}
+</style>
+</head>
+<body><main>
+<header class="brand"><div class="logo">Z</div><div><strong>ZOZ Pro</strong><div class="muted">مساحة عمل مستقلة لكل شركة</div></div></header>
+<section id="auth" class="panel"><h2>ابدأ مساحة شركتك</h2><p class="muted">سجّل الدخول أو أنشئ حساب عميل جديد. هذه بيئة معاينة بخطة مجانية وتنفيذ داخلي فقط.</p>
+<div class="grid"><div><label for="email">البريد الإلكتروني</label><input id="email" type="email" autocomplete="email" placeholder="name@company.com"></div><div><label for="password">كلمة المرور</label><input id="password" type="password" autocomplete="current-password" minlength="8" placeholder="8 أحرف على الأقل"></div></div>
+<div class="actions"><button id="login">تسجيل الدخول</button><button id="signup" class="secondary">إنشاء حساب جديد</button></div><div id="authmsg" class="status hidden"></div></section>
+<section id="onboard" class="panel hidden"><h2>أنشئ مساحة شركتك</h2><label for="orgname">اسم الشركة</label><input id="orgname" maxlength="120" placeholder="مثال: شركة النور"><div class="actions"><button id="createorg">إنشاء الشركة والمساحة المجانية</button></div><div id="onboardmsg" class="status hidden"></div></section>
+<section id="app" class="hidden"><div class="panel"><div class="grid"><div><small>الشركة</small><h2 id="orgtitle">—</h2></div><div><small>الباقة الحالية</small><h2><span class="pill">مجانية · 0 جنيه</span></h2></div><div><small>مساحة العمل</small><select id="workspace"></select></div></div><div class="actions"><button id="refresh" class="secondary">تحديث</button><button id="logout" class="secondary">تسجيل الخروج</button></div><p class="tiny">الخطة المجانية: حتى 10 مهام شهريًا ومساحة عمل واحدة. التنفيذ داخلي ولا يشغّل بحثًا خارجيًا أو نماذج مدفوعة أو إجراءات خارجية.</p></div>
+<div class="panel"><h2>اطلب من مساحة عملك</h2><label for="tasktitle">عنوان المهمة</label><input id="tasktitle" maxlength="180" placeholder="مثال: إعداد خطة تشغيل أسبوعية"><label for="tasktype">نوع المهمة</label><select id="tasktype"><option value="plan">خطة عمل</option><option value="analysis">تحليل</option><option value="checklist">قائمة تحقق</option><option value="draft">مسودة</option></select><label for="taskrequest">ما المطلوب؟</label><textarea id="taskrequest" maxlength="5000" placeholder="اكتب النتيجة المطلوبة وتفاصيل المهمة..."></textarea><div class="actions"><button id="submitTask">إنشاء المهمة</button></div><div id="taskmsg" class="status hidden"></div></div>
+<div class="panel"><h2>مهام الشركة ونتائجها</h2><div id="tasks"><p class="muted">سجّل الدخول لعرض المهام.</p></div></div></section>
+<footer class="tiny">بيئة معاينة · بيانات العملاء معزولة حسب المؤسسة · لا نشر أو مراسلات أو إنفاق خارجي.</footer>
+</main>
+<script>
+(function(){
+"use strict";
+const URL="https://vjnwojrqduoxhetutxrs.supabase.co";
+const KEY="sb_publishable_h0eas8ulCa_7zdrt3OvFGA_6aeAuxSw";
+const FN=URL+"/functions/v1/zoz-tenant-workspace";
+const sb=window.supabase.createClient(URL,KEY);
+let currentOrg=null,workspaces=[];
+const el=id=>document.getElementById(id);
+function message(id,text,good=false){const n=el(id);n.textContent=text;n.classList.remove("hidden");n.style.borderColor=good?"#287e61":"#8a6335"}
+function show(id){["auth","onboard","app"].forEach(x=>el(x).classList.toggle("hidden",x!==id))}
+function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+async function api(action,payload={}){const {data:{session}}=await sb.auth.getSession();if(!session)throw Error("انتهت الجلسة. سجّل الدخول مرة أخرى.");const r=await fetch(FN,{method:"POST",headers:{"content-type":"application/json","apikey":KEY,"authorization":"Bearer "+session.access_token},body:JSON.stringify({action,...payload})});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw Error(d.error||"تعذر إكمال الطلب.");return d}
+async function loadTasks(){if(!currentOrg)return;const d=await api("list_tasks",{organization_id:currentOrg.id,workspace_id:el("workspace").value});el("tasks").innerHTML=(d.tasks||[]).map(t=>{const r=t.result||{};const result=t.result?'<div class="result">'+esc(r.summary||"")+'\n'+esc((r.steps||[]).join("\n"))+'</div>':"";const run=t.status==="queued"?'<div class="actions"><button data-run="'+esc(t.id)+'">تنفيذ داخلي مجاني</button></div>':"";return '<article class="task"><h3>'+esc(t.title)+'</h3><span class="pill">'+esc(t.status)+'</span><p>'+esc(t.task_type)+' · '+new Date(t.created_at).toLocaleString("ar-EG")+'</p>'+result+run+'</article>'}).join("")||'<p class="muted">لا توجد مهام بعد. أنشئ أول مهمة.</p>';el("tasks").querySelectorAll("[data-run]").forEach(b=>b.addEventListener("click",async()=>{b.disabled=true;try{await api("run_task",{organization_id:currentOrg.id,task_id:b.dataset.run});await loadTasks()}catch(e){alert(e.message);b.disabled=false}}))}
+async function boot(name){try{const d=await api("bootstrap",name?{organization_name:name}:{});if(!d.organizations||!d.organizations.length){show("onboard");return}currentOrg=d.organizations[0].organization;workspaces=d.organizations[0].workspaces||[];el("orgtitle").textContent=currentOrg.name;el("workspace").innerHTML=workspaces.map(w=>'<option value="'+esc(w.id)+'">'+esc(w.name)+'</option>').join("");if(!workspaces.length)throw Error("لا توجد مساحة عمل نشطة لهذه الشركة.");show("app");await loadTasks()}catch(e){show("auth");message("authmsg",e.message)}}
+el("login").onclick=async()=>{try{const {error}=await sb.auth.signInWithPassword({email:el("email").value.trim(),password:el("password").value});if(error)throw error;await boot()}catch(e){message("authmsg",e.message)}};
+el("signup").onclick=async()=>{try{const {data,error}=await sb.auth.signUp({email:el("email").value.trim(),password:el("password").value});if(error)throw error;if(!data.session){message("authmsg","تم إنشاء الحساب. أكّد بريدك الإلكتروني ثم سجّل الدخول.",true);return}await boot()}catch(e){message("authmsg",e.message)}};
+el("createorg").onclick=()=>boot(el("orgname").value.trim());
+el("submitTask").onclick=async()=>{const b=el("submitTask");b.disabled=true;try{if(!currentOrg)throw Error("لا توجد شركة محددة.");await api("create_task",{organization_id:currentOrg.id,workspace_id:el("workspace").value,title:el("tasktitle").value.trim(),request:el("taskrequest").value.trim(),task_type:el("tasktype").value});message("taskmsg","تم إنشاء المهمة. يمكنك تشغيل التنفيذ الداخلي من قائمة المهام.",true);el("tasktitle").value="";el("taskrequest").value="";await loadTasks()}catch(e){message("taskmsg",e.message)}finally{b.disabled=false}};
+el("refresh").onclick=()=>boot();el("workspace").onchange=()=>loadTasks().catch(e=>message("taskmsg",e.message));el("logout").onclick=async()=>{await sb.auth.signOut();currentOrg=null;show("auth")};
+sb.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_IN"&&session)boot()});sb.auth.getSession().then(({data})=>{if(data.session)boot()});
+})();
+</script></body></html>
