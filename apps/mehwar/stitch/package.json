@@ -4,13 +4,19 @@
   "private": true,
   "type": "module",
   "description": "Read, export and safely refine the existing MEHWAR Stitch project.",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "projects": "node --env-file=.env.local list-projects.mjs",
     "export": "node --env-file=.env.local export-project.mjs",
-    "edit": "node --env-file=.env.local edit-screen.mjs"
+    "edit": "node --env-file=.env.local edit-screen.mjs",
+    "typecheck": "tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --skipLibCheck sdk-contract-check.ts"
   },
   "dependencies": {
     "@google/stitch-sdk": "0.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
   }
 }
