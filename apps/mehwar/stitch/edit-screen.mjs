@@ -38,7 +38,8 @@ async function main() {
   // It never creates a project or a replacement screen.
   const project = stitch.project(projectId);
   const original = await project.getScreen(screenId);
-  const generation = await original.edit(prompt);\n  const updated = generation.first;
+  const generation = await original.edit(prompt);
+  const updated = generation.first;
 
   const directory = path.resolve("..", ".stitch", "iterations", safeName(projectId));
   await mkdir(directory, { recursive: true });
