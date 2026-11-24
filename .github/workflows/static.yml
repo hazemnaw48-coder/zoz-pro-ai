@@ -87,8 +87,7 @@ jobs:
           touch _site/.nojekyll
           mkdir -p _site/production
           cp studio/index.html studio/style.css _site/production/
-          git fetch origin refs/heads/supabase-studio-pages:refs/remotes/origin/supabase-studio-pages
-          git show refs/remotes/origin/supabase-studio-pages:studio/app.js > _site/production/app.js
+          cp studio/app.js _site/production/app.js
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
