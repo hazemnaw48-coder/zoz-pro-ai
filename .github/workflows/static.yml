@@ -117,3 +117,9 @@ jobs:
           grep -q "sb_publishable_" /tmp/fieldops-live-config.js
           ! grep -Eiq "service_role|sb_secret_" /tmp/fieldops-live-config.js
           echo "FieldOps live Pages route and public Supabase config verified."
+          curl --fail --silent --show-error "${base}/customer-portal.html" -o /tmp/customer-portal-live.html
+          grep -q "بوابة الشركات" /tmp/customer-portal-live.html
+          grep -q "zoz-tenant-workspace" /tmp/customer-portal-live.html
+          grep -q "sb_publishable_" /tmp/customer-portal-live.html
+          ! grep -Eiq "service_role|sb_secret_" /tmp/customer-portal-live.html
+          echo "Customer portal live route, workspace endpoint, and public-only key verified."
