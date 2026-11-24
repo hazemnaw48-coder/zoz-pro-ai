@@ -21,7 +21,24 @@
 <div class="actions"><button id="login">تسجيل الدخول</button><button id="signup" class="secondary">إنشاء حساب جديد</button></div><div id="authmsg" class="status hidden"></div></section>
 <section id="onboard" class="panel hidden"><h2>أنشئ مساحة شركتك</h2><p class="muted">أدخل الاسم التجاري الذي تريد ظهوره داخل حساب شركتك. هذا الاسم يخص شركتك أنت، وليس اسم المنصة.</p><label for="orgname">الاسم التجاري لشركتك</label><input id="orgname" maxlength="120" placeholder="مثال: شركة النور للتجارة"><div class="actions"><button id="createorg">إنشاء الشركة والمساحة المجانية</button></div><div id="onboardmsg" class="status hidden"></div></section>
 <section id="ownerNotice" class="panel hidden"><h2>هذا حساب المالك الداخلي</h2><p class="muted">هذه بوابة العملاء المنفصلة عن حسابات الإدارة. لا يمكن استخدام حساب الإدارة داخل مساحة العميل. سجّل الخروج ثم ادخل بحساب شركتك المستقل.</p><div class="actions"><button id="ownerLogout" class="secondary">تسجيل الخروج من بوابة العملاء</button></div></section>
-<section id="app" class="hidden"><div class="panel"><div class="grid"><div><small>الشركة</small><h2 id="orgtitle">—</h2></div><div><small>الباقة الحالية</small><h2><span class="pill">مجانية · 0 جنيه</span></h2></div><div><small>مساحة العمل</small><select id="workspace"></select></div></div><div class="actions"><button id="refresh" class="secondary">تحديث</button><button id="logout" class="secondary">تسجيل الخروج</button></div><p class="tiny">الخطة المجانية: حتى 10 مهام شهريًا ومساحة عمل واحدة. التنفيذ داخلي ولا يشغّل بحثًا خارجيًا أو نماذج مدفوعة أو إجراءات خارجية.</p></div>
+<section id="app" class="hidden"><div class="panel"><div class="grid"><div><small>الشركة</small><h2 id="orgtitle">—</h2></div><div><small>الباقة الحالية</small><h2><span class="pill">مجانية · 0 جنيه</span></h2></div><div><small>مساحة العمل</small><select id="workspace"></select></div></div><div class="actions"><button id="refresh" class="secondary">تحديث</button><button id="logout" class="secondary">تسجيل الخروج</button></div><p class="tiny">الخطة المجانية: حتى 10 مهام شهريًا ومساحة عمل واحدة. تُنتج المنصة مسودات داخلية منظمة؛ لا بحث حي ولا تنفيذ خارجي أو مراسلات أو نشر.</p></div>
+<div class="panel" id="businessProfilePanel">
+<h2>ملف نشاط شركتك</h2>
+<p class="muted">أدخل معلومات النشاط مرة واحدة حتى ترتبط بها مسودات الخطط والتحليلات. تُحفظ البيانات داخل مساحة شركتك فقط.</p>
+<div class="grid">
+<div><label for="bpIndustry">مجال النشاط</label><input id="bpIndustry" maxlength="100" placeholder="مثال: تجارة التجزئة"></div>
+<div><label for="bpCustomer">العملاء المستهدفون</label><input id="bpCustomer" maxlength="500" placeholder="مثال: الأفراد والشركات الصغيرة"></div>
+</div>
+<label for="bpDescription">وصف النشاط</label><textarea id="bpDescription" maxlength="1000" placeholder="ماذا تقدم الشركة؟ وكيف تعمل؟"></textarea>
+<label for="bpProducts">المنتجات أو الخدمات</label><textarea id="bpProducts" maxlength="1000" placeholder="اكتب أهم المنتجات أو الخدمات"></textarea>
+<div class="grid">
+<div><label for="bpLocation">موقع النشاط</label><input id="bpLocation" maxlength="160" placeholder="المدينة والدولة"></div>
+<div><label for="bpChannels">قنوات العمل</label><input id="bpChannels" maxlength="300" placeholder="المتجر، الموقع، الهاتف..."></div>
+</div>
+<label for="bpGoals">الأهداف الحالية</label><textarea id="bpGoals" maxlength="600" placeholder="أهم أهداف الشركة خلال الفترة الحالية"></textarea>
+<div class="actions"><button id="saveProfile">حفظ ملف النشاط</button></div>
+<div id="profilemsg" class="status hidden"></div>
+</div>
 <div class="panel"><h2>اطلب من مساحة عملك</h2><label for="tasktitle">عنوان المهمة</label><input id="tasktitle" maxlength="180" placeholder="مثال: إعداد خطة تشغيل أسبوعية"><label for="tasktype">نوع المهمة</label><select id="tasktype"><option value="plan">خطة عمل</option><option value="analysis">تحليل</option><option value="checklist">قائمة تحقق</option><option value="draft">مسودة</option></select><label for="taskrequest">ما المطلوب؟</label><textarea id="taskrequest" maxlength="5000" placeholder="اكتب النتيجة المطلوبة وتفاصيل المهمة..."></textarea><div class="actions"><button id="submitTask">إنشاء المهمة</button></div><div id="taskmsg" class="status hidden"></div></div>
 <div class="panel"><h2>مهام الشركة ونتائجها</h2><div id="tasks"><p class="muted">سجّل الدخول لعرض المهام.</p></div></div></section>
 <footer class="tiny">بيئة معاينة · بيانات العملاء معزولة حسب المؤسسة · لا نشر أو مراسلات أو إنفاق خارجي.</footer>
@@ -39,13 +56,35 @@ function message(id,text,good=false){const n=el(id);n.textContent=text;n.classLi
 function show(id){["auth","onboard","app","ownerNotice"].forEach(x=>el(x).classList.toggle("hidden",x!==id))}
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 async function api(action,payload={}){const {data:{session}}=await sb.auth.getSession();if(!session)throw Error("انتهت الجلسة. سجّل الدخول مرة أخرى.");const r=await fetch(FN,{method:"POST",headers:{"content-type":"application/json","apikey":KEY,"authorization":"Bearer "+session.access_token},body:JSON.stringify({action,...payload})});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw Error(d.error||"تعذر إكمال الطلب.");return d}
+async function loadProfile(){
+ if(!currentOrg||!workspaces.length)return;
+ const p=workspaces.find(w=>w.id===el("workspace").value)?.settings?.business_profile||{};
+ el("bpIndustry").value=p.industry||"";
+ el("bpCustomer").value=p.target_customer||"";
+ el("bpDescription").value=p.business_description||"";
+ el("bpProducts").value=p.products_services||"";
+ el("bpLocation").value=p.business_location||"";
+ el("bpChannels").value=p.primary_channels||"";
+ el("bpGoals").value=p.business_goals||"";
+}
+async function saveProfile(){
+ const b=el("saveProfile");b.disabled=true;
+ try{
+  const profile={industry:el("bpIndustry").value.trim(),target_customer:el("bpCustomer").value.trim(),business_description:el("bpDescription").value.trim(),products_services:el("bpProducts").value.trim(),business_location:el("bpLocation").value.trim(),primary_channels:el("bpChannels").value.trim(),business_goals:el("bpGoals").value.trim()};
+  const d=await api("save_business_profile",{organization_id:currentOrg.id,workspace_id:el("workspace").value,profile});
+  const w=workspaces.find(x=>x.id===el("workspace").value);if(w)w.settings={...(w.settings||{}),business_profile:d.profile};
+  message("profilemsg","تم حفظ ملف نشاط شركتك داخل مساحة العمل.",true);
+ }catch(e){message("profilemsg",e.message)}
+ finally{b.disabled=false}
+}
 async function loadTasks(){if(!currentOrg)return;const d=await api("list_tasks",{organization_id:currentOrg.id,workspace_id:el("workspace").value});el("tasks").innerHTML=(d.tasks||[]).map(t=>{const r=t.result||{};const result=t.result?'<div class="result">'+esc(r.summary||"")+'\n'+esc((r.steps||[]).join("\n"))+'</div>':"";const run=t.status==="queued"?'<div class="actions"><button data-run="'+esc(t.id)+'">تنفيذ داخلي مجاني</button></div>':"";return '<article class="task"><h3>'+esc(t.title)+'</h3><span class="pill">'+esc(t.status)+'</span><p>'+esc(t.task_type)+' · '+new Date(t.created_at).toLocaleString("ar-EG")+'</p>'+result+run+'</article>'}).join("")||'<p class="muted">لا توجد مهام بعد. أنشئ أول مهمة.</p>';el("tasks").querySelectorAll("[data-run]").forEach(b=>b.addEventListener("click",async()=>{b.disabled=true;try{await api("run_task",{organization_id:currentOrg.id,task_id:b.dataset.run});await loadTasks()}catch(e){alert(e.message);b.disabled=false}}))}
-async function boot(name){try{const d=await api("bootstrap",name?{organization_name:name}:{});const all=d.organizations||[];const isInternalOrg=x=>{const o=x&&x.organization||{};const slug=String(o.slug||"").toLowerCase();const name=String(o.name||"").trim().toLowerCase();return slug==="zoz-pro-internal"||name==="zoz group"};const customers=all.filter(x=>x.organization&&!isInternalOrg(x));if(!customers.length){currentOrg=null;workspaces=[];if(all.some(isInternalOrg)){show("ownerNotice");return}show("onboard");return}currentOrg=customers[0].organization;workspaces=customers[0].workspaces||[];el("orgtitle").textContent=currentOrg.name;el("workspace").innerHTML=workspaces.map(w=>'<option value="'+esc(w.id)+'">'+esc(w.name)+'</option>').join("");if(!workspaces.length)throw Error("لا توجد مساحة عمل نشطة لهذه الشركة.");show("app");await loadTasks()}catch(e){show("auth");message("authmsg",e.message)}}
+async function boot(name){try{const d=await api("bootstrap",name?{organization_name:name}:{});const all=d.organizations||[];const isInternalOrg=x=>{const o=x&&x.organization||{};const slug=String(o.slug||"").toLowerCase();const name=String(o.name||"").trim().toLowerCase();return slug==="zoz-pro-internal"||name==="zoz group"};const customers=all.filter(x=>x.organization&&!isInternalOrg(x));if(!customers.length){currentOrg=null;workspaces=[];if(all.some(isInternalOrg)){show("ownerNotice");return}show("onboard");return}currentOrg=customers[0].organization;workspaces=customers[0].workspaces||[];el("orgtitle").textContent=currentOrg.name;el("workspace").innerHTML=workspaces.map(w=>'<option value="'+esc(w.id)+'">'+esc(w.name)+'</option>').join("");if(!workspaces.length)throw Error("لا توجد مساحة عمل نشطة لهذه الشركة.");show("app");await loadProfile();await loadTasks()}catch(e){show("auth");message("authmsg",e.message)}}
 el("login").onclick=async()=>{try{const {error}=await sb.auth.signInWithPassword({email:el("email").value.trim(),password:el("password").value});if(error)throw error;await boot()}catch(e){message("authmsg",e.message)}};
 el("signup").onclick=async()=>{try{const {data,error}=await sb.auth.signUp({email:el("email").value.trim(),password:el("password").value,options:{emailRedirectTo:"https://hazemnaw48-coder.github.io/zoz-pro-ai/customer-portal.html"}});if(error)throw error;if(!data.session){message("authmsg","تم إنشاء الحساب. أكّد بريدك الإلكتروني ثم سجّل الدخول.",true);return}await boot()}catch(e){message("authmsg",e.message)}};
 el("createorg").onclick=()=>boot(el("orgname").value.trim());
 el("submitTask").onclick=async()=>{const b=el("submitTask");b.disabled=true;try{if(!currentOrg)throw Error("لا توجد شركة محددة.");await api("create_task",{organization_id:currentOrg.id,workspace_id:el("workspace").value,title:el("tasktitle").value.trim(),request:el("taskrequest").value.trim(),task_type:el("tasktype").value});message("taskmsg","تم إنشاء المهمة. يمكنك تشغيل التنفيذ الداخلي من قائمة المهام.",true);el("tasktitle").value="";el("taskrequest").value="";await loadTasks()}catch(e){message("taskmsg",e.message)}finally{b.disabled=false}};
-el("refresh").onclick=()=>boot();el("workspace").onchange=()=>loadTasks().catch(e=>message("taskmsg",e.message));el("logout").onclick=async()=>{await sb.auth.signOut({scope:"local"});currentOrg=null;show("auth")};el("ownerLogout").onclick=async()=>{await sb.auth.signOut({scope:"local"});currentOrg=null;show("auth")};
+el("refresh").onclick=()=>boot();el("workspace").onchange=()=>{loadProfile().catch(e=>message("profilemsg",e.message));loadTasks().catch(e=>message("taskmsg",e.message))};
+el("saveProfile").onclick=saveProfile;el("logout").onclick=async()=>{await sb.auth.signOut({scope:"local"});currentOrg=null;show("auth")};el("ownerLogout").onclick=async()=>{await sb.auth.signOut({scope:"local"});currentOrg=null;show("auth")};
 sb.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_IN"&&session)boot()});sb.auth.getSession().then(({data})=>{if(data.session)boot()});
 })();
 </script></body></html>
