@@ -1,35 +1,31 @@
-# MEHWAR customer app — current implementation status
+# MEHWAR customer app — verified status
 
-This folder is an isolated customer-app integration foundation. It does not
-replace the internal Node.js application or its Android Flow Bridge module.
+## Completed and committed
 
-## Implemented in this commit
+- Isolated customer application foundation under `apps/mehwar/`; internal Node.js service and Android Flow Bridge remain untouched.
+- Preview-only Supabase client factory uses environment configuration and never embeds a service-role credential.
+- Typed, read-only adapter for the active Preview `zoz-tenant-workspace` Edge Function (version 5).
+- Tasks screen calls the tenant API, handles loading/error/empty/success, search and status filtering.
+- Task status labels now match the database's actual allowed statuses: `queued`, `running`, `completed`, `blocked`, `failed`.
+- Integration documentation's client example now uses the actual exported `getSupabaseClient()` factory.
+- Existing tenant schema/RLS and the existing `zoz_create_organization(p_name,p_slug)` RPC were inspected. No tables, migrations, functions, or Production resources were changed.
 
-- A typed, read-only TypeScript adapter for the existing Preview
-  `zoz-tenant-workspace` Edge Function.
-- Typed response models for tenant organizations, plans, services and tasks.
-- Client-side UUID input validation before calling tenant-scoped actions.
-- A safe Preview environment template containing no secret credentials.
-- Documentation that identifies the exact verified actions and explicitly
-  blocks unaudited agent mutations.
+## Verified backend boundary
 
-## Intentionally not generated yet
+- Preview project is `ACTIVE_HEALTHY`.
+- `zoz-tenant-workspace` is ACTIVE version 5.
+- Authenticated tenant membership is validated server-side by the Edge Function.
+- `public.zoz_tenant_tasks` currently contains a real completed task; status values were queried read-only.
+- Task list is read-only. Agent writes remain disabled in the client because audit/owner approval is incomplete.
+- No service-role key is included in browser files.
 
-- React pages or replacement UI.
-- Vite build configuration and dependency lockfile.
-- PWA manifest/service worker and Android package.
-- Database migrations or new Supabase functions.
-- File upload/download, deliverables and notification integrations.
-- Agent write methods.
+## Not closed yet — required inputs / gates
 
-The approved editable Stitch design source was not present in the audited
-repository. Creating substitute screens from descriptive text would violate
-the requirement to preserve the existing design exactly. The customer app's
-React/PWA shell must be built after that source is added.
+- The editable approved Stitch export is not present in the repository or current mounted Downloads. Therefore exact UI fidelity and all nine connected screens cannot be implemented/verified yet.
+- `apps/mehwar` still has no Vite package manifest, React entry point, full navigation shell, lockfile, or production build.
+- No PWA install test, Android package, end-to-end authenticated tenant test, or downloadable ZIP has been produced.
+- Uploads/deliverables/notifications and secure approval/audit-backed mutations remain unimplemented.
 
-## Verification boundary
+## Next acceptance gate
 
-The Supabase Preview function and schema were inspected read-only. No
-Production project was accessed or modified. The code in this folder has not
-yet been run through a TypeScript build or end-to-end test because this folder
-does not yet have a Vite package manifest or installed dependencies.
+Add the actual Stitch source/export to this directory or provide it in the conversation. Continue on `feat/mehwar-customer-foundation`; preserve the design and implement the app shell, then run install/typecheck/build, tenant-isolation checks, PWA tests, and create a verified ZIP. Do not merge to Production or modify the Production Supabase project.
