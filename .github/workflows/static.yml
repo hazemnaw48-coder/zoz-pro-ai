@@ -24,6 +24,7 @@ on:
       - "agent-control-preview.html"
       - "index.html"
       - "intelligence.html"
+      - "customer-portal.html"
       - "youtube-analytics.html"
       - "youtube-manager.html"
       - "proof-studio.html"
@@ -69,7 +70,7 @@ jobs:
           mkdir -p _site
           mkdir -p _site/fieldops
           cp -a fieldops/. _site/fieldops/
-          cp whatsapp-center.html analysis-production.html agent-control.html agent-control-preview.html index.html production-center.html production-workbench.html production-workbench.js channel-control.html company-office.html qwen-provider-connect.html video-provider-connect.html youtube-analytics.html youtube-manager.html studio.html proof-studio.html studio.css studio.js visual-production.js production-handoff.js pwa.js sw.js manifest.webmanifest zoz-icon.svg channel-dashboard.html dashboard.html android-app-factory.html app-control.html tool-credentials.html terms-of-service.html privacy-policy.html canva-connect.html canva-connect-v2.html tiktok1ShjJDl7tDu6DbqXFuOmpvDQgPYBqPcZ.txt software-factory.html intelligence.html _site/
+          cp whatsapp-center.html analysis-production.html agent-control.html agent-control-preview.html index.html production-center.html production-workbench.html production-workbench.js channel-control.html company-office.html qwen-provider-connect.html video-provider-connect.html youtube-analytics.html youtube-manager.html studio.html proof-studio.html studio.css studio.js visual-production.js production-handoff.js pwa.js sw.js manifest.webmanifest zoz-icon.svg channel-dashboard.html dashboard.html android-app-factory.html app-control.html tool-credentials.html terms-of-service.html privacy-policy.html canva-connect.html canva-connect-v2.html tiktok1ShjJDl7tDu6DbqXFuOmpvDQgPYBqPcZ.txt software-factory.html customer-portal.html _site/
           test -s _site/whatsapp-center.html
           test -s _site/intelligence.html
           grep -q "ZOZ Intelligence" _site/intelligence.html
