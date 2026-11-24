@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "supabase/functions/zoz-company-agent/**"
+      - "supabase/functions/zoz-intelligence-engine/**"
       - "supabase/functions/zoz-pro-agent/**"
       - ".github/workflows/company-agent-check.yml"
   push:
@@ -31,3 +32,5 @@ jobs:
         run: deno check --config supabase/functions/zoz-company-agent/deno.json supabase/functions/zoz-company-agent/index.ts
       - name: Type-check autonomous production agent
         run: deno check --config supabase/functions/zoz-pro-agent/deno.json supabase/functions/zoz-pro-agent/index.ts
+      - name: Type-check ZOZ Intelligence Engine
+        run: deno check --config supabase/functions/zoz-intelligence-engine/deno.json supabase/functions/zoz-intelligence-engine/index.ts

@@ -272,3 +272,20 @@ The center project `894a0e3a-85c4-43de-b8f7-205db24685b9` still uses browser `lo
 - PR #73 remains draft and unmerged; latest Vercel status was successful on the prior commit, but current head CI has not been confirmed. Production GitHub Pages still serves main, so these UI changes are not live yet.
 - Remaining FieldOps launch gates: enable leaked-password protection in Supabase Auth; complete an actual backup-and-restore drill; test second-company switching in an authenticated browser; pass CI and end-to-end factory build. Keep commercial rollout in pilot until then.
 - Product operation statement: FieldOps is currently a human-operated workflow app with automatic guardrails, trial/plan enforcement and audit logging; it is not yet an autonomous dispatch/notification/route-optimization system. Do not market autonomous operation as currently available.
+
+
+## ZOZ Intelligence Engine — 2026-11-23
+
+- Task: Build an Arabic-first, grounded search and problem-solving pilot.
+- Feature branch: feat/intelligence-solution-engine (based on main commit 0719ddbc4a96dff1acfa7ad15180dcd998e7f0d1).
+- Scope: Preview-only; no Production schema, function, or publishing workflow changes.
+- Added: intelligence.html; supabase/functions/zoz-intelligence-engine/index.ts; supabase/migrations/20261123155500_zoz_intelligence_engine.sql; docs/INTELLIGENCE_ENGINE.md.
+- Modified: channel-control.html adds a navigation link to the intelligence workspace; supabase/config.toml registers the two functions.
+- Preview Supabase: vjnwojrqduoxhetutxrs.
+- Deployed Preview functions: zoz-intelligence-engine v1 and zoz-intelligence-ui v1.
+- Preview tables verified: zoz_intelligence_runs and zoz_intelligence_events; RLS enabled.
+- Search provider: Gemini Interactions API gemini-3.8-flash with Google Search grounding.
+- Verified: schema/table inspection, RLS enabled, functions ACTIVE, branch files committed.
+- Not yet verified: authenticated end-to-end search, source quality, Gemini key presence in Preview secrets, browser rendering on device, execution handoff, customer tenancy.
+- Never claim successful search until an authenticated live run returns citations.
+- Next: owner-browser smoke test, 20–30 case benchmark, safe internal execution queue, tenant membership and quota controls, then PR review. Do not merge or deploy Production without explicit owner approval.

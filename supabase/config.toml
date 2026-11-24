@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.zoz-whatsapp-control]
 verify_jwt = false
+
+[functions.zoz-intelligence-engine]
+verify_jwt = false
+
+[functions.zoz-intelligence-ui]
+verify_jwt = false
