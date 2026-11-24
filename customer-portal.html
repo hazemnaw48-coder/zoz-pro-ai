@@ -1,11 +1,13 @@
-<!-- ZOZ customer portal deployment-ready source -->
+<!-- MEHWAR customer portal deployment-ready source -->
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1422">
-<title>ZOZ Pro | بوابة الشركات</title>
+<title>مِحور | MEHWAR — منصة تشغيل وإدارة الأعمال</title>
+<meta name="application-name" content="MEHWAR">
+<meta name="description" content="مِحور — منصة تشغيل وإدارة الأعمال للشركات، بمساحات عمل مستقلة وآمنة.">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{color-scheme:dark;--bg:#0b1422;--panel:#122238;--line:#2b405a;--text:#eef4ff;--muted:#a9bad0;--blue:#416fe0}
@@ -13,12 +15,12 @@
 </style>
 </head>
 <body><main>
-<header class="brand"><div class="logo">Z</div><div><strong>ZOZ Pro</strong><div class="muted">منصة تشغيل الأعمال للشركات</div></div></header>
+<header class="brand"><div class="logo" aria-label="مِحور">م</div><div><strong>مِحور | MEHWAR</strong><div class="muted">منصة تشغيل وإدارة الأعمال</div></div></header>
 <section id="auth" class="panel"><h2>ابدأ مساحة شركتك</h2><p class="muted">سجّل الدخول أو أنشئ حساب عميل جديد. هذه بيئة معاينة بخطة مجانية وتنفيذ داخلي فقط.</p>
 <div class="grid"><div><label for="email">البريد الإلكتروني</label><input id="email" type="email" autocomplete="email" placeholder="name@company.com"></div><div><label for="password">كلمة المرور</label><input id="password" type="password" autocomplete="current-password" minlength="8" placeholder="8 أحرف على الأقل"></div></div>
 <div class="actions"><button id="login">تسجيل الدخول</button><button id="signup" class="secondary">إنشاء حساب جديد</button></div><div id="authmsg" class="status hidden"></div></section>
-<section id="onboard" class="panel hidden"><h2>أنشئ مساحة شركتك</h2><p class="muted">أدخل الاسم التجاري الذي تريد ظهوره داخل حساب شركتك. هذا الاسم يخص مؤسستك أنت، وليس اسم منصة ZOZ Pro.</p><label for="orgname">الاسم التجاري لشركتك</label><input id="orgname" maxlength="120" placeholder="مثال: شركة النور للتجارة"><div class="actions"><button id="createorg">إنشاء الشركة والمساحة المجانية</button></div><div id="onboardmsg" class="status hidden"></div></section>
-<section id="ownerNotice" class="panel hidden"><h2>هذا حساب المالك الداخلي</h2><p class="muted">هذه بوابة حسابات العملاء. مساحة ZOZ Pro الداخلية منفصلة عن مساحات العملاء ولا تُعرض هنا. سجّل الخروج من بوابة العملاء ثم ادخل بحساب الشركة المستقل.</p><div class="actions"><button id="ownerLogout" class="secondary">تسجيل الخروج من بوابة العملاء</button></div></section>
+<section id="onboard" class="panel hidden"><h2>أنشئ مساحة شركتك</h2><p class="muted">أدخل الاسم التجاري الذي تريد ظهوره داخل حساب شركتك. هذا الاسم يخص شركتك أنت، وليس اسم المنصة.</p><label for="orgname">الاسم التجاري لشركتك</label><input id="orgname" maxlength="120" placeholder="مثال: شركة النور للتجارة"><div class="actions"><button id="createorg">إنشاء الشركة والمساحة المجانية</button></div><div id="onboardmsg" class="status hidden"></div></section>
+<section id="ownerNotice" class="panel hidden"><h2>هذا حساب المالك الداخلي</h2><p class="muted">هذه بوابة العملاء المنفصلة عن حسابات الإدارة. لا يمكن استخدام حساب الإدارة داخل مساحة العميل. سجّل الخروج ثم ادخل بحساب شركتك المستقل.</p><div class="actions"><button id="ownerLogout" class="secondary">تسجيل الخروج من بوابة العملاء</button></div></section>
 <section id="app" class="hidden"><div class="panel"><div class="grid"><div><small>الشركة</small><h2 id="orgtitle">—</h2></div><div><small>الباقة الحالية</small><h2><span class="pill">مجانية · 0 جنيه</span></h2></div><div><small>مساحة العمل</small><select id="workspace"></select></div></div><div class="actions"><button id="refresh" class="secondary">تحديث</button><button id="logout" class="secondary">تسجيل الخروج</button></div><p class="tiny">الخطة المجانية: حتى 10 مهام شهريًا ومساحة عمل واحدة. التنفيذ داخلي ولا يشغّل بحثًا خارجيًا أو نماذج مدفوعة أو إجراءات خارجية.</p></div>
 <div class="panel"><h2>اطلب من مساحة عملك</h2><label for="tasktitle">عنوان المهمة</label><input id="tasktitle" maxlength="180" placeholder="مثال: إعداد خطة تشغيل أسبوعية"><label for="tasktype">نوع المهمة</label><select id="tasktype"><option value="plan">خطة عمل</option><option value="analysis">تحليل</option><option value="checklist">قائمة تحقق</option><option value="draft">مسودة</option></select><label for="taskrequest">ما المطلوب؟</label><textarea id="taskrequest" maxlength="5000" placeholder="اكتب النتيجة المطلوبة وتفاصيل المهمة..."></textarea><div class="actions"><button id="submitTask">إنشاء المهمة</button></div><div id="taskmsg" class="status hidden"></div></div>
 <div class="panel"><h2>مهام الشركة ونتائجها</h2><div id="tasks"><p class="muted">سجّل الدخول لعرض المهام.</p></div></div></section>
