@@ -52,7 +52,8 @@ async function main() {
 
   console.log(JSON.stringify({
     projectId,
-    screenId: updated.screenId ?? updated.id ?? screenId,\n    generationScreenCount: generation.screens.length,
+    screenId: updated.screenId ?? updated.id ?? screenId,
+    generationScreenCount: generation.screens.length,
     htmlFile,
     screenshotFile: imageFile,
     note: "راجع اللقطة والـ HTML قبل اعتماد التغييرات في كود التطبيق.",
