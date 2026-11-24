@@ -1,0 +1,16 @@
+{
+  "name": "@mehwar/stitch-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Read, export and safely refine the existing MEHWAR Stitch project.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "projects": "node --env-file=.env.local list-projects.mjs",
+    "export": "node --env-file=.env.local export-project.mjs",
+    "edit": "node --env-file=.env.local edit-screen.mjs"
+  },
+  "dependencies": {
+    "@google/stitch-sdk": "0.4.0"
+  }
+}
