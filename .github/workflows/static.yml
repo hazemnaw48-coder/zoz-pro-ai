@@ -38,6 +38,7 @@ on:
       - "zoz-icon.svg"
       - "channel-dashboard.html"
       - "android-app-factory.html"
+      - "screen-factory.html"
       - "app-control.html"
       - "tool-credentials.html"
       - "whatsapp-center.html"
@@ -70,11 +71,15 @@ jobs:
           mkdir -p _site
           mkdir -p _site/fieldops
           cp -a fieldops/. _site/fieldops/
-          cp whatsapp-center.html analysis-production.html agent-control.html agent-control-preview.html index.html production-center.html production-workbench.html production-workbench.js channel-control.html company-office.html qwen-provider-connect.html video-provider-connect.html youtube-analytics.html youtube-manager.html studio.html proof-studio.html studio.css studio.js visual-production.js production-handoff.js pwa.js sw.js manifest.webmanifest zoz-icon.svg channel-dashboard.html dashboard.html android-app-factory.html app-control.html tool-credentials.html terms-of-service.html privacy-policy.html canva-connect.html canva-connect-v2.html tiktok1ShjJDl7tDu6DbqXFuOmpvDQgPYBqPcZ.txt software-factory.html intelligence.html customer-portal.html _site/
+          cp whatsapp-center.html analysis-production.html agent-control.html agent-control-preview.html index.html production-center.html production-workbench.html production-workbench.js channel-control.html company-office.html qwen-provider-connect.html video-provider-connect.html youtube-analytics.html youtube-manager.html studio.html proof-studio.html studio.css studio.js visual-production.js production-handoff.js pwa.js sw.js manifest.webmanifest zoz-icon.svg channel-dashboard.html dashboard.html android-app-factory.html screen-factory.html app-control.html tool-credentials.html terms-of-service.html privacy-policy.html canva-connect.html canva-connect-v2.html tiktok1ShjJDl7tDu6DbqXFuOmpvDQgPYBqPcZ.txt software-factory.html intelligence.html customer-portal.html _site/
           test -s _site/whatsapp-center.html
           test -s _site/intelligence.html
           grep -q "ZOZ Intelligence" _site/intelligence.html
           test -s _site/customer-portal.html
+          test -s _site/screen-factory.html
+          grep -q "مصنع الشاشات" _site/screen-factory.html
+          node -e "const fs=require('fs');const h=fs.readFileSync('_site/screen-factory.html','utf8');const scripts=[...h.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];if(!scripts.length)throw Error('Screen factory script missing');fs.writeFileSync('/tmp/screen-factory-inline.js',scripts[scripts.length-1][1]);"
+          node --check /tmp/screen-factory-inline.js
           grep -q "مِحور | MEHWAR" _site/customer-portal.html
           ! grep -Eiq "ZOZ Pro|ZOZ Group" _site/customer-portal.html
           node -e "const fs=require('fs');const h=fs.readFileSync('_site/customer-portal.html','utf8');const scripts=[...h.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];if(!scripts.length)throw Error('Customer portal script missing');fs.writeFileSync('/tmp/customer-portal-inline.js',scripts[scripts.length-1][1]);"
