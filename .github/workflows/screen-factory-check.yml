@@ -1,0 +1,34 @@
+name: Screen Factory Preview Checks
+on:
+  pull_request:
+    paths:
+      - "screen-factory.html"
+      - "android-app-factory.html"
+      - "customer-portal.html"
+      - ".github/workflows/screen-factory-check.yml"
+  push:
+    branches: ["feature/mehwar-real-operations-portal"]
+    paths:
+      - "screen-factory.html"
+      - "android-app-factory.html"
+      - "customer-portal.html"
+      - ".github/workflows/screen-factory-check.yml"
+permissions:
+  contents: read
+jobs:
+  screen-factory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate Screen Factory inline JavaScript
+        run: |
+          node -e "const fs=require('fs');const h=fs.readFileSync('screen-factory.html','utf8');if(!h.includes('مصنع الشاشات')||!h.includes('MEHWAR')||!h.includes('zoz-screen-factory'))throw Error('Screen Factory content or endpoint missing');const s=[...h.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];if(!s.length)throw Error('inline script missing');fs.writeFileSync('/tmp/screen-factory.js',s[s.length-1][1]);"
+          node --check /tmp/screen-factory.js
+      - name: Verify factory is linked and customer branding is clean
+        run: |
+          grep -q 'href="./screen-factory.html"' android-app-factory.html
+          ! grep -Eiq 'ZOZ Pro|ZOZ Group' customer-portal.html
+          echo "Screen Factory code checks passed; UI and Edge Function require authenticated acceptance testing."
