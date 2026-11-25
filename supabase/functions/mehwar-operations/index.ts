@@ -99,6 +99,39 @@ Deno.serve(async (req: Request) => {
         return result({ company_id: data, created: true }, {},);
       }
 
+      case "list_members": {
+        const membership = await requireCompany(db, user.id, companyId, true);
+        const [members, profiles] = await Promise.all([
+          db.from("mehwar_memberships").select("user_id,role,created_at").eq("company_id",companyId).order("created_at"),
+          db.from("mehwar_profiles").select("user_id,full_name,phone,job_title"),
+        ]);
+        if(members.error||profiles.error) throw members.error||profiles.error;
+        const profileMap = new Map((profiles.data||[]).map((p:any)=>[p.user_id,p]));
+        return result((members.data||[]).map((m:any)=>({ ...m, profile:profileMap.get(m.user_id)||null })));
+      }
+
+      case "list_invitations": {
+        await requireCompany(db, user.id, companyId, true);
+        const {data,error}=await db.from("mehwar_invitations")
+          .select("id,email,role,created_by,expires_at,accepted_at,created_at")
+          .eq("company_id",companyId).order("created_at",{ascending:false}).limit(50);
+        if(error)throw error;
+        return result(data||[]);
+      }
+
+      case "create_invitation": {
+        await requireCompany(db,user.id,companyId,true);
+        const email=clean(body.email,254).toLowerCase();
+        const role=clean(body.role,20);
+        if(email.length<5||!email.includes("@")||!["admin","manager","member"].includes(role))return fail("invalid_invitation",422);
+        const bytes=crypto.getRandomValues(new Uint8Array(32));
+        const token=btoa(String.fromCharCode(...bytes)).replaceAll("+","-").replaceAll("/","_").replaceAll("=","");
+        const hash=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token)))).map(b=>b.toString(16).padStart(2,"0")).join("");
+        const {data,error}=await db.rpc("mehwar_create_invitation",{p_company_id:companyId,p_email:email,p_role:role,p_token_hash:hash});
+        if(error)throw error;
+        return result({id:data,email,role,token,invite_url:locationOrigin(req)+"/customer-portal.html?invite="+encodeURIComponent(token)}, {created:true,email_delivery:"not_configured"});
+      }
+
       case "list_services": {
         const { data, error } = await db.from("mehwar_services")
           .select("id,code,name_ar,description_ar")
