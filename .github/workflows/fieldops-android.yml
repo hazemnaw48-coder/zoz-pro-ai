@@ -1,0 +1,67 @@
+name: ZOZ FieldOps Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - feature/fieldops-android-client-app
+    paths:
+      - "android/fieldops/**"
+      - "android/settings.gradle.kts"
+      - "android/build.gradle.kts"
+      - ".github/workflows/fieldops-android.yml"
+  pull_request:
+    paths:
+      - "android/fieldops/**"
+      - "android/settings.gradle.kts"
+      - "android/build.gradle.kts"
+      - ".github/workflows/fieldops-android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-fieldops:
+    name: Build and verify FieldOps APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools"
+      - name: Install Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Assemble FieldOps debug APK
+        working-directory: android
+        run: gradle :fieldops:assembleDebug --no-daemon --stacktrace
+      - name: Verify package and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="android/fieldops/build/outputs/apk/debug/fieldops-debug.apk"
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.zozfieldops.client'"
+          sha256sum "$APK" | tee android/fieldops/build/outputs/apk/debug/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zoz-fieldops-android-debug-apk
+          path: |
+            android/fieldops/build/outputs/apk/debug/fieldops-debug.apk
+            android/fieldops/build/outputs/apk/debug/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
