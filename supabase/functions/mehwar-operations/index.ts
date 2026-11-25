@@ -90,6 +90,14 @@ Deno.serve(async (req: Request) => {
         });
       }
 
+      case "accept_invitation": {
+        const invitationToken=clean(body.token,256);
+        if(invitationToken.length<32)return fail("invalid_invitation_token",422);
+        const {data,error}=await db.rpc("mehwar_accept_invitation",{p_token:invitationToken});
+        if(error)throw error;
+        return result({company_id:data,accepted:true});
+      }
+
       case "create_company": {
         const name = clean(body.name, 160);
         const slug = clean(body.slug, 63).toLowerCase();
