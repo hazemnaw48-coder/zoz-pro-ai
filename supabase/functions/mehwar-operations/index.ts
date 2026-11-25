@@ -129,7 +129,7 @@ Deno.serve(async (req: Request) => {
         const hash=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token)))).map(b=>b.toString(16).padStart(2,"0")).join("");
         const {data,error}=await db.rpc("mehwar_create_invitation",{p_company_id:companyId,p_email:email,p_role:role,p_token_hash:hash});
         if(error)throw error;
-        return result({id:data,email,role,token,invite_url:locationOrigin(req)+"/customer-portal.html?invite="+encodeURIComponent(token)}, {created:true,email_delivery:"not_configured"});
+        return result({id:data,email,role,token,invite_url:(req.headers.get("origin")||"https://hazemnaw48-coder.github.io/zoz-pro-ai")+"/customer-portal.html?invite="+encodeURIComponent(token)}, {created:true,email_delivery:"not_configured"});
       }
 
       case "list_services": {
@@ -234,6 +234,18 @@ Deno.serve(async (req: Request) => {
           .eq("company_id", companyId).order("created_at", { ascending: false }).limit(limit);
         if (error) throw error;
         return result(data ?? []);
+      }
+
+      case "get_task": {
+        const taskId=clean(body.task_id,80);
+        if(!UUID.test(taskId))return fail("invalid_task_id",422);
+        await requireCompany(db,user.id,companyId);
+        const {data,error}=await db.from("mehwar_tasks")
+          .select("id,request_id,title,description,assigned_to,status,due_at,created_at,updated_at")
+          .eq("company_id",companyId).eq("id",taskId).maybeSingle();
+        if(error)throw error;
+        if(!data)return fail("task_not_found",404);
+        return result(data);
       }
 
       case "create_task": {
