@@ -19,7 +19,7 @@ function fail(code: string, status = 400, message?: string) {
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-async function getMembership(db: ReturnType<typeof createClient>, userId: string, companyId: string) {
+async function getMembership(db: any, userId: string, companyId: string) {
   if (!UUID.test(companyId)) return null;
   const { data, error } = await db.from("mehwar_memberships")
     .select("company_id,user_id,role")
@@ -29,7 +29,7 @@ async function getMembership(db: ReturnType<typeof createClient>, userId: string
   if (error) throw error;
   return data;
 }
-async function requireCompany(db: ReturnType<typeof createClient>, userId: string, companyId: string, manager = false) {
+async function requireCompany(db: any, userId: string, companyId: string, manager = false) {
   const membership = await getMembership(db, userId, companyId);
   if (!membership) throw Object.assign(new Error("company_access_denied"), { status: 403 });
   if (manager && !["owner", "admin", "manager"].includes(membership.role)) {
