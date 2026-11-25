@@ -1,0 +1,42 @@
+name: MEHWAR production operations checks
+on:
+  pull_request:
+    paths:
+      - "customer-portal.html"
+      - "supabase/functions/mehwar-operations/**"
+      - ".github/workflows/mehwar-operations-check.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "customer-portal.html"
+      - "supabase/functions/mehwar-operations/**"
+      - ".github/workflows/mehwar-operations-check.yml"
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check authenticated MEHWAR operations
+        run: deno check --node-modules-dir=auto supabase/functions/mehwar-operations/index.ts
+      - name: Validate portal JavaScript and production connection
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('customer-portal.html', 'utf8');
+          if (!html.includes('https://izcmkxrleppadeshcgwh.supabase.co')) throw Error('MEHWAR production project ref missing');
+          if (!html.includes('mehwar-operations')) throw Error('Operations Edge Function is not connected');
+          if (/service_role|sb_secret_/i.test(html)) throw Error('Privileged key must never appear in customer HTML');
+          if (/ZOZ Pro|ZOZ Group/i.test(html)) throw Error('Internal ZOZ branding must not appear in customer portal');
+          const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+          if (!scripts.length) throw Error('Customer portal application script missing');
+          fs.writeFileSync('/tmp/mehw ar-portal.js'.replace(' ', ''), scripts[scripts.length-1][1]);
+          NODE
+          node --check /tmp/mehwar-portal.js
