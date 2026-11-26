@@ -234,13 +234,13 @@ const text=(node,value)=>{node.textContent=value==null?'—':String(value);};
 function rowCell(tr,value){const td=document.createElement('td');td.textContent=value||'—';tr.appendChild(td);return td;}
 async function refresh(){
  const btn=el('factory-refresh'),status=el('factory-live-status');
- btn.disabled=true;text(status,'جارٍ قراءة بيانات المشاريع والبناء والأجهزة من الإنتاج…');
+ btn.disabled=true;text(status,'جارٍ مزامنة تشغيلات GitHub وملفات البناء مع قاعدة المصنع…');
  try{
   const {data:{session},error}=await sb.auth.getSession();if(error)throw error;
   if(!session?.access_token)throw new Error('جلسة المالك غير موجودة. افتح مركز ZOZ Pro وسجّل الدخول أولًا؛ ستُستخدم الجلسة نفسها هنا.');
   const {data:userData,error:userError}=await sb.auth.getUser(session.access_token);if(userError)throw userError;
   if(String(userData?.user?.email||'').toLowerCase()!==OWNER)throw new Error('هذه الصفحة تتطلب جلسة مالك ZOZ Pro.');
-  const res=await fetch(API,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({action:'app_factory_overview'}),cache:'no-store'});
+  const res=await fetch(API,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({action:'app_factory_sync'}),cache:'no-store'});
   const d=await res.json().catch(()=>({}));if(!res.ok||d.ok!==true)throw new Error(d.error||('HTTP '+res.status));
   const a=d.android_app_factory||{},projects=Array.isArray(a.projects)?a.projects:[],builds=Array.isArray(a.builds)?a.builds:[],devices=Array.isArray(d.android_devices?.rows)?d.android_devices.rows:[];
   text(el('factory-project-count'),a.project_count??projects.length);text(el('factory-build-count'),a.build_count??builds.length);text(el('factory-device-count'),devices.length);
@@ -258,7 +258,7 @@ async function refresh(){
   const host=el('factory-device-details');host.replaceChildren();
   if(!devices.length){const card=document.createElement('article');card.className='project';card.textContent='لا يوجد جهاز مسجل في قراءة الإنتاج الحالية.';host.appendChild(card);}
   devices.forEach(x=>{const card=document.createElement('article');card.className='project';const h=document.createElement('h3');h.textContent=x.device_name||'جهاز Android';const p=document.createElement('p');p.textContent='الحالة: '+(x.device_status||'غير معروفة')+' · الإصدار: '+(x.app_version||'غير معروف');const meta=document.createElement('div');meta.className='meta';meta.textContent='آخر اتصال: '+(x.last_heartbeat_at||'غير متاح')+' · القدرات: '+(Array.isArray(x.capabilities)?x.capabilities.join('، '):'غير معلنة');card.append(h,p,meta);host.appendChild(card);});
-  text(status,'تم تحديث البيانات مباشرة من قاعدة الإنتاج. آخر قراءة: '+new Date().toLocaleString('ar-EG'));
+  const sync=d.factory_sync||{};text(status,(sync.ok===false?'تم عرض السجل السابق؛ تعذرت مزامنة GitHub: '+(sync.error||'غير معروف'):'تمت مزامنة GitHub مع قاعدة المصنع · builds: '+(sync.builds_synced??0))+' · '+new Date().toLocaleString('ar-EG'));
  }catch(e){text(status,'تعذر تحميل البيانات الحية: '+(e.message||e));}
  finally{btn.disabled=false;}
 }
