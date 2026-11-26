@@ -255,9 +255,12 @@ async function refresh(){
    if(b?.sha256){const small=document.createElement('div');small.className='small';small.textContent='SHA-256: '+b.sha256.slice(0,16)+'…';td.appendChild(small);}
    tr.appendChild(td);
    const control=document.createElement('td');
-   if(String(p.project_key||'').startsWith('request-')&&String(p.branch||'').startsWith('products/')){
-    const action=document.createElement('button');action.type='button';action.className='secondary';action.dataset.factoryGenerate=p.id;action.textContent='توليد المصدر + بناء';control.appendChild(action);
-   }else control.textContent='مصدر قائم محفوظ';
+   if(String(p.branch||'').startsWith('products/')){
+    const buildAction=document.createElement('button');buildAction.type='button';buildAction.className='secondary';buildAction.dataset.factoryBuild=p.id;buildAction.textContent='تشغيل بناء من المصدر';control.appendChild(buildAction);
+    if(String(p.project_key||'').startsWith('request-')){
+     const generateAction=document.createElement('button');generateAction.type='button';generateAction.className='secondary';generateAction.dataset.factoryGenerate=p.id;generateAction.textContent='توليد ميزات + بناء';generateAction.style.marginTop='6px';control.appendChild(generateAction);
+    }
+   }else control.textContent='المصدر غير مرتبط بخط المصنع';
    tr.appendChild(control);tbody.appendChild(tr);
   });
   const host=el('factory-device-details');host.replaceChildren();
@@ -289,11 +292,19 @@ el('app-request-form')?.addEventListener('submit',async(event)=>{
 });
 el('factory-refresh')?.addEventListener('click',refresh);
 el('factory-project-rows')?.addEventListener('click',async(event)=>{
- const button=event.target?.closest?.('button[data-factory-generate]');if(!button)return;
- const status=el('factory-live-status');button.disabled=true;text(status,'المصنع يولّد ملفات المصدر على الفرع الخاص ثم يطلب البناء…');
+ const buildButton=event.target?.closest?.('button[data-factory-build]');
+ const generateButton=event.target?.closest?.('button[data-factory-generate]');
+ const button=generateButton||buildButton;if(!button)return;
+ const action=generateButton?'app_factory_generate':'app_factory_dispatch_build';
+ const status=el('factory-live-status');button.disabled=true;text(status,generateButton?'المصنع ينشئ تحديث المصدر ثم يطلب البناء…':'المصنع يتحقق من المصدر الخاص ويرسل تشغيل البناء…');
  try{
   const {data:{session},error}=await sb.auth.getSession();if(error)throw error;if(!session?.access_token)throw new Error('جلسة المالك غير موجودة.');
-  const response=await fetch(API,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({action:'app_factory_generate',project_id:button.dataset.factoryGenerate,request_id:crypto.randomUUID()}),cache:'no-store'});
+  const response=await fetch(API,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({action,project_id:button.dataset.factoryGenerate||button.dataset.factoryBuild,request_id:crypto.randomUUID()}),cache:'no-store'});
+  const data=await response.json().catch(()=>({}));if(!response.ok||data.ok!==true)throw new Error(data.error||('HTTP '+response.status));
+  const result=data.result||data;text(status,(generateButton?'تم حفظ commit المصدر ':'تم إرسال تشغيل البناء من المصدر ')+String(result.commit||result.source_commit||'')+' · '+String(result.workflow_dispatch||result.dispatch||'accepted')+' · الإصدار التجاري غير معتمد.');await refresh();
+ }catch(e){text(status,'تعذر تنفيذ إجراء المصنع: '+(e.message||e));}
+ finally{button.disabled=false;}
+});
   const data=await response.json().catch(()=>({}));if(!response.ok||data.ok!==true)throw new Error(data.error||('HTTP '+response.status));
   const result=data.result||{};text(status,'تم حفظ commit '+String(result.commit||'')+' · طلب البناء: '+String(result.workflow_dispatch||'')+' · لم يعتمد الإصدار التجاري.');await refresh();
  }catch(e){text(status,'تعذر تنفيذ توليد المصدر: '+(e.message||e));}
