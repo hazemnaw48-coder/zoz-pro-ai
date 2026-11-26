@@ -305,11 +305,6 @@ el('factory-project-rows')?.addEventListener('click',async(event)=>{
  }catch(e){text(status,'تعذر تنفيذ إجراء المصنع: '+(e.message||e));}
  finally{button.disabled=false;}
 });
-  const data=await response.json().catch(()=>({}));if(!response.ok||data.ok!==true)throw new Error(data.error||('HTTP '+response.status));
-  const result=data.result||{};text(status,'تم حفظ commit '+String(result.commit||'')+' · طلب البناء: '+String(result.workflow_dispatch||'')+' · لم يعتمد الإصدار التجاري.');await refresh();
- }catch(e){text(status,'تعذر تنفيذ توليد المصدر: '+(e.message||e));}
- finally{button.disabled=false;}
-});
 refresh();
 })();
 </script>
