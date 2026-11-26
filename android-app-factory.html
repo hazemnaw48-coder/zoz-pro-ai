@@ -68,9 +68,9 @@ footer{padding:16px 3px 28px;color:#8295ad;font-size:12px}
  <div class="row"><h2>منهج المصنع</h2><span class="badge good">قسم تطوير مستقل</span></div>
  <p>قسم دائم داخل الشركة، يستقبل طلب التطبيق ويحفظ المشروع وينشئ مهمة تلقائية لمدير مصنع التطبيقات داخل طابور الشركة. يتولى الوكيل المواصفات والتنسيق مع الهندسة والجودة والمبيعات. البناء والإصدار يمران باختبارات CI واختبار الهاتف وموافقة المالك. لا ندّعي إنشاء تطبيق كامل تلقائيًا قبل اكتمال هذه المراحل.</p>
  <div class="kpis">
-  <div class="kpi"><strong>5</strong><span>مشاريع تطبيقات مسجلة في الإنتاج</span></div>
-  <div class="kpi"><strong>8</strong><span>عمليات بناء مسجلة في الإنتاج</span></div>
-  <div class="kpi"><strong>0</strong><span>إصدارات عامة اجتازت اختبار الهاتف النهائي</span></div>
+  <div class="kpi"><strong id="factory-static-project-count">—</strong><span>مشاريع تطبيقات مسجلة في الإنتاج</span></div>
+  <div class="kpi"><strong id="factory-static-build-count">—</strong><span>عمليات بناء مسجلة في الإنتاج</span></div>
+  <div class="kpi"><strong id="factory-static-release-count">0</strong><span>إصدارات تجارية موقعة اجتازت بوابات الإطلاق</span></div>
  </div>
 </section>
 
@@ -243,9 +243,9 @@ async function refresh(){
   const res=await fetch(API,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({action:'app_factory_sync'}),cache:'no-store'});
   const d=await res.json().catch(()=>({}));if(!res.ok||d.ok!==true)throw new Error(d.error||('HTTP '+res.status));
   const a=d.android_app_factory||{},projects=Array.isArray(a.projects)?a.projects:[],builds=Array.isArray(a.builds)?a.builds:[],devices=Array.isArray(d.android_devices?.rows)?d.android_devices.rows:[];
-  text(el('factory-project-count'),a.project_count??projects.length);text(el('factory-build-count'),a.build_count??builds.length);text(el('factory-device-count'),devices.length);
+  text(el('factory-project-count'),a.project_count??projects.length);text(el('factory-build-count'),a.build_count??builds.length);text(el('factory-device-count'),devices.length);text(el('factory-static-project-count'),a.project_count??projects.length);text(el('factory-static-build-count'),a.build_count??builds.length);
   const tbody=el('factory-project-rows');tbody.replaceChildren();
-  if(!projects.length){const tr=document.createElement('tr');rowCell(tr,'لا توجد مشاريع مسجلة');rowCell(tr,'—');rowCell(tr,'—');rowCell(tr,'—');tbody.appendChild(tr);}
+  if(!projects.length){const tr=document.createElement('tr');rowCell(tr,'لا توجد مشاريع مسجلة');rowCell(tr,'—');rowCell(tr,'—');rowCell(tr,'—');rowCell(tr,'—');tbody.appendChild(tr);}
   projects.forEach(p=>{
    const b=builds.find(x=>x.project_id===p.id)||null,tr=document.createElement('tr');
    rowCell(tr,p.name||p.project_key);rowCell(tr,p.version||b?.version||'لم يصدر بعد');rowCell(tr,b?.status||'لا يوجد بناء');
