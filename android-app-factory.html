@@ -98,6 +98,13 @@ footer{padding:16px 3px 28px;color:#8295ad;font-size:12px}
    <p class="small">حالة المصنع: البناء والاختبار الآلي نجحا، ومالك المنتج أكد تثبيت APK. الإصدار تجريبي Debug؛ بوابة النشر التجاري تتطلب استضافة من المصدر الخاص، إعداد رابط Auth، اختبار رحلة العميل، وتوقيع إصدار نهائي.</p>
   </article>
   <article class="project">
+   <div class="row"><h3>ZOZ Native Product Factory — خط البناء الموحد</h3><span class="badge good">مضاف إلى المصدر الخاص</span></div>
+   <p>كل منتج داخل products/ له product.json ومجلد وفرع مستقل. استقبال الطلب يتحقق من المالك، ثم ينشئ مصدرًا خاصًا من قالب المصنع ويطلق GitHub Actions للبناء والاختبار وحفظ الحزم والبصمات. لا ينشئ مستودعًا جديدًا لكل منتج ولا يربط المصدر بمزود بناء خارجي.</p>
+   <div class="meta">المصدر الموحد: hazemnaw48-coder/zoz-content-production-studio-source · Workflow: .github/workflows/native-product-factory.yml</div>
+   <div class="actions"><a href="https://github.com/hazemnaw48-coder/zoz-content-production-studio-source/blob/main/.github/workflows/native-product-factory.yml">تعريف خط البناء</a><a href="https://github.com/hazemnaw48-coder/zoz-content-production-studio-source/actions/runs/45771293535">بناء MEHWAR الحالي — نجاح Web وAPK</a></div>
+   <p class="small">المتاح الآن: إنشاء مساحة مصدر خاصة وبناء Android Debug/PWA من قالب React/Vite/Capacitor. توليد ميزات المنتج تلقائيًا، موصل تشغيل كل تطبيق، توقيع الإصدار التجاري، واختبار عميل حقيقي تبقى بوابات منفصلة ولا يُدّعى إغلاقها تلقائيًا.</p>
+  </article>
+  <article class="project">
    <div class="row"><h3>ZOZ Browser Agent</h3><span class="badge">مخطط</span></div>
    <p>محرك متصفح محلي بمواقع مسموحة وجلسات معزولة وقدرات محددة، لإدارة المهام الخارجية حيث تسمح المنصة.</p>
    <div class="meta">تصميم الأمان والجلسات ونطاقات المواقع.</div><div class="actions"><a href="https://github.com/hazemnaw48-coder/zoz-pro-ai/blob/feature/zoz-android-flow-bridge/docs/ZOZ_BROWSER_AGENT_SPEC.md">مواصفات المتصفح</a></div>
@@ -177,9 +184,9 @@ footer{padding:16px 3px 28px;color:#8295ad;font-size:12px}
   <tbody>
    <tr><td>تسجيل طلب التطبيق ومواصفاته في قاعدة الإنتاج</td><td><span class="badge good">متاح للمالك</span></td></tr>
    <tr><td>إعداد المعمارية وخطة التنفيذ التفصيلية لأي تطبيق</td><td><span class="badge warn">مراجعة وتطوير مطلوبة</span></td></tr>
-   <tr><td>توليد كود كامل تلقائيًا لتطبيق جديد على فرع مستقل</td><td><span class="badge warn">غير معتمد إنتاجيًا بعد</span></td></tr>
-   <tr><td>بناء APK آليًا</td><td><span class="badge good">متاح لقالب FieldOps الحالي فقط</span></td></tr>
-   <tr><td>اختبار تطبيق جديد على هاتف فعلي</td><td><span class="badge warn">يتطلب جهازًا واختبار قبول</span></td></tr>
+   <tr><td>إنشاء مساحة مصدر خاصة وفرع ومجلد منتج من قالب المصنع</td><td><span class="badge good">موصل المصدر الخاص منشور</span></td></tr>
+   <tr><td>بناء PWA وAndroid Debug من قالب React/Vite/Capacitor</td><td><span class="badge good">خط CI موحد؛ نجاح بناء MEHWAR موثق</span></td></tr>
+   <tr><td>توليد ميزات المنتج من المواصفات واختبارها آليًا وفعليًا</td><td><span class="badge warn">موصل كتابة الكود/QA لكل منتج قيد الإكمال؛ لا يُزعم اكتماله</span></td></tr>
    <tr><td>إضافة صلاحيات حساسة أو الوصول لحساب خارجي</td><td><span class="badge warn">موافقتك</span></td></tr>
    <tr><td>توقيع إصدار نهائي أو نشر التطبيق للعامة</td><td><span class="badge warn">موافقتك</span></td></tr>
    <tr><td>شراء خدمة أو تفعيل فوترة أو حذف بيانات</td><td><span class="badge warn">موافقتك</span></td></tr>
