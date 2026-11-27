@@ -1559,7 +1559,7 @@ fun findLocalDownloadForAgent(payload: JSONObject): File {
     val after = payload.optLong("after_timestamp_ms", 0L)
     val minSize = payload.optLong("min_size_bytes", 1L).coerceAtLeast(1L)
     val largeMedia = extensions.any { it in setOf("mp4","mov","webm","mkv","mp3","wav","m4a","aac","ogg","zip") }
-    val fileCap = if (kind == "video" || (kind == "mehwar_deliverable" && largeMedia)) 850L * 1024L * 1024L else 100L * 1024L * 1024L
+    val fileCap = if (kind == "video" || ((kind == "mehwar_deliverable" || kind == "mehwar_inspect") && largeMedia)) 850L * 1024L * 1024L else 100L * 1024L * 1024L
     val maxSize = payload.optLong("max_size_bytes", fileCap).coerceAtMost(fileCap)
     val now = System.currentTimeMillis()
     val incomplete = listOf(".crdownload", ".part", ".download", ".tmp", ".temp")
