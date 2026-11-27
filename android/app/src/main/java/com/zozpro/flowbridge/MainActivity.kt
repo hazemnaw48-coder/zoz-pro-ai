@@ -1534,9 +1534,9 @@ fun findLocalDownloadForAgent(payload: JSONObject): File {
     val allowed = if (kind == "video") {
         setOf("mp4", "mov", "webm", "mkv")
     } else if (kind == "document") {
-        setOf("csv", "xlsx", "xls", "pdf", "txt", "docx", "png", "jpg", "jpeg", "webp")
+        setOf("csv", "xlsx", "xls", "pdf", "txt", "md", "docx", "ppt", "pptx", "zip", "json", "html", "png", "jpg", "jpeg", "webp")
     } else if (kind == "mehwar_deliverable") {
-        setOf("mp4", "pdf", "txt", "docx", "xlsx", "jpg", "jpeg", "png")
+        setOf("mp4", "mov", "webm", "mkv", "pdf", "txt", "md", "csv", "json", "html", "docx", "xlsx", "xls", "ppt", "pptx", "zip", "mp3", "wav", "m4a", "aac", "ogg", "srt", "vtt", "jpg", "jpeg", "png", "webp")
     } else {
         throw IllegalArgumentException("نوع الملف المطلوب غير مدعوم.")
     }
@@ -1556,7 +1556,8 @@ fun findLocalDownloadForAgent(payload: JSONObject): File {
     val contains = payload.optString("filename_contains", "").trim().lowercase(Locale.ROOT)
     val after = payload.optLong("after_timestamp_ms", 0L)
     val minSize = payload.optLong("min_size_bytes", 1L).coerceAtLeast(1L)
-    val fileCap = if (kind == "video" || (kind == "mehwar_deliverable" && extensions.contains("mp4"))) 850L * 1024L * 1024L else 100L * 1024L * 1024L
+    val largeMedia = extensions.any { it in setOf("mp4","mov","webm","mkv","mp3","wav","m4a","aac","ogg","zip") }
+    val fileCap = if (kind == "video" || (kind == "mehwar_deliverable" && largeMedia)) 850L * 1024L * 1024L else 100L * 1024L * 1024L
     val maxSize = payload.optLong("max_size_bytes", fileCap).coerceAtMost(fileCap)
     val now = System.currentTimeMillis()
     val incomplete = listOf(".crdownload", ".part", ".download", ".tmp", ".temp")
@@ -1663,7 +1664,15 @@ fun uploadMehwarCustomerDeliverable(context: Context, file: File, payload: JSONO
     val max=grant.optLong("max_bytes",850L*1024L*1024L).coerceIn(1L,850L*1024L*1024L)
     if(!file.isFile||file.length()<=0L||file.length()>max) throw IllegalArgumentException("customer_file_size_invalid")
     val mime=grant.optString("mime_type")
-    if(mime !in setOf("video/mp4","application/pdf","text/plain","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","image/jpeg","image/png"))
+    if(mime !in setOf(
+        "video/mp4","video/quicktime","video/webm","video/x-matroska",
+        "application/pdf","text/plain","text/markdown","text/csv","application/json","text/html","application/zip",
+        "application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-powerpoint","application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "audio/mpeg","audio/wav","audio/mp4","audio/aac","audio/ogg",
+        "image/jpeg","image/png","image/webp"
+    ))
        throw IllegalArgumentException("customer_file_mime_not_allowlisted")
     val size=file.length(); val modified=file.lastModified(); Thread.sleep(1800L)
     if(!file.exists()||file.length()!=size||file.lastModified()!=modified) throw IllegalStateException("customer_file_not_stable")
