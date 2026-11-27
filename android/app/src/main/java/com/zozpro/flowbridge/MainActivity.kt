@@ -1535,6 +1535,8 @@ fun findLocalDownloadForAgent(payload: JSONObject): File {
         setOf("mp4", "mov", "webm", "mkv")
     } else if (kind == "document") {
         setOf("csv", "xlsx", "xls", "pdf", "txt", "docx", "png", "jpg", "jpeg", "webp")
+    } else if (kind == "mehwar_deliverable") {
+        setOf("mp4", "pdf", "txt", "docx", "xlsx", "jpg", "jpeg", "png")
     } else {
         throw IllegalArgumentException("نوع الملف المطلوب غير مدعوم.")
     }
@@ -1554,8 +1556,8 @@ fun findLocalDownloadForAgent(payload: JSONObject): File {
     val contains = payload.optString("filename_contains", "").trim().lowercase(Locale.ROOT)
     val after = payload.optLong("after_timestamp_ms", 0L)
     val minSize = payload.optLong("min_size_bytes", 1L).coerceAtLeast(1L)
-    val maxSize = payload.optLong("max_size_bytes", if (kind == "video") 850L * 1024L * 1024L else 25L * 1024L * 1024L)
-        .coerceAtMost(if (kind == "video") 850L * 1024L * 1024L else 25L * 1024L * 1024L)
+    val fileCap = if (kind == "video" || (kind == "mehwar_deliverable" && extensions.contains("mp4"))) 850L * 1024L * 1024L else 100L * 1024L * 1024L
+    val maxSize = payload.optLong("max_size_bytes", fileCap).coerceAtMost(fileCap)
     val now = System.currentTimeMillis()
     val incomplete = listOf(".crdownload", ".part", ".download", ".tmp", ".temp")
     val candidates = root.walkTopDown().maxDepth(3).filter { file ->
@@ -1639,6 +1641,56 @@ fun uploadDocumentToIntake(context: Context, uri: Uri, appVersion: String): Stri
         JSONObject().put("asset_id", assetId).put("checksum_sha256", checksum), deviceToken)
     if (finalized.optString("status") != "ready") throw IllegalStateException("تم نقل الملف لكن الخادم لم يؤكد اكتمال الاستقبال.")
     return "تم استيراد الملف بنجاح إلى ذاكرة ZOZ Pro.\nالملف: $filename\nالحجم: $sent بايت\nبصمة SHA-256: $checksum\nالحالة: محفوظ بأمان وينتظر تحليل الوكيل."
+}
+
+
+fun uploadMehwarCustomerDeliverable(context: Context, file: File, payload: JSONObject): JSONObject {
+    val grant = payload.optJSONObject("delivery_grant") ?: throw IllegalArgumentException("delivery_grant_missing")
+    val companyId=grant.optString("company_id"); val requestId=grant.optString("request_id")
+    val grantId=grant.optString("grant_id"); val grantToken=grant.optString("grant_token")
+    val objectPath=grant.optString("object_path"); val uploadUrl=grant.optString("upload_url")
+    val finalizeUrl=grant.optString("finalize_url"); val filename=file.name
+    val uuid=Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",RegexOption.IGNORE_CASE)
+    if(!uuid.matches(companyId)||!uuid.matches(requestId)||!uuid.matches(grantId)||grantToken.length<40||
+       objectPath != companyId+"/"+requestId+"/deliverable-"+grantId+"-"+filename) throw IllegalArgumentException("delivery_grant_scope_invalid")
+    val up=java.net.URI(uploadUrl); val path=java.net.URLDecoder.decode(up.rawPath,"UTF-8")
+    if(up.scheme!="https"||up.userInfo!=null||up.port !in listOf(-1,443)||!up.host.endsWith(".supabase.co",true)||
+       !path.contains("/storage/v1/object/upload/sign/mehwar-private/")||!path.endsWith(objectPath))
+       throw IllegalArgumentException("customer_storage_upload_url_not_allowlisted")
+    val fin=java.net.URI(finalizeUrl)
+    if(fin.scheme!="https"||fin.userInfo!=null||fin.port !in listOf(-1,443)||!fin.host.endsWith(".supabase.co",true)||
+       fin.rawPath!="/functions/v1/mehwar-android-delivery/finalize") throw IllegalArgumentException("customer_finalize_url_not_allowlisted")
+    val max=grant.optLong("max_bytes",850L*1024L*1024L).coerceIn(1L,850L*1024L*1024L)
+    if(!file.isFile||file.length()<=0L||file.length()>max) throw IllegalArgumentException("customer_file_size_invalid")
+    val mime=grant.optString("mime_type")
+    if(mime !in setOf("video/mp4","application/pdf","text/plain","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","image/jpeg","image/png"))
+       throw IllegalArgumentException("customer_file_mime_not_allowlisted")
+    val size=file.length(); val modified=file.lastModified(); Thread.sleep(1800L)
+    if(!file.exists()||file.length()!=size||file.lastModified()!=modified) throw IllegalStateException("customer_file_not_stable")
+    val sha=sha256LocalFile(file)
+    val put=java.net.URL(uploadUrl).openConnection() as java.net.HttpURLConnection
+    put.requestMethod="PUT"; put.connectTimeout=30000; put.readTimeout=180000; put.doOutput=true; put.instanceFollowRedirects=false
+    put.setRequestProperty("content-type",mime); put.setFixedLengthStreamingMode(size)
+    try { FileInputStream(file).use { input -> put.outputStream.use { output -> input.copyTo(output,128*1024) } }
+      if(put.responseCode !in 200..299) throw IllegalStateException("customer_storage_upload_failed")
+    } finally { put.disconnect() }
+    val body=JSONObject().put("grant_id",grantId).put("grant_token",grantToken).put("company_id",companyId)
+      .put("request_id",requestId).put("object_path",objectPath).put("filename",filename)
+      .put("bytes",size).put("mime_type",mime).put("sha256",sha)
+    val conn=java.net.URL(finalizeUrl).openConnection() as java.net.HttpURLConnection
+    conn.requestMethod="POST"; conn.connectTimeout=20000; conn.readTimeout=30000; conn.doOutput=true; conn.instanceFollowRedirects=false
+    conn.setRequestProperty("content-type","application/json"); conn.setRequestProperty("authorization","Bearer "+grantToken)
+    val response:String
+    try { conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+      val code=conn.responseCode; val stream=if(code in 200..299) conn.inputStream else conn.errorStream
+      response=stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+      if(code !in 200..299) throw IllegalStateException("customer_finalize_http_"+code)
+    } finally { conn.disconnect() }
+    val result=JSONObject(response)
+    if(!result.optBoolean("ok",false)||result.optString("status")!="ready") throw IllegalStateException("customer_delivery_not_confirmed")
+    return JSONObject().put("company_id",companyId).put("request_id",requestId).put("deliverable_id",result.optString("deliverable_id"))
+      .put("filename",filename).put("bytes",size).put("mime_type",mime).put("sha256",sha)
+      .put("private",true).put("publication_performed",false).put("status","ready")
 }
 
 private fun apiPost(context: Context, action: String, body: JSONObject): JSONObject {
