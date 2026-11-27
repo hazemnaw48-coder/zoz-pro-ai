@@ -613,6 +613,18 @@ class FlowAutomationService : AccessibilityService() {
                             .put("sha256", checksum).put("upload_message", message)
                             .put("publication_performed", false)
                         prefs.edit().putString(scopedKey, assetId).apply()
+                    } else if (kind == "mehwar_inspect") {
+                        if (!file.name.endsWith(".mp4", ignoreCase = true)) throw IllegalStateException("customer_video_must_be_mp4")
+                        val isMp4 = FileInputStream(file).use { input ->
+                            val header = ByteArray(12); val count = input.read(header)
+                            count >= 8 && String(header, 4, 4, Charsets.US_ASCII) == "ftyp"
+                        }
+                        if (!isMp4) throw IllegalStateException("customer_video_invalid_mp4")
+                        result.put("inspection", JSONObject()
+                            .put("filename", file.name).put("bytes", file.length())
+                            .put("mime_type", "video/mp4").put("sha256", checksum)
+                            .put("last_modified_ms", file.lastModified()).put("verified_mp4", true))
+                        result.put("filename", file.name).put("bytes", file.length()).put("sha256", checksum)
                     } else if (kind == "mehwar_deliverable") {
                         val delivered = uploadMehwarCustomerDeliverable(this, file, payload)
                         result.put("customer_delivery", delivered)
