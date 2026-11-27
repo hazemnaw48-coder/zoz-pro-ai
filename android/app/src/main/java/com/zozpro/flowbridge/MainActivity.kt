@@ -1535,6 +1535,8 @@ fun findLocalDownloadForAgent(payload: JSONObject): File {
         setOf("mp4", "mov", "webm", "mkv")
     } else if (kind == "document") {
         setOf("csv", "xlsx", "xls", "pdf", "txt", "md", "docx", "ppt", "pptx", "zip", "json", "html", "png", "jpg", "jpeg", "webp")
+    } else if (kind == "mehwar_inspect") {
+        setOf("mp4")
     } else if (kind == "mehwar_deliverable") {
         setOf("mp4", "mov", "webm", "mkv", "pdf", "txt", "md", "csv", "json", "html", "docx", "xlsx", "xls", "ppt", "pptx", "zip", "mp3", "wav", "m4a", "aac", "ogg", "srt", "vtt", "jpg", "jpeg", "png", "webp")
     } else {
