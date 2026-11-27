@@ -573,14 +573,16 @@ class FlowAutomationService : AccessibilityService() {
                 }
                 val checksum = sha256LocalFile(file)
                 val prefs = getSharedPreferences("zoz_auto_file_intake", Context.MODE_PRIVATE)
-                val prior = prefs.getString("uploaded_$checksum", null)
+                val kind = payload.optString("file_kind").lowercase()
+                val dedupeScope = if (kind == "mehwar_deliverable") payload.optJSONObject("delivery_grant")?.optString("grant_id").orEmpty() else kind
+                val scopedKey = "uploaded_${checksum}_${dedupeScope}"
+                val prior = prefs.getString(scopedKey, null)
                 if (!prior.isNullOrBlank()) {
                     result.put("duplicate", true).put("asset_id", prior)
                         .put("filename", file.name).put("sha256", checksum)
-                        .put("message", "تم رفع هذه النسخة سابقًا؛ لم يُنشأ رفع مكرر.")
+                        .put("message", "تم رفع هذه النسخة لهذا الطلب سابقًا؛ لم يُكرر الرفع.")
                     succeeded = true
                 } else {
-                    val kind = payload.optString("file_kind").lowercase()
                     if (kind == "video") {
                         val channelId = payload.optString("channel_id")
                         val kids = payload.opt("made_for_kids")
@@ -610,17 +612,17 @@ class FlowAutomationService : AccessibilityService() {
                             .put("filename", file.name).put("bytes", file.length())
                             .put("sha256", checksum).put("upload_message", message)
                             .put("publication_performed", false)
-                        prefs.edit().putString("uploaded_$checksum", assetId).apply()
+                        prefs.edit().putString(scopedKey, assetId).apply()
                     } else if (kind == "mehwar_deliverable") {
                         val delivered = uploadMehwarCustomerDeliverable(this, file, payload)
                         result.put("customer_delivery", delivered)
-                        prefs.edit().putString("uploaded_$checksum", "mehwar:" + delivered.optString("deliverable_id")).apply()
+                        prefs.edit().putString(scopedKey, delivered.optString("deliverable_id")).apply()
                     } else if (kind == "document") {
                         val message = uploadDocumentToIntake(this, Uri.fromFile(file), BuildConfig.VERSION_NAME)
                         result.put("filename", file.name).put("bytes", file.length())
                             .put("sha256", checksum).put("intake_status", "ready")
                             .put("upload_message", message)
-                        prefs.edit().putString("uploaded_$checksum", "document:" + file.name).apply()
+                        prefs.edit().putString(scopedKey, "document:" + file.name).apply()
                     } else {
                         throw IllegalArgumentException("unsupported_file_kind")
                     }
