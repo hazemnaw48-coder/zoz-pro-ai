@@ -611,12 +611,16 @@ class FlowAutomationService : AccessibilityService() {
                             .put("sha256", checksum).put("upload_message", message)
                             .put("publication_performed", false)
                         prefs.edit().putString("uploaded_$checksum", assetId).apply()
+                    } else if (kind == "mehwar_deliverable") {
+                        val delivered = uploadMehwarCustomerDeliverable(this, file, payload)
+                        result.put("customer_delivery", delivered)
+                        prefs.edit().putString("uploaded_$checksum", "mehwar:" + delivered.optString("deliverable_id")).apply()
                     } else if (kind == "document") {
                         val message = uploadDocumentToIntake(this, Uri.fromFile(file), BuildConfig.VERSION_NAME)
                         result.put("filename", file.name).put("bytes", file.length())
                             .put("sha256", checksum).put("intake_status", "ready")
                             .put("upload_message", message)
-                        prefs.edit().putString("uploaded_$checksum", "document:${file.name}").apply()
+                        prefs.edit().putString("uploaded_$checksum", "document:" + file.name).apply()
                     } else {
                         throw IllegalArgumentException("unsupported_file_kind")
                     }
