@@ -1736,6 +1736,70 @@ private fun executeJob(context: Context, job: JSONObject): String {
         val result = JSONObject()
         when (cap) {
             "device.health_check" -> result.put("device_model", android.os.Build.MODEL).put("android_release", android.os.Build.VERSION.RELEASE)
+            "media.upload_intake" -> {
+                if (payload.optString("_zoz_executor_capability") != "media.downloads.upload" ||
+                    payload.optString("file_kind") !in setOf("mehwar_inspect", "mehwar_deliverable") ||
+                    payload.optBoolean("owner_approved") != true || payload.optBoolean("owner_command_approved") != true) {
+                    throw IllegalArgumentException("mehwar_delivery_task_not_authorized")
+                }
+                val local = findLocalDownloadForAgent(payload)
+                val digest = sha256LocalFile(local)
+                if (payload.optString("file_kind") == "mehwar_inspect") {
+                    result.put("inspection", JSONObject()
+                        .put("verified_mp4", local.extension.equals("mp4", true))
+                        .put("filename", local.name).put("bytes", local.length())
+                        .put("sha256", digest).put("modified_at_ms", local.lastModified()))
+                } else {
+                    val grant = payload.optJSONObject("delivery_grant") ?: throw IllegalArgumentException("mehwar_delivery_grant_missing")
+                    val grantId = grant.optString("grant_id")
+                    val grantToken = grant.optString("grant_token")
+                    val companyId = grant.optString("company_id")
+                    val requestId = grant.optString("request_id")
+                    val objectPath = grant.optString("object_path")
+                    val mime = grant.optString("mime_type")
+                    val uploadUrl = grant.optString("upload_url")
+                    val finalizeUrl = grant.optString("finalize_url")
+                    val expectedBytes = grant.optLong("max_bytes", -1L)
+                    if (local.name != payload.optString("exact_filename") || local.length() != expectedBytes ||
+                        mime != "video/mp4" || !grantId.matches(Regex("(?i)^[0-9a-f-]{36}$")) ||
+                        !grantToken.matches(Regex("(?i)^[0-9a-f]{64}$")) ||
+                        !uploadUrl.startsWith("https://izcmkxrleppadeshcgwh.supabase.co/storage/v1/object/upload/sign/mehwar-private/") ||
+                        finalizeUrl != "https://izcmkxrleppadeshcgwh.supabase.co/functions/v1/mehwar-android-delivery/finalize") {
+                        throw IllegalArgumentException("mehwar_delivery_grant_or_file_mismatch")
+                    }
+                    val conn = java.net.URL(uploadUrl).openConnection() as java.net.HttpURLConnection
+                    conn.requestMethod = "PUT"; conn.connectTimeout = 30000; conn.readTimeout = 180000
+                    conn.doOutput = true; conn.setRequestProperty("content-type", mime)
+                    conn.setRequestProperty("cache-control", "3600")
+                    conn.setFixedLengthStreamingMode(local.length())
+                    try {
+                        local.inputStream().use { input -> conn.outputStream.use { output -> input.copyTo(output, 128 * 1024) } }
+                        val code = conn.responseCode
+                        if (code !in 200..299) throw IllegalStateException("mehwar_private_upload_http_$code")
+                    } finally { conn.disconnect() }
+                    val finalize = java.net.URL(finalizeUrl).openConnection() as java.net.HttpURLConnection
+                    finalize.requestMethod = "POST"; finalize.connectTimeout = 30000; finalize.readTimeout = 60000
+                    finalize.doOutput = true; finalize.setRequestProperty("content-type", "application/json")
+                    val finalizeBody = JSONObject()
+                        .put("grant_id", grantId).put("grant_token", grantToken)
+                        .put("company_id", companyId).put("request_id", requestId)
+                        .put("object_path", objectPath).put("filename", local.name)
+                        .put("mime_type", mime).put("bytes", local.length()).put("sha256", digest)
+                    try {
+                        finalize.outputStream.use { it.write(finalizeBody.toString().toByteArray(Charsets.UTF_8)) }
+                        val code = finalize.responseCode
+                        val responseText = (if (code in 200..299) finalize.inputStream else finalize.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
+                        val response = runCatching { JSONObject(responseText) }.getOrElse { JSONObject() }
+                        if (code !in 200..299 || !response.optBoolean("ok") || response.optString("status") != "ready")
+                            throw IllegalStateException("mehwar_finalize_failed_" + response.optString("error", code.toString()))
+                        result.put("customer_delivery", JSONObject()
+                            .put("status", "ready").put("deliverable_id", response.optString("deliverable_id"))
+                            .put("filename", response.optString("filename", local.name))
+                            .put("bytes", response.optLong("bytes", local.length()))
+                            .put("all_required_ready", response.optBoolean("all_required_ready")))
+                    } finally { finalize.disconnect() }
+                }
+            }
             "flow.generate_scene" -> {
                 FlowAutomationService.startScene(context, id, payload)
                 return "بدأ الهاتف تنفيذ مشهد Flow المرئي."
