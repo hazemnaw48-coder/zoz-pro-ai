@@ -574,7 +574,7 @@ class FlowAutomationService : AccessibilityService() {
                 val checksum = sha256LocalFile(file)
                 val prefs = getSharedPreferences("zoz_auto_file_intake", Context.MODE_PRIVATE)
                 val kind = payload.optString("file_kind").lowercase()
-                val dedupeScope = if (kind == "mehwar_deliverable") payload.optJSONObject("delivery_grant")?.optString("grant_id").orEmpty() else kind
+                val dedupeScope = when (kind) { "mehwar_deliverable" -> payload.optJSONObject("delivery_grant")?.optString("grant_id").orEmpty(); "mehwar_inspect" -> payload.optString("dispatch_id").ifBlank { jobId }; else -> kind }
                 val scopedKey = "uploaded_${checksum}_${dedupeScope}"
                 val prior = prefs.getString(scopedKey, null)
                 if (!prior.isNullOrBlank()) {
