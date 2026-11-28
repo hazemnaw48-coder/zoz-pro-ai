@@ -1685,7 +1685,7 @@ fun uploadMehwarCustomerDeliverable(context: Context, file: File, payload: JSONO
     try { FileInputStream(file).use { input -> put.outputStream.use { output -> input.copyTo(output,128*1024) } }
       if(put.responseCode !in 200..299) throw IllegalStateException("customer_storage_upload_failed")
     } finally { put.disconnect() }
-    val body=JSONObject().put("grant_id",grantId).put("grant_token",grantToken).put("company_id",companyId)
+    val body=JSONObject().put("action","finalize").put("grant_id",grantId).put("grant_token",grantToken).put("company_id",companyId)
       .put("request_id",requestId).put("object_path",objectPath).put("filename",filename)
       .put("bytes",size).put("mime_type",mime).put("sha256",sha)
     val conn=java.net.URL(finalizeUrl).openConnection() as java.net.HttpURLConnection
